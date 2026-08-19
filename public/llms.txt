@@ -1,0 +1,11 @@
+# Abrefy
+
+> Plataforma SaaS de atendimento omnichannel via WhatsApp. Centraliza chamados, equipe e clientes em um só lugar, com kanban, SLA e histórico completo.
+
+Abrefy ajuda equipes de atendimento a sair do caos do WhatsApp e planilhas, oferecendo tickets organizados, integração com WhatsApp, métricas em tempo real e SLA.
+
+## Pages
+
+- [Home](/): Visão geral do produto, recursos, benefícios e FAQ.
+- [Entrar](/login): Acesso de usuários cadastrados.
+- [Criar conta](/register): Solicitação de acesso ao sistema.
