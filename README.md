@@ -1,4 +1,4 @@
-# Abrefy Inbox — gestão de conversas de WhatsApp
+# Livih — gestão de conversas de WhatsApp
 
 Sistema de **caixa de entrada compartilhada** para atendimento por WhatsApp, com
 trilha de auditoria imutável. Nasceu como fork do [Abrefy](https://abrefy.com.br)
