@@ -1,4 +1,4 @@
-"""Aplica as migrations + scripts/teste_fase1.sql no banco linkado dentro de begin … rollback.
+"""Aplica as migrations pendentes + scripts/teste_fase1.sql no banco linkado dentro de begin … rollback.
 
 Nada fica gravado. Uso (na raiz do repo): python scripts/testar_migrations.py
 """
@@ -9,8 +9,21 @@ import subprocess
 import sys
 import tempfile
 
+def consultar(sql):
+    saida = subprocess.run(
+        ["npx", "-y", "supabase", "db", "query", "--linked", "-o", "json", sql],
+        capture_output=True, text=True, encoding="utf-8", shell=sys.platform == "win32",
+    ).stdout
+    return json.loads(saida[saida.index("{"):saida.rindex("}") + 1])["rows"]
+
+
+# Só as migrations que ainda não estão no banco; as já aplicadas fazem parte do estado atual.
+aplicadas = {r["version"] for r in consultar("select version from supabase_migrations.schema_migrations")}
 partes = ["begin;"]
 for arquivo in sorted(glob.glob("supabase/migrations/*.sql")):
+    if os.path.basename(arquivo).split("_")[0] in aplicadas:
+        continue
+    print("aplicando no teste:", os.path.basename(arquivo))
     partes.append(open(arquivo, encoding="utf-8").read())
 partes.append(open("scripts/teste_fase1.sql", encoding="utf-8").read())
 partes.append("rollback;")

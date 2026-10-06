@@ -195,5 +195,31 @@ insert into resultado (teste, ok)
 select 'auditoria registrou a conversa assumida', count(*) >= 1 from public.auditoria
  where acao = 'conversa_estado' and ator_tipo = 'atendente';
 
+-- mensagem digitada no próprio celular: entra como saída do atendente e o bot para
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+set local role service_role;
+do $$
+declare r jsonb; v_canal uuid; v_conv uuid;
+begin
+  select id into v_canal from public.canais where instance_id = 'INST-F7';
+  perform public.registrar_entrada(v_canal, 'WAMID-NOVO-1', '5541977776666', 'Beltrano', 'texto', 'Oi', '{}');
+  r := public.registrar_saida_celular(v_canal, 'WAMID-CEL-1', '5541977776666', 'texto', 'Já te respondo', '{}');
+  v_conv := (r ->> 'conversa_id')::uuid;
+  insert into resultado (teste, ok)
+  select 'resposta pelo celular para o bot', estado = 'humano' and motivo_humano = 'respondida pelo celular'
+    from public.conversas where id = v_conv;
+  r := public.registrar_saida_celular(v_canal, 'WAMID-OUT-1', '5541988887777', 'texto', 'Olá! Me conta mais.', '{}');
+  insert into resultado (teste, ok) values ('eco do que o Livih enviou é ignorado', (r ->> 'duplicada')::boolean);
+  insert into resultado (teste, ok)
+  select 'segredo interno confere só o certo', public.verificar_segredo_interno(
+      (select decrypted_secret from vault.decrypted_secrets where name = 'livih_interno'))
+    and not public.verificar_segredo_interno('chute');
+end $$;
+
+insert into resultado (teste, ok)
+select 'inserir na fila dispara a Edge Function', count(*) >= 1 from net.http_request_queue
+ where url like '%/functions/v1/wapi-enviar';
+
 reset role;
 select n, teste, ok from resultado order by n;
