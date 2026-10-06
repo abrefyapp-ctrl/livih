@@ -1,4 +1,0 @@
-# Preencher com o project_id do Supabase DESTE projeto.
-# Deixado em branco de propósito: evita `supabase db push` acidental
-# contra o projeto de produção do Abrefy.
-project_id = ""
