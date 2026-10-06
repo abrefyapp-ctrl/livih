@@ -414,8 +414,8 @@ enabled = true
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
 
-[functions.wapi-webhook]
+[functions.waha-webhook]
 verify_jwt = false
 
-[functions.wapi-enviar]
+[functions.whatsapp-enviar]
 verify_jwt = false

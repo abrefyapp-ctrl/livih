@@ -61,9 +61,9 @@ do $$
 declare r jsonb; r2 jsonb; v_canal uuid;
 begin
   select id into v_canal from public.canais where instance_id = 'INST-F7';
-  r := public.registrar_entrada(v_canal, 'WAMID-1', '5541988887777', 'Fulano', 'texto', 'Oi, quero um sistema', '{"x":1}');
+  r := public.registrar_entrada(v_canal, 'WAMID-1', '5541988887777', null, 'Fulano', 'texto', 'Oi, quero um sistema', '{"x":1}');
   insert into resultado (teste, ok) values ('entrada chama o agente', (r ->> 'chamar_agente')::boolean and r ->> 'estado' = 'bot');
-  r2 := public.registrar_entrada(v_canal, 'WAMID-1', '5541988887777', 'Fulano', 'texto', 'Oi, quero um sistema', '{"x":1}');
+  r2 := public.registrar_entrada(v_canal, 'WAMID-1', '5541988887777', null, 'Fulano', 'texto', 'Oi, quero um sistema', '{"x":1}');
   insert into resultado (teste, ok) values ('mesma mensagem não entra duas vezes', (r2 ->> 'duplicada')::boolean);
   perform set_config('teste.conversa', r ->> 'conversa_id', true);
 end $$;
@@ -111,7 +111,7 @@ exception when others then
 end $$;
 
 do $$ begin
-  perform public.registrar_entrada((select id from public.canais limit 1), 'X', '5541900000000', 'x', 'texto', 'x', '{}');
+  perform public.registrar_entrada((select id from public.canais limit 1), 'X', '5541900000000', null, 'x', 'texto', 'x', '{}');
   insert into resultado (teste, ok) values ('app não chama registrar_entrada', false);
 exception when others then
   insert into resultado (teste, ok) values ('app não chama registrar_entrada', true);
@@ -148,7 +148,7 @@ begin
 end $$;
 
 insert into resultado (teste, ok)
-select 'mensagem marcada como enviada', status_entrega = 'enviada' and wapi_id = 'WAMID-OUT-1'
+select 'mensagem marcada como enviada', status_entrega = 'enviada' and wa_id = 'WAMID-OUT-1'
   from public.mensagens where direcao = 'saida';
 
 select public.registrar_status_entrega((select id from public.canais limit 1), 'WAMID-OUT-1', 'lida');
@@ -203,13 +203,13 @@ do $$
 declare r jsonb; v_canal uuid; v_conv uuid;
 begin
   select id into v_canal from public.canais where instance_id = 'INST-F7';
-  perform public.registrar_entrada(v_canal, 'WAMID-NOVO-1', '5541977776666', 'Beltrano', 'texto', 'Oi', '{}');
-  r := public.registrar_saida_celular(v_canal, 'WAMID-CEL-1', '5541977776666', 'texto', 'Já te respondo', '{}');
+  perform public.registrar_entrada(v_canal, 'WAMID-NOVO-1', '5541977776666', null, 'Beltrano', 'texto', 'Oi', '{}');
+  r := public.registrar_saida_celular(v_canal, 'WAMID-CEL-1', '5541977776666', null, 'texto', 'Já te respondo', '{}');
   v_conv := (r ->> 'conversa_id')::uuid;
   insert into resultado (teste, ok)
   select 'resposta pelo celular para o bot', estado = 'humano' and motivo_humano = 'respondida pelo celular'
     from public.conversas where id = v_conv;
-  r := public.registrar_saida_celular(v_canal, 'WAMID-OUT-1', '5541988887777', 'texto', 'Olá! Me conta mais.', '{}');
+  r := public.registrar_saida_celular(v_canal, 'WAMID-OUT-1', '5541988887777', null, 'texto', 'Olá! Me conta mais.', '{}');
   insert into resultado (teste, ok) values ('eco do que o Livih enviou é ignorado', (r ->> 'duplicada')::boolean);
   insert into resultado (teste, ok)
   select 'segredo interno confere só o certo', public.verificar_segredo_interno(
@@ -219,7 +219,29 @@ end $$;
 
 insert into resultado (teste, ok)
 select 'inserir na fila dispara a Edge Function', count(*) >= 1 from net.http_request_queue
- where url like '%/functions/v1/wapi-enviar';
+ where url like '%/functions/v1/whatsapp-enviar';
+
+-- LID: contato que chega só com LID e depois se revela com telefone vira um só
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+set local role service_role;
+do $$
+declare v_canal uuid; r1 jsonb; r2 jsonb;
+begin
+  select id into v_canal from public.canais where instance_id = 'INST-F7';
+  r1 := public.registrar_entrada(v_canal, 'LID-1', null, '123456789012345', 'Sicrano', 'texto', 'oi pelo lid', '{}');
+  r2 := public.registrar_entrada(v_canal, 'LID-2', '5541966665555', '123456789012345', 'Sicrano', 'texto', 'de novo', '{}');
+  insert into resultado (teste, ok) values ('LID e telefone caem na mesma conversa', r1 ->> 'conversa_id' = r2 ->> 'conversa_id');
+  insert into resultado (teste, ok)
+  select 'contato do LID ganha o telefone', telefone = '5541966665555'
+    from public.contatos where whatsapp_lid = '123456789012345';
+  begin
+    perform public.registrar_entrada(v_canal, 'SEM-ID', null, null, 'x', 'texto', 'x', '{}');
+    insert into resultado (teste, ok) values ('mensagem sem telefone e sem LID é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('mensagem sem telefone e sem LID é recusada', true);
+  end;
+end $$;
 
 reset role;
 select n, teste, ok from resultado order by n;
