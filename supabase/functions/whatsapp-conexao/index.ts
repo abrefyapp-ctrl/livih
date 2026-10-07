@@ -1,13 +1,17 @@
-// Conexão do WhatsApp de uma organização com o WAHA (Configurações → WhatsApp).
+// Números de WhatsApp de uma organização no WAHA (Configurações → WhatsApp).
+//
+// Uma organização tem o número da empresa (sem responsável, toda a equipe vê) e, se quiser, números de
+// vendedores (com responsável: só ele, dono e admin veem). Só dono/admin criam, conectam e removem.
 //
 // Dois chamadores:
 //   - o banco (pg_cron a cada 2 min, header x-livih-segredo): { acao: 'verificar' } — lê todas as sessões
-//     do WAHA de uma vez e grava o estado de cada canal por canal_atualizar_status (que decide queda/aviso).
-//   - a tela, com o login do usuário: { org_id, acao } — 'status' para qualquer membro; 'iniciar', 'qr',
-//     'codigo' e 'desconectar' só para dono/admin. A chave do WAHA nunca sai daqui.
-//
-// 'iniciar' numa organização sem canal cria tudo: canal, agente (desligado), segredo do webhook e a
-// sessão no WAHA já apontando para o waha-webhook. É o que permite um cliente novo se configurar sozinho.
+//     do WAHA de uma vez e grava o estado de cada canal por canal_atualizar_status (queda e aviso).
+//   - a tela, com o login do usuário:
+//       { org_id, acao: 'listar' }                                  → { canais } que a pessoa pode ver
+//       { org_id, acao: 'criar', nome, responsavel_id? }           → { canal } (dono/admin)
+//       { org_id, canal_id, acao: 'iniciar' | 'desconectar' | 'remover' } (dono/admin)
+//       { org_id, canal_id, acao: 'qr' }  /  { ..., acao: 'codigo', telefone } (dono/admin)
+// A chave do WAHA nunca sai daqui.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -32,15 +36,19 @@ class ErroUsuario extends Error {}
 type Canal = {
   id: string;
   org_id: string;
+  nome: string;
   instance_id: string | null;
+  responsavel_id: string | null;
   status_conexao: string | null;
   numero_conectado: string | null;
   conectado_em: string | null;
   caiu_em: string | null;
   alerta_queda_em: string | null;
   desconectado_em: string | null;
+  criado_em: string;
 };
-const CAMPOS = "id, org_id, instance_id, status_conexao, numero_conectado, conectado_em, caiu_em, alerta_queda_em, desconectado_em";
+const CAMPOS =
+  "id, org_id, nome, instance_id, responsavel_id, status_conexao, numero_conectado, conectado_em, caiu_em, alerta_queda_em, desconectado_em, criado_em";
 
 function waha(caminho: string, init: RequestInit = {}, timeoutMs = 15_000) {
   return fetch(`${WAHA_URL}${caminho}`, {
@@ -52,46 +60,37 @@ function waha(caminho: string, init: RequestInit = {}, timeoutMs = 15_000) {
 
 const numeroDe = (me: { id?: string } | null | undefined) => (me?.id ? String(me.id).split("@")[0].split(":")[0] : null);
 
-async function estadoSessao(sessao: string): Promise<{ status: string; numero: string | null }> {
+/** Todas as sessões do WAHA de uma vez; null se o WAHA não respondeu. */
+async function sessoesWaha(): Promise<Map<string, { status: string; numero: string | null }> | null> {
   try {
-    const r = await waha(`/api/sessions/${encodeURIComponent(sessao)}`);
-    if (r.status === 404) return { status: "INEXISTENTE", numero: null };
-    if (!r.ok) return { status: "INACESSIVEL", numero: null };
-    const s = await r.json();
-    return { status: String(s?.status ?? "INACESSIVEL"), numero: numeroDe(s?.me) };
+    const r = await waha("/api/sessions?all=true");
+    if (!r.ok) return null;
+    const lista = (await r.json()) as { name: string; status: string; me?: { id?: string } }[];
+    return new Map(lista.map((s) => [s.name, { status: s.status, numero: numeroDe(s.me) }]));
   } catch {
-    return { status: "INACESSIVEL", numero: null };
+    return null;
   }
 }
 
-async function registrar(canalId: string, status: string, numero: string | null) {
-  const { error } = await admin.rpc("canal_atualizar_status", { p_canal: canalId, p_status: status, p_numero: numero });
-  if (error) console.error("canal_atualizar_status", error.message);
-}
-
-// Cron: uma chamada ao WAHA para todas as sessões.
-async function verificarTodos() {
-  const { data: canais } = await admin.from("canais").select("id, instance_id").eq("tipo", "waha").eq("ativo", true);
-  if (!canais?.length) return;
-  let sessoes: Map<string, { status: string; numero: string | null }> | null = null;
-  try {
-    const r = await waha("/api/sessions?all=true");
-    if (r.ok) {
-      const lista = (await r.json()) as { name: string; status: string; me?: { id?: string } }[];
-      sessoes = new Map(lista.map((s) => [s.name, { status: s.status, numero: numeroDe(s.me) }]));
-    }
-  } catch { /* WAHA fora: todos ficam INACESSIVEL */ }
+async function registrarCanais(canais: { id: string; instance_id: string | null }[]) {
+  const sessoes = await sessoesWaha();
   for (const c of canais) {
     if (!c.instance_id) continue;
     const s = sessoes ? (sessoes.get(c.instance_id) ?? { status: "INEXISTENTE", numero: null }) : { status: "INACESSIVEL", numero: null };
-    await registrar(c.id, s.status, s.numero);
+    const { error } = await admin.rpc("canal_atualizar_status", { p_canal: c.id, p_status: s.status, p_numero: s.numero });
+    if (error) console.error("canal_atualizar_status", error.message);
   }
 }
 
-async function canalDaOrg(orgId: string): Promise<Canal | null> {
-  const { data } = await admin.from("canais").select(CAMPOS).eq("org_id", orgId).eq("tipo", "waha").eq("ativo", true)
-    .order("criado_em").limit(1).maybeSingle();
-  return data as Canal | null;
+async function estadoSessao(sessao: string): Promise<string> {
+  try {
+    const r = await waha(`/api/sessions/${encodeURIComponent(sessao)}`);
+    if (r.status === 404) return "INEXISTENTE";
+    if (!r.ok) return "INACESSIVEL";
+    return String((await r.json())?.status ?? "INACESSIVEL");
+  } catch {
+    return "INACESSIVEL";
+  }
 }
 
 const hex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -120,38 +119,48 @@ async function criarSessao(canal: Canal) {
   if (!r.ok) throw new Error(`WAHA recusou criar a sessão: ${r.status} ${(await r.text()).slice(0, 200)}`);
 }
 
-async function iniciar(orgId: string): Promise<Canal> {
-  let canal = await canalDaOrg(orgId);
-  if (!canal) {
-    // Nome da sessão no WAHA: estável e sem dado pessoal.
-    const sessao = `org-${orgId.replace(/-/g, "").slice(0, 12)}`;
-    const { data, error } = await admin.from("canais")
-      .insert({ org_id: orgId, tipo: "waha", nome: "WhatsApp", instance_id: sessao })
-      .select(CAMPOS).single();
-    if (error) throw new Error(`canal: ${error.message}`);
-    canal = data as Canal;
-    await admin.from("agentes").insert({ org_id: orgId, canal_id: canal.id, ativo: false });
-  }
-  const atual = await estadoSessao(canal.instance_id!);
-  if (atual.status === "INACESSIVEL") throw new ErroUsuario("O servidor do WhatsApp não respondeu. Tente de novo em instantes.");
-  if (atual.status === "INEXISTENTE") await criarSessao(canal);
-  else if (atual.status === "STOPPED") await waha(`/api/sessions/${canal.instance_id}/start`, { method: "POST" });
-  else if (atual.status === "FAILED") await waha(`/api/sessions/${canal.instance_id}/restart`, { method: "POST" });
-  return canal;
+async function iniciar(canal: Canal) {
+  const status = await estadoSessao(canal.instance_id!);
+  if (status === "INACESSIVEL") throw new ErroUsuario("O servidor do WhatsApp não respondeu. Tente de novo em instantes.");
+  if (status === "INEXISTENTE") await criarSessao(canal);
+  else if (status === "STOPPED") await waha(`/api/sessions/${canal.instance_id}/start`, { method: "POST" });
+  else if (status === "FAILED") await waha(`/api/sessions/${canal.instance_id}/restart`, { method: "POST" });
 }
 
-async function atualizar(canal: Canal): Promise<Canal> {
-  const s = await estadoSessao(canal.instance_id!);
-  await registrar(canal.id, s.status, s.numero);
-  const { data } = await admin.from("canais").select(CAMPOS).eq("id", canal.id).single();
+// Número novo: o agente é o da empresa (mesmas instruções, casos e alerta), desligado neste número.
+async function criarCanal(orgId: string, nome: string, responsavelId: string | null): Promise<Canal> {
+  const id = crypto.randomUUID();
+  const { data, error } = await admin.from("canais")
+    .insert({ id, org_id: orgId, tipo: "waha", nome, instance_id: `c-${id.replace(/-/g, "").slice(0, 16)}`, responsavel_id: responsavelId })
+    .select(CAMPOS).single();
+  if (error) throw new Error(`canal: ${error.message}`);
+  const { data: modelo } = await admin.from("agentes").select("prompt, regras_humano, telefone_alerta, modelo")
+    .eq("org_id", orgId).limit(1).maybeSingle();
+  await admin.from("agentes").insert({ org_id: orgId, canal_id: id, ativo: false, ...(modelo ?? {}) });
   return data as Canal;
+}
+
+async function listar(orgId: string, userId: string, gerencia: boolean) {
+  let consulta = admin.from("canais").select(CAMPOS).eq("org_id", orgId).eq("ativo", true).order("criado_em");
+  if (!gerencia) consulta = consulta.or(`responsavel_id.is.null,responsavel_id.eq.${userId}`);
+  const { data } = await consulta;
+  const canais = (data ?? []) as Canal[];
+  await registrarCanais(canais);
+  const ids = canais.map((c) => c.id);
+  if (!ids.length) return [];
+  const [{ data: atualizados }, { data: agentes }] = await Promise.all([
+    admin.from("canais").select(CAMPOS).in("id", ids).order("criado_em"),
+    admin.from("agentes").select("canal_id, ativo").in("canal_id", ids),
+  ]);
+  const ligado = new Map((agentes ?? []).map((a) => [a.canal_id, a.ativo]));
+  return ((atualizados ?? []) as Canal[]).map((c) => ({ ...c, agente_ativo: ligado.get(c.id) ?? false }));
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json(405, { erro: "use POST" });
 
-  let p: { acao?: string; org_id?: string; telefone?: string };
+  let p: { acao?: string; org_id?: string; canal_id?: string; telefone?: string; nome?: string; responsavel_id?: string | null };
   try {
     p = await req.json();
   } catch {
@@ -164,7 +173,10 @@ Deno.serve(async (req) => {
     if (segredo) {
       const { data: ok } = await admin.rpc("verificar_segredo_interno", { p_segredo: segredo });
       if (ok !== true) return json(401, { erro: "não autorizado" });
-      if (p.acao === "verificar") await verificarTodos();
+      if (p.acao === "verificar") {
+        const { data: canais } = await admin.from("canais").select("id, instance_id").eq("tipo", "waha").eq("ativo", true);
+        await registrarCanais(canais ?? []);
+      }
       return json(200, { ok: true });
     }
 
@@ -178,20 +190,32 @@ Deno.serve(async (req) => {
     if (!membro) return json(403, { erro: "sem acesso a esta organização" });
     const gerencia = membro.papel === "dono" || membro.papel === "admin";
 
-    if (p.acao === "status") {
-      const canal = await canalDaOrg(p.org_id);
-      return json(200, { canal: canal ? await atualizar(canal) : null });
+    if (p.acao === "listar") return json(200, { canais: await listar(p.org_id, quem.user.id, gerencia) });
+    if (!gerencia) return json(403, { erro: "Só dono e admin mexem nos números de WhatsApp." });
+
+    if (p.acao === "criar") {
+      const nome = (p.nome ?? "").trim() || "WhatsApp";
+      const responsavel = p.responsavel_id || null;
+      if (responsavel) {
+        const { data: ok } = await admin.from("membros_org").select("user_id")
+          .eq("org_id", p.org_id).eq("user_id", responsavel).eq("ativo", true).maybeSingle();
+        if (!ok) throw new ErroUsuario("O responsável precisa estar ativo na equipe.");
+      }
+      const canal = await criarCanal(p.org_id, nome, responsavel);
+      await iniciar(canal);
+      return json(200, { canal });
     }
-    if (!gerencia) return json(403, { erro: "Só dono e admin conectam o WhatsApp." });
+
+    // Demais ações: um canal desta organização.
+    const { data: achado } = await admin.from("canais").select(CAMPOS)
+      .eq("id", p.canal_id ?? "").eq("org_id", p.org_id).eq("ativo", true).maybeSingle();
+    const canal = achado as Canal | null;
+    if (!canal?.instance_id) return json(404, { erro: "Número não encontrado." });
 
     if (p.acao === "iniciar") {
-      const canal = await iniciar(p.org_id);
-      return json(200, { canal: await atualizar(canal) });
+      await iniciar(canal);
+      return json(200, { ok: true });
     }
-
-    const canal = await canalDaOrg(p.org_id);
-    if (!canal?.instance_id) return json(404, { erro: "Esta organização ainda não tem WhatsApp." });
-
     if (p.acao === "qr") {
       const r = await waha(`/api/${canal.instance_id}/auth/qr?format=image`);
       if (!r.ok) return json(200, { imagem: null });
@@ -201,19 +225,25 @@ Deno.serve(async (req) => {
     if (p.acao === "codigo") {
       const d = (p.telefone ?? "").replace(/\D/g, "");
       const tel = d.length === 10 || d.length === 11 ? `55${d}` : d;
-      if (tel.length < 12) throw new ErroUsuario("Informe DDD + número do celular da empresa.");
+      if (tel.length < 12) throw new ErroUsuario("Informe DDD + número do celular.");
       const r = await waha(`/api/${canal.instance_id}/auth/request-code`, { method: "POST", body: JSON.stringify({ phoneNumber: tel }) });
       const c = await r.json().catch(() => null);
       if (!r.ok || !c?.code) throw new ErroUsuario("O WhatsApp não gerou o código. Tente o QR code.");
       return json(200, { codigo: String(c.code) });
     }
-    if (p.acao === "desconectar") {
+    if (p.acao === "desconectar" || p.acao === "remover") {
       // Marca antes: a saída de WORKING não pode ser lida como queda.
       await admin.from("canais").update({ desconectado_em: new Date().toISOString(), desconectado_por: quem.user.id, caiu_em: null })
         .eq("id", canal.id);
       const r = await waha(`/api/sessions/${canal.instance_id}/logout`, { method: "POST" });
       if (!r.ok && r.status !== 404) throw new Error(`WAHA logout: ${r.status}`);
-      return json(200, { canal: await atualizar(canal) });
+      if (p.acao === "remover") {
+        // O histórico fica: o canal só deixa de existir para novas mensagens.
+        await waha(`/api/sessions/${canal.instance_id}`, { method: "DELETE" });
+        await admin.from("canais").update({ ativo: false }).eq("id", canal.id);
+        await admin.from("agentes").update({ ativo: false }).eq("canal_id", canal.id);
+      }
+      return json(200, { ok: true });
     }
     return json(400, { erro: "ação desconhecida" });
   } catch (e) {
