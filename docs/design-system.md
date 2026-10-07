@@ -45,8 +45,14 @@ Navegação principal (barra lateral), só com o que já tem dado real:
 | Oportunidades (kanban do funil, arrastar entre etapas) | `/oportunidades` | feito |
 | Configurações (equipe, WhatsApp, agente, base) | `/configuracoes/:secao` | feito |
 | Painel (números reais: conversas por estado, tempo até assumir, funil) | `/` | próximo |
+| Empresas (só equipe da plataforma: criar empresa + link do dono, suspender, pedidos do site) | `/empresas` | feito |
 
 Menu só com o que existe — não leva a tela vazia.
+
+**Empresa nova (decisão de 07/10):** a F7 cria pelo painel Empresas (nome + e-mail do dono) e manda o link
+de acesso; o dono cai em "Primeiros passos" (Conversas e Configurações) até conectar o WhatsApp, escrever as
+instruções, montar a base, ligar o agente e convidar a equipe. Cadastro livre pelo site não: o formulário do
+site grava em `pedidos_acesso` e a F7 aprova. Empresa suspensa: equipe vê só o aviso, agente para, nada apaga.
 
 **Carteira (decisão de 07/10):** número de vendedor e os clientes dele só para ele, dono e admin; número da
 empresa e contatos sem dono para todos. A regra está na RLS (pode_ver_canal / pode_ver_contato), não na tela.

@@ -16,7 +16,7 @@ export type ConversaLista = Pick<
   canal: { id: string; nome: string } | null
 }
 
-export type Organizacao = { id: string; nome: string; papel: Database['public']['Enums']['papel_org'] }
+export type Organizacao = { id: string; nome: string; status: string; papel: Database['public']['Enums']['papel_org'] }
 
 export type Oportunidade = Pick<Tabelas['oportunidades']['Row'], 'id' | 'titulo' | 'valor_estimado' | 'resumo'> & {
   etapa: { nome: string; tipo: Database['public']['Enums']['tipo_etapa'] } | null
@@ -28,13 +28,13 @@ const CAMPOS_CONVERSA =
 export async function listarOrganizacoes(userId: string): Promise<Organizacao[]> {
   const { data, error } = await supabase
     .from('membros_org')
-    .select('papel, organizacoes(id, nome)')
+    .select('papel, organizacoes(id, nome, status)')
     .eq('user_id', userId)
     .eq('ativo', true)
   if (error) throw error
   return (data ?? [])
     .filter((m) => m.organizacoes)
-    .map((m) => ({ id: m.organizacoes!.id, nome: m.organizacoes!.nome, papel: m.papel }))
+    .map((m) => ({ id: m.organizacoes!.id, nome: m.organizacoes!.nome, status: m.organizacoes!.status, papel: m.papel }))
     .sort((a, b) => a.nome.localeCompare(b.nome))
 }
 

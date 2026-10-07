@@ -510,5 +510,44 @@ exception when others then
   insert into resultado (teste, ok) values ('responsável precisa ser da equipe', sqlerrm like '%da equipe%');
 end $$;
 
+-- painel da plataforma
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v1 uuid; v2 uuid;
+begin
+  v1 := public.plataforma_criar_empresa('  Padaria São João ');
+  v2 := public.plataforma_criar_empresa('Padaria São João');
+  insert into resultado (teste, ok) select 'empresa nova ganha endereço sem acento e sem repetir',
+    (select slug from public.organizacoes where id = v1) = 'padaria-sao-joao'
+    and (select slug from public.organizacoes where id = v2) = 'padaria-sao-joao-2'
+    and not exists (select 1 from public.membros_org where org_id = v1)
+    and (select count(*) from public.etapas_funil where org_id = v1) > 0;
+  insert into resultado (teste, ok) select 'primeiros passos da empresa nova começam todos pendentes',
+    not (whatsapp or instrucoes or base or equipe or agente_ligado) from public.org_primeiros_passos(v1);
+  insert into resultado (teste, ok) select 'primeiros passos reconhecem o que a F7 já fez',
+    instrucoes and base and equipe and agente_ligado from public.org_primeiros_passos(current_setting('teste.f7')::uuid);
+  perform public.plataforma_definir_status(current_setting('teste.cli')::uuid, 'suspensa');
+  insert into resultado (teste, ok) select 'painel lista as empresas com a situação',
+    exists (select 1 from public.plataforma_empresas() where id = current_setting('teste.cli')::uuid and status = 'suspensa');
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'equipe da empresa suspensa vê a situação', exists (
+  select 1 from public.organizacoes where id = current_setting('teste.cli')::uuid and status = 'suspensa');
+insert into resultado (teste, ok)
+select 'equipe da empresa suspensa perde o acesso',
+  not public.eh_membro(current_setting('teste.cli')::uuid) and not public.tem_papel(current_setting('teste.cli')::uuid, '{dono}');
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.plataforma_empresas();
+  insert into resultado (teste, ok) values ('só a equipe da plataforma vê o painel', false);
+exception when others then
+  insert into resultado (teste, ok) values ('só a equipe da plataforma vê o painel', sqlerrm like '%plataforma%');
+end $$;
+insert into resultado (teste, ok)
+select 'pedidos de acesso só para a plataforma', not exists (select 1 from public.pedidos_acesso);
+
 reset role;
 select n, teste, ok from resultado order by n;

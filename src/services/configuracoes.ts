@@ -41,6 +41,10 @@ async function chamarConvite(corpo: Record<string, unknown>): Promise<RespostaCo
 export const convidarMembro = (orgId: string, dados: { email: string; nome: string; papel: Exclude<Papel, 'dono'> }) =>
   chamarConvite({ org_id: orgId, ...dados })
 
+/** Dono de empresa nova (só a equipe da plataforma): mesmo convite, papel dono. */
+export const convidarDono = (orgId: string, dados: { email: string; nome: string }) =>
+  chamarConvite({ org_id: orgId, ...dados, papel: 'dono' })
+
 /** Link para alguém da equipe criar senha nova (esqueceu), sem depender de e-mail. */
 export const linkNovaSenha = (orgId: string, email: string) =>
   chamarConvite({ org_id: orgId, email, acao: 'redefinir' }).then((r) => r.link)

@@ -13,6 +13,7 @@ import { Configuracoes } from './pages/Configuracoes'
 import { Contatos } from './pages/Contatos'
 import { ContatoPerfil } from './pages/ContatoPerfil'
 import { Oportunidades } from './pages/Oportunidades'
+import { Empresas } from './pages/Empresas'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -34,6 +35,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="contatos/:id" element={<ContatoPerfil />} />
             <Route path="oportunidades" element={<Oportunidades />} />
             <Route path="configuracoes/:secao?" element={<Configuracoes />} />
+            <Route path="empresas" element={<Empresas />} />
             <Route path="*" element={<NaoEncontrada />} />
           </Route>
         </Routes>

@@ -9,6 +9,7 @@ import { PainelConversa } from '../components/PainelConversa'
 import { PainelContato } from '../components/PainelContato'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { Icone } from '../components/Icone'
+import { PrimeirosPassos } from '../components/PrimeirosPassos'
 
 /**
  * ≥1280: lista + conversa + contato. 768–1279: lista + conversa (contato em gaveta).
@@ -24,6 +25,7 @@ export function Conversas() {
   const { conversas, contagem, carregando, erro, recarregar } = useConversas(orgAtiva?.id, aba, numero)
   const [numeros, setNumeros] = useState<{ orgId: string; lista: { id: string; nome: string }[] } | null>(null)
   const orgId = orgAtiva?.id
+  const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   useEffect(() => {
     if (!orgId) return
     let ativo = true
@@ -93,7 +95,12 @@ export function Conversas() {
             aoAlternarContato={() => setContatoAberto((v) => !v)}
           />
         ) : (
-          <div className="flex h-full items-center justify-center bg-fundo">
+          <div className="flex h-full flex-col items-center justify-center gap-4 overflow-y-auto bg-fundo p-6">
+            {gerencia && orgId && (
+              <div className="w-full max-w-md">
+                <PrimeirosPassos orgId={orgId} />
+              </div>
+            )}
             <EstadoVazio icone="conversas" titulo="Escolha uma conversa">
               As que precisam de você estão na aba Aguardando.
             </EstadoVazio>

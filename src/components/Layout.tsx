@@ -14,7 +14,7 @@ type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: num
  * Celular: barra lateral vira gaveta aberta pelo botão de menu.
  */
 export function Layout() {
-  const { orgAtiva, organizacoes, trocarOrganizacao, sessao, equipe, sair } = useSessao()
+  const { orgAtiva, organizacoes, trocarOrganizacao, sessao, equipe, sair, adminPlataforma } = useSessao()
   const aguardando = useContagemAguardando(orgAtiva?.id)
   const caidos = useNumerosCaidos(orgAtiva?.id)
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
@@ -30,6 +30,7 @@ export function Layout() {
     { para: '/contatos', rotulo: 'Contatos', icone: 'usuario' },
     { para: '/oportunidades', rotulo: 'Oportunidades', icone: 'funil' },
     { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
+    ...(adminPlataforma ? [{ para: '/empresas', rotulo: 'Empresas', icone: 'empresa' as const }] : []),
   ]
 
   const userId = sessao?.user.id
@@ -126,6 +127,7 @@ export function Layout() {
                     {organizacoes.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.nome}
+                        {o.status !== 'ativa' && ' (suspensa)'}
                       </option>
                     ))}
                   </select>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../services/supabaseClient'
 import { listarEquipe, listarOrganizacoes, type Organizacao, type Perfil } from '../services/atendimento'
+import { ehAdminPlataforma } from '../services/plataforma'
 import { ContextoSessao } from '../hooks/useSessao'
 
 const CHAVE_ORG = 'livih.org'
@@ -17,7 +18,7 @@ function lerOrgSalva(): string | null {
 
 // Cada resultado guarda a quem pertence (usuário, organização): trocar de conta ou de organização
 // descarta o antigo sem precisar zerar estado dentro de efeito.
-type Orgs = { userId: string; lista: Organizacao[] }
+type Orgs = { userId: string; lista: Organizacao[]; admin: boolean }
 type Equipe = { orgId: string; mapa: Map<string, Perfil> }
 
 export function ProvedorSessao({ children }: { children: ReactNode }) {
@@ -36,15 +37,25 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId) return
     let ativo = true
-    listarOrganizacoes(userId)
-      .then((lista) => ativo && setOrgs({ userId, lista }))
-      .catch(() => ativo && setOrgs({ userId, lista: [] }))
+    Promise.all([listarOrganizacoes(userId), ehAdminPlataforma(userId).catch(() => false)])
+      .then(([lista, admin]) => ativo && setOrgs({ userId, lista, admin }))
+      .catch(() => ativo && setOrgs({ userId, lista: [], admin: false }))
     return () => {
       ativo = false
     }
   }, [userId])
 
-  const organizacoes = useMemo(() => (orgs && orgs.userId === userId ? orgs.lista : []), [orgs, userId])
+  const minhas = orgs && orgs.userId === userId ? orgs : null
+  const adminPlataforma = !!minhas?.admin
+  // Empresa suspensa sai do seletor; a equipe da plataforma continua entrando (suporte).
+  const organizacoes = useMemo(
+    () => (minhas ? minhas.lista.filter((o) => adminPlataforma || o.status === 'ativa') : []),
+    [minhas, adminPlataforma],
+  )
+  const suspensas = useMemo(
+    () => (minhas && !adminPlataforma ? minhas.lista.filter((o) => o.status !== 'ativa') : []),
+    [minhas, adminPlataforma],
+  )
   const carregandoOrgs = !!userId && orgs?.userId !== userId
 
   const orgAtiva = useMemo(
@@ -80,8 +91,8 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
   }, [])
 
   const valor = useMemo(
-    () => ({ sessao, organizacoes, orgAtiva, carregandoOrgs, equipe: mapaEquipe, trocarOrganizacao, sair }),
-    [sessao, organizacoes, orgAtiva, carregandoOrgs, mapaEquipe, trocarOrganizacao, sair],
+    () => ({ sessao, organizacoes, suspensas, adminPlataforma, orgAtiva, carregandoOrgs, equipe: mapaEquipe, trocarOrganizacao, sair }),
+    [sessao, organizacoes, suspensas, adminPlataforma, orgAtiva, carregandoOrgs, mapaEquipe, trocarOrganizacao, sair],
   )
 
   return <ContextoSessao.Provider value={valor}>{children}</ContextoSessao.Provider>

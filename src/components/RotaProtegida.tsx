@@ -15,12 +15,12 @@ function Carregando() {
 
 /** Exige login e pelo menos uma organização ativa. */
 export function RotaProtegida({ children }: { children: ReactNode }) {
-  const { sessao, orgAtiva, carregandoOrgs, organizacoes } = useSessao()
+  const { sessao, orgAtiva, carregandoOrgs, organizacoes, suspensas } = useSessao()
   const local = useLocation()
 
   if (sessao === undefined) return <Carregando />
   if (!sessao) return <Navigate to="/login" replace state={{ de: local.pathname + local.search }} />
   if (carregandoOrgs || (!orgAtiva && organizacoes.length)) return <Carregando />
-  if (!orgAtiva) return <SemOrganizacao />
+  if (!orgAtiva) return <SemOrganizacao suspensas={suspensas} />
   return children
 }

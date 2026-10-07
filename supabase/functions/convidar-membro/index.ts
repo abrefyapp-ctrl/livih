@@ -1,10 +1,11 @@
 // Convida alguém para a equipe de uma organização. Chamada pela tela de Configurações → Equipe.
 //
-// Só o dono da organização convida (mesma regra da policy membros_gerir). Não manda e-mail: devolve
+// Só o dono da organização convida (mesma regra da policy membros_gerir) — ou a equipe da plataforma, que
+// também cria o dono de uma empresa nova (papel 'dono', pelo painel da F7). Não manda e-mail: devolve
 // um link de convite para o dono repassar (WhatsApp, por exemplo) — o link abre /definir-senha já
 // logado. Se a pessoa já tem conta no Livih, só entra na equipe e usa a senha que já tem.
 //
-// POST { org_id, email, nome?, papel: 'admin' | 'atendente', redirect_to }
+// POST { org_id, email, nome?, papel: 'admin' | 'atendente' | 'dono' (só a plataforma), redirect_to }
 //   → { link } (conta nova ou ainda sem senha) | { link: null } (já tinha conta: entra com a senha dela)
 //   409 se já está na equipe
 // POST { org_id, email, acao: 'redefinir', redirect_to } → { link } para alguém da equipe criar senha nova
@@ -53,19 +54,18 @@ Deno.serve(async (req) => {
     return json(400, { erro: "corpo inválido" });
   }
   const email = (p.email ?? "").trim().toLowerCase();
-  const papel = p.papel === "admin" ? "admin" : "atendente";
+  const papelPedido = p.papel === "admin" || p.papel === "dono" ? p.papel : "atendente";
   if (!p.org_id || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(400, { erro: "Informe um e-mail válido." });
 
-  // Mesma regra da RLS: só o dono da organização.
-  const { data: dono } = await admin
-    .from("membros_org")
-    .select("user_id")
-    .eq("org_id", p.org_id)
-    .eq("user_id", quem.user.id)
-    .eq("papel", "dono")
-    .eq("ativo", true)
-    .maybeSingle();
-  if (!dono) return json(403, { erro: "Só o dono da organização convida pessoas." });
+  // Mesma regra da RLS: só o dono da organização (ou a equipe da plataforma).
+  const [{ data: dono }, { data: daPlataforma }] = await Promise.all([
+    admin.from("membros_org").select("user_id").eq("org_id", p.org_id).eq("user_id", quem.user.id)
+      .eq("papel", "dono").eq("ativo", true).maybeSingle(),
+    admin.from("admins_plataforma").select("user_id").eq("user_id", quem.user.id).maybeSingle(),
+  ]);
+  if (!dono && !daPlataforma) return json(403, { erro: "Só o dono da organização convida pessoas." });
+  if (papelPedido === "dono" && !daPlataforma) return json(403, { erro: "Só a equipe da Livih define o dono." });
+  const papel = papelPedido;
 
   // O link só pode levar para o próprio app (a lista de redirecionamentos do Auth também confere).
   let redirectTo: string | undefined;
