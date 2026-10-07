@@ -365,5 +365,47 @@ exception when others then
   insert into resultado (teste, ok) values ('último dono não se rebaixa', sqlerrm like '%pelo menos um dono%');
 end $$;
 
+-- Conexão do WhatsApp e agente desligado (migration 20261007180000)
+do $$
+declare v_canal uuid; v_alerta uuid; r jsonb; v_conv uuid; n integer;
+begin
+  select id into v_canal from public.canais where instance_id = 'INST-F7';
+  -- canal de alertas da plataforma: outro canal da mesma org de teste
+  insert into public.canais (org_id, nome, telefone, instance_id)
+  select org_id, 'Alertas', '5541911112222', 'INST-ALERTAS' from public.canais where id = v_canal
+  returning id into v_alerta;
+  update public.plataforma_config set canal_alertas = v_alerta where id = 1;
+  update public.agentes set telefone_alerta = '5541900001111' where canal_id = v_canal;
+
+  perform public.canal_atualizar_status(v_canal, 'WORKING', '5541999990000');
+  perform public.canal_atualizar_status(v_canal, 'STARTING');
+  insert into resultado (teste, ok) select 'saiu de WORKING marca a queda', caiu_em is not null and alerta_queda_em is null
+    from public.canais where id = v_canal;
+  update public.canais set caiu_em = now() - interval '6 minutes' where id = v_canal;
+  perform public.canal_atualizar_status(v_canal, 'FAILED');
+  perform public.canal_atualizar_status(v_canal, 'FAILED');
+  select count(*) into n from public.alertas where canal_id = v_alerta and texto like '%desconectado%';
+  insert into resultado (teste, ok) values ('queda de 5 min gera um aviso só, pelo canal de alertas', n = 1);
+  perform public.canal_atualizar_status(v_canal, 'WORKING', '5541999990000');
+  insert into resultado (teste, ok) select 'voltou: limpa a queda e avisa', c.caiu_em is null and c.alerta_queda_em is null
+    and (select count(*) from public.alertas where canal_id = v_alerta and texto like '%conectado de novo%') = 1
+    from public.canais c where c.id = v_canal;
+
+  update public.canais set desconectado_em = now() where id = v_canal;
+  perform public.canal_atualizar_status(v_canal, 'STOPPED');
+  insert into resultado (teste, ok) select 'desconectar pela tela não é queda', caiu_em is null from public.canais where id = v_canal;
+
+  -- agente desligado
+  r := public.registrar_entrada(v_canal, 'OFF-1', '5541922223333', null, 'Sem Agente', 'texto', 'oi', '{}');
+  v_conv := (r ->> 'conversa_id')::uuid;
+  update public.agentes set ativo = false where canal_id = v_canal;
+  insert into resultado (teste, ok) select 'desligar o agente passa a conversa esperando para a equipe',
+    estado = 'aguardando_humano' and motivo_humano = 'Agente desligado' from public.conversas where id = v_conv;
+  r := public.registrar_entrada(v_canal, 'OFF-2', '5541922224444', null, 'Novo', 'texto', 'oi', '{}');
+  insert into resultado (teste, ok) values ('com agente desligado, conversa nova vai para a equipe',
+    r ->> 'estado' = 'aguardando_humano' and not (r ->> 'chamar_agente')::boolean);
+  update public.agentes set ativo = true where canal_id = v_canal;
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;
