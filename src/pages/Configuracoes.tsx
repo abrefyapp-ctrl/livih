@@ -3,9 +3,11 @@ import { Icone, type NomeIcone } from '../components/Icone'
 import { SecaoAgente } from '../components/SecaoAgente'
 import { SecaoBase } from '../components/SecaoBase'
 import { SecaoEquipe } from '../components/SecaoEquipe'
+import { SecaoWhatsapp } from '../components/SecaoWhatsapp'
 
 const SECOES: { id: string; rotulo: string; icone: NomeIcone }[] = [
   { id: 'equipe', rotulo: 'Equipe', icone: 'equipe' },
+  { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone' },
   { id: 'agente', rotulo: 'Agente', icone: 'agente' },
   { id: 'base', rotulo: 'Base de conhecimento', icone: 'livro' },
 ]
@@ -36,6 +38,7 @@ export function Configuracoes() {
         </nav>
         <div className="py-6">
           {secao === 'equipe' && <SecaoEquipe />}
+          {secao === 'whatsapp' && <SecaoWhatsapp />}
           {secao === 'agente' && <SecaoAgente />}
           {secao === 'base' && <SecaoBase />}
         </div>

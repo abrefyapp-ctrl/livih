@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useSessao } from '../hooks/useSessao'
 import { useContagemAguardando } from '../hooks/useConversas'
+import { useCanalCaido } from '../hooks/useCanalCaido'
 import { Avatar } from './Avatar'
 import { Icone, type NomeIcone } from './Icone'
 import { Logo } from './Logo'
@@ -15,6 +16,8 @@ type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: num
 export function Layout() {
   const { orgAtiva, organizacoes, trocarOrganizacao, sessao, equipe, sair } = useSessao()
   const aguardando = useContagemAguardando(orgAtiva?.id)
+  const canalCaido = useCanalCaido(orgAtiva?.id)
+  const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const [gaveta, setGaveta] = useState(false)
 
   // Título da aba avisa quem está em outra aba.
@@ -147,6 +150,21 @@ export function Layout() {
             </button>
           </div>
         </header>
+
+        {canalCaido && (
+          <div role="alert" className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-erro px-4 py-2 text-pequeno text-white lg:px-6">
+            <Icone nome="alerta" className="size-4 shrink-0" />
+            <span className="font-semibold">O WhatsApp da empresa está desconectado.</span>
+            <span>Nenhuma mensagem entra ou sai até reconectar.</span>
+            {gerencia ? (
+              <Link to="/configuracoes/whatsapp" className="font-semibold underline">
+                Reconectar
+              </Link>
+            ) : (
+              <span>Avise um administrador.</span>
+            )}
+          </div>
+        )}
 
         <main className="min-h-0 flex-1">
           <Outlet />

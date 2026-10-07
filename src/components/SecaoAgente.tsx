@@ -123,7 +123,7 @@ export function SecaoAgente() {
             <p className="text-pequeno text-texto-3">
               {form.ativo
                 ? 'Responde as conversas novas e chama a equipe quando precisa.'
-                : 'Não responde ninguém. Conversas novas ficam sem resposta até alguém da equipe assumir.'}
+                : 'Não responde ninguém. Conversas novas vão direto para Aguardando você.'}
             </p>
           </div>
           <label className="relative inline-flex shrink-0 cursor-pointer items-center">

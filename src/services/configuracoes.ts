@@ -91,3 +91,43 @@ export async function removerConteudo(id: string) {
   const { error } = await supabase.from('base_conhecimento').delete().eq('id', id)
   if (error) throw new Error('Não foi possível remover. Tente de novo.')
 }
+
+export type CanalConexao = {
+  id: string
+  status_conexao: string | null
+  numero_conectado: string | null
+  conectado_em: string | null
+  caiu_em: string | null
+  alerta_queda_em: string | null
+  desconectado_em: string | null
+}
+
+async function conexao<T>(orgId: string, acao: string, extra: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('whatsapp-conexao', { body: { org_id: orgId, acao, ...extra } })
+  if (error) {
+    const corpo = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null
+    throw new Error(corpo?.erro ?? 'Não foi possível falar com o WhatsApp. Tente de novo.')
+  }
+  return data as T
+}
+
+/** Consulta o WAHA agora (e atualiza o canal no banco). */
+export const statusWhatsapp = (orgId: string) => conexao<{ canal: CanalConexao | null }>(orgId, 'status')
+export const iniciarWhatsapp = (orgId: string) => conexao<{ canal: CanalConexao }>(orgId, 'iniciar')
+export const qrWhatsapp = (orgId: string) => conexao<{ imagem: string | null }>(orgId, 'qr')
+export const codigoWhatsapp = (orgId: string, telefone: string) => conexao<{ codigo: string }>(orgId, 'codigo', { telefone })
+export const desconectarWhatsapp = (orgId: string) => conexao<{ canal: CanalConexao }>(orgId, 'desconectar')
+
+/** Só o que está no banco (sem consultar o WAHA) — para a faixa de aviso. */
+export async function canalDaOrganizacao(orgId: string): Promise<CanalConexao | null> {
+  const { data, error } = await supabase
+    .from('canais')
+    .select('id, status_conexao, numero_conectado, conectado_em, caiu_em, alerta_queda_em, desconectado_em')
+    .eq('org_id', orgId)
+    .eq('ativo', true)
+    .order('criado_em')
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data as CanalConexao | null
+}
