@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
+import { supabase } from '../services/supabaseClient'
 import { atualizarOportunidade, listarEtapas, listarOportunidades, type Etapa, type Oportunidade } from '../services/crm'
 import { haQuanto, moeda, nomeDoContato } from '../services/formato'
 import { useSessao } from '../hooks/useSessao'
@@ -32,16 +33,29 @@ export function Oportunidades() {
 
   useEffect(() => {
     let ativo = true
-    Promise.all([listarEtapas(orgId), listarOportunidades(orgId)])
-      .then(([etapas, lista]) => {
-        if (!ativo) return
-        // Fechadas há mais de 30 dias saem do quadro; o corte é fixado quando os dados chegam.
-        setDados({ orgId, etapas, lista, corte: Date.now() - DIAS_FECHADAS * 86_400_000 })
-        setErro(null)
+    let espera: ReturnType<typeof setTimeout> | undefined
+    const buscar = () =>
+      Promise.all([listarEtapas(orgId), listarOportunidades(orgId)])
+        .then(([etapas, lista]) => {
+          if (!ativo) return
+          // Fechadas há mais de 30 dias saem do quadro; o corte é fixado quando os dados chegam.
+          setDados({ orgId, etapas, lista, corte: Date.now() - DIAS_FECHADAS * 86_400_000 })
+          setErro(null)
+        })
+        .catch(() => ativo && setErro('Não foi possível carregar o funil.'))
+    void buscar()
+    // Ao vivo: o agente ou outro membro move um cartão e o quadro acompanha.
+    const canal = supabase
+      .channel(`oportunidades-${orgId}-${versao}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'oportunidades', filter: `org_id=eq.${orgId}` }, () => {
+        clearTimeout(espera)
+        espera = setTimeout(() => void buscar(), 400)
       })
-      .catch(() => ativo && setErro('Não foi possível carregar o funil.'))
+      .subscribe()
     return () => {
       ativo = false
+      clearTimeout(espera)
+      void supabase.removeChannel(canal)
     }
   }, [orgId, versao])
 
@@ -69,7 +83,6 @@ export function Oportunidades() {
     setDados({ ...atual, lista: atual.lista.map((x) => (x.id === o.id ? { ...x, etapa_id: etapa.id } : x)) })
     try {
       await atualizarOportunidade(o.id, { etapa_id: etapa.id, motivo_perda: null })
-      recarregar()
     } catch (e) {
       setErro((e as Error).message)
       recarregar()
