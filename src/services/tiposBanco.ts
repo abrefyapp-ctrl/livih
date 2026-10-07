@@ -231,11 +231,17 @@ export type Database = {
       }
       canais: {
         Row: {
+          alerta_queda_em: string | null
           ativo: boolean
+          caiu_em: string | null
+          conectado_em: string | null
           criado_em: string
+          desconectado_em: string | null
+          desconectado_por: string | null
           id: string
           instance_id: string | null
           nome: string
+          numero_conectado: string | null
           org_id: string
           status_atualizado_em: string | null
           status_conexao: string | null
@@ -245,11 +251,17 @@ export type Database = {
           webhook_segredo_hash: string | null
         }
         Insert: {
+          alerta_queda_em?: string | null
           ativo?: boolean
+          caiu_em?: string | null
+          conectado_em?: string | null
           criado_em?: string
+          desconectado_em?: string | null
+          desconectado_por?: string | null
           id?: string
           instance_id?: string | null
           nome: string
+          numero_conectado?: string | null
           org_id: string
           status_atualizado_em?: string | null
           status_conexao?: string | null
@@ -259,11 +271,17 @@ export type Database = {
           webhook_segredo_hash?: string | null
         }
         Update: {
+          alerta_queda_em?: string | null
           ativo?: boolean
+          caiu_em?: string | null
+          conectado_em?: string | null
           criado_em?: string
+          desconectado_em?: string | null
+          desconectado_por?: string | null
           id?: string
           instance_id?: string | null
           nome?: string
+          numero_conectado?: string | null
           org_id?: string
           status_atualizado_em?: string | null
           status_conexao?: string | null
@@ -833,6 +851,29 @@ export type Database = {
         }
         Relationships: []
       }
+      plataforma_config: {
+        Row: {
+          canal_alertas: string | null
+          id: number
+        }
+        Insert: {
+          canal_alertas?: string | null
+          id?: number
+        }
+        Update: {
+          canal_alertas?: string | null
+          id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plataforma_config_canal_alertas_fkey"
+            columns: ["canal_alertas"]
+            isOneToOne: false
+            referencedRelation: "canais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -900,6 +941,10 @@ export type Database = {
       autor_atual: {
         Args: never
         Returns: Database["public"]["Enums"]["autor_tipo"]
+      }
+      canal_atualizar_status: {
+        Args: { p_canal: string; p_numero?: string; p_status: string }
+        Returns: undefined
       }
       canal_por_webhook: {
         Args: { p_canal: string; p_segredo: string }
