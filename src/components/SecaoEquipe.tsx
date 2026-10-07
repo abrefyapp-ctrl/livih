@@ -41,6 +41,7 @@ export function SecaoEquipe() {
   const [desativar, setDesativar] = useState<MembroEquipe | null>(null)
   const [salvando, setSalvando] = useState<string | null>(null)
   const [erroAcao, setErroAcao] = useState<string | null>(null)
+  const [novoLink, setNovoLink] = useState<{ nome: string; link: string } | null>(null)
 
   useEffect(() => {
     let ativo = true
@@ -54,6 +55,22 @@ export function SecaoEquipe() {
 
   const lista = equipe?.orgId === orgId ? equipe.lista : null
   const recarregar = () => setVersao((v) => v + 1)
+
+  // Convite pendente: mesma Edge Function do convite, que devolve um link novo para quem ainda não criou senha.
+  async function gerarNovoLink(m: MembroEquipe) {
+    setSalvando(m.user_id)
+    setErroAcao(null)
+    try {
+      const link = await convidarMembro(orgId, { email: m.email, nome: m.nome ?? '', papel: m.papel === 'admin' ? 'admin' : 'atendente' })
+      if (link) setNovoLink({ nome: m.nome || m.email, link })
+      else setErroAcao(`${m.nome || m.email} já criou a senha. Basta entrar com ela.`)
+      recarregar()
+    } catch (e) {
+      setErroAcao((e as Error).message)
+    } finally {
+      setSalvando(null)
+    }
+  }
 
   async function alterar(m: MembroEquipe, campos: { papel?: Papel; ativo?: boolean }) {
     setSalvando(m.user_id)
@@ -138,6 +155,11 @@ export function SecaoEquipe() {
                     ) : (
                       <span className="text-pequeno text-texto-2">{PAPEIS[m.papel].rotulo}</span>
                     )}
+                    {editavel && m.ativo && !m.senha_definida && m.papel !== 'dono' && (
+                      <Botao tamanho="sm" variante="secundario" icone="link" carregando={salvando === m.user_id} onClick={() => void gerarNovoLink(m)}>
+                        Novo link
+                      </Botao>
+                    )}
                     {editavel &&
                       (m.ativo ? (
                         <Botao tamanho="sm" variante="fantasma" onClick={() => setDesativar(m)}>
@@ -172,6 +194,15 @@ export function SecaoEquipe() {
         aoFechar={() => setConvidando(false)}
         aoConvidar={recarregar}
       />
+
+      <Modal
+        aberto={!!novoLink}
+        titulo="Novo link de convite"
+        aoFechar={() => setNovoLink(null)}
+        rodape={<Botao onClick={() => setNovoLink(null)}>Concluir</Botao>}
+      >
+        {novoLink && <LinkConvite link={novoLink.link} nome={novoLink.nome} nomeOrg={orgAtiva?.nome ?? ''} />}
+      </Modal>
 
       <DialogoConfirmacao
         aberto={!!desativar}
@@ -208,7 +239,6 @@ function Convite({
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [resultado, setResultado] = useState<{ link: string | null } | null>(null)
-  const [copiado, setCopiado] = useState(false)
 
   function fechar() {
     setNome('')
@@ -216,7 +246,6 @@ function Convite({
     setPapel('atendente')
     setErro(null)
     setResultado(null)
-    setCopiado(false)
     aoFechar()
   }
 
@@ -235,19 +264,6 @@ function Convite({
     }
   }
 
-  async function copiar(link: string) {
-    try {
-      await navigator.clipboard.writeText(link)
-      setCopiado(true)
-    } catch {
-      setCopiado(false)
-    }
-  }
-
-  const mensagem = (link: string) =>
-    `Oi${nome ? `, ${nome.split(' ')[0]}` : ''}! Você foi convidado(a) para atender as conversas da ${nomeOrg} no Livih. ` +
-    `Crie sua senha por este link (vale por 24 horas): ${link}`
-
   if (resultado) {
     return (
       <Modal
@@ -257,27 +273,7 @@ function Convite({
         rodape={<Botao onClick={fechar}>Concluir</Botao>}
       >
         {resultado.link ? (
-          <div className="space-y-3">
-            <p>Mande este link para {nome || email}. Ele vale por 24 horas e abre a tela para criar a senha.</p>
-            <div className="flex items-center gap-2 rounded-md border border-borda bg-fundo p-2">
-              <Icone nome="link" className="size-4 shrink-0 text-texto-3" />
-              <code className="min-w-0 flex-1 truncate text-legenda">{resultado.link}</code>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Botao variante="secundario" icone={copiado ? 'check' : 'copiar'} onClick={() => void copiar(resultado.link!)}>
-                {copiado ? 'Link copiado' : 'Copiar link'}
-              </Botao>
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(mensagem(resultado.link))}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-10 items-center gap-2 rounded-md bg-primaria px-4 font-medium text-white hover:bg-primaria-hover"
-              >
-                <Icone nome="enviar" className="size-4" />
-                Enviar pelo WhatsApp
-              </a>
-            </div>
-          </div>
+          <LinkConvite link={resultado.link} nome={nome || email} nomeOrg={nomeOrg} />
         ) : (
           <p>{email} já tinha conta no Livih e agora está na equipe. Entra com a senha que já usa.</p>
         )}
@@ -323,5 +319,47 @@ function Convite({
         <p className="text-legenda text-texto-3">Não enviamos e-mail: você recebe um link para mandar à pessoa.</p>
       </form>
     </Modal>
+  )
+}
+
+/** Link de convite com copiar e mandar pelo WhatsApp (mensagem pronta). */
+function LinkConvite({ link, nome, nomeOrg }: { link: string; nome: string; nomeOrg: string }) {
+  const [copiado, setCopiado] = useState(false)
+  const primeiroNome = nome.includes('@') ? '' : nome.split(' ')[0]
+  const mensagem =
+    `Oi${primeiroNome ? `, ${primeiroNome}` : ''}! Você foi convidado(a) para atender as conversas da ${nomeOrg} no Livih. ` +
+    `Crie sua senha por este link (vale por 24 horas): ${link}`
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopiado(true)
+    } catch {
+      setCopiado(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p>Mande este link para {nome}. Ele vale por 24 horas e abre a tela para criar a senha.</p>
+      <div className="flex items-center gap-2 rounded-md border border-borda bg-fundo p-2">
+        <Icone nome="link" className="size-4 shrink-0 text-texto-3" />
+        <code className="min-w-0 flex-1 truncate text-legenda">{link}</code>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Botao variante="secundario" icone={copiado ? 'check' : 'copiar'} onClick={() => void copiar()}>
+          {copiado ? 'Link copiado' : 'Copiar link'}
+        </Botao>
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(mensagem)}`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-10 items-center gap-2 rounded-md bg-primaria px-4 font-medium text-white hover:bg-primaria-hover"
+        >
+          <Icone nome="enviar" className="size-4" />
+          Enviar pelo WhatsApp
+        </a>
+      </div>
+    </div>
   )
 }
