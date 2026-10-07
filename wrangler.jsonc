@@ -1,0 +1,11 @@
+// Worker só com arquivos estáticos (o build do Vite). Publicado pela integração da Cloudflare com o
+// GitHub: cada push na main faz `npm run build` e `npx wrangler deploy`.
+// As variáveis VITE_* entram no build — cadastrar em Settings → Build → Variables do Worker.
+{
+	"name": "livih",
+	"compatibility_date": "2026-10-07",
+	"assets": {
+		"directory": "./dist/",
+		"not_found_handling": "single-page-application"
+	}
+}
