@@ -303,5 +303,44 @@ begin
   insert into resultado (teste, ok) select 'alerta sai pela fila de alertas', count(*) = 1 from public.alertas_reivindicar(10);
 end $$;
 
+-- Trava contra robô do outro lado (migration 20261007160000)
+do $$
+declare v_canal uuid; r jsonb; v_conv uuid; x jsonb; i integer;
+begin
+  select id into v_canal from public.canais where instance_id = 'INST-F7';
+
+  -- cliente de verdade citando protocolo uma vez: o agente continua
+  r := public.registrar_entrada(v_canal, 'RB-1', '5541944443333', null, 'Robo', 'texto', 'Olá', '{}');
+  v_conv := (r ->> 'conversa_id')::uuid;
+  x := public.agente_responder(v_conv, 'Olá! Em que posso ajudar?', (r ->> 'mensagem_id')::uuid);
+  r := public.registrar_entrada(v_canal, 'RB-2', '5541944443333', null, 'Robo', 'texto',
+    '*Atendente:* Recebemos sua solicitação. *Ticket:* #106', '{}');
+  insert into resultado (teste, ok) values ('uma mensagem com ticket ainda não trava',
+    public.agente_deve_responder(v_conv, (r ->> 'mensagem_id')::uuid));
+  x := public.agente_responder(v_conv, 'Certo, como posso ajudar?', (r ->> 'mensagem_id')::uuid);
+
+  -- segunda resposta automática: trava, passa para a equipe com o motivo
+  r := public.registrar_entrada(v_canal, 'RB-3', '5541944443333', null, 'Robo', 'texto',
+    '*Atendente:* Recebemos sua solicitação. *Ticket:* #107', '{}');
+  insert into resultado (teste, ok) values ('duas respostas automáticas travam o agente',
+    not public.agente_deve_responder(v_conv, (r ->> 'mensagem_id')::uuid));
+  insert into resultado (teste, ok) select 'conversa vai para a equipe com o motivo do robô',
+    estado = 'aguardando_humano' and motivo_humano like 'Possível atendimento automático%'
+    from public.conversas where id = v_conv;
+
+  -- robô que responde na hora (sem marcadores): na 4ª mensagem, 3 respostas instantâneas travam
+  for i in 1..4 loop
+    r := public.registrar_entrada(v_canal, 'RV-' || i, '5541933332222', null, 'Veloz', 'texto', 'mensagem ' || i, '{}');
+    v_conv := (r ->> 'conversa_id')::uuid;
+    if i < 4 then
+      x := public.agente_responder(v_conv, 'resposta ' || i, (r ->> 'mensagem_id')::uuid);
+    end if;
+  end loop;
+  insert into resultado (teste, ok) values ('3 respostas instantâneas travam o agente',
+    not public.agente_deve_responder(v_conv, (r ->> 'mensagem_id')::uuid));
+  insert into resultado (teste, ok) select 'motivo cita a velocidade',
+    motivo_humano like '%menos de 6 segundos%' from public.conversas where id = v_conv;
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;
