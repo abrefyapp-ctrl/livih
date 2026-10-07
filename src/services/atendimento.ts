@@ -11,7 +11,10 @@ export type Perfil = Tabelas['perfis']['Row']
 export type ConversaLista = Pick<
   Tabelas['conversas']['Row'],
   'id' | 'estado' | 'atribuida_a' | 'motivo_humano' | 'ultima_mensagem_em' | 'ultima_mensagem_resumo' | 'nao_lidas'
-> & { contato: Pick<Contato, 'id' | 'nome' | 'nome_whatsapp' | 'telefone'> | null }
+> & {
+  contato: Pick<Contato, 'id' | 'nome' | 'nome_whatsapp' | 'telefone'> | null
+  canal: { id: string; nome: string } | null
+}
 
 export type Organizacao = { id: string; nome: string; papel: Database['public']['Enums']['papel_org'] }
 
@@ -20,7 +23,7 @@ export type Oportunidade = Pick<Tabelas['oportunidades']['Row'], 'id' | 'titulo'
 }
 
 const CAMPOS_CONVERSA =
-  'id, estado, atribuida_a, motivo_humano, ultima_mensagem_em, ultima_mensagem_resumo, nao_lidas, contato:contatos(id, nome, nome_whatsapp, telefone)'
+  'id, estado, atribuida_a, motivo_humano, ultima_mensagem_em, ultima_mensagem_resumo, nao_lidas, contato:contatos(id, nome, nome_whatsapp, telefone), canal:canais(id, nome)'
 
 export async function listarOrganizacoes(userId: string): Promise<Organizacao[]> {
   const { data, error } = await supabase
@@ -46,28 +49,38 @@ export async function listarEquipe(orgId: string): Promise<Perfil[]> {
   return data ?? []
 }
 
-export async function listarConversas(orgId: string, estado: EstadoConversa): Promise<ConversaLista[]> {
-  const { data, error } = await supabase
+/** Números que a pessoa vê (a RLS já tira os de outros vendedores). */
+export async function listarNumerosVisiveis(orgId: string): Promise<{ id: string; nome: string }[]> {
+  const { data, error } = await supabase.from('canais').select('id, nome').eq('org_id', orgId).order('criado_em')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function listarConversas(orgId: string, estado: EstadoConversa, canalId?: string): Promise<ConversaLista[]> {
+  let consulta = supabase
     .from('conversas')
     .select(CAMPOS_CONVERSA)
     .eq('org_id', orgId)
     .eq('estado', estado)
+  if (canalId) consulta = consulta.eq('canal_id', canalId)
+  const { data, error } = await consulta
     .order('ultima_mensagem_em', { ascending: false, nullsFirst: false })
     .limit(estado === 'encerrada' ? 100 : 300)
   if (error) throw error
   return (data ?? []) as ConversaLista[]
 }
 
-export async function contarPorEstado(orgId: string): Promise<Record<EstadoConversa, number>> {
+export async function contarPorEstado(orgId: string, canalId?: string): Promise<Record<EstadoConversa, number>> {
   const estados: EstadoConversa[] = ['aguardando_humano', 'humano', 'bot']
   const resultados = await Promise.all(
-    estados.map((estado) =>
-      supabase
+    estados.map((estado) => {
+      const consulta = supabase
         .from('conversas')
         .select('id', { count: 'exact', head: true })
         .eq('org_id', orgId)
-        .eq('estado', estado),
-    ),
+        .eq('estado', estado)
+      return canalId ? consulta.eq('canal_id', canalId) : consulta
+    }),
   )
   const contagem = { aguardando_humano: 0, humano: 0, bot: 0, encerrada: 0 }
   resultados.forEach((r, i) => {

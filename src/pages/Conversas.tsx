@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { buscarConversa, type EstadoConversa } from '../services/atendimento'
+import { buscarConversa, listarNumerosVisiveis, type EstadoConversa } from '../services/atendimento'
 import { useConversas } from '../hooks/useConversas'
 import { useSessao } from '../hooks/useSessao'
 import { ListaConversas } from '../components/ListaConversas'
@@ -20,24 +20,60 @@ export function Conversas() {
   const { orgAtiva } = useSessao()
   const parametro = params.get('aba')
   const aba: EstadoConversa = ehAba(parametro) ? parametro : 'aguardando_humano'
-  const { conversas, contagem, carregando, erro, recarregar } = useConversas(orgAtiva?.id, aba)
+  const numero = params.get('numero') ?? undefined
+  const { conversas, contagem, carregando, erro, recarregar } = useConversas(orgAtiva?.id, aba, numero)
+  const [numeros, setNumeros] = useState<{ orgId: string; lista: { id: string; nome: string }[] } | null>(null)
+  const orgId = orgAtiva?.id
+  useEffect(() => {
+    if (!orgId) return
+    let ativo = true
+    listarNumerosVisiveis(orgId)
+      .then((lista) => ativo && setNumeros({ orgId, lista }))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [orgId])
+  const listaNumeros = numeros !== null && numeros.orgId === orgId ? numeros.lista : []
+  // Troca um filtro na URL mantendo os outros (aba e número andam juntos).
+  const trocarFiltro = (chave: 'aba' | 'numero', valor: string | undefined, substituir = false) =>
+    setParams(
+      (atual) => {
+        const novo = new URLSearchParams(atual)
+        if (valor) novo.set(chave, valor)
+        else novo.delete(chave)
+        return novo
+      },
+      { replace: substituir },
+    )
   const [contatoAberto, setContatoAberto] = useState(() => window.matchMedia('(min-width: 1280px)').matches)
 
   // Sem aba escolhida e ninguém aguardando: abre onde há trabalho.
   useEffect(() => {
     if (parametro || carregando || contagem.aguardando_humano > 0) return
     const proxima = contagem.humano > 0 ? 'humano' : contagem.bot > 0 ? 'bot' : null
-    if (proxima) setParams({ aba: proxima }, { replace: true })
+    if (proxima)
+      setParams(
+        (atual) => {
+          const novo = new URLSearchParams(atual)
+          novo.set('aba', proxima)
+          return novo
+        },
+        { replace: true },
+      )
   }, [parametro, carregando, contagem, setParams])
 
-  const voltarPara = `/conversas?aba=${aba}`
+  const voltarPara = `/conversas?${new URLSearchParams({ aba, ...(numero ? { numero } : {}) })}`
 
   return (
     <div className="flex h-full min-h-0">
       <div className={`h-full w-full shrink-0 border-r border-borda md:w-80 lg:w-96 ${id ? 'hidden md:block' : ''}`}>
         <ListaConversas
           aba={aba}
-          aoTrocarAba={(a) => setParams({ aba: a })}
+          aoTrocarAba={(a) => trocarFiltro('aba', a)}
+          numeros={listaNumeros}
+          numero={numero}
+          aoTrocarNumero={(n) => trocarFiltro('numero', n)}
           conversas={conversas}
           contagem={contagem}
           carregando={carregando}

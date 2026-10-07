@@ -28,9 +28,26 @@ type Props = {
   erro: string | null
   aoTentarDeNovo: () => void
   selecionada?: string
+  numeros: { id: string; nome: string }[]
+  numero?: string
+  aoTrocarNumero: (id: string | undefined) => void
 }
 
-export function ListaConversas({ aba, aoTrocarAba, conversas, contagem, carregando, erro, aoTentarDeNovo, selecionada }: Props) {
+export function ListaConversas({
+  aba,
+  aoTrocarAba,
+  conversas,
+  contagem,
+  carregando,
+  erro,
+  aoTentarDeNovo,
+  selecionada,
+  numeros,
+  numero,
+  aoTrocarNumero,
+}: Props) {
+  // Com um número só, o nome do número em cada conversa é ruído.
+  const variosNumeros = numeros.length > 1
   const { sessao, equipe } = useSessao()
   const [busca, setBusca] = useState('')
   const [soMinhas, setSoMinhas] = useState(false)
@@ -78,6 +95,24 @@ export function ListaConversas({ aba, aoTrocarAba, conversas, contagem, carregan
             )
           })}
         </div>
+        {variosNumeros && (
+          <label className="relative block">
+            <span className="sr-only">Número de WhatsApp</span>
+            <select
+              value={numero ?? ''}
+              onChange={(e) => aoTrocarNumero(e.target.value || undefined)}
+              className="h-9 w-full appearance-none rounded-md border border-borda bg-superficie pr-8 pl-3 text-pequeno focus:border-primaria focus:outline-none"
+            >
+              <option value="">Todos os números</option>
+              {numeros.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.nome}
+                </option>
+              ))}
+            </select>
+            <Icone nome="abaixo" className="pointer-events-none absolute top-2.5 right-2.5 size-4 text-texto-3" />
+          </label>
+        )}
         <label className="relative block">
           <span className="sr-only">Buscar por nome ou telefone</span>
           <Icone nome="busca" className="pointer-events-none absolute top-2.5 left-3 size-4 text-texto-3" />
@@ -147,7 +182,7 @@ export function ListaConversas({ aba, aoTrocarAba, conversas, contagem, carregan
               return (
                 <li key={c.id}>
                   <Link
-                    to={`/conversas/${c.id}?aba=${aba}`}
+                    to={`/conversas/${c.id}?${new URLSearchParams({ aba, ...(numero ? { numero } : {}) })}`}
                     aria-current={ativa ? 'true' : undefined}
                     className={`flex gap-3 border-b border-l-2 border-b-borda px-4 py-3 transition-colors ${
                       ativa ? 'border-l-primaria bg-primaria-suave' : 'border-l-transparent hover:bg-fundo'
@@ -176,6 +211,12 @@ export function ListaConversas({ aba, aoTrocarAba, conversas, contagem, carregan
                           </span>
                         )}
                       </span>
+                      {variosNumeros && c.canal && !numero && (
+                        <span className="mt-1 flex items-center gap-1 text-legenda text-texto-3">
+                          <Icone nome="telefone" className="size-3.5 shrink-0" />
+                          <span className="truncate">{c.canal.nome}</span>
+                        </span>
+                      )}
                       {aba === 'aguardando_humano' && (
                         <span className="mt-1 flex items-center gap-1 text-legenda text-atencao">
                           <Icone nome="alerta" className="size-3.5 shrink-0" />

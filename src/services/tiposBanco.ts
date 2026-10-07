@@ -243,6 +243,7 @@ export type Database = {
           nome: string
           numero_conectado: string | null
           org_id: string
+          responsavel_id: string | null
           status_atualizado_em: string | null
           status_conexao: string | null
           telefone: string | null
@@ -263,6 +264,7 @@ export type Database = {
           nome: string
           numero_conectado?: string | null
           org_id: string
+          responsavel_id?: string | null
           status_atualizado_em?: string | null
           status_conexao?: string | null
           telefone?: string | null
@@ -283,6 +285,7 @@ export type Database = {
           nome?: string
           numero_conectado?: string | null
           org_id?: string
+          responsavel_id?: string | null
           status_atualizado_em?: string | null
           status_conexao?: string | null
           telefone?: string | null
@@ -1030,6 +1033,8 @@ export type Database = {
         Returns: undefined
       }
       gerar_segredo_webhook: { Args: { p_canal: string }; Returns: string }
+      pode_ver_canal: { Args: { p_canal: string }; Returns: boolean }
+      pode_ver_conversa: { Args: { p_conversa: string }; Returns: boolean }
       registrar_entrada: {
         Args: {
           p_canal: string

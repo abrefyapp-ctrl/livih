@@ -138,6 +138,7 @@ export function PainelConversa({
           <h1 className="truncate font-semibold">{nome}</h1>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-legenda text-texto-3">
             <span>{formatarTelefone(conversa.contato?.telefone)}</span>
+            {conversa.canal && <span>· via {conversa.canal.nome}</span>}
             <EtiquetaEstado estado={estado} complemento={estado === 'humano' ? (minha ? 'você' : atendente) : undefined} />
           </p>
         </div>

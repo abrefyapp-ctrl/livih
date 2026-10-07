@@ -64,8 +64,9 @@ export async function buscarAgente(orgId: string): Promise<Agente | null> {
 
 export async function salvarAgente(
   id: string,
-  campos: Pick<Agente, 'ativo' | 'prompt' | 'telefone_alerta' | 'regras_humano'>,
+  campos: Pick<Agente, 'prompt' | 'telefone_alerta' | 'regras_humano'>,
 ) {
+  // As outras linhas da organização acompanham (trigger agentes_sincronizar).
   const { error } = await supabase.from('agentes').update(campos).eq('id', id)
   if (error) throw new Error('Não foi possível salvar o agente. Tente de novo.')
 }
@@ -98,14 +99,17 @@ export async function removerConteudo(id: string) {
   if (error) throw new Error('Não foi possível remover. Tente de novo.')
 }
 
-export type CanalConexao = {
+export type NumeroWhatsapp = {
   id: string
+  nome: string
+  responsavel_id: string | null
   status_conexao: string | null
   numero_conectado: string | null
   conectado_em: string | null
   caiu_em: string | null
   alerta_queda_em: string | null
   desconectado_em: string | null
+  agente_ativo: boolean
 }
 
 async function conexao<T>(orgId: string, acao: string, extra: Record<string, unknown> = {}): Promise<T> {
@@ -117,23 +121,37 @@ async function conexao<T>(orgId: string, acao: string, extra: Record<string, unk
   return data as T
 }
 
-/** Consulta o WAHA agora (e atualiza o canal no banco). */
-export const statusWhatsapp = (orgId: string) => conexao<{ canal: CanalConexao | null }>(orgId, 'status')
-export const iniciarWhatsapp = (orgId: string) => conexao<{ canal: CanalConexao }>(orgId, 'iniciar')
-export const qrWhatsapp = (orgId: string) => conexao<{ imagem: string | null }>(orgId, 'qr')
-export const codigoWhatsapp = (orgId: string, telefone: string) => conexao<{ codigo: string }>(orgId, 'codigo', { telefone })
-export const desconectarWhatsapp = (orgId: string) => conexao<{ canal: CanalConexao }>(orgId, 'desconectar')
+/** Números que a pessoa pode ver, com o estado consultado no WAHA agora. */
+export const listarNumeros = (orgId: string) =>
+  conexao<{ canais: NumeroWhatsapp[] }>(orgId, 'listar').then((r) => r.canais)
+export const criarNumero = (orgId: string, nome: string, responsavelId: string | null) =>
+  conexao<{ canal: NumeroWhatsapp }>(orgId, 'criar', { nome, responsavel_id: responsavelId })
+export const iniciarNumero = (orgId: string, canalId: string) => conexao(orgId, 'iniciar', { canal_id: canalId })
+export const qrNumero = (orgId: string, canalId: string) => conexao<{ imagem: string | null }>(orgId, 'qr', { canal_id: canalId })
+export const codigoNumero = (orgId: string, canalId: string, telefone: string) =>
+  conexao<{ codigo: string }>(orgId, 'codigo', { canal_id: canalId, telefone })
+export const desconectarNumero = (orgId: string, canalId: string) => conexao(orgId, 'desconectar', { canal_id: canalId })
+export const removerNumero = (orgId: string, canalId: string) => conexao(orgId, 'remover', { canal_id: canalId })
 
-/** Só o que está no banco (sem consultar o WAHA) — para a faixa de aviso. */
-export async function canalDaOrganizacao(orgId: string): Promise<CanalConexao | null> {
+export async function editarNumero(canalId: string, campos: { nome: string; responsavel_id: string | null }) {
+  const { error } = await supabase.from('canais').update(campos).eq('id', canalId)
+  if (error) throw new Error('Não foi possível salvar o número. Tente de novo.')
+}
+
+/** Liga ou desliga o agente só neste número (as instruções são as mesmas da empresa). */
+export async function ligarAgenteNoNumero(canalId: string, ativo: boolean) {
+  const { error } = await supabase.from('agentes').update({ ativo }).eq('canal_id', canalId)
+  if (error) throw new Error('Não foi possível mudar o agente deste número. Tente de novo.')
+}
+
+/** Números fora do ar há mais de 5 min (só os que a pessoa pode ver) — para a faixa de aviso. */
+export async function numerosCaidos(orgId: string): Promise<{ id: string; nome: string }[]> {
   const { data, error } = await supabase
     .from('canais')
-    .select('id, status_conexao, numero_conectado, conectado_em, caiu_em, alerta_queda_em, desconectado_em')
+    .select('id, nome')
     .eq('org_id', orgId)
     .eq('ativo', true)
-    .order('criado_em')
-    .limit(1)
-    .maybeSingle()
+    .not('alerta_queda_em', 'is', null)
   if (error) throw error
-  return data as CanalConexao | null
+  return data ?? []
 }

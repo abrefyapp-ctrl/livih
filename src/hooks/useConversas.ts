@@ -15,8 +15,8 @@ type Dados = { chave: string; conversas: ConversaLista[]; erro: string | null }
  * Conversas de uma aba + contagem por estado, ao vivo: qualquer mudança em `conversas` da
  * organização (mensagem nova, alguém assumiu, agente chamou a equipe) recarrega a lista.
  */
-export function useConversas(orgId: string | undefined, estado: EstadoConversa) {
-  const chave = `${orgId}|${estado}`
+export function useConversas(orgId: string | undefined, estado: EstadoConversa, canalId?: string) {
+  const chave = `${orgId}|${estado}|${canalId ?? ''}`
   const [dados, setDados] = useState<Dados | null>(null)
   const [contagem, setContagem] = useState(ZERO)
   const [versao, setVersao] = useState(0) // "tentar de novo" pede uma nova busca
@@ -26,7 +26,7 @@ export function useConversas(orgId: string | undefined, estado: EstadoConversa) 
     let ativo = true
     let espera: ReturnType<typeof setTimeout> | undefined
     const buscar = () =>
-      Promise.all([listarConversas(orgId, estado), contarPorEstado(orgId)])
+      Promise.all([listarConversas(orgId, estado, canalId), contarPorEstado(orgId, canalId)])
         .then(([lista, cont]) => {
           if (!ativo) return // resposta velha (trocou de aba no meio)
           setDados({ chave, conversas: lista, erro: null })
@@ -47,7 +47,7 @@ export function useConversas(orgId: string | undefined, estado: EstadoConversa) 
       clearTimeout(espera)
       void supabase.removeChannel(canal)
     }
-  }, [orgId, estado, chave, versao])
+  }, [orgId, estado, canalId, chave, versao])
 
   const recarregar = useCallback(() => setVersao((v) => v + 1), [])
   const atual = dados?.chave === chave ? dados : null

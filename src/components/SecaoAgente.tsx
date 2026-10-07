@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useSessao } from '../hooks/useSessao'
 import { buscarAgente, salvarAgente, type Agente } from '../services/configuracoes'
 import { formatarTelefone } from '../services/formato'
@@ -8,7 +9,7 @@ import { CampoTexto } from './CampoTexto'
 import { EstadoVazio } from './EstadoVazio'
 import { Icone } from './Icone'
 
-type Formulario = { ativo: boolean; prompt: string; casos: string[]; telefone: string }
+type Formulario = { prompt: string; casos: string[]; telefone: string }
 
 const casosDe = (a: Agente): string[] => {
   const r = a.regras_humano as { casos?: unknown } | null
@@ -16,7 +17,6 @@ const casosDe = (a: Agente): string[] => {
 }
 
 const paraFormulario = (a: Agente): Formulario => ({
-  ativo: a.ativo,
   prompt: a.prompt,
   casos: casosDe(a),
   telefone: a.telefone_alerta ? formatarTelefone(a.telefone_alerta) : '',
@@ -83,7 +83,6 @@ export function SecaoAgente() {
     setErro(null)
     try {
       const campos = {
-        ativo: form.ativo,
         prompt: form.prompt,
         telefone_alerta: telefone ?? null,
         regras_humano: { ...((atual.dado.regras_humano as object) ?? {}), casos: form.casos },
@@ -117,22 +116,13 @@ export function SecaoAgente() {
       {!podeEditar && <Aviso>Só dono e admin alteram o agente. Você está vendo as configurações atuais.</Aviso>}
 
       <fieldset disabled={!podeEditar} className="space-y-6">
-        <div className="flex items-start justify-between gap-4 rounded-lg border border-borda bg-superficie p-4">
-          <div>
-            <p className="font-medium">{form.ativo ? 'Agente ligado' : 'Agente desligado'}</p>
-            <p className="text-pequeno text-texto-3">
-              {form.ativo
-                ? 'Responde as conversas novas e chama a equipe quando precisa.'
-                : 'Não responde ninguém. Conversas novas vão direto para Aguardando você.'}
-            </p>
-          </div>
-          <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-            <span className="sr-only">Agente ligado</span>
-            <input type="checkbox" role="switch" checked={form.ativo} onChange={(e) => mudar({ ativo: e.target.checked })} className="peer sr-only" />
-            <span className="h-6 w-11 rounded-full bg-slate-300 transition-colors peer-checked:bg-primaria peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-destaque" />
-            <span className="absolute left-0.5 size-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5" />
-          </label>
-        </div>
+        <Aviso>
+          Estas instruções valem para todos os números da empresa. Ligar ou desligar o agente em cada número é em{' '}
+          <Link to="/configuracoes/whatsapp" className="font-semibold underline">
+            WhatsApp
+          </Link>
+          . Com o agente desligado, as conversas novas vão direto para Aguardando você.
+        </Aviso>
 
         <div className="space-y-1.5">
           <label htmlFor="prompt" className="block text-pequeno font-medium text-texto-2">
