@@ -1,6 +1,7 @@
 import type { Mensagem } from '../services/atendimento'
 import { hora } from '../services/formato'
 import { Icone, type NomeIcone } from './Icone'
+import { TextoWhatsapp } from './TextoWhatsapp'
 
 const MIDIA: Partial<Record<Mensagem['tipo'], string>> = {
   imagem: 'Imagem',
@@ -22,7 +23,13 @@ const ENTREGA: Record<Mensagem['status_entrega'], { icone: NomeIcone; rotulo: st
 }
 
 function Conteudo({ m }: { m: Mensagem }) {
-  if (m.tipo === 'texto') return <p className="break-words whitespace-pre-wrap">{m.texto}</p>
+  if (m.tipo === 'texto') {
+    return (
+      <p className="break-words whitespace-pre-wrap">
+        <TextoWhatsapp texto={m.texto ?? ''} />
+      </p>
+    )
+  }
 
   if (m.tipo === 'audio') {
     return (
@@ -44,7 +51,11 @@ function Conteudo({ m }: { m: Mensagem }) {
         <Icone nome="arquivo" className="size-3.5" />
         {MIDIA[m.tipo]}
       </p>
-      {m.texto && <p className="break-words whitespace-pre-wrap">{m.texto}</p>}
+      {m.texto && (
+        <p className="break-words whitespace-pre-wrap">
+          <TextoWhatsapp texto={m.texto} />
+        </p>
+      )}
     </div>
   )
 }

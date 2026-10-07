@@ -34,7 +34,7 @@ export function Conversas() {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className={`h-full w-full shrink-0 border-r border-borda md:w-80 lg:w-90 ${id ? 'hidden md:block' : ''}`}>
+      <div className={`h-full w-full shrink-0 border-r border-borda md:w-80 lg:w-96 ${id ? 'hidden md:block' : ''}`}>
         <ListaConversas
           aba={aba}
           aoTrocarAba={(a) => setParams({ aba: a })}

@@ -50,7 +50,7 @@ export function ListaConversas({ aba, aoTrocarAba, conversas, contagem, carregan
   return (
     <section aria-label="Conversas" className="flex h-full min-h-0 flex-col bg-superficie">
       <div className="space-y-3 border-b border-borda p-3">
-        <div role="tablist" aria-label="Filtrar por situação" className="flex gap-1 overflow-x-auto">
+        <div role="tablist" aria-label="Filtrar por situação" className="grid grid-cols-4 gap-1">
           {ABAS.map((a) => {
             const ativa = a.estado === aba
             const n = contagem[a.estado]
@@ -60,14 +60,14 @@ export function ListaConversas({ aba, aoTrocarAba, conversas, contagem, carregan
                 role="tab"
                 aria-selected={ativa}
                 onClick={() => aoTrocarAba(a.estado)}
-                className={`flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-pequeno font-medium transition-colors ${
+                className={`flex h-8 min-w-0 items-center justify-center gap-1 rounded-md px-1 text-legenda font-medium transition-colors ${
                   ativa ? 'bg-primaria-suave text-primaria' : 'text-texto-2 hover:bg-fundo'
                 }`}
               >
-                {a.rotulo}
+                <span className="truncate">{a.rotulo}</span>
                 {a.estado !== 'encerrada' && n > 0 && (
                   <span
-                    className={`rounded-full px-1.5 text-legenda font-semibold ${
+                    className={`shrink-0 rounded-full px-1.5 text-legenda font-semibold ${
                       a.estado === 'aguardando_humano' ? 'bg-atencao text-white' : 'bg-slate-100 text-texto-2'
                     }`}
                   >
