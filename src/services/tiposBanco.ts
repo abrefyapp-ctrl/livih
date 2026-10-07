@@ -871,6 +871,7 @@ export type Database = {
         Args: { p_conversa: string; p_mensagem: string; p_texto: string }
         Returns: Json
       }
+      agente_suspeita_robo: { Args: { p_conversa: string }; Returns: string }
       alerta_resultado: {
         Args: { p_alerta: number; p_erro?: string; p_ok: boolean }
         Returns: undefined
@@ -946,6 +947,19 @@ export type Database = {
         Args: { p_conversa: string; p_texto: string }
         Returns: string
       }
+      equipe_listar: {
+        Args: { p_org: string }
+        Returns: {
+          ativo: boolean
+          criado_em: string
+          email: string
+          nome: string
+          papel: Database["public"]["Enums"]["papel_org"]
+          senha_definida: boolean
+          ultimo_acesso: string
+          user_id: string
+        }[]
+      }
       fila_manutencao: { Args: never; Returns: undefined }
       fila_reivindicar: {
         Args: { p_limite?: number }
@@ -1020,6 +1034,13 @@ export type Database = {
           p_papeis: Database["public"]["Enums"]["papel_org"][]
         }
         Returns: boolean
+      }
+      usuario_por_email: {
+        Args: { p_email: string }
+        Returns: {
+          id: string
+          senha_definida: boolean
+        }[]
       }
       verificar_segredo_interno: {
         Args: { p_segredo: string }

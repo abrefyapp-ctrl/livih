@@ -22,7 +22,10 @@ export function Layout() {
     document.title = aguardando ? `(${aguardando}) Livih` : 'Livih'
   }, [aguardando])
 
-  const itens: ItemMenu[] = [{ para: '/conversas', rotulo: 'Conversas', icone: 'conversas', contador: aguardando }]
+  const itens: ItemMenu[] = [
+    { para: '/conversas', rotulo: 'Conversas', icone: 'conversas', contador: aguardando },
+    { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
+  ]
 
   const userId = sessao?.user.id
   const meuNome = (userId && equipe.get(userId)?.nome) || sessao?.user.email || ''

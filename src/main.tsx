@@ -9,6 +9,7 @@ import { Login } from './pages/Login'
 import { DefinirSenha } from './pages/DefinirSenha'
 import { Conversas } from './pages/Conversas'
 import { NaoEncontrada } from './pages/NaoEncontrada'
+import { Configuracoes } from './pages/Configuracoes'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -26,6 +27,7 @@ createRoot(document.getElementById('root')!).render(
           >
             <Route index element={<Navigate to="/conversas" replace />} />
             <Route path="conversas/:id?" element={<Conversas />} />
+            <Route path="configuracoes/:secao?" element={<Configuracoes />} />
             <Route path="*" element={<NaoEncontrada />} />
           </Route>
         </Routes>
