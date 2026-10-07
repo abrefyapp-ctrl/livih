@@ -1,14 +1,12 @@
-/** Marca da Livih: o "L" em dois planos do kit + o nome. */
+/**
+ * Marca oficial da Livih (public/marca). `claro` é a versão sobre o fundo petróleo (#092124) — só
+ * combina com esse fundo, que vem na própria imagem. Sem nome: só o símbolo (menu recolhido, carregando).
+ */
 export function Logo({ comNome = true, claro = false }: { comNome?: boolean; claro?: boolean }) {
-  return (
-    <span className="inline-flex items-center gap-2" aria-label="Livih">
-      <svg viewBox="0 0 32 32" className="size-7" aria-hidden="true">
-        <path d="M6 4l8-3v22l-8 3z" className="fill-destaque" />
-        <path d="M6 26l8-3h14l-8 3z" className="fill-primaria" />
-      </svg>
-      {comNome && (
-        <span className={`text-h2 font-bold tracking-tight ${claro ? 'text-white' : 'text-texto'}`}>livih</span>
-      )}
-    </span>
+  if (!comNome) return <img src="/marca/livih-simbolo.png" alt="Livih" className="size-8 shrink-0 self-start object-contain" />
+  return claro ? (
+    <img src="/marca/livih-petroleo.png" alt="Livih" className="h-12 w-auto shrink-0 self-start object-contain" />
+  ) : (
+    <img src="/marca/livih.png" alt="Livih" className="h-8 w-auto shrink-0 self-start object-contain" />
   )
 }

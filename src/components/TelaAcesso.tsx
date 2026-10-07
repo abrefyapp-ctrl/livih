@@ -5,7 +5,7 @@ import { Logo } from './Logo'
 export function TelaAcesso({ titulo, subtitulo, children }: { titulo: string; subtitulo: string; children: ReactNode }) {
   return (
     <div className="flex min-h-full">
-      <div className="hidden w-2/5 flex-col justify-between bg-navy-900 p-10 text-white lg:flex">
+      <div className="hidden w-2/5 flex-col justify-between bg-petroleo p-10 text-white lg:flex">
         <Logo claro />
         <div className="max-w-sm">
           <p className="text-2xl leading-snug font-semibold">
