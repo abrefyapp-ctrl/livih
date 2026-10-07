@@ -184,7 +184,10 @@ Deno.serve(async (req) => {
 
   if (body.event !== "message.any") return resposta(200, { ignorado: body.event ?? "sem evento" });
 
-  const chat: string = p.fromMe ? p.to : p.from;
+  // No GOWS, mensagem enviada pelo celular chega com `to` vazio e o chat em `from`
+  // (o `from` é sempre o chat, não o remetente). Sem o fallback, a resposta do atendente
+  // era descartada e a conversa não passava para "humano" — o agente respondia por cima.
+  const chat: string = p.fromMe ? (p.to || p.from) : p.from;
   if (!chat || chat.endsWith("@g.us") || chat.endsWith("@broadcast") || chat.endsWith("@newsletter")) {
     return resposta(200, { ignorado: "grupo/status/canal" });
   }
