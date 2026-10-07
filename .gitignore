@@ -6,3 +6,5 @@ dist
 .DS_Store
 .wrangler
 supabase/.temp
+*.log
+*.local

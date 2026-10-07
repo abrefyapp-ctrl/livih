@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+/* Tokens — ver docs/design-system.md. Primitivos da paleta do kit; os semânticos abaixo são o que
+   os componentes usam. Trocar a identidade = mexer aqui, não nos componentes. */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* primitivos */
+  --color-verde-50: #ecfdf5;
+  --color-verde-100: #d1fae5;
+  --color-verde-400: #34d399;
+  --color-verde-500: #10b981;
+  --color-verde-700: #0f766e;
+  --color-verde-800: #115e59;
+  --color-navy-900: #0f172a;
+
+  /* semânticos */
+  --color-primaria: #0f766e;        /* botão primário, links, item ativo (branco sobre ele: 5,4:1) */
+  --color-primaria-hover: #115e59;
+  --color-primaria-suave: #ecfdf5;  /* fundo de item ativo e de mensagem do agente */
+  --color-destaque: #10b981;        /* marca e indicadores; nunca texto branco sobre ele */
+  --color-fundo: #f8fafc;
+  --color-superficie: #ffffff;
+  --color-borda: #e2e8f0;
+  --color-texto: #0f172a;
+  --color-texto-2: #334155;
+  --color-texto-3: #64748b;         /* metadados: 4,8:1 sobre branco */
+  --color-atencao: #b45309;
+  --color-atencao-suave: #fffbeb;
+  --color-erro: #b91c1c;
+  --color-erro-suave: #fef2f2;
+  --color-info: #1d4ed8;
+  --color-info-suave: #eff6ff;
+
+  /* tipografia (tamanho / altura) */
+  --text-h1: 1.5rem;
+  --text-h1--line-height: 2rem;
+  --text-h2: 1.125rem;
+  --text-h2--line-height: 1.75rem;
+  --text-corpo: 0.875rem;
+  --text-corpo--line-height: 1.25rem;
+  --text-pequeno: 0.8125rem;
+  --text-pequeno--line-height: 1.125rem;
+  --text-legenda: 0.75rem;
+  --text-legenda--line-height: 1rem;
+
+  /* raio */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-fundo font-sans text-corpo text-texto antialiased;
+  }
+  /* Foco sempre visível no teclado, com a cor da marca. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-destaque;
+  }
+}
