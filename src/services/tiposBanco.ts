@@ -873,7 +873,15 @@ export type Database = {
           status?: string
           telefone?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_acesso_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       perfis: {
         Row: {
@@ -1037,39 +1045,6 @@ export type Database = {
         Args: { p_conversa: string; p_texto: string }
         Returns: string
       }
-      org_primeiros_passos: {
-        Args: { p_org: string }
-        Returns: {
-          agente_ligado: boolean
-          base: boolean
-          equipe: boolean
-          instrucoes: boolean
-          whatsapp: boolean
-        }[]
-      }
-      plataforma_criar_empresa: { Args: { p_nome: string }; Returns: string }
-      plataforma_definir_status: {
-        Args: { p_org: string; p_status: string }
-        Returns: undefined
-      }
-      plataforma_empresas: {
-        Args: never
-        Returns: {
-          conversas_30d: number
-          criado_em: string
-          dono_email: string
-          dono_nome: string
-          dono_senha_definida: boolean
-          id: string
-          membros: number
-          nome: string
-          numeros: number
-          numeros_conectados: number
-          slug: string
-          status: string
-          ultima_mensagem_em: string
-        }[]
-      }
       equipe_listar: {
         Args: { p_org: string }
         Returns: {
@@ -1108,7 +1083,41 @@ export type Database = {
         Returns: undefined
       }
       gerar_segredo_webhook: { Args: { p_canal: string }; Returns: string }
+      org_primeiros_passos: {
+        Args: { p_org: string }
+        Returns: {
+          agente_ligado: boolean
+          base: boolean
+          equipe: boolean
+          instrucoes: boolean
+          whatsapp: boolean
+        }[]
+      }
+      plataforma_criar_empresa: { Args: { p_nome: string }; Returns: string }
+      plataforma_definir_status: {
+        Args: { p_org: string; p_status: string }
+        Returns: undefined
+      }
+      plataforma_empresas: {
+        Args: never
+        Returns: {
+          conversas_30d: number
+          criado_em: string
+          dono_email: string
+          dono_nome: string
+          dono_senha_definida: boolean
+          id: string
+          membros: number
+          nome: string
+          numeros: number
+          numeros_conectados: number
+          slug: string
+          status: string
+          ultima_mensagem_em: string
+        }[]
+      }
       pode_ver_canal: { Args: { p_canal: string }; Returns: boolean }
+      pode_ver_contato: { Args: { p_contato: string }; Returns: boolean }
       pode_ver_conversa: { Args: { p_conversa: string }; Returns: boolean }
       registrar_entrada: {
         Args: {
