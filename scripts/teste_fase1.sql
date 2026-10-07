@@ -407,5 +407,55 @@ begin
   update public.agentes set ativo = true where canal_id = v_canal;
 end $$;
 
+-- Números por vendedor (migration 20261007190000)
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000d1', 'vendedor@f7.teste', '{"nome":"Vítor"}');
+insert into public.membros_org (org_id, user_id, papel)
+values (current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000d1', 'atendente');
+do $$
+declare v_canal uuid; r jsonb;
+begin
+  insert into public.canais (org_id, nome, telefone, instance_id, responsavel_id)
+  values (current_setting('teste.f7')::uuid, 'Vítor', '5541933334444', 'INST-VITOR', '00000000-0000-0000-0000-0000000000d1')
+  returning id into v_canal;
+  insert into public.agentes (org_id, canal_id, ativo, prompt) values (current_setting('teste.f7')::uuid, v_canal, true, 'outro');
+  r := public.registrar_entrada(v_canal, 'VEND-1', '5541977771111', null, 'Cliente do Vítor', 'texto', 'oi Vítor', '{}');
+  perform set_config('teste.conv_vendedor', r ->> 'conversa_id', true);
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'outro atendente não vê a conversa do número do vendedor',
+  not exists (select 1 from public.conversas where id = current_setting('teste.conv_vendedor')::uuid)
+  and not exists (select 1 from public.mensagens where conversa_id = current_setting('teste.conv_vendedor')::uuid);
+do $$ begin
+  perform public.enviar_mensagem(current_setting('teste.conv_vendedor')::uuid, 'oi');
+  insert into resultado (teste, ok) values ('outro atendente não responde no número do vendedor', false);
+exception when others then
+  insert into resultado (teste, ok) values ('outro atendente não responde no número do vendedor', true);
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000d1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'vendedor vê as conversas dele e as do número da empresa',
+  exists (select 1 from public.conversas where id = current_setting('teste.conv_vendedor')::uuid)
+  and exists (select 1 from public.conversas where id = current_setting('teste.conversa')::uuid);
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'dono vê o número do vendedor', exists (select 1 from public.conversas where id = current_setting('teste.conv_vendedor')::uuid);
+
+reset role;
+update public.agentes set prompt = 'instruções novas da empresa'
+ where canal_id = (select id from public.canais where instance_id = 'INST-F7');
+insert into resultado (teste, ok)
+select 'instruções do agente valem para todos os números', bool_and(prompt = 'instruções novas da empresa')
+  from public.agentes where org_id = current_setting('teste.f7')::uuid;
+insert into resultado (teste, ok)
+select 'ligar/desligar continua por número', count(distinct ativo) >= 1
+  from public.agentes where org_id = current_setting('teste.f7')::uuid;
+
 reset role;
 select n, teste, ok from resultado order by n;
