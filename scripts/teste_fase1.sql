@@ -457,5 +457,58 @@ insert into resultado (teste, ok)
 select 'ligar/desligar continua por número', count(distinct ativo) >= 1
   from public.agentes where org_id = current_setting('teste.f7')::uuid;
 
+-- Carteira (migration 20261007200000). Reaproveita: Vítor (d1) com número próprio e a conversa
+-- teste.conv_vendedor; Ana (b1) atendente comum; a1 dono.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare v_contato_vitor uuid; v_etapa uuid;
+begin
+  select contato_id into v_contato_vitor from public.conversas where id = current_setting('teste.conv_vendedor')::uuid;
+  perform set_config('teste.contato_vitor', v_contato_vitor::text, true);
+  select id into v_etapa from public.etapas_funil where org_id = current_setting('teste.f7')::uuid and nome = 'Novo';
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo)
+  values (current_setting('teste.f7')::uuid, v_contato_vitor, v_etapa, 'Negócio do Vítor');
+  -- contato cadastrado à mão, sem conversa nem responsável: é da empresa
+  insert into public.contatos (org_id, telefone, nome) values (current_setting('teste.f7')::uuid, '5541911110000', 'Sem dono');
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'atendente não vê o cliente nem o negócio da carteira do vendedor',
+  not exists (select 1 from public.contatos where id = current_setting('teste.contato_vitor')::uuid)
+  and not exists (select 1 from public.oportunidades where contato_id = current_setting('teste.contato_vitor')::uuid);
+insert into resultado (teste, ok)
+select 'contato sem conversa e sem responsável é de todos', exists (select 1 from public.contatos where nome = 'Sem dono');
+insert into resultado (teste, ok)
+select 'contato do número da empresa é de todos',
+  exists (select 1 from public.contatos c join public.conversas v on v.contato_id = c.id
+           where v.id = current_setting('teste.conversa')::uuid);
+
+do $$ begin
+  insert into public.contatos (org_id, telefone, nome) values (current_setting('teste.f7')::uuid, '5541922220000', 'Da Ana');
+  insert into resultado (teste, ok) select 'contato criado pela tela nasce na carteira de quem criou',
+    responsavel_id = '00000000-0000-0000-0000-0000000000b1' from public.contatos where telefone = '5541922220000';
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000d1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'vendedor vê o cliente e o negócio dele, e não o contato criado pela Ana',
+  exists (select 1 from public.contatos where id = current_setting('teste.contato_vitor')::uuid)
+  and exists (select 1 from public.oportunidades where titulo = 'Negócio do Vítor')
+  and not exists (select 1 from public.contatos where telefone = '5541922220000');
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'dono vê a carteira de todos', count(*) = 2 from public.contatos
+ where id = current_setting('teste.contato_vitor')::uuid or telefone = '5541922220000';
+do $$ begin
+  update public.contatos set responsavel_id = '00000000-0000-0000-0000-0000000000c1' where telefone = '5541922220000';
+  insert into resultado (teste, ok) values ('responsável precisa ser da equipe', false);
+exception when others then
+  insert into resultado (teste, ok) values ('responsável precisa ser da equipe', sqlerrm like '%da equipe%');
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;
