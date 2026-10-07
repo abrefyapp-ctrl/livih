@@ -342,5 +342,28 @@ begin
     motivo_humano like '%menos de 6 segundos%' from public.conversas where id = v_conv;
 end $$;
 
+-- Equipe (migration 20261007170000)
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'membro vê a equipe com e-mail',
+  count(*) >= 2 and bool_or(email = 'atendente@f7.teste') from public.equipe_listar(current_setting('teste.f7')::uuid);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'quem não é da organização não vê a equipe',
+  count(*) = 0 from public.equipe_listar(current_setting('teste.f7')::uuid);
+do $$ begin
+  perform public.usuario_por_email('atendente@f7.teste');
+  insert into resultado (teste, ok) values ('app não procura usuário por e-mail', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('app não procura usuário por e-mail', true);
+end $$;
+reset role;
+do $$ begin
+  update public.membros_org set papel = 'admin'
+   where org_id = current_setting('teste.f7')::uuid and user_id = '00000000-0000-0000-0000-0000000000a1';
+  insert into resultado (teste, ok) values ('último dono não se rebaixa', false);
+exception when others then
+  insert into resultado (teste, ok) values ('último dono não se rebaixa', sqlerrm like '%pelo menos um dono%');
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

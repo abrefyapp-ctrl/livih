@@ -419,3 +419,7 @@ verify_jwt = false
 
 [functions.whatsapp-enviar]
 verify_jwt = false
+
+# convidar-membro valida o login dentro da função (auth.getUser) e exige ser dono da organização.
+[functions.convidar-membro]
+verify_jwt = false
