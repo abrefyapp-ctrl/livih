@@ -109,10 +109,13 @@ RPC_FERRAMENTA = RPC.replace(
 
 
 def ferramenta(nome, descricao, fn, corpo_js, schema):
+    campos = json.dumps(list(schema["properties"].keys()))
     code = RPC_FERRAMENTA + f"""
 // A conversa vem do webhook, nunca do modelo: o agente não escolhe em qual conversa mexe.
 const conversa = $('Validar').first().json.conversa_id;
-const args = $input.item.json;
+// $input.item.json traz o item inteiro do workflow junto com os argumentos: fica só o que é do esquema.
+const CAMPOS = {campos};
+const args = Object.fromEntries(Object.entries($input.item.json || {{}}).filter(([k]) => CAMPOS.includes(k)));
 return JSON.stringify(await rpc('{fn}', {corpo_js}));
 """
     return {

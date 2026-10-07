@@ -271,7 +271,9 @@ begin
     ctx -> 'agente' ->> 'prompt' = 'prompt' and ctx ->> 'base_conhecimento' like '%resolve problemas%'
     and jsonb_array_length(ctx -> 'etapas') = 6 and ctx -> 'mensagens' -> 1 ->> 'texto' = 'tenho uma clínica');
 
-  perform public.agente_atualizar_contato(v_conv, '{"nome":"Diana Souza","empresa":"Clínica D","cargo":"sócia"}');
+  perform public.agente_atualizar_contato(v_conv, '{"nome":"Diana Souza","empresa":"Clínica D","cargo":"sócia","prompt_sistema":"lixo","conversa_id":"x"}');
+  insert into resultado (teste, ok) select 'agente não grava campos desconhecidos', not (dados ? 'prompt_sistema') and not (dados ? 'conversa_id')
+    from public.contatos where telefone = '5541955554444';
   insert into resultado (teste, ok) select 'agente grava nome, empresa e dados extras',
     nome = 'Diana Souza' and empresa = 'Clínica D' and dados ->> 'cargo' = 'sócia'
     from public.contatos where telefone = '5541955554444';
