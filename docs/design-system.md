@@ -40,12 +40,16 @@ Navegação principal (barra lateral), só com o que já tem dado real:
 
 | Item | Rota | Fase |
 |---|---|---|
-| Conversas (com contador de "aguardando") | `/conversas` | MVP |
-| Contatos | `/contatos` | 2 |
-| Oportunidades (kanban do funil) | `/oportunidades` | 2 |
-| Configurações (agente, base, canal, equipe) | `/configuracoes` | 2 |
+| Conversas (com contador de "aguardando"; filtro por número) | `/conversas` | feito |
+| Contatos (lista da carteira + perfil `/contatos/:id`) | `/contatos` | feito |
+| Oportunidades (kanban do funil, arrastar entre etapas) | `/oportunidades` | feito |
+| Configurações (equipe, WhatsApp, agente, base) | `/configuracoes/:secao` | feito |
+| Painel (números reais: conversas por estado, tempo até assumir, funil) | `/` | próximo |
 
-Itens de fase 2 não aparecem no menu até existirem — menu não leva a tela vazia.
+Menu só com o que existe — não leva a tela vazia.
+
+**Carteira (decisão de 07/10):** número de vendedor e os clientes dele só para ele, dono e admin; número da
+empresa e contatos sem dono para todos. A regra está na RLS (pode_ver_canal / pode_ver_contato), não na tela.
 
 Cabeçalho: seletor de organização (um usuário pode estar em várias), menu do usuário (sair).
 Busca global fica para a fase 2 (precisa de contatos + oportunidades).

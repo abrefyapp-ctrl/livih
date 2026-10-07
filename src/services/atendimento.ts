@@ -156,7 +156,7 @@ export async function listarNotas(contatoId: string): Promise<Nota[]> {
   return data ?? []
 }
 
-export async function criarNota(orgId: string, contatoId: string, conversaId: string, texto: string) {
+export async function criarNota(orgId: string, contatoId: string, conversaId: string | null, texto: string) {
   const { error } = await supabase
     .from('notas')
     .insert({ org_id: orgId, contato_id: contatoId, conversa_id: conversaId, texto })

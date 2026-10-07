@@ -27,6 +27,8 @@ export function Layout() {
 
   const itens: ItemMenu[] = [
     { para: '/conversas', rotulo: 'Conversas', icone: 'conversas', contador: aguardando },
+    { para: '/contatos', rotulo: 'Contatos', icone: 'usuario' },
+    { para: '/oportunidades', rotulo: 'Oportunidades', icone: 'funil' },
     { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
   ]
 

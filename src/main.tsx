@@ -10,6 +10,9 @@ import { DefinirSenha } from './pages/DefinirSenha'
 import { Conversas } from './pages/Conversas'
 import { NaoEncontrada } from './pages/NaoEncontrada'
 import { Configuracoes } from './pages/Configuracoes'
+import { Contatos } from './pages/Contatos'
+import { ContatoPerfil } from './pages/ContatoPerfil'
+import { Oportunidades } from './pages/Oportunidades'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -27,6 +30,9 @@ createRoot(document.getElementById('root')!).render(
           >
             <Route index element={<Navigate to="/conversas" replace />} />
             <Route path="conversas/:id?" element={<Conversas />} />
+            <Route path="contatos" element={<Contatos />} />
+            <Route path="contatos/:id" element={<ContatoPerfil />} />
+            <Route path="oportunidades" element={<Oportunidades />} />
             <Route path="configuracoes/:secao?" element={<Configuracoes />} />
             <Route path="*" element={<NaoEncontrada />} />
           </Route>
