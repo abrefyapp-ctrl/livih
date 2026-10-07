@@ -11,6 +11,8 @@ const supabase = createClient(
 );
 const WAHA_URL = (Deno.env.get("WAHA_URL") ?? "").replace(/\/$/, "");
 const WAHA_API_KEY = Deno.env.get("WAHA_API_KEY") ?? "";
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
+const AUDIO_MAX_SEGUNDOS = 5 * 60;
 
 type Tipo = "texto" | "audio" | "imagem" | "video" | "documento" | "figurinha" | "localizacao" | "contato";
 // deno-lint-ignore no-explicit-any
@@ -95,6 +97,56 @@ function enxugar(o: Json, prof = 0): Json {
   return saida;
 }
 
+function emSegundoPlano(p: Promise<unknown>) {
+  const tarefa = p.catch((e) => console.error("segundo plano", String(e)));
+  // @ts-ignore EdgeRuntime existe no runtime do Supabase
+  globalThis.EdgeRuntime?.waitUntil?.(tarefa);
+}
+
+// Conversa com o bot → avisa o agente no n8n. Só a referência vai; o n8n lê o resto do banco.
+async function avisarAgente(ref: { org_id: string; conversa_id: string; mensagem_id: string }) {
+  const agenteUrl = Deno.env.get("N8N_AGENTE_URL");
+  if (!agenteUrl) return;
+  const r = await fetch(agenteUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-livih-token": Deno.env.get("N8N_AGENTE_TOKEN") ?? "" },
+    body: JSON.stringify({ org_id: ref.org_id, conversa_id: ref.conversa_id, mensagem_id: ref.mensagem_id }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) console.error("n8n", r.status, (await r.text()).slice(0, 200));
+}
+
+// Baixa o áudio do WAHA (o arquivo não é guardado), transcreve e grava. Áudio longo demais não
+// é transcrito: o agente vê "[audio]" e pede um áudio mais curto ou texto.
+async function transcreverEAvisar(
+  mensagemId: string, mediaUrl: string, mime: string | undefined, segundos: number,
+  entrada: { org_id: string; conversa_id: string; mensagem_id: string; chamar_agente: boolean },
+) {
+  let chamar = entrada.chamar_agente;
+  if (!segundos || segundos <= AUDIO_MAX_SEGUNDOS) {
+    const audio = await fetch(mediaUrl, { headers: { "X-Api-Key": WAHA_API_KEY }, signal: AbortSignal.timeout(20000) });
+    if (audio.ok) {
+      const form = new FormData();
+      const ext = (mime ?? "").includes("mpeg") ? "mp3" : (mime ?? "").includes("mp4") ? "m4a" : "ogg";
+      form.append("file", new Blob([await audio.arrayBuffer()], { type: mime ?? "audio/ogg" }), `audio.${ext}`);
+      form.append("model", "gpt-4o-transcribe");
+      form.append("language", "pt");
+      const t = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+        body: form,
+        signal: AbortSignal.timeout(60000),
+      });
+      const corpo = await t.json().catch(() => null);
+      if (t.ok && corpo?.text) {
+        const { data } = await supabase.rpc("registrar_transcricao", { p_mensagem: mensagemId, p_transcricao: corpo.text });
+        chamar = data?.chamar_agente ?? chamar;
+      } else console.error("transcrição", t.status, JSON.stringify(corpo).slice(0, 200));
+    } else console.error("download do áudio", audio.status);
+  }
+  if (chamar) await avisarAgente(entrada);
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return resposta(405, { erro: "método" });
 
@@ -176,16 +228,14 @@ Deno.serve(async (req) => {
     return resposta(500, { erro: "gravar" });
   }
 
-  // Fase 2: conversa com o bot → avisa o agente no n8n. Só a referência vai; o n8n lê o resto do banco.
-  const agenteUrl = Deno.env.get("N8N_AGENTE_URL");
-  if (entrada?.chamar_agente && agenteUrl) {
-    const aviso = fetch(agenteUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-livih-token": Deno.env.get("N8N_AGENTE_TOKEN") ?? "" },
-      body: JSON.stringify({ org_id: entrada.org_id, conversa_id: entrada.conversa_id, mensagem_id: entrada.mensagem_id }),
-    }).catch((e) => console.error("n8n", String(e)));
-    // @ts-ignore EdgeRuntime existe no runtime do Supabase
-    globalThis.EdgeRuntime?.waitUntil?.(aviso);
+  if (entrada?.duplicada) return resposta(200, { ok: true, duplicada: true });
+
+  // Áudio: transcreve depois de responder ao WAHA e só então acorda o agente, que já recebe o texto.
+  const segundos = Number(p._data?.Message?.audioMessage?.seconds ?? p._data?.message?.audioMessage?.seconds ?? 0);
+  if (tipo === "audio" && p.media?.url && OPENAI_API_KEY) {
+    emSegundoPlano(transcreverEAvisar(entrada.mensagem_id, p.media.url, p.media.mimetype, segundos, entrada));
+  } else if (entrada?.chamar_agente) {
+    emSegundoPlano(avisarAgente(entrada));
   }
 
   return resposta(200, { ok: true, duplicada: entrada?.duplicada ?? false });

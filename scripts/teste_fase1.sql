@@ -13,7 +13,7 @@ insert into auth.users (id, email, raw_user_meta_data) values
 insert into public.admins_plataforma (user_id) values ('00000000-0000-0000-0000-0000000000a1');
 
 insert into resultado (teste, ok)
-select 'perfil criado no cadastro', count(*) = 3 from public.perfis;
+select 'perfil criado no cadastro', count(*) = 3 from public.perfis where user_id::text like '00000000-0000-0000-0000-0000000000%';
 
 -- como admin da plataforma: cria F7 e um cliente
 set local role authenticated;
@@ -22,8 +22,8 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 do $$
 declare v_f7 uuid; v_cli uuid;
 begin
-  v_f7 := public.criar_organizacao('F7 Tech', 'f7');
-  v_cli := public.criar_organizacao('Cliente X', 'cliente-x');
+  v_f7 := public.criar_organizacao('F7 Teste', 'teste-f7');
+  v_cli := public.criar_organizacao('Cliente X', 'teste-cliente-x');
   insert into public.membros_org (org_id, user_id, papel) values
     (v_f7, '00000000-0000-0000-0000-0000000000b1', 'atendente'),
     (v_cli, '00000000-0000-0000-0000-0000000000c1', 'dono');
@@ -70,7 +70,8 @@ end $$;
 
 insert into resultado (teste, ok)
 select 'contato, conversa e 1 mensagem gravados',
-  (select count(*) from public.contatos) = 1 and (select count(*) from public.mensagens) = 1
+  (select count(*) from public.contatos where org_id = current_setting('teste.f7')::uuid) = 1
+  and (select count(*) from public.mensagens where org_id = current_setting('teste.f7')::uuid) = 1
   and (select nao_lidas from public.conversas where id = current_setting('teste.conversa')::uuid) = 1;
 
 -- atendente responde e assume
@@ -85,7 +86,7 @@ select 'responder assume a conversa', estado = 'humano' and atribuida_a = '00000
   from public.conversas where id = current_setting('teste.conversa')::uuid;
 
 insert into resultado (teste, ok)
-select 'resposta entra na fila', count(*) = 1 from public.fila_envio where status = 'pendente';
+select 'resposta entra na fila', count(*) = 1 from public.fila_envio where status = 'pendente' and org_id = current_setting('teste.f7')::uuid;
 
 -- atendente não grava mensagem direto nem altera conteúdo
 do $$ begin
@@ -111,7 +112,7 @@ exception when others then
 end $$;
 
 do $$ begin
-  perform public.registrar_entrada((select id from public.canais limit 1), 'X', '5541900000000', null, 'x', 'texto', 'x', '{}');
+  perform public.registrar_entrada((select id from public.canais where instance_id = 'INST-F7'), 'X', '5541900000000', null, 'x', 'texto', 'x', '{}');
   insert into resultado (teste, ok) values ('app não chama registrar_entrada', false);
 exception when others then
   insert into resultado (teste, ok) values ('app não chama registrar_entrada', true);
@@ -149,13 +150,13 @@ end $$;
 
 insert into resultado (teste, ok)
 select 'mensagem marcada como enviada', status_entrega = 'enviada' and wa_id = 'WAMID-OUT-1'
-  from public.mensagens where direcao = 'saida';
+  from public.mensagens where direcao = 'saida' and org_id = current_setting('teste.f7')::uuid;
 
-select public.registrar_status_entrega((select id from public.canais limit 1), 'WAMID-OUT-1', 'lida');
-select public.registrar_status_entrega((select id from public.canais limit 1), 'WAMID-OUT-1', 'entregue');
+select public.registrar_status_entrega((select id from public.canais where instance_id = 'INST-F7'), 'WAMID-OUT-1', 'lida');
+select public.registrar_status_entrega((select id from public.canais where instance_id = 'INST-F7'), 'WAMID-OUT-1', 'entregue');
 insert into resultado (teste, ok)
 select 'recibo não regride (lida não volta para entregue)', status_entrega = 'lida'
-  from public.mensagens where direcao = 'saida';
+  from public.mensagens where direcao = 'saida' and org_id = current_setting('teste.f7')::uuid;
 
 -- falha de envio volta para a fila com espera
 reset role;
@@ -182,11 +183,12 @@ insert into public.oportunidades (org_id, contato_id, etapa_id, titulo)
 select current_setting('teste.f7')::uuid, (select id from public.contatos limit 1),
        (select id from public.etapas_funil where org_id = current_setting('teste.f7')::uuid and nome = 'Novo'), 'Sistema de pedidos';
 update public.oportunidades set etapa_id = (select id from public.etapas_funil
-  where org_id = current_setting('teste.f7')::uuid and nome = 'Ganho');
+  where org_id = current_setting('teste.f7')::uuid and nome = 'Ganho')
+ where org_id = current_setting('teste.f7')::uuid;
 insert into resultado (teste, ok)
 select 'ganho fecha a oportunidade e o histórico tem 2 passos',
-  (select fechada_em is not null from public.oportunidades limit 1)
-  and (select count(*) from public.oportunidade_historico) = 2;
+  (select fechada_em is not null from public.oportunidades where org_id = current_setting('teste.f7')::uuid limit 1)
+  and (select count(*) from public.oportunidade_historico where org_id = current_setting('teste.f7')::uuid) = 2;
 
 -- auditoria: atendente não lê; dono lê a troca de estado
 insert into resultado (teste, ok) select 'atendente não lê auditoria', count(*) = 0 from public.auditoria;
@@ -241,6 +243,62 @@ begin
   exception when others then
     insert into resultado (teste, ok) values ('mensagem sem telefone e sem LID é recusada', true);
   end;
+end $$;
+
+-- ============ fase 2: agente ============
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+set local role service_role;
+update public.agentes set telefone_alerta = '5541911112222' where org_id = current_setting('teste.f7')::uuid;
+insert into public.base_conhecimento (org_id, titulo, conteudo)
+values (current_setting('teste.f7')::uuid, 'Quem somos', 'A F7 resolve problemas com tecnologia.');
+do $$
+declare v_canal uuid; r1 jsonb; r2 jsonb; v_conv uuid; ctx jsonb; x jsonb;
+begin
+  select id into v_canal from public.canais where instance_id = 'INST-F7';
+  r1 := public.registrar_entrada(v_canal, 'AG-1', '5541955554444', null, 'Diana', 'texto', 'Quero automatizar meu atendimento', '{}');
+  v_conv := (r1 ->> 'conversa_id')::uuid;
+  insert into resultado (teste, ok) values ('agente deve responder a última mensagem',
+    public.agente_deve_responder(v_conv, (r1 ->> 'mensagem_id')::uuid));
+  r2 := public.registrar_entrada(v_canal, 'AG-2', '5541955554444', null, 'Diana', 'audio', null, '{}', 'audio/ogg');
+  insert into resultado (teste, ok) values ('mensagem mais nova faz a anterior desistir',
+    not public.agente_deve_responder(v_conv, (r1 ->> 'mensagem_id')::uuid));
+  x := public.registrar_transcricao((r2 ->> 'mensagem_id')::uuid, 'tenho uma clínica');
+  insert into resultado (teste, ok) values ('transcrição gravada e devolve chamar_agente', (x ->> 'chamar_agente')::boolean);
+
+  ctx := public.agente_contexto(v_conv);
+  insert into resultado (teste, ok) values ('contexto traz prompt, base, etapas e mensagens com transcrição',
+    ctx -> 'agente' ->> 'prompt' = 'prompt' and ctx ->> 'base_conhecimento' like '%resolve problemas%'
+    and jsonb_array_length(ctx -> 'etapas') = 6 and ctx -> 'mensagens' -> 1 ->> 'texto' = 'tenho uma clínica');
+
+  perform public.agente_atualizar_contato(v_conv, '{"nome":"Diana Souza","empresa":"Clínica D","cargo":"sócia"}');
+  insert into resultado (teste, ok) select 'agente grava nome, empresa e dados extras',
+    nome = 'Diana Souza' and empresa = 'Clínica D' and dados ->> 'cargo' = 'sócia'
+    from public.contatos where telefone = '5541955554444';
+
+  x := public.agente_registrar_oportunidade(v_conv, 'Agente de atendimento para clínica', 'muitos pedidos repetidos');
+  x := public.agente_mover_etapa(v_conv, 'em diagnóstico');
+  insert into resultado (teste, ok) values ('agente move etapa (nome sem diferenciar maiúsculas)', (x ->> 'sucesso')::boolean);
+  x := public.agente_mover_etapa(v_conv, 'Ganho');
+  insert into resultado (teste, ok) values ('agente não marca ganho', not (x ->> 'sucesso')::boolean);
+  insert into resultado (teste, ok) select 'histórico do funil registra o agente', count(*) = 2
+    from public.oportunidade_historico h join public.oportunidades o on o.id = h.oportunidade_id
+   where o.contato_id = (select contato_id from public.conversas where id = v_conv) and h.autor_tipo = 'bot';
+
+  x := public.agente_responder(v_conv, 'Me conta como funciona hoje?', (r2 ->> 'mensagem_id')::uuid);
+  insert into resultado (teste, ok) values ('agente responde e entra na fila', (x ->> 'enviado')::boolean);
+
+  x := public.agente_chamar_humano(v_conv, 'pediu orçamento');
+  insert into resultado (teste, ok) select 'chamar humano para o bot e avisa a equipe',
+    c.estado = 'aguardando_humano' and (select count(*) from public.alertas where conversa_id = v_conv) = 1
+    from public.conversas c where c.id = v_conv;
+  x := public.agente_responder(v_conv, 'Vou chamar um especialista.', (r2 ->> 'mensagem_id')::uuid);
+  insert into resultado (teste, ok) values ('despedida da passagem para a equipe sai', (x ->> 'enviado')::boolean);
+  update public.conversas set estado = 'humano' where id = v_conv;
+  x := public.agente_responder(v_conv, 'resposta atrasada', (r2 ->> 'mensagem_id')::uuid);
+  insert into resultado (teste, ok) values ('agente não responde conversa assumida pela equipe', not (x ->> 'enviado')::boolean);
+
+  insert into resultado (teste, ok) select 'alerta sai pela fila de alertas', count(*) = 1 from public.alertas_reivindicar(10);
 end $$;
 
 reset role;

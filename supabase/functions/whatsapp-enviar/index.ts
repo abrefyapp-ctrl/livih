@@ -50,11 +50,15 @@ async function enviarWaha(item: ItemFila): Promise<Resultado> {
   if (!WAHA_URL || !WAHA_API_KEY) return { ok: false, erro: "WAHA_URL/WAHA_API_KEY não configurados" };
   if (!item.instance_id) return { ok: false, erro: "canal sem sessão" };
   const chatId = await chatIdWaha(item);
-  if (!chatId) return { ok: false, erro: `número sem WhatsApp: ${item.telefone}` };
+  return await sendTextWaha(item.instance_id, chatId, item.texto, item.telefone);
+}
+
+async function sendTextWaha(sessao: string, chatId: string | null, mensagem: string, telefone: string | null): Promise<Resultado> {
+  if (!chatId) return { ok: false, erro: `número sem WhatsApp: ${telefone}` };
   const r = await fetch(`${WAHA_URL}/api/sendText`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Api-Key": WAHA_API_KEY },
-    body: JSON.stringify({ session: item.instance_id, chatId, text: item.texto }),
+    body: JSON.stringify({ session: sessao, chatId, text: mensagem }),
     signal: AbortSignal.timeout(20000),
   });
   const texto = await r.text();
@@ -107,5 +111,21 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ enviadas, falhas }), { headers: { "Content-Type": "application/json" } });
+  // Alertas para a equipe (mesmo canal da organização, destinatário fora do CRM).
+  let alertas = 0;
+  const { data: pendentes } = await supabase.rpc("alertas_reivindicar", { p_limite: 10 });
+  for (const a of (pendentes ?? []) as { alerta_id: number; canal_tipo: string; instance_id: string; telefone: string; texto: string }[]) {
+    let resultado: Resultado;
+    try {
+      resultado = a.canal_tipo === "waha"
+        ? await sendTextWaha(a.instance_id, await chatIdWaha({ instance_id: a.instance_id, telefone: a.telefone, whatsapp_lid: null } as ItemFila), a.texto, a.telefone)
+        : { ok: false, erro: `provedor sem envio: ${a.canal_tipo}` };
+    } catch (e) {
+      resultado = { ok: false, erro: String(e).slice(0, 300) };
+    }
+    await supabase.rpc("alerta_resultado", { p_alerta: a.alerta_id, p_ok: resultado.ok, p_erro: resultado.erro ?? null });
+    if (resultado.ok) alertas++;
+  }
+
+  return new Response(JSON.stringify({ enviadas, falhas, alertas }), { headers: { "Content-Type": "application/json" } });
 });
