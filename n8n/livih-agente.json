@@ -1,0 +1,332 @@
+{
+  "id": "LvhAgenteLivih01",
+  "name": "Livih — Agente",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "livih-agente",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "name": "Webhook",
+      "id": "8f7ff96a-75ad-5a22-b2b0-6d3cd65ad2cc",
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "5f0d6c1e-1a2b-4a9e-9a61-0000000000a1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Só o Livih (Edge Function waha-webhook) chama este webhook: confere o token compartilhado.\nconst req = $input.first().json;\nif ((req.headers?.['x-livih-token'] || '') !== $env.LIVIH_AGENTE_TOKEN) return [];\nconst { conversa_id, mensagem_id } = req.body || {};\nif (!conversa_id || !mensagem_id) return [];\nreturn [{ json: { conversa_id, mensagem_id } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Validar",
+      "id": "d3d9be5f-a630-513c-8387-67e54778d830",
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 6,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "name": "Aguardar",
+      "id": "ef4cd392-2f21-5288-b9be-7b1ec318dc87",
+      "position": [
+        440,
+        0
+      ],
+      "webhookId": "5f0d6c1e-1a2b-4a9e-9a61-0000000000a2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rpc = async (fn, body) => {\n  const r = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${$env.LIVIH_SUPABASE_URL}/rest/v1/rpc/${fn}`,\n    headers: { apikey: $env.LIVIH_SUPABASE_KEY, Authorization: `Bearer ${$env.LIVIH_SUPABASE_KEY}` },\n    body,\n    json: true,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n  if (r.statusCode >= 400) throw new Error(`${fn}: ${r.body?.message || 'HTTP ' + r.statusCode}`);\n  return r.body;\n};\n\n// Depois da espera: se o cliente mandou outra mensagem (ou um atendente assumiu), esta execução\n// desiste; a execução da mensagem mais nova responde tudo junto.\nconst { conversa_id, mensagem_id } = $input.first().json;\nif ((await rpc('agente_deve_responder', { p_conversa: conversa_id, p_mensagem: mensagem_id })) !== true) return [];\n\nconst c = await rpc('agente_contexto', { p_conversa: conversa_id });\nconst contato = c.contato || {};\nconst op = c.oportunidade;\nconst regras = c.agente?.regras_humano?.casos || [];\n\nconst linha = (m) => {\n  const t = m.texto\n    ? m.texto\n    : m.tipo === 'audio'\n      ? '[áudio que não deu para transcrever — peça para escrever ou mandar um áudio mais curto]'\n      : `[${m.tipo} — você só lê texto e áudio; peça para descrever por escrito se for importante]`;\n  return `[${m.em}] ${m.de}: ${t}`;\n};\n\nconst agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });\n\nconst prompt_sistema = `${c.agente?.prompt || ''}\n\n---\n\n# CRM — COMO USAR AS FERRAMENTAS\n\nVocê trabalha dentro do CRM da ${c.organizacao?.nome || 'empresa'}. As ferramentas gravam o que você aprende na conversa.\n\n- **atualizar_contato**: sempre que o cliente disser algo novo sobre ele (nome, empresa, e-mail, cargo, segmento, cidade, tamanho da equipe), grave. Não pergunte nada só para preencher cadastro.\n- **registrar_oportunidade**: quando entender a necessidade, registre com um título curto e um resumo do diagnóstico. Atualize o resumo quando aprender mais.\n- **mover_etapa**: reflita o avanço no funil usando exatamente um destes nomes: ${(c.etapas || []).join(', ')}. Nunca marque Ganho ou Perdido; isso é da equipe.\n- **registrar_nota**: antes de passar para a equipe, deixe um resumo útil: dores, contexto, o que já foi explicado e o próximo passo sugerido.\n- **chamar_humano**: chame quando acontecer um destes casos:\n${regras.map((r) => `  - ${r}`).join('\\n') || '  - o cliente pedir para falar com uma pessoa'}\n  Depois de chamar, diga ao cliente, em uma frase, que um especialista vai continuar a conversa por aqui. Não continue o atendimento depois disso.\n\nNunca fale de ferramentas, CRM ou sistema com o cliente. A sua resposta final é exatamente o texto que será enviado no WhatsApp.\n\n# O QUE JÁ SABEMOS DESTE CONTATO\n\n- Nome: ${contato.nome || contato.nome_whatsapp || 'não informado'}${contato.nome ? '' : ' (nome do perfil do WhatsApp, não confirmado)'}\n- Empresa: ${contato.empresa || 'não informada'}\n- E-mail: ${contato.email || 'não informado'}\n- Outros dados: ${Object.keys(contato.dados || {}).length ? JSON.stringify(contato.dados) : 'nenhum'}\n- Oportunidade aberta: ${op ? `\"${op.titulo}\" — etapa ${op.etapa}${op.resumo ? `. Resumo: ${op.resumo}` : ''}` : 'nenhuma ainda'}\n\n# BASE DE CONHECIMENTO\n\n${c.base_conhecimento || '(vazia)'}\n\nData e hora agora: ${agora} (horário de Brasília).`;\n\nconst entrada = `Histórico da conversa no WhatsApp (mais antigas primeiro):\n\n${(c.mensagens || []).map(linha).join('\\n')}\n\nEscreva a próxima resposta para o cliente.`;\n\nreturn [{ json: { conversa_id, mensagem_id, prompt_sistema, entrada } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Contexto",
+      "id": "7614a449-7d5e-51eb-b37d-71119d77451c",
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.entrada }}",
+        "options": {
+          "systemMessage": "={{ $json.prompt_sistema }}",
+          "maxIterations": 8
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "name": "AI Agent",
+      "id": "712cfe5c-6ca8-5b3e-973c-eddb53fdd70a",
+      "position": [
+        900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "name": "OpenAI Chat Model",
+      "id": "62282f72-45c2-58ca-8a77-fcddc292256c",
+      "position": [
+        700,
+        260
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "7sGjuIVHzRDjq3T0",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rpc = async (fn, body) => {\n  const r = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${$env.LIVIH_SUPABASE_URL}/rest/v1/rpc/${fn}`,\n    headers: { apikey: $env.LIVIH_SUPABASE_KEY, Authorization: `Bearer ${$env.LIVIH_SUPABASE_KEY}` },\n    body,\n    json: true,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n  if (r.statusCode >= 400) throw new Error(`${fn}: ${r.body?.message || 'HTTP ' + r.statusCode}`);\n  return r.body;\n};\n\nconst texto = String($input.first().json.output || '').trim();\nif (!texto) return [];\nconst { conversa_id, mensagem_id } = $('Contexto').first().json;\nconst r = await rpc('agente_responder', { p_conversa: conversa_id, p_texto: texto, p_mensagem: mensagem_id });\nreturn [{ json: r }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "name": "Responder",
+      "id": "f78f0113-7dbc-5be2-ad66-2abd86f7952b",
+      "position": [
+        1300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Grava o que o cliente contou sobre ele mesmo. Envie só os campos que ele informou.",
+        "jsCode": "const rpc = async (fn, body) => {\n  const r = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${$env.LIVIH_SUPABASE_URL}/rest/v1/rpc/${fn}`,\n    headers: { apikey: $env.LIVIH_SUPABASE_KEY, Authorization: `Bearer ${$env.LIVIH_SUPABASE_KEY}` },\n    body,\n    json: true,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n  if (r.statusCode >= 400) return { erro: r.body?.message || `HTTP ${r.statusCode}` };\n  return r.body;\n};\n\n// A conversa vem do webhook, nunca do modelo: o agente não escolhe em qual conversa mexe.\nconst conversa = $('Validar').first().json.conversa_id;\nconst args = $input.item.json;\nreturn JSON.stringify(await rpc('agente_atualizar_contato', { p_conversa: conversa, p_dados: args }));\n",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"nome\": {\n      \"type\": \"string\",\n      \"description\": \"Nome da pessoa\"\n    },\n    \"empresa\": {\n      \"type\": \"string\",\n      \"description\": \"Nome da empresa\"\n    },\n    \"email\": {\n      \"type\": \"string\",\n      \"description\": \"E-mail\"\n    },\n    \"cargo\": {\n      \"type\": \"string\",\n      \"description\": \"Cargo ou função\"\n    },\n    \"segmento\": {\n      \"type\": \"string\",\n      \"description\": \"Ramo de atuação da empresa\"\n    },\n    \"cidade\": {\n      \"type\": \"string\",\n      \"description\": \"Cidade\"\n    },\n    \"colaboradores\": {\n      \"type\": \"string\",\n      \"description\": \"Tamanho da equipe\"\n    }\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "name": "atualizar_contato",
+      "id": "bc1fa346-5eec-5a50-bf55-1da1838a2d17",
+      "position": [
+        880,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Cria ou atualiza a oportunidade (lead) deste contato com um título curto e o resumo do diagnóstico até agora.",
+        "jsCode": "const rpc = async (fn, body) => {\n  const r = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${$env.LIVIH_SUPABASE_URL}/rest/v1/rpc/${fn}`,\n    headers: { apikey: $env.LIVIH_SUPABASE_KEY, Authorization: `Bearer ${$env.LIVIH_SUPABASE_KEY}` },\n    body,\n    json: true,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n  if (r.statusCode >= 400) return { erro: r.body?.message || `HTTP ${r.statusCode}` };\n  return r.body;\n};\n\n// A conversa vem do webhook, nunca do modelo: o agente não escolhe em qual conversa mexe.\nconst conversa = $('Validar').first().json.conversa_id;\nconst args = $input.item.json;\nreturn JSON.stringify(await rpc('agente_registrar_oportunidade', { p_conversa: conversa, p_titulo: args.titulo, p_resumo: args.resumo }));\n",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"titulo\": {\n      \"type\": \"string\",\n      \"description\": \"Título curto da necessidade, ex.: Agente de atendimento para clínica\"\n    },\n    \"resumo\": {\n      \"type\": \"string\",\n      \"description\": \"Resumo do diagnóstico: processo, gargalos, impacto\"\n    }\n  },\n  \"required\": [\n    \"titulo\",\n    \"resumo\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "name": "registrar_oportunidade",
+      "id": "3463df7c-2c8a-57ba-838c-8ec3672ddf4e",
+      "position": [
+        1030,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Move a oportunidade deste contato para outra etapa do funil (use o nome exato de uma etapa aberta).",
+        "jsCode": "const rpc = async (fn, body) => {\n  const r = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${$env.LIVIH_SUPABASE_URL}/rest/v1/rpc/${fn}`,\n    headers: { apikey: $env.LIVIH_SUPABASE_KEY, Authorization: `Bearer ${$env.LIVIH_SUPABASE_KEY}` },\n    body,\n    json: true,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n  if (r.statusCode >= 400) return { erro: r.body?.message || `HTTP ${r.statusCode}` };\n  return r.body;\n};\n\n// A conversa vem do webhook, nunca do modelo: o agente não escolhe em qual conversa mexe.\nconst conversa = $('Validar').first().json.conversa_id;\nconst args = $input.item.json;\nreturn JSON.stringify(await rpc('agente_mover_etapa', { p_conversa: conversa, p_etapa: args.etapa }));\n",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"etapa\": {\n      \"type\": \"string\",\n      \"description\": \"Nome exato da etapa\"\n    }\n  },\n  \"required\": [\n    \"etapa\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "name": "mover_etapa",
+      "id": "c7a881cc-65bf-545b-bc8f-4473cc9b1f0a",
+      "position": [
+        1180,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Deixa uma nota interna para a equipe (o cliente não vê).",
+        "jsCode": "const rpc = async (fn, body) => {\n  const r = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${$env.LIVIH_SUPABASE_URL}/rest/v1/rpc/${fn}`,\n    headers: { apikey: $env.LIVIH_SUPABASE_KEY, Authorization: `Bearer ${$env.LIVIH_SUPABASE_KEY}` },\n    body,\n    json: true,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n  if (r.statusCode >= 400) return { erro: r.body?.message || `HTTP ${r.statusCode}` };\n  return r.body;\n};\n\n// A conversa vem do webhook, nunca do modelo: o agente não escolhe em qual conversa mexe.\nconst conversa = $('Validar').first().json.conversa_id;\nconst args = $input.item.json;\nreturn JSON.stringify(await rpc('agente_nota', { p_conversa: conversa, p_texto: args.texto }));\n",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"texto\": {\n      \"type\": \"string\",\n      \"description\": \"Conteúdo da nota\"\n    }\n  },\n  \"required\": [\n    \"texto\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "name": "registrar_nota",
+      "id": "a19fb74f-2e9b-5e5c-ab58-0efc5a580472",
+      "position": [
+        1330,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Passa a conversa para a equipe: o assistente para de responder e a equipe é avisada no WhatsApp.",
+        "jsCode": "const rpc = async (fn, body) => {\n  const r = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${$env.LIVIH_SUPABASE_URL}/rest/v1/rpc/${fn}`,\n    headers: { apikey: $env.LIVIH_SUPABASE_KEY, Authorization: `Bearer ${$env.LIVIH_SUPABASE_KEY}` },\n    body,\n    json: true,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n  if (r.statusCode >= 400) return { erro: r.body?.message || `HTTP ${r.statusCode}` };\n  return r.body;\n};\n\n// A conversa vem do webhook, nunca do modelo: o agente não escolhe em qual conversa mexe.\nconst conversa = $('Validar').first().json.conversa_id;\nconst args = $input.item.json;\nreturn JSON.stringify(await rpc('agente_chamar_humano', { p_conversa: conversa, p_motivo: args.motivo }));\n",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"motivo\": {\n      \"type\": \"string\",\n      \"description\": \"Por que a equipe deve assumir, em uma frase\"\n    }\n  },\n  \"required\": [\n    \"motivo\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "name": "chamar_humano",
+      "id": "aab4eca9-0bdd-526c-b8fa-9e8c88c60498",
+      "position": [
+        1480,
+        260
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar": {
+      "main": [
+        [
+          {
+            "node": "Aguardar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar": {
+      "main": [
+        [
+          {
+            "node": "Contexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contexto": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "atualizar_contato": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrar_oportunidade": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "mover_etapa": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrar_nota": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chamar_humano": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
