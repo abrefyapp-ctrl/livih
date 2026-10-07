@@ -24,20 +24,26 @@ export async function listarEquipeCompleta(orgId: string): Promise<MembroEquipe[
   return (data ?? []) as MembroEquipe[]
 }
 
-/** Devolve o link de convite (conta nova ou ainda sem senha) ou null (já tinha conta). */
-export async function convidarMembro(
-  orgId: string,
-  dados: { email: string; nome: string; papel: Exclude<Papel, 'dono'> },
-): Promise<string | null> {
+type RespostaConvite = { link: string | null; aviso?: string | null }
+
+async function chamarConvite(corpo: Record<string, unknown>): Promise<RespostaConvite> {
   const { data, error } = await supabase.functions.invoke('convidar-membro', {
-    body: { org_id: orgId, ...dados, redirect_to: `${window.location.origin}/definir-senha` },
+    body: { ...corpo, redirect_to: `${window.location.origin}/definir-senha` },
   })
   if (error) {
-    const corpo = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null
-    throw new Error(corpo?.erro ?? 'Não foi possível convidar agora. Tente de novo.')
+    const resposta = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null
+    throw new Error(resposta?.erro ?? 'Não foi possível gerar o link agora. Tente de novo.')
   }
-  return (data as { link: string | null }).link
+  return data as RespostaConvite
 }
+
+/** Link de convite (conta nova ou ainda sem senha); link null = já tinha conta (aviso explica se houver). */
+export const convidarMembro = (orgId: string, dados: { email: string; nome: string; papel: Exclude<Papel, 'dono'> }) =>
+  chamarConvite({ org_id: orgId, ...dados })
+
+/** Link para alguém da equipe criar senha nova (esqueceu), sem depender de e-mail. */
+export const linkNovaSenha = (orgId: string, email: string) =>
+  chamarConvite({ org_id: orgId, email, acao: 'redefinir' }).then((r) => r.link)
 
 export async function alterarMembro(orgId: string, userId: string, campos: { papel?: Papel; ativo?: boolean }) {
   const { error } = await supabase.from('membros_org').update(campos).eq('org_id', orgId).eq('user_id', userId)

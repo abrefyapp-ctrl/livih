@@ -20,7 +20,7 @@ export function Configuracoes() {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-4xl px-4 pt-6 lg:px-8">
         <h1 className="text-h1 font-semibold">Configurações</h1>
-        <nav aria-label="Seções" className="mt-4 flex gap-1 overflow-x-auto border-b border-borda">
+        <nav aria-label="Seções" className="mt-4 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-borda [scrollbar-width:none]">
           {SECOES.map((s) => (
             <NavLink
               key={s.id}

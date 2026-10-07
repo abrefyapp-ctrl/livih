@@ -3,6 +3,7 @@ import { useSessao } from '../hooks/useSessao'
 import {
   alterarMembro,
   convidarMembro,
+  linkNovaSenha,
   listarEquipeCompleta,
   type MembroEquipe,
   type Papel,
@@ -41,7 +42,7 @@ export function SecaoEquipe() {
   const [desativar, setDesativar] = useState<MembroEquipe | null>(null)
   const [salvando, setSalvando] = useState<string | null>(null)
   const [erroAcao, setErroAcao] = useState<string | null>(null)
-  const [novoLink, setNovoLink] = useState<{ nome: string; link: string } | null>(null)
+  const [novoLink, setNovoLink] = useState<{ nome: string; link: string; tipo: 'convite' | 'senha' } | null>(null)
 
   useEffect(() => {
     let ativo = true
@@ -56,14 +57,20 @@ export function SecaoEquipe() {
   const lista = equipe?.orgId === orgId ? equipe.lista : null
   const recarregar = () => setVersao((v) => v + 1)
 
-  // Convite pendente: mesma Edge Function do convite, que devolve um link novo para quem ainda não criou senha.
+  // Convite pendente → link novo de convite; já tem senha (esqueceu) → link para criar senha nova.
   async function gerarNovoLink(m: MembroEquipe) {
     setSalvando(m.user_id)
     setErroAcao(null)
     try {
-      const link = await convidarMembro(orgId, { email: m.email, nome: m.nome ?? '', papel: m.papel === 'admin' ? 'admin' : 'atendente' })
-      if (link) setNovoLink({ nome: m.nome || m.email, link })
-      else setErroAcao(`${m.nome || m.email} já criou a senha. Basta entrar com ela.`)
+      const nome = m.nome || m.email
+      if (m.senha_definida) {
+        const link = await linkNovaSenha(orgId, m.email)
+        if (link) setNovoLink({ nome, link, tipo: 'senha' })
+      } else {
+        const r = await convidarMembro(orgId, { email: m.email, nome: m.nome ?? '', papel: m.papel === 'admin' ? 'admin' : 'atendente' })
+        if (r.link) setNovoLink({ nome, link: r.link, tipo: 'convite' })
+        else setErroAcao(r.aviso ?? `${nome} já criou a senha. Basta entrar com ela.`)
+      }
       recarregar()
     } catch (e) {
       setErroAcao((e as Error).message)
@@ -155,9 +162,9 @@ export function SecaoEquipe() {
                     ) : (
                       <span className="text-pequeno text-texto-2">{PAPEIS[m.papel].rotulo}</span>
                     )}
-                    {editavel && m.ativo && !m.senha_definida && m.papel !== 'dono' && (
+                    {editavel && m.ativo && (m.senha_definida || m.papel !== 'dono') && (
                       <Botao tamanho="sm" variante="secundario" icone="link" carregando={salvando === m.user_id} onClick={() => void gerarNovoLink(m)}>
-                        Novo link
+                        {m.senha_definida ? 'Redefinir senha' : 'Novo link'}
                       </Botao>
                     )}
                     {editavel &&
@@ -197,11 +204,11 @@ export function SecaoEquipe() {
 
       <Modal
         aberto={!!novoLink}
-        titulo="Novo link de convite"
+        titulo={novoLink?.tipo === 'senha' ? 'Link para criar senha nova' : 'Novo link de convite'}
         aoFechar={() => setNovoLink(null)}
         rodape={<Botao onClick={() => setNovoLink(null)}>Concluir</Botao>}
       >
-        {novoLink && <LinkConvite link={novoLink.link} nome={novoLink.nome} nomeOrg={orgAtiva?.nome ?? ''} />}
+        {novoLink && <LinkConvite link={novoLink.link} nome={novoLink.nome} nomeOrg={orgAtiva?.nome ?? ''} tipo={novoLink.tipo} />}
       </Modal>
 
       <DialogoConfirmacao
@@ -238,7 +245,7 @@ function Convite({
   const [papel, setPapel] = useState<Exclude<Papel, 'dono'>>('atendente')
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
-  const [resultado, setResultado] = useState<{ link: string | null } | null>(null)
+  const [resultado, setResultado] = useState<{ link: string | null; aviso: string | null } | null>(null)
 
   function fechar() {
     setNome('')
@@ -254,8 +261,8 @@ function Convite({
     setEnviando(true)
     setErro(null)
     try {
-      const link = await convidarMembro(orgId, { email, nome, papel })
-      setResultado({ link })
+      const r = await convidarMembro(orgId, { email, nome, papel })
+      setResultado({ link: r.link, aviso: r.aviso ?? null })
       aoConvidar()
     } catch (err) {
       setErro((err as Error).message)
@@ -275,7 +282,10 @@ function Convite({
         {resultado.link ? (
           <LinkConvite link={resultado.link} nome={nome || email} nomeOrg={nomeOrg} />
         ) : (
-          <p>{email} já tinha conta no Livih e agora está na equipe. Entra com a senha que já usa.</p>
+          <div className="space-y-3">
+            <p>{email} já tinha conta no Livih e agora está na equipe.</p>
+            {resultado.aviso ? <Aviso tom="atencao">{resultado.aviso}</Aviso> : <p>Entra com a senha que já usa.</p>}
+          </div>
         )}
       </Modal>
     )
@@ -323,12 +333,25 @@ function Convite({
 }
 
 /** Link de convite com copiar e mandar pelo WhatsApp (mensagem pronta). */
-function LinkConvite({ link, nome, nomeOrg }: { link: string; nome: string; nomeOrg: string }) {
+function LinkConvite({
+  link,
+  nome,
+  nomeOrg,
+  tipo = 'convite',
+}: {
+  link: string
+  nome: string
+  nomeOrg: string
+  tipo?: 'convite' | 'senha'
+}) {
   const [copiado, setCopiado] = useState(false)
   const primeiroNome = nome.includes('@') ? '' : nome.split(' ')[0]
+  const oi = `Oi${primeiroNome ? `, ${primeiroNome}` : ''}!`
   const mensagem =
-    `Oi${primeiroNome ? `, ${primeiroNome}` : ''}! Você foi convidado(a) para atender as conversas da ${nomeOrg} no Livih. ` +
-    `Crie sua senha por este link (vale por 24 horas): ${link}`
+    tipo === 'senha'
+      ? `${oi} Este é o link para você criar uma senha nova no Livih (vale por 24 horas): ${link}`
+      : `${oi} Você foi convidado(a) para atender as conversas da ${nomeOrg} no Livih. ` +
+        `Crie sua senha por este link (vale por 24 horas): ${link}`
 
   async function copiar() {
     try {
@@ -341,7 +364,10 @@ function LinkConvite({ link, nome, nomeOrg }: { link: string; nome: string; nome
 
   return (
     <div className="space-y-3">
-      <p>Mande este link para {nome}. Ele vale por 24 horas e abre a tela para criar a senha.</p>
+      <p>
+        Mande este link para {nome}. Ele vale por 24 horas e abre a tela para criar {tipo === 'senha' ? 'uma senha nova' : 'a senha'}.
+        {tipo === 'senha' && ' A senha atual continua valendo até a pessoa trocar.'}
+      </p>
       <div className="flex items-center gap-2 rounded-md border border-borda bg-fundo p-2">
         <Icone nome="link" className="size-4 shrink-0 text-texto-3" />
         <code className="min-w-0 flex-1 truncate text-legenda">{link}</code>

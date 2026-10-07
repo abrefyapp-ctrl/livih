@@ -7,6 +7,8 @@
 // POST { org_id, email, nome?, papel: 'admin' | 'atendente', redirect_to }
 //   → { link } (conta nova ou ainda sem senha) | { link: null } (já tinha conta: entra com a senha dela)
 //   409 se já está na equipe
+// POST { org_id, email, acao: 'redefinir', redirect_to } → { link } para alguém da equipe criar senha nova
+//   (esqueceu a senha) sem depender do e-mail do Supabase.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -23,6 +25,19 @@ const CORS = {
 const json = (status: number, corpo: unknown) =>
   new Response(JSON.stringify(corpo), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
+// Um link de senha para conta que JÁ existe entrega a conta a quem gerou. Só o dono da organização
+// pode gerar, e só para quem não tem acesso a mais nada: se a pessoa está em outra organização (ou é admin
+// da plataforma), o dono desta tomaria a conta e veria a outra. Nesses casos, "Esqueci minha senha" (vai
+// para o e-mail dela).
+async function soDestaOrganizacao(userId: string, orgId: string): Promise<boolean> {
+  const [{ count }, { data: adm }] = await Promise.all([
+    admin.from("membros_org").select("org_id", { count: "exact", head: true }).eq("user_id", userId).neq("org_id", orgId),
+    admin.from("admins_plataforma").select("user_id").eq("user_id", userId).maybeSingle(),
+  ]);
+  return (count ?? 0) === 0 && !adm;
+}
+const SO_PELO_EMAIL = "Essa pessoa também tem acesso a outra organização. Peça para ela usar “Esqueci minha senha” na tela de entrar.";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json(405, { erro: "use POST" });
@@ -31,7 +46,7 @@ Deno.serve(async (req) => {
   const { data: quem } = await admin.auth.getUser(token);
   if (!quem.user) return json(401, { erro: "faça login de novo" });
 
-  let p: { org_id?: string; email?: string; nome?: string; papel?: string; redirect_to?: string };
+  let p: { org_id?: string; email?: string; nome?: string; papel?: string; redirect_to?: string; acao?: string };
   try {
     p = await req.json();
   } catch {
@@ -62,6 +77,20 @@ Deno.serve(async (req) => {
   const { data: achados } = await admin.rpc("usuario_por_email", { p_email: email });
   const existente = (achados as { id: string; senha_definida: boolean }[] | null)?.[0];
 
+  if (p.acao === "redefinir") {
+    const { data: membro } = existente
+      ? await admin.from("membros_org").select("ativo").eq("org_id", p.org_id).eq("user_id", existente.id).maybeSingle()
+      : { data: null };
+    if (!membro?.ativo) return json(404, { erro: "Essa pessoa não está ativa na equipe." });
+    if (!(await soDestaOrganizacao(existente!.id, p.org_id))) return json(409, { erro: SO_PELO_EMAIL });
+    const { data, error } = await admin.auth.admin.generateLink({ type: "recovery", email, options: { redirectTo } });
+    if (error) {
+      console.error("generateLink recovery", error.message);
+      return json(500, { erro: "Não foi possível gerar o link. Tente de novo." });
+    }
+    return json(200, { link: data.properties.action_link });
+  }
+
   if (existente) {
     const { data: membro } = await admin
       .from("membros_org")
@@ -75,6 +104,7 @@ Deno.serve(async (req) => {
 
   let userId = existente?.id ?? null;
   let link: string | null = null;
+  let aviso: string | null = null;
   const nome = (p.nome ?? "").trim();
 
   if (!existente) {
@@ -89,6 +119,8 @@ Deno.serve(async (req) => {
     }
     userId = data.user.id;
     link = data.properties.action_link;
+  } else if (!existente.senha_definida && !(await soDestaOrganizacao(existente.id, p.org_id))) {
+    aviso = SO_PELO_EMAIL; // entra na equipe, mas o link de senha só pelo e-mail dela
   } else if (!existente.senha_definida) {
     // Convidado antes e ainda sem senha: link novo para criar a senha.
     const { data, error } = await admin.auth.admin.generateLink({ type: "recovery", email, options: { redirectTo } });
@@ -108,5 +140,5 @@ Deno.serve(async (req) => {
     return json(500, { erro: "A conta existe, mas não entrou na equipe. Tente de novo." });
   }
 
-  return json(200, { link });
+  return json(200, { link, aviso });
 });
