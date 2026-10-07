@@ -25,10 +25,32 @@ type ItemFila = {
 };
 type Resultado = { ok: boolean; id?: string; erro?: string };
 
+// Para quem enviar. O LID é o identificador que o WhatsApp realmente usa, então tem preferência.
+// Sem LID, pergunta ao WAHA o id certo do número: contas brasileiras antigas existem SEM o nono
+// dígito, e o telefone guardado no Livih sempre tem o 9 (o GOWS não acha "55419…" se a conta é "5541…").
+async function chatIdWaha(item: ItemFila): Promise<string | null> {
+  if (item.whatsapp_lid) return `${item.whatsapp_lid}@lid`;
+  if (!item.telefone) return null;
+  const candidatos = [item.telefone];
+  const br = item.telefone.match(/^55(\d{2})9(\d{8})$/);
+  if (br) candidatos.push(`55${br[1]}${br[2]}`);
+  for (const numero of candidatos) {
+    const r = await fetch(
+      `${WAHA_URL}/api/contacts/check-exists?session=${encodeURIComponent(item.instance_id!)}&phone=${numero}`,
+      { headers: { "X-Api-Key": WAHA_API_KEY }, signal: AbortSignal.timeout(8000) },
+    );
+    if (!r.ok) continue;
+    const corpo = await r.json().catch(() => null);
+    if (corpo?.numberExists && corpo?.chatId) return String(corpo.chatId);
+  }
+  return null;
+}
+
 async function enviarWaha(item: ItemFila): Promise<Resultado> {
   if (!WAHA_URL || !WAHA_API_KEY) return { ok: false, erro: "WAHA_URL/WAHA_API_KEY não configurados" };
   if (!item.instance_id) return { ok: false, erro: "canal sem sessão" };
-  const chatId = item.telefone ? `${item.telefone}@c.us` : `${item.whatsapp_lid}@lid`;
+  const chatId = await chatIdWaha(item);
+  if (!chatId) return { ok: false, erro: `número sem WhatsApp: ${item.telefone}` };
   const r = await fetch(`${WAHA_URL}/api/sendText`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Api-Key": WAHA_API_KEY },
