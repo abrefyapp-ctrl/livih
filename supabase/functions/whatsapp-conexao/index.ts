@@ -192,6 +192,9 @@ Deno.serve(async (req) => {
 
     if (p.acao === "listar") return json(200, { canais: await listar(p.org_id, quem.user.id, gerencia) });
     if (!gerencia) return json(403, { erro: "Só dono e admin mexem nos números de WhatsApp." });
+    // Empresa suspensa não conecta nem reconecta número (o resto do sistema já a bloqueia por eh_membro/tem_papel).
+    const { data: org } = await admin.from("organizacoes").select("status").eq("id", p.org_id).maybeSingle();
+    if (org?.status !== "ativa") return json(403, { erro: "Esta empresa está suspensa. Fale com a equipe da Livih." });
 
     if (p.acao === "criar") {
       const nome = (p.nome ?? "").trim() || "WhatsApp";
