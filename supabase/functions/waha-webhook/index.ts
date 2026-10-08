@@ -107,16 +107,37 @@ function emSegundoPlano(p: Promise<unknown>) {
 }
 
 // Conversa com o bot → avisa o agente no n8n. Só a referência vai; o n8n lê o resto do banco.
+// Se o agente não pode ser chamado, o cliente não pode ficar sem resposta em silêncio: a conversa vai para a
+// equipe (aguardando_humano) com o motivo. Aconteceu em 08/10/2026: os secrets do n8n sumiram do projeto e o
+// agente parou de responder sem nenhum aviso.
 async function avisarAgente(ref: { org_id: string; conversa_id: string; mensagem_id: string }) {
   const agenteUrl = Deno.env.get("N8N_AGENTE_URL");
-  if (!agenteUrl) return;
-  const r = await fetch(agenteUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-livih-token": Deno.env.get("N8N_AGENTE_TOKEN") ?? "" },
-    body: JSON.stringify({ org_id: ref.org_id, conversa_id: ref.conversa_id, mensagem_id: ref.mensagem_id }),
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!r.ok) console.error("n8n", r.status, (await r.text()).slice(0, 200));
+  const token = Deno.env.get("N8N_AGENTE_TOKEN");
+  let falha: string | null = null;
+  if (!agenteUrl || !token) {
+    falha = "Agente indisponível (configuração do servidor)";
+  } else {
+    try {
+      const r = await fetch(agenteUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-livih-token": token },
+        body: JSON.stringify({ org_id: ref.org_id, conversa_id: ref.conversa_id, mensagem_id: ref.mensagem_id }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!r.ok) {
+        console.error("n8n", r.status, (await r.text()).slice(0, 200));
+        falha = `Agente indisponível (n8n respondeu ${r.status})`;
+      }
+    } catch (e) {
+      console.error("n8n", String(e));
+      falha = "Agente indisponível (n8n fora do ar)";
+    }
+  }
+  if (falha) {
+    console.error("agente não acionado:", falha, ref.conversa_id);
+    await supabase.from("conversas").update({ estado: "aguardando_humano", motivo_humano: falha })
+      .eq("id", ref.conversa_id).eq("estado", "bot");
+  }
 }
 
 // Baixa o áudio do WAHA (o arquivo não é guardado), transcreve e grava. Áudio longo demais não
