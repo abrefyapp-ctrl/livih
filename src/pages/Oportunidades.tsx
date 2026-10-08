@@ -174,7 +174,7 @@ export function Oportunidades() {
                       {etapa.tipo !== 'aberta' && ` · últimos ${DIAS_FECHADAS} dias`}
                     </p>
                   </header>
-                  <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2">
+                  <ul className="relative min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2">
                     {cartoes.map((o) => {
                       const resp = nomeResp(o.responsavel_id)
                       return (

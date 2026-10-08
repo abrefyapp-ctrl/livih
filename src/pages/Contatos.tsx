@@ -60,7 +60,7 @@ export function Contatos() {
   const responsavel = (id: string | null) => (id ? (id === eu ? 'Você' : (equipe.get(id)?.nome ?? '—')) : '—')
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="relative h-full overflow-y-auto">
       <div className="mx-auto max-w-6xl space-y-4 px-4 py-6 lg:px-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

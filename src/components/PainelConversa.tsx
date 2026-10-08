@@ -191,7 +191,7 @@ export function PainelConversa({
           const el = e.currentTarget
           noFim.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
         }}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-fundo px-4 py-4"
+        className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain bg-fundo px-4 py-4"
         aria-live="polite"
         aria-busy={carregando}
       >

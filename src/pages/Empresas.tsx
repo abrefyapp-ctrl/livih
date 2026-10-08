@@ -115,7 +115,7 @@ export function Empresas() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="relative h-full overflow-y-auto">
       <div className="mx-auto max-w-5xl space-y-5 px-4 py-6 lg:px-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

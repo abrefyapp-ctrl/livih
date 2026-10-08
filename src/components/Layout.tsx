@@ -69,8 +69,10 @@ export function Layout() {
 
   // A casca tem a altura da janela e nunca rola: cada tela rola por dentro (h-full + overflow-y-auto). Sem isso,
   // ao chegar no fim de uma lista interna a rolagem passava para a página inteira.
+  // `relative` é o que segura os elementos absolutos (ex.: textos sr-only dos balões): sem um ancestral
+  // posicionado eles são colocados em relação à página, o overflow-hidden não os corta e esticam a página.
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="relative flex h-full overflow-hidden">
       {/* barra lateral: tablet (compacta) e desktop */}
       <aside className="hidden shrink-0 flex-col border-r border-borda bg-superficie md:flex md:w-16 lg:w-60">
         <div className="flex h-16 items-center px-4 lg:px-5">

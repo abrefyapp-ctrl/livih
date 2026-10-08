@@ -41,7 +41,7 @@ export function Modal({
     >
       {aberto && (
         <>
-          <div className="max-h-[75vh] overflow-y-auto p-5">
+          <div className="relative max-h-[75vh] overflow-y-auto p-5">
             <h2 id={idTitulo} className="text-h2 font-semibold">
               {titulo}
             </h2>

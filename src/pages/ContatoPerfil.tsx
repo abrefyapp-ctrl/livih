@@ -89,7 +89,7 @@ export function ContatoPerfil() {
   const conversas = [...c.conversas].sort((a, b) => (b.ultima_mensagem_em ?? '').localeCompare(a.ultima_mensagem_em ?? ''))
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="relative h-full overflow-y-auto">
       <div className="mx-auto max-w-5xl space-y-4 px-4 py-6 lg:px-8">
         <Link to="/contatos" className="inline-flex items-center gap-1 text-pequeno text-texto-3 hover:text-texto">
           <Icone nome="voltar" className="size-4" /> Contatos

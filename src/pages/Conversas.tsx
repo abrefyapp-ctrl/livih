@@ -95,7 +95,7 @@ export function Conversas() {
             aoAlternarContato={() => setContatoAberto((v) => !v)}
           />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-4 overflow-y-auto bg-fundo p-6">
+          <div className="relative flex h-full flex-col items-center justify-center gap-4 overflow-y-auto bg-fundo p-6">
             {gerencia && orgId && (
               <div className="w-full max-w-md">
                 <PrimeirosPassos orgId={orgId} />
@@ -118,7 +118,7 @@ export function Conversas() {
           />
           <aside
             aria-label="Dados do contato"
-            className="fixed inset-y-0 right-0 z-40 w-80 max-w-full overflow-y-auto overscroll-contain border-l border-borda bg-superficie shadow-xl xl:static xl:z-auto xl:h-full xl:shrink-0 xl:shadow-none"
+            className="fixed inset-y-0 right-0 z-40 w-80 max-w-full overflow-y-auto overscroll-contain border-l border-borda bg-superficie shadow-xl xl:relative xl:z-auto xl:h-full xl:shrink-0 xl:shadow-none"
           >
             <div className="flex justify-end p-2 xl:hidden">
               <button

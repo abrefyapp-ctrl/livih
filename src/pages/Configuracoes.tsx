@@ -21,7 +21,7 @@ export function Configuracoes() {
   if (!SECOES.some((s) => s.id === secao)) return <Navigate to="/configuracoes/equipe" replace />
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="relative h-full overflow-y-auto">
       <div className="mx-auto max-w-4xl px-4 pt-6 lg:px-8">
         <h1 className="text-h1 font-semibold">Configurações</h1>
         {gerencia && orgAtiva && (
