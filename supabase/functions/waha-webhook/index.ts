@@ -37,8 +37,11 @@ function lerJid(jid: unknown): { telefone?: string; lid?: string } {
 
 // O WhatsApp às vezes manda só o LID no campo principal; o telefone pode estar em campos
 // "Alt" dentro de _data (varia por motor: remoteJidAlt no NOWEB, SenderAlt/RecipientAlt no GOWS).
-// Varre esses campos ignorando o próprio número da sessão.
-function identificar(chat: string, data: Json, meDigitos: string): { telefone?: string; lid?: string } {
+// Varre esses campos ignorando o próprio número da sessão. O `eu` precisa passar pelo mesmo lerJid: a sessão
+// informa o número como o WhatsApp guarda (conta antiga sem o 9) e aqui todo telefone ganha o 9 — comparar o
+// cru com o normalizado nunca batia, e na mensagem enviada pelo celular o SenderAlt (o próprio número) virava
+// o contato: todas as conversas do vendedor caíam num contato só, ele mesmo.
+function identificar(chat: string, data: Json, eu: { telefone?: string; lid?: string }): { telefone?: string; lid?: string } {
   const achado = lerJid(chat);
   const campos = /^(remoteJid|remoteJidAlt|participant|participantAlt|Chat|ChatAlt|Sender|SenderAlt|RecipientAlt)$/;
   const visitar = (o: Json, prof: number) => {
@@ -46,8 +49,8 @@ function identificar(chat: string, data: Json, meDigitos: string): { telefone?: 
     for (const [k, v] of Object.entries(o)) {
       if (typeof v === "string" && campos.test(k)) {
         const j = lerJid(v);
-        if (j.telefone && j.telefone !== meDigitos && !achado.telefone) achado.telefone = j.telefone;
-        if (j.lid && !achado.lid) achado.lid = j.lid;
+        if (j.telefone && j.telefone !== eu.telefone && !achado.telefone) achado.telefone = j.telefone;
+        if (j.lid && j.lid !== eu.lid && !achado.lid) achado.lid = j.lid;
       } else if (typeof v === "object") visitar(v, prof + 1);
     }
   };
@@ -196,8 +199,8 @@ Deno.serve(async (req) => {
   const tipo = tipoDaMensagem(p);
   if (!tipo || !p.id) return resposta(200, { ignorado: "sem conteúdo" });
 
-  const meDigitos = String(body.me?.id ?? "").split("@")[0].split(":")[0];
-  const quem = identificar(chat, p._data, meDigitos);
+  const eu = { telefone: lerJid(body.me?.id).telefone, lid: lerJid(body.me?.lid).lid };
+  const quem = identificar(chat, p._data, eu);
   if (!quem.telefone && quem.lid) quem.telefone = await telefoneDoLid(body.session, quem.lid);
   if (!quem.telefone && !quem.lid) return resposta(200, { ignorado: "sem telefone nem LID" });
 
