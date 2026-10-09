@@ -335,7 +335,7 @@
       <div class="container">
         <h2 id="titulo-chamada">Organize o WhatsApp da sua equipe</h2>
         <p>Peça o acesso ao Livih. Nossa equipe entra em contato para conhecer a sua operação e ajudar a conectar os números.</p>
-        <form id="form-pedido" class="formulario" novalidate>
+        <form id="form-pedido" class="formulario" novalidate hidden>
           <div class="campos">
             <label><span>Empresa</span><input name="empresa" required maxlength="120" autocomplete="organization"></label>
             <label><span>Seu nome</span><input name="nome" required maxlength="120" autocomplete="name"></label>
@@ -374,6 +374,10 @@
       var status = document.getElementById("pedido-status");
       var botao = form.querySelector("button[type=submit]");
       var token = "", widget = null, carregado = false;
+      // Sem a chave do captcha configurada o formulário fica escondido (a função recusaria todo pedido);
+      // a seção mostra só o contato pelo WhatsApp.
+      if (CHAVE_TURNSTILE.indexOf("__") === 0) return;
+      form.hidden = false;
 
       function carregarCaptcha() {
         if (carregado) return;
