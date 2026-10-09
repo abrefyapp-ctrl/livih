@@ -8,6 +8,7 @@ import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { EtiquetaEtapa } from './EtiquetaEtapa'
 import { Icone, type NomeIcone } from './Icone'
+import { ModalContato } from './ModalContato'
 import { NotasContato } from './NotasContato'
 
 function Linha({ icone, children }: { icone: NomeIcone; children: ReactNode }) {
@@ -34,6 +35,8 @@ export function PainelContato({ contatoId, conversaId }: { contatoId: string; co
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [erroAgente, setErroAgente] = useState<string | null>(null)
+  const [editando, setEditando] = useState(false)
+  const [recarregar, setRecarregar] = useState(0)
 
   useEffect(() => {
     let ativo = true
@@ -47,7 +50,7 @@ export function PainelContato({ contatoId, conversaId }: { contatoId: string; co
     return () => {
       ativo = false
     }
-  }, [contatoId])
+  }, [contatoId, recarregar])
 
   if (erro) return <div className="p-4"><Aviso tom="erro">{erro}</Aviso></div>
   if (!contato) return <div className="p-5 text-pequeno text-texto-3">Carregando contato…</div>
@@ -78,6 +81,9 @@ export function PainelContato({ contatoId, conversaId }: { contatoId: string; co
             <p className="text-pequeno text-texto-3">No WhatsApp: {contato.nome_whatsapp}</p>
           )}
         </div>
+        <Botao tamanho="sm" variante="secundario" icone="nota" onClick={() => setEditando(true)}>
+          Editar contato
+        </Botao>
       </div>
 
       <Secao titulo="Contato">
@@ -138,6 +144,26 @@ export function PainelContato({ contatoId, conversaId }: { contatoId: string; co
           Abrir perfil completo
         </Link>
       </div>
+
+      {editando && (
+        <ModalContato
+          aberto
+          inicial={{
+            id: contato.id,
+            nome: contato.nome ?? contato.nome_whatsapp,
+            telefone: contato.telefone,
+            empresa: contato.empresa,
+            email: contato.email,
+            responsavel_id: contato.responsavel_id,
+            sem_agente: contato.sem_agente,
+          }}
+          aoFechar={() => setEditando(false)}
+          aoSalvar={() => {
+            setEditando(false)
+            setRecarregar((n) => n + 1)
+          }}
+        />
+      )}
     </div>
   )
 }
