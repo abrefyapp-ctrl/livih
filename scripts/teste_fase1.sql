@@ -639,5 +639,62 @@ begin
     and (select m ->> 'texto' from jsonb_array_elements(ctx -> 'mensagens') m where not (m ->> 'anterior')::boolean) = 'voltei';
 end $$;
 
+
+-- ============ contatos que o agente não atende ============
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+set local role service_role;
+do $$
+declare v_canal uuid; r jsonb; v_conv uuid; v_conv2 uuid; v_msg uuid;
+begin
+  select id into v_canal from public.canais where instance_id = 'INST-F7';
+
+  -- cadastrado antes de escrever: a primeira mensagem já vai para a equipe
+  insert into public.contatos (org_id, telefone, nome, sem_agente)
+  values (current_setting('teste.f7')::uuid, '5541912345001', 'Fornecedor', true);
+  r := public.registrar_entrada(v_canal, 'SA-1', '5541912345001', null, 'Fornecedor', 'texto', 'oi', '{}');
+  v_conv := (r ->> 'conversa_id')::uuid;
+  insert into resultado (teste, ok) values ('contato sem agente: conversa nova vai para a equipe',
+    r ->> 'estado' = 'aguardando_humano' and not (r ->> 'chamar_agente')::boolean
+    and (select motivo_humano from public.conversas where id = v_conv) = 'Contato atendido só pela equipe');
+
+  -- devolver ao agente não pega
+  update public.conversas set estado = 'bot' where id = v_conv;
+  insert into resultado (teste, ok)
+  select 'contato sem agente: devolver ao agente não pega', estado = 'aguardando_humano' from public.conversas where id = v_conv;
+
+  -- encerrada e reaberta pelo cliente continua com a equipe
+  update public.conversas set estado = 'encerrada' where id = v_conv;
+  r := public.registrar_entrada(v_canal, 'SA-2', '5541912345001', null, 'Fornecedor', 'texto', 'voltei', '{}');
+  insert into resultado (teste, ok) values ('contato sem agente: reaberta vai para a equipe',
+    r ->> 'estado' = 'aguardando_humano' and not (r ->> 'chamar_agente')::boolean);
+
+  -- marcar depois: a conversa com o agente passa para a equipe e o agente não responde mais
+  r := public.registrar_entrada(v_canal, 'SA-3', '5541912345002', null, 'Cliente antigo', 'texto', 'oi', '{}');
+  v_conv2 := (r ->> 'conversa_id')::uuid;
+  v_msg := (r ->> 'mensagem_id')::uuid;
+  insert into resultado (teste, ok) values ('contato comum continua com o agente', r ->> 'estado' = 'bot');
+  update public.contatos set sem_agente = true where telefone = '5541912345002' and org_id = current_setting('teste.f7')::uuid;
+  insert into resultado (teste, ok)
+  select 'marcar o contato tira a conversa do agente', estado = 'aguardando_humano' from public.conversas where id = v_conv2;
+  insert into resultado (teste, ok) values ('agente não responde contato marcado',
+    not public.agente_deve_responder(v_conv2, v_msg));
+
+  -- desmarcar: devolver ao agente volta a funcionar
+  update public.contatos set sem_agente = false where telefone = '5541912345002' and org_id = current_setting('teste.f7')::uuid;
+  update public.conversas set estado = 'bot' where id = v_conv2;
+  insert into resultado (teste, ok)
+  select 'desmarcado, devolver ao agente funciona', estado = 'bot' from public.conversas where id = v_conv2;
+end $$;
+
+-- atendente da empresa consegue marcar
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+update public.contatos set sem_agente = true where telefone = '5541912345002';
+reset role;
+insert into resultado (teste, ok)
+select 'atendente marca contato sem agente', sem_agente from public.contatos where telefone = '5541912345002';
+
 reset role;
 select n, teste, ok from resultado order by n;

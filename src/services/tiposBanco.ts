@@ -341,6 +341,7 @@ export type Database = {
           org_id: string
           origem: string | null
           responsavel_id: string | null
+          sem_agente: boolean
           tags: string[]
           telefone: string | null
           whatsapp_lid: string | null
@@ -357,6 +358,7 @@ export type Database = {
           org_id: string
           origem?: string | null
           responsavel_id?: string | null
+          sem_agente?: boolean
           tags?: string[]
           telefone?: string | null
           whatsapp_lid?: string | null
@@ -373,6 +375,7 @@ export type Database = {
           org_id?: string
           origem?: string | null
           responsavel_id?: string | null
+          sem_agente?: boolean
           tags?: string[]
           telefone?: string | null
           whatsapp_lid?: string | null

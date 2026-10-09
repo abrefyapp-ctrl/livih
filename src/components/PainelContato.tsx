@@ -1,9 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { buscarContato, listarOportunidades, type Contato, type Oportunidade } from '../services/atendimento'
+import { atualizarContato } from '../services/crm'
 import { formatarTelefone, moeda, nomeDoContato } from '../services/formato'
 import { Avatar } from './Avatar'
 import { Aviso } from './Aviso'
+import { Botao } from './Botao'
 import { EtiquetaEtapa } from './EtiquetaEtapa'
 import { Icone, type NomeIcone } from './Icone'
 import { NotasContato } from './NotasContato'
@@ -30,6 +32,8 @@ export function PainelContato({ contatoId, conversaId }: { contatoId: string; co
   const [contato, setContato] = useState<Contato | null>(null)
   const [oportunidades, setOportunidades] = useState<Oportunidade[]>([])
   const [erro, setErro] = useState<string | null>(null)
+  const [salvando, setSalvando] = useState(false)
+  const [erroAgente, setErroAgente] = useState<string | null>(null)
 
   useEffect(() => {
     let ativo = true
@@ -49,6 +53,20 @@ export function PainelContato({ contatoId, conversaId }: { contatoId: string; co
   if (!contato) return <div className="p-5 text-pequeno text-texto-3">Carregando contato…</div>
 
   const nome = nomeDoContato(contato)
+
+  async function alternarAgente() {
+    if (!contato) return
+    setSalvando(true)
+    setErroAgente(null)
+    try {
+      await atualizarContato(contato.id, { sem_agente: !contato.sem_agente })
+      setContato({ ...contato, sem_agente: !contato.sem_agente })
+    } catch {
+      setErroAgente('Não foi possível salvar. Tente de novo.')
+    } finally {
+      setSalvando(false)
+    }
+  }
 
   return (
     <div className="pb-6">
@@ -78,6 +96,18 @@ export function PainelContato({ contatoId, conversaId }: { contatoId: string; co
             ))}
           </ul>
         )}
+      </Secao>
+
+      <Secao titulo="Agente">
+        <p className="text-pequeno text-texto-2">
+          {contato.sem_agente
+            ? 'O agente não atende este contato: as mensagens vão direto para a equipe.'
+            : 'O agente pode atender este contato.'}
+        </p>
+        {erroAgente && <p className="mt-2 text-pequeno text-erro">{erroAgente}</p>}
+        <Botao tamanho="sm" variante="secundario" icone="agente" carregando={salvando} onClick={() => void alternarAgente()} className="mt-3">
+          {contato.sem_agente ? 'Permitir o agente' : 'Não atender pelo agente'}
+        </Botao>
       </Secao>
 
       <Secao titulo="Oportunidades">

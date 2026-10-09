@@ -10,7 +10,7 @@ type EtapaResumo = { nome: string; tipo: TipoEtapa } | null
 
 export type ContatoLista = Pick<
   Tabelas['contatos']['Row'],
-  'id' | 'nome' | 'nome_whatsapp' | 'telefone' | 'empresa' | 'email' | 'origem' | 'tags' | 'responsavel_id' | 'criado_em'
+  'id' | 'nome' | 'nome_whatsapp' | 'telefone' | 'empresa' | 'email' | 'origem' | 'tags' | 'responsavel_id' | 'sem_agente' | 'criado_em'
 > & {
   conversas: { id: string; estado: EstadoConversa; ultima_mensagem_em: string | null }[]
   oportunidades: { id: string; titulo: string; valor_estimado: number | null; fechada_em: string | null; etapa: EtapaResumo }[]
@@ -40,7 +40,7 @@ export type PassoFunil = {
   criado_em: string
 }
 
-export type DadosContato = Pick<Tabelas['contatos']['Row'], 'nome' | 'telefone' | 'empresa' | 'email' | 'responsavel_id'>
+export type DadosContato = Pick<Tabelas['contatos']['Row'], 'nome' | 'telefone' | 'empresa' | 'email' | 'responsavel_id' | 'sem_agente'>
 
 /** 41999998888 / (41) 99999-8888 / +55… → 5541999998888; vazio → null; inválido → undefined. */
 export function normalizarTelefone(v: string): string | null | undefined {
@@ -66,7 +66,7 @@ export async function listarContatos(orgId: string, busca: string): Promise<Cont
   let consulta = supabase
     .from('contatos')
     .select(
-      'id, nome, nome_whatsapp, telefone, empresa, email, origem, tags, responsavel_id, criado_em, ' +
+      'id, nome, nome_whatsapp, telefone, empresa, email, origem, tags, responsavel_id, sem_agente, criado_em, ' +
         'conversas(id, estado, ultima_mensagem_em), ' +
         'oportunidades(id, titulo, valor_estimado, fechada_em, etapa:etapas_funil(nome, tipo))',
     )

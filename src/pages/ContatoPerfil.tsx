@@ -107,6 +107,7 @@ export function ContatoPerfil() {
               {c.email && <Dado icone="email">{c.email}</Dado>}
               {c.empresa && <Dado icone="empresa">{c.empresa}</Dado>}
               <Dado icone="usuario">{resp ? `Responsável: ${resp}` : 'Sem responsável (cliente da empresa)'}</Dado>
+              {c.sem_agente && <Dado icone="agente">Não é atendido pelo agente: as mensagens vão direto para a equipe</Dado>}
             </div>
             {c.tags.length > 0 && (
               <ul className="flex flex-wrap gap-1" aria-label="Tags">
@@ -184,7 +185,7 @@ export function ContatoPerfil() {
       {editando && (
         <ModalContato
           aberto
-          inicial={{ id: c.id, nome: c.nome ?? c.nome_whatsapp, telefone: c.telefone, empresa: c.empresa, email: c.email, responsavel_id: c.responsavel_id }}
+          inicial={{ id: c.id, nome: c.nome ?? c.nome_whatsapp, telefone: c.telefone, empresa: c.empresa, email: c.email, responsavel_id: c.responsavel_id, sem_agente: c.sem_agente }}
           aoFechar={() => setEditando(false)}
           aoSalvar={() => {
             setEditando(false)

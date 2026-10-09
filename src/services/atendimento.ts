@@ -12,7 +12,7 @@ export type ConversaLista = Pick<
   Tabelas['conversas']['Row'],
   'id' | 'estado' | 'atribuida_a' | 'motivo_humano' | 'ultima_mensagem_em' | 'ultima_mensagem_resumo' | 'nao_lidas'
 > & {
-  contato: Pick<Contato, 'id' | 'nome' | 'nome_whatsapp' | 'telefone'> | null
+  contato: Pick<Contato, 'id' | 'nome' | 'nome_whatsapp' | 'telefone' | 'sem_agente'> | null
   canal: { id: string; nome: string } | null
 }
 
@@ -23,7 +23,7 @@ export type Oportunidade = Pick<Tabelas['oportunidades']['Row'], 'id' | 'titulo'
 }
 
 const CAMPOS_CONVERSA =
-  'id, estado, atribuida_a, motivo_humano, ultima_mensagem_em, ultima_mensagem_resumo, nao_lidas, contato:contatos(id, nome, nome_whatsapp, telefone), canal:canais(id, nome)'
+  'id, estado, atribuida_a, motivo_humano, ultima_mensagem_em, ultima_mensagem_resumo, nao_lidas, contato:contatos(id, nome, nome_whatsapp, telefone, sem_agente), canal:canais(id, nome)'
 
 export async function listarOrganizacoes(userId: string): Promise<Organizacao[]> {
   const { data, error } = await supabase

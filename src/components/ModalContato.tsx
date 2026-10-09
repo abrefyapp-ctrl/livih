@@ -29,6 +29,7 @@ export function ModalContato({
   const [telefone, setTelefone] = useState(inicial?.telefone ? formatarTelefone(inicial.telefone) : '')
   const [empresa, setEmpresa] = useState(inicial?.empresa ?? '')
   const [email, setEmail] = useState(inicial?.email ?? '')
+  const [semAgente, setSemAgente] = useState(inicial?.sem_agente ?? false)
   const [responsavel, setResponsavel] = useState(editando ? (inicial?.responsavel_id ?? '') : (sessao?.user.id ?? ''))
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -48,6 +49,7 @@ export function ModalContato({
       empresa: empresa.trim() || null,
       email: email.trim() || null,
       responsavel_id: responsavel || null,
+      sem_agente: semAgente,
     }
     try {
       if (editando) {
@@ -121,6 +123,15 @@ export function ModalContato({
           </select>
           <p className="text-legenda text-texto-3">O responsável e quem atende as conversas desse cliente veem o contato.</p>
         </div>
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-borda p-3">
+          <input type="checkbox" checked={semAgente} onChange={(e) => setSemAgente(e.target.checked)} className="mt-0.5 size-4 shrink-0 accent-primaria" />
+          <span>
+            <span className="block text-pequeno font-medium text-texto">Não atender pelo agente</span>
+            <span className="block text-legenda text-texto-3">
+              As mensagens deste contato vão direto para a equipe. Use para clientes antigos, fornecedores, parceiros ou contatos pessoais.
+            </span>
+          </span>
+        </label>
       </form>
     </Modal>
   )

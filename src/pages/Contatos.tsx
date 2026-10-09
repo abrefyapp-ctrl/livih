@@ -31,6 +31,7 @@ export function Contatos() {
   const [busca, setBusca] = useState('')
   const [buscaAplicada, setBuscaAplicada] = useState('')
   const [soMeus, setSoMeus] = useState(false)
+  const [soSemAgente, setSoSemAgente] = useState(false)
   const [dados, setDados] = useState<{ chave: string; lista: ContatoLista[] } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [novo, setNovo] = useState(false)
@@ -54,8 +55,8 @@ export function Contatos() {
 
   const lista = useMemo(() => {
     const todos = dados?.chave === chave ? dados.lista : null
-    return todos && soMeus ? todos.filter((c) => c.responsavel_id === eu) : todos
-  }, [dados, chave, soMeus, eu])
+    return todos?.filter((c) => (!soMeus || c.responsavel_id === eu) && (!soSemAgente || c.sem_agente)) ?? null
+  }, [dados, chave, soMeus, soSemAgente, eu])
 
   const responsavel = (id: string | null) => (id ? (id === eu ? 'Você' : (equipe.get(id)?.nome ?? '—')) : '—')
 
@@ -88,6 +89,10 @@ export function Contatos() {
             <input type="checkbox" checked={soMeus} onChange={(e) => setSoMeus(e.target.checked)} className="size-4 accent-primaria" />
             Só os que estão comigo
           </label>
+          <label className="flex cursor-pointer items-center gap-2 text-pequeno text-texto-2">
+            <input type="checkbox" checked={soSemAgente} onChange={(e) => setSoSemAgente(e.target.checked)} className="size-4 accent-primaria" />
+            Só os que o agente não atende
+          </label>
           {lista && (
             <span className="ml-auto text-legenda text-texto-3">
               {lista.length} {lista.length === 1 ? 'contato' : 'contatos'}
@@ -106,10 +111,10 @@ export function Contatos() {
           ) : !lista.length ? (
             <EstadoVazio
               icone="usuario"
-              titulo={buscaAplicada || soMeus ? 'Nenhum contato encontrado' : 'Nenhum contato ainda'}
-              acao={!buscaAplicada && !soMeus && <Botao icone="mais" onClick={() => setNovo(true)}>Cadastrar contato</Botao>}
+              titulo={buscaAplicada || soMeus || soSemAgente ? 'Nenhum contato encontrado' : 'Nenhum contato ainda'}
+              acao={!buscaAplicada && !soMeus && !soSemAgente && <Botao icone="mais" onClick={() => setNovo(true)}>Cadastrar contato</Botao>}
             >
-              {buscaAplicada || soMeus
+              {buscaAplicada || soMeus || soSemAgente
                 ? 'Tente outro termo ou tire o filtro.'
                 : 'Quem escrever para o WhatsApp entra aqui sozinho. Você também pode cadastrar à mão.'}
             </EstadoVazio>
@@ -138,6 +143,7 @@ export function Contatos() {
                             <span className="min-w-0">
                               <span className="block truncate font-medium text-texto">{nome}</span>
                               {c.empresa && <span className="block truncate text-legenda text-texto-3">{c.empresa}</span>}
+                              {c.sem_agente && <SemAgente />}
                             </span>
                           </Link>
                         </td>
@@ -171,6 +177,7 @@ export function Contatos() {
                         <Avatar nome={nome} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">{nome}</span>
+                          {c.sem_agente && <SemAgente />}
                           <span className="block truncate text-pequeno text-texto-3">
                             {[c.empresa, formatarTelefone(c.telefone)].filter(Boolean).join(' · ')}
                           </span>
@@ -197,5 +204,14 @@ export function Contatos() {
         />
       )}
     </div>
+  )
+}
+
+function SemAgente() {
+  return (
+    <span className="mt-0.5 inline-flex items-center gap-1 rounded-sm bg-slate-100 px-1.5 py-0.5 text-legenda text-texto-2">
+      <Icone nome="agente" className="size-3" />
+      Sem agente
+    </span>
   )
 }

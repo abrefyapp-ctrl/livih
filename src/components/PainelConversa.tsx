@@ -148,7 +148,7 @@ export function PainelConversa({
               Assumir conversa
             </Botao>
           )}
-          {(estado === 'aguardando_humano' || estado === 'humano') && (
+          {(estado === 'aguardando_humano' || estado === 'humano') && !conversa.contato?.sem_agente && (
             <Botao tamanho="sm" variante="secundario" icone="agente" onClick={() => setConfirmar('devolver')}>
               Devolver ao agente
             </Botao>
