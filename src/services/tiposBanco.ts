@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       admins_plataforma: {
@@ -927,9 +952,114 @@ export type Database = {
           },
         ]
       }
+      precos_ia: {
+        Row: {
+          atualizado_em: string
+          modelo: string
+          observacao: string | null
+          usd_por_milhao_entrada: number
+          usd_por_milhao_saida: number
+        }
+        Insert: {
+          atualizado_em?: string
+          modelo: string
+          observacao?: string | null
+          usd_por_milhao_entrada: number
+          usd_por_milhao_saida: number
+        }
+        Update: {
+          atualizado_em?: string
+          modelo?: string
+          observacao?: string | null
+          usd_por_milhao_entrada?: number
+          usd_por_milhao_saida?: number
+        }
+        Relationships: []
+      }
+      uso_ia: {
+        Row: {
+          chamadas: number
+          conversa_id: string | null
+          criado_em: string
+          id: number
+          mensagem_id: string | null
+          modelo: string
+          org_id: string
+          origem_ref: string
+          segundos_audio: number | null
+          tipo: string
+          tokens_entrada: number
+          tokens_saida: number
+        }
+        Insert: {
+          chamadas?: number
+          conversa_id?: string | null
+          criado_em?: string
+          id?: never
+          mensagem_id?: string | null
+          modelo: string
+          org_id: string
+          origem_ref: string
+          segundos_audio?: number | null
+          tipo: string
+          tokens_entrada?: number
+          tokens_saida?: number
+        }
+        Update: {
+          chamadas?: number
+          conversa_id?: string | null
+          criado_em?: string
+          id?: never
+          mensagem_id?: string | null
+          modelo?: string
+          org_id?: string
+          origem_ref?: string
+          segundos_audio?: number | null
+          tipo?: string
+          tokens_entrada?: number
+          tokens_saida?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uso_ia_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "uso_ia_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      uso_ia_mensal: {
+        Row: {
+          audios_transcritos: number | null
+          conversas_com_agente: number | null
+          custo_usd: number | null
+          mes: string | null
+          org_id: string | null
+          respostas_agente: number | null
+          segundos_audio: number | null
+          tokens_entrada: number | null
+          tokens_saida: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uso_ia_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       agente_atualizar_contato: {
@@ -1330,6 +1460,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       autor_tipo: ["contato", "atendente", "bot", "sistema"],

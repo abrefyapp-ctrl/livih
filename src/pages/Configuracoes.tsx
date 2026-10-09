@@ -5,6 +5,7 @@ import { Icone, type NomeIcone } from '../components/Icone'
 import { SecaoAgente } from '../components/SecaoAgente'
 import { SecaoBase } from '../components/SecaoBase'
 import { SecaoEquipe } from '../components/SecaoEquipe'
+import { SecaoUsoIa } from '../components/SecaoUsoIa'
 import { SecaoWhatsapp } from '../components/SecaoWhatsapp'
 
 const SECOES: { id: string; rotulo: string; icone: NomeIcone }[] = [
@@ -12,6 +13,7 @@ const SECOES: { id: string; rotulo: string; icone: NomeIcone }[] = [
   { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone' },
   { id: 'agente', rotulo: 'Agente', icone: 'agente' },
   { id: 'base', rotulo: 'Base de conhecimento', icone: 'livro' },
+  { id: 'uso', rotulo: 'Uso da IA', icone: 'painel' },
 ]
 
 export function Configuracoes() {
@@ -50,6 +52,7 @@ export function Configuracoes() {
           {secao === 'whatsapp' && <SecaoWhatsapp />}
           {secao === 'agente' && <SecaoAgente />}
           {secao === 'base' && <SecaoBase />}
+          {secao === 'uso' && <SecaoUsoIa />}
         </div>
       </div>
     </div>

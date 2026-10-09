@@ -9,6 +9,7 @@ import {
   type Empresa,
   type PedidoAcesso,
 } from '../services/plataforma'
+import { buscarUsoIaDoMes, dolar, mesAtual, nomeDoMes, type UsoIaMes } from '../services/usoIa'
 import { useSessao } from '../hooks/useSessao'
 import { Avatar } from '../components/Avatar'
 import { Aviso } from '../components/Aviso'
@@ -29,7 +30,7 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 /** Painel da equipe F7: empresas clientes, acesso do dono, suspender/reativar e pedidos vindos do site. */
 export function Empresas() {
   const { adminPlataforma, sessao } = useSessao()
-  const [dados, setDados] = useState<{ empresas: Empresa[]; pedidos: PedidoAcesso[] } | null>(null)
+  const [dados, setDados] = useState<{ empresas: Empresa[]; pedidos: PedidoAcesso[]; uso: Map<string, UsoIaMes> } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
   const [busca, setBusca] = useState('')
@@ -42,10 +43,11 @@ export function Empresas() {
   useEffect(() => {
     if (!adminPlataforma) return
     let ativo = true
-    Promise.all([listarEmpresas(), listarPedidosPendentes()])
-      .then(([empresas, pedidos]) => {
+    // O uso de IA é complementar: se falhar, a lista de empresas aparece mesmo assim.
+    Promise.all([listarEmpresas(), listarPedidosPendentes(), buscarUsoIaDoMes().catch(() => new Map<string, UsoIaMes>())])
+      .then(([empresas, pedidos, uso]) => {
         if (!ativo) return
-        setDados({ empresas, pedidos })
+        setDados({ empresas, pedidos, uso })
         setErro(null)
       })
       .catch(() => ativo && setErro('Não foi possível carregar as empresas.'))
@@ -67,6 +69,7 @@ export function Empresas() {
   const empresas = dados?.empresas ?? []
   const ativas = empresas.filter((e) => e.status === 'ativa').length
   const semAcesso = empresas.filter((e) => !e.dono_email || !e.dono_senha_definida).length
+  const custoIaMes = [...(dados?.uso.values() ?? [])].reduce((s, u) => s + Number(u.custo_usd ?? 0), 0)
 
   async function acessoDoDono(e: Empresa) {
     if (!e.dono_email) {
@@ -167,6 +170,7 @@ export function Empresas() {
             {plural(ativas, 'empresa ativa', 'empresas ativas')}
             {empresas.length > ativas && ` · ${plural(empresas.length - ativas, 'suspensa', 'suspensas')}`}
             {semAcesso > 0 && ` · ${plural(semAcesso, 'dono ainda sem acesso', 'donos ainda sem acesso')}`}
+            {` · IA em ${nomeDoMes(mesAtual())}: ${dolar(custoIaMes)}`}
           </p>
         )}
 
@@ -234,6 +238,7 @@ export function Empresas() {
                       {plural(e.conversas_30d, 'conversa', 'conversas')} em 30 dias
                       {e.ultima_mensagem_em && ` · última ${haQuanto(e.ultima_mensagem_em)}`}
                     </p>
+                    <UsoIaEmpresa uso={dados?.uso.get(e.id)} />
                   </div>
 
                   <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -305,5 +310,16 @@ export function Empresas() {
         O pedido da {recusar?.empresa} sai da lista. Ninguém é avisado automaticamente.
       </DialogoConfirmacao>
     </div>
+  )
+}
+
+// Consumo de IA do mês na linha da empresa (só a equipe da plataforma vê o custo).
+function UsoIaEmpresa({ uso }: { uso: UsoIaMes | undefined }) {
+  if (!uso) return <p className="text-legenda text-texto-3">IA no mês: sem uso</p>
+  return (
+    <p className="text-legenda text-texto-3">
+      IA no mês: {plural(uso.conversas_com_agente ?? 0, 'conversa', 'conversas')} com o agente
+      {!!uso.audios_transcritos && ` · ${plural(uso.audios_transcritos, 'áudio', 'áudios')}`} · {dolar(uso.custo_usd)}
+    </p>
   )
 }
