@@ -1,0 +1,11 @@
+// Site institucional do Livih (livih.com.br), estático. O app fica em app.livih.com.br (raiz do repositório).
+// O 404.html responde com status 404 de verdade, e as URLs sem barra final redirecionam para a versão canônica.
+{
+  "name": "livih-site",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  }
+}

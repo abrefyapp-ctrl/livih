@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Livih | Atendimento e Vendas pelo WhatsApp para Equipes</title>
+  <meta name="description" content="Centralize as conversas do WhatsApp da sua equipe, organize atendimentos, acompanhe oportunidades e automatize respostas com inteligência artificial.">
+  <link rel="canonical" href="https://livih.com.br/">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#092124">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:site_name" content="Livih">
+  <meta property="og:url" content="https://livih.com.br/">
+  <meta property="og:title" content="Livih | Atendimento e Vendas pelo WhatsApp para Equipes">
+  <meta property="og:description" content="Reúna as conversas dos seus vendedores num só lugar, acompanhe atendimentos e oportunidades e conte com inteligência artificial para responder clientes e acionar sua equipe na hora certa.">
+  <meta property="og:image" content="https://livih.com.br/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Livih: atendimento e vendas pelo WhatsApp em um só lugar">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://livih.com.br/#organizacao",
+        "name": "Livih",
+        "url": "https://livih.com.br/",
+        "logo": "https://livih.com.br/marca/livih.png",
+        "parentOrganization": { "@type": "Organization", "name": "F7 Tech" }
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://livih.com.br/#site",
+        "url": "https://livih.com.br/",
+        "name": "Livih",
+        "inLanguage": "pt-BR",
+        "publisher": { "@id": "https://livih.com.br/#organizacao" }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "Livih",
+        "url": "https://livih.com.br/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "inLanguage": "pt-BR",
+        "description": "Plataforma de atendimento e vendas pelo WhatsApp para equipes comerciais: caixa de entrada compartilhada, filas de atendimento, agente de inteligência artificial com transferência para atendentes, funil de oportunidades e trilha de auditoria.",
+        "publisher": { "@id": "https://livih.com.br/#organizacao" }
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    :root {
+      --petroleo: #092124;
+      --primaria: #0f766e;
+      --primaria-hover: #115e59;
+      --destaque: #10b981;
+      --suave: #ecfdf5;
+      --fundo: #f8fafc;
+      --texto: #0f172a;
+      --texto-2: #334155;
+      --texto-3: #64748b;
+      --borda: #e2e8f0;
+      --largura: 72rem;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--texto);
+      background: #fff;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    img { max-width: 100%; height: auto; display: block; }
+    a { color: var(--primaria); }
+    :focus-visible { outline: 3px solid var(--destaque); outline-offset: 2px; }
+    .container { width: 100%; max-width: var(--largura); margin: 0 auto; padding: 0 1rem; }
+    @media (min-width: 48rem) { .container { padding: 0 2rem; } }
+
+    .pular { position: absolute; left: -999px; }
+    .pular:focus { left: 1rem; top: 1rem; background: #fff; padding: .5rem 1rem; z-index: 10; }
+
+    header.topo { border-bottom: 1px solid var(--borda); background: #fff; position: sticky; top: 0; z-index: 5; }
+    .topo .container { display: flex; align-items: center; justify-content: space-between; gap: 1rem; height: 4rem; }
+    .topo nav { display: flex; align-items: center; gap: 1.5rem; }
+    .topo nav a.secao { color: var(--texto-2); text-decoration: none; font-weight: 500; font-size: .95rem; display: none; }
+    .topo nav a.secao:hover { color: var(--texto); }
+    @media (min-width: 48rem) { .topo nav a.secao { display: inline; } }
+
+    .botao {
+      display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+      min-height: 2.75rem; padding: 0 1.25rem; border-radius: .5rem; border: 1px solid transparent;
+      font-weight: 600; font-size: 1rem; text-decoration: none; white-space: nowrap;
+      transition: background-color .15s;
+    }
+    .botao.primario { background: var(--primaria); color: #fff; }
+    .botao.primario:hover { background: var(--primaria-hover); }
+    .botao.secundario { background: #fff; color: var(--texto); border-color: var(--borda); }
+    .botao.secundario:hover { background: var(--fundo); }
+    .botao.claro { background: #fff; color: var(--petroleo); }
+    .botao.claro:hover { background: var(--suave); }
+    .botao.pequeno { min-height: 2.5rem; padding: 0 1rem; font-size: .95rem; }
+
+    .heroi { background: var(--petroleo); color: #fff; padding: 4rem 0 4.5rem; }
+    .heroi .container { display: grid; gap: 2.5rem; align-items: center; }
+    @media (min-width: 60rem) { .heroi .container { grid-template-columns: 1.2fr .8fr; } }
+    .heroi .selo { display: inline-block; color: var(--destaque); font-weight: 600; font-size: .9rem; letter-spacing: .02em; margin: 0 0 1rem; }
+    .heroi h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.12; margin: 0 0 1.25rem; letter-spacing: -.02em; }
+    .heroi p.sub { font-size: clamp(1.05rem, 2vw, 1.25rem); color: #cbd5e1; margin: 0 0 2rem; max-width: 40rem; }
+    .heroi .acoes { display: flex; flex-wrap: wrap; gap: .75rem; }
+    .heroi .acoes .botao.secundario { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
+    .heroi .acoes .botao.secundario:hover { background: rgba(255,255,255,.08); }
+    .heroi .simbolo { justify-self: center; width: 11rem; opacity: .95; }
+    @media (max-width: 59.99rem) { .heroi .simbolo { display: none; } }
+
+    section.bloco { padding: 4rem 0; }
+    section.bloco.cinza { background: var(--fundo); }
+    .bloco h2 { font-size: clamp(1.6rem, 3.5vw, 2.25rem); line-height: 1.2; letter-spacing: -.01em; margin: 0 0 .75rem; }
+    .bloco p.intro { color: var(--texto-2); font-size: 1.1rem; max-width: 46rem; margin: 0 0 2.5rem; }
+
+    .grade { display: grid; gap: 1rem; }
+    @media (min-width: 40rem) { .grade { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 64rem) { .grade.tres { grid-template-columns: repeat(3, 1fr); } }
+    .cartao { background: #fff; border: 1px solid var(--borda); border-radius: .75rem; padding: 1.5rem; }
+    .cartao h3 { font-size: 1.1rem; margin: 0 0 .5rem; line-height: 1.35; }
+    .cartao p { margin: 0; color: var(--texto-2); }
+    .cartao .marca { display: block; width: 2rem; height: .3rem; border-radius: 1rem; background: var(--destaque); margin-bottom: 1rem; }
+
+    ol.passos { list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; counter-reset: passo; }
+    @media (min-width: 64rem) { ol.passos { grid-template-columns: repeat(3, 1fr); } }
+    ol.passos li { counter-increment: passo; background: #fff; border: 1px solid var(--borda); border-radius: .75rem; padding: 1.5rem; }
+    ol.passos li::before {
+      content: counter(passo); display: inline-grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%;
+      background: var(--suave); color: var(--primaria); font-weight: 700; margin-bottom: .75rem;
+    }
+    ol.passos h3 { margin: 0 0 .5rem; font-size: 1.1rem; }
+    ol.passos p { margin: 0; color: var(--texto-2); }
+
+    .lista-publico { display: grid; gap: .75rem; padding: 0; margin: 0; list-style: none; max-width: 46rem; }
+    .lista-publico li { padding-left: 1.75rem; position: relative; color: var(--texto-2); }
+    .lista-publico li::before { content: ""; position: absolute; left: 0; top: .55em; width: .75rem; height: .75rem; border-radius: 3px; background: var(--destaque); }
+
+    .perguntas { max-width: 50rem; }
+    .perguntas details { border-bottom: 1px solid var(--borda); padding: 1.1rem 0; }
+    .perguntas summary { cursor: pointer; font-weight: 600; font-size: 1.05rem; list-style: none; display: flex; justify-content: space-between; gap: 1rem; }
+    .perguntas summary::-webkit-details-marker { display: none; }
+    .perguntas summary::after { content: "+"; color: var(--primaria); font-weight: 700; }
+    .perguntas details[open] summary::after { content: "–"; }
+    .perguntas details p { margin: .75rem 0 0; color: var(--texto-2); }
+
+    .chamada { background: var(--petroleo); color: #fff; padding: 4rem 0; text-align: center; }
+    .chamada h2 { font-size: clamp(1.6rem, 3.5vw, 2.25rem); margin: 0 0 .75rem; }
+    .chamada p { color: #cbd5e1; margin: 0 auto 2rem; max-width: 36rem; font-size: 1.1rem; }
+
+    footer.rodape { padding: 2rem 0; color: var(--texto-3); font-size: .9rem; border-top: 1px solid var(--borda); }
+    footer.rodape .container { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center; }
+    footer.rodape a { color: var(--texto-2); }
+  </style>
+</head>
+<body>
+  <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+  <header class="topo">
+    <div class="container">
+      <a href="/" aria-label="Livih, página inicial">
+        <img src="/marca/livih.png" alt="Livih" width="95" height="40">
+      </a>
+      <nav aria-label="Principal">
+        <a class="secao" href="#como-funciona">Como funciona</a>
+        <a class="secao" href="#recursos">Recursos</a>
+        <a class="secao" href="#perguntas">Perguntas</a>
+        <a class="botao secundario pequeno" href="https://app.livih.com.br/">Entrar</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="conteudo">
+    <section class="heroi" aria-labelledby="titulo">
+      <div class="container">
+        <div>
+          <p class="selo">Atendimento compartilhado no WhatsApp</p>
+          <h1 id="titulo">Atendimento e vendas pelo WhatsApp em um só lugar</h1>
+          <p class="sub">Reúna as conversas dos seus vendedores, acompanhe os atendimentos e as oportunidades comerciais e conte com inteligência artificial para responder clientes e acionar sua equipe no momento certo.</p>
+          <div class="acoes">
+            <a class="botao claro" href="https://wa.me/5541984871599?text=Ol%C3%A1!%20Quero%20conhecer%20o%20Livih." rel="noopener">Fale com a gente no WhatsApp</a>
+            <a class="botao secundario" href="#como-funciona">Veja como funciona</a>
+          </div>
+        </div>
+        <img class="simbolo" src="/marca/livih-simbolo.png" alt="" width="136" height="136">
+      </div>
+    </section>
+
+    <section class="bloco" aria-labelledby="para-quem">
+      <div class="container">
+        <h2 id="para-quem">Para empresas que vendem e atendem pelo WhatsApp</h2>
+        <p class="intro">O Livih foi feito para pequenas e médias empresas em que vários vendedores atendem clientes pelo próprio celular, cada um com o seu número.</p>
+        <ul class="lista-publico">
+          <li>As conversas ficam espalhadas pelos celulares e a gestão não enxerga o que está acontecendo.</li>
+          <li>Clientes ficam sem resposta porque ninguém percebeu a mensagem.</li>
+          <li>Quando um vendedor sai da empresa, o histórico com os clientes vai embora junto.</li>
+          <li>Fica difícil saber quais negociações estão em andamento e com quem.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="bloco cinza" id="como-funciona" aria-labelledby="titulo-como">
+      <div class="container">
+        <h2 id="titulo-como">Como funciona</h2>
+        <p class="intro">Cada vendedor continua com o seu número de WhatsApp. O Livih reúne as conversas e organiza o atendimento da equipe.</p>
+        <ol class="passos">
+          <li>
+            <h3>Conecte os números da equipe</h3>
+            <p>Os números de WhatsApp dos vendedores são conectados ao Livih. O vendedor continua usando o celular normalmente, e as mensagens enviadas por ele também ficam registradas.</p>
+          </li>
+          <li>
+            <h3>As conversas chegam num só lugar</h3>
+            <p>Todas as conversas entram numa caixa de entrada compartilhada, separadas em filas: aguardando atendimento, em atendimento, com o agente e encerradas.</p>
+          </li>
+          <li>
+            <h3>O agente atende e chama a equipe</h3>
+            <p>O agente de inteligência artificial responde dúvidas e passa a conversa para um vendedor quando é preciso, avisando a pessoa pelo WhatsApp.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="bloco" id="recursos" aria-labelledby="titulo-recursos">
+      <div class="container">
+        <h2 id="titulo-recursos">O que o Livih faz pela sua equipe</h2>
+        <p class="intro">Ferramentas para organizar o atendimento, dar visibilidade à gestão e não perder nenhuma oportunidade de venda.</p>
+        <div class="grade tres">
+          <article class="cartao">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>Caixa de entrada compartilhada</h3>
+            <p>As conversas de todos os números da equipe reunidas numa só tela, no computador ou no celular.</p>
+          </article>
+          <article class="cartao">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>Filas de atendimento</h3>
+            <p>Quem precisa de resposta aparece primeiro, com o tempo de espera. Ninguém fica esquecido.</p>
+          </article>
+          <article class="cartao">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>Cada vendedor com a sua carteira</h3>
+            <p>O vendedor vê os próprios clientes. Donos e gestores acompanham a operação inteira.</p>
+          </article>
+          <article class="cartao">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>Agente de inteligência artificial</h3>
+            <p>Responde dúvidas a partir das informações da sua empresa, entende áudios e transfere para um atendente em casos como pedido de orçamento, reclamação ou cliente pronto para fechar.</p>
+          </article>
+          <article class="cartao">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>Funil de oportunidades</h3>
+            <p>As negociações ficam num quadro por etapas, ligadas às conversas com cada cliente.</p>
+          </article>
+          <article class="cartao">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>Notas internas</h3>
+            <p>A equipe registra informações sobre o cliente e a negociação, visíveis para quem atende.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="bloco cinza" aria-labelledby="titulo-historico">
+      <div class="container">
+        <h2 id="titulo-historico">Histórico e trilha de auditoria</h2>
+        <p class="intro">As mensagens registradas no Livih não podem ser editadas nem apagadas pelos usuários, e as ações da equipe, como assumir, transferir ou encerrar um atendimento, ficam registradas com o responsável e o horário. A gestão mantém o histórico das conversas comerciais mesmo quando alguém sai da equipe, respeitando os procedimentos previstos na LGPD.</p>
+      </div>
+    </section>
+
+    <section class="bloco" id="perguntas" aria-labelledby="titulo-perguntas">
+      <div class="container">
+        <h2 id="titulo-perguntas">Perguntas frequentes</h2>
+        <div class="perguntas">
+          <details>
+            <summary>Preciso trocar os números de WhatsApp da equipe?</summary>
+            <p>Não. Cada vendedor continua com o próprio número. Ele é conectado ao Livih e segue funcionando no celular normalmente.</p>
+          </details>
+          <details>
+            <summary>O vendedor continua usando o WhatsApp no celular?</summary>
+            <p>Sim. As mensagens enviadas pelo celular também são registradas no Livih e a conversa passa automaticamente para o atendimento da pessoa, sem o agente responder por cima.</p>
+          </details>
+          <details>
+            <summary>O agente de inteligência artificial atende sozinho?</summary>
+            <p>O agente responde dúvidas com base nas informações que a sua empresa cadastra e chama um atendente quando a conversa pede uma pessoa. Ele pode ser ligado ou desligado em cada número.</p>
+          </details>
+          <details>
+            <summary>O Livih faz disparo de mensagens em massa?</summary>
+            <p>Não. O Livih é uma plataforma de atendimento e vendas: organiza as conversas da equipe com os clientes. Envio de mensagens em massa não faz parte do produto.</p>
+          </details>
+          <details>
+            <summary>Como começo a usar?</summary>
+            <p>O acesso é liberado pela nossa equipe, que ajuda a conectar os números e configurar o agente. <a href="https://wa.me/5541984871599?text=Ol%C3%A1!%20Quero%20conhecer%20o%20Livih." rel="noopener">Fale com a gente pelo WhatsApp</a>.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="chamada" aria-labelledby="titulo-chamada">
+      <div class="container">
+        <h2 id="titulo-chamada">Organize o WhatsApp da sua equipe</h2>
+        <p>Converse com a gente e veja como o Livih funciona com os números da sua empresa.</p>
+        <a class="botao claro" href="https://wa.me/5541984871599?text=Ol%C3%A1!%20Quero%20conhecer%20o%20Livih." rel="noopener">Fale com a gente no WhatsApp</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <div class="container">
+      <span>© 2026 Livih · um produto da F7 Tech</span>
+      <span><a href="https://app.livih.com.br/">Entrar na plataforma</a></span>
+    </div>
+  </footer>
+</body>
+</html>
