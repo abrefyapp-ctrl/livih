@@ -725,5 +725,76 @@ when others then
   insert into resultado (teste, ok) values ('telefone repetido: ' || sqlstate || ' ' || sqlerrm, false);
 end $$;
 
+
+-- ============ notificações push ============
+reset role;
+-- a atendente (b1) ativa notificações pela tela; o dono do cliente X (c1) também, mas é de outra empresa
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+select public.push_inscrever('https://push.exemplo/b1', 'chave-b1', 'auth-b1', 'teste');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+select public.push_inscrever('https://push.exemplo/c1', 'chave-c1', 'auth-c1', 'teste');
+insert into resultado (teste, ok)
+select 'cada um vê só as próprias inscrições', count(*) = 1 from public.push_inscricoes;
+reset role;
+delete from public.push_fila;
+
+do $$
+declare v_canal uuid; r jsonb; v_conv uuid; v_n int;
+begin
+  select id into v_canal from public.canais where instance_id = 'INST-F7';
+
+  -- contato sem agente escreve: conversa nasce aguardando → UMA notificação para a equipe, com o texto
+  insert into public.contatos (org_id, telefone, nome, sem_agente)
+  values (current_setting('teste.f7')::uuid, '5541912345101', 'Bia Push', true);
+  r := public.registrar_entrada(v_canal, 'PUSH-1', '5541912345101', null, 'Bia Push', 'texto', 'preciso de ajuda', '{}');
+  v_conv := (r ->> 'conversa_id')::uuid;
+  select count(*) into v_n from public.push_fila where conversa_id = v_conv;
+  insert into resultado (teste, ok)
+  select 'aguardando equipe: uma notificação para quem ativou', v_n = 1
+     and exists (select 1 from public.push_fila where conversa_id = v_conv and user_id = '00000000-0000-0000-0000-0000000000b1'
+                 and corpo = 'preciso de ajuda' and titulo = 'Bia Push aguarda atendimento' and url = '/conversas/' || v_conv);
+  insert into resultado (teste, ok)
+  select 'outra empresa não é notificada', not exists (select 1 from public.push_fila where user_id = '00000000-0000-0000-0000-0000000000c1');
+
+  -- segunda mensagem antes de enviar: atualiza a mesma notificação
+  r := public.registrar_entrada(v_canal, 'PUSH-2', '5541912345101', null, 'Bia Push', 'texto', 'alguém aí?', '{}');
+  insert into resultado (teste, ok)
+  select 'mensagens seguidas viram uma notificação só', count(*) = 1 and max(corpo) = 'alguém aí?'
+    from public.push_fila where conversa_id = v_conv and enviado_em is null;
+
+  -- a Edge Function pega e marca como enviada
+  select count(*) into v_n from public.push_reivindicar(100);
+  insert into resultado (teste, ok)
+  select 'push_reivindicar entrega e marca', v_n >= 1 and not exists (select 1 from public.push_fila where enviado_em is null);
+
+  -- a atendente assume; cliente escreve → notificação só para ela
+  update public.conversas set estado = 'humano', atribuida_a = '00000000-0000-0000-0000-0000000000b1' where id = v_conv;
+  r := public.registrar_entrada(v_canal, 'PUSH-3', '5541912345101', null, 'Bia Push', 'texto', 'obrigada', '{}');
+  insert into resultado (teste, ok)
+  select 'em atendimento: notifica o atendente', count(*) = 1 and max(titulo) = 'Bia Push'
+    from public.push_fila where conversa_id = v_conv and enviado_em is null and user_id = '00000000-0000-0000-0000-0000000000b1';
+
+  -- conversa com o agente não notifica ninguém
+  delete from public.push_fila;
+  r := public.registrar_entrada(v_canal, 'PUSH-4', '5541912345102', null, 'Com agente', 'texto', 'oi', '{}');
+  insert into resultado (teste, ok) values ('conversa com o agente não notifica', r ->> 'estado' = 'bot'
+    and not exists (select 1 from public.push_fila));
+end $$;
+
+-- teste pela tela e cancelar
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+select public.push_testar();
+select public.push_cancelar('https://push.exemplo/b1');
+reset role;
+insert into resultado (teste, ok)
+select 'botão de teste enfileira e cancelar remove o aparelho',
+  exists (select 1 from public.push_fila where user_id = '00000000-0000-0000-0000-0000000000b1' and conversa_id is null)
+  and not exists (select 1 from public.push_inscricoes where endpoint = 'https://push.exemplo/b1');
+insert into resultado (teste, ok)
+select 'usuário não lê a fila nem as chaves', not has_function_privilege('authenticated', 'public.push_chaves()', 'execute')
+  and not has_function_privilege('authenticated', 'public.push_reivindicar(integer)', 'execute');
+
 reset role;
 select n, teste, ok from resultado order by n;

@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../services/supabaseClient'
 import { listarEquipe, listarOrganizacoes, type Organizacao, type Perfil } from '../services/atendimento'
 import { ehAdminPlataforma } from '../services/plataforma'
+import { desativarNotificacoes } from '../services/notificacoes'
 import { ContextoSessao } from '../hooks/useSessao'
 
 const CHAVE_ORG = 'livih.org'
@@ -87,6 +88,8 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
   }, [])
 
   const sair = useCallback(async () => {
+    // Aparelho compartilhado: quem sai não continua recebendo as notificações da conta.
+    await desativarNotificacoes().catch(() => undefined)
     await supabase.auth.signOut()
   }, [])
 

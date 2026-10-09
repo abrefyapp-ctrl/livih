@@ -861,6 +861,12 @@ export type Database = {
         }
         Relationships: []
       }
+      push_config: {
+        Row: { chave_publica: string; criado_em: string; id: number }
+        Insert: { chave_publica: string; criado_em?: string; id?: number }
+        Update: { chave_publica?: string; criado_em?: string; id?: number }
+        Relationships: []
+      }
       pedidos_acesso: {
         Row: {
           criado_em: string
@@ -1252,6 +1258,12 @@ export type Database = {
       pode_ver_canal: { Args: { p_canal: string }; Returns: boolean }
       pode_ver_contato: { Args: { p_contato: string }; Returns: boolean }
       pode_ver_conversa: { Args: { p_conversa: string }; Returns: boolean }
+      push_cancelar: { Args: { p_endpoint: string }; Returns: undefined }
+      push_inscrever: {
+        Args: { p_auth: string; p_dispositivo?: string; p_endpoint: string; p_p256dh: string }
+        Returns: undefined
+      }
+      push_testar: { Args: never; Returns: undefined }
       registrar_entrada: {
         Args: {
           p_canal: string
