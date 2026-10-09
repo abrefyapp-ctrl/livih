@@ -427,3 +427,7 @@ verify_jwt = false
 # whatsapp-conexao: chamada pelo banco (x-livih-segredo) e pela tela (login validado dentro da função).
 [functions.whatsapp-conexao]
 verify_jwt = false
+
+[functions.pedido-acesso]
+# Formulário público do site (sem login): Turnstile, campo isca e limite por e-mail dentro da função.
+verify_jwt = false

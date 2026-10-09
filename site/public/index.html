@@ -162,6 +162,29 @@
     .chamada h2 { font-size: clamp(1.6rem, 3.5vw, 2.25rem); margin: 0 0 .75rem; }
     .chamada p { color: #cbd5e1; margin: 0 auto 2rem; max-width: 36rem; font-size: 1.1rem; }
 
+    .formulario { max-width: 44rem; margin: 0 auto; text-align: left; }
+    .formulario .campos { display: grid; gap: 1rem; }
+    @media (min-width: 40rem) { .formulario .campos { grid-template-columns: 1fr 1fr; } .formulario .largo { grid-column: 1 / -1; } }
+    .formulario label { display: flex; flex-direction: column; gap: .35rem; font-weight: 600; font-size: .95rem; color: #e2e8f0; }
+    .formulario .opcional { font-weight: 400; color: #94a3b8; }
+    .formulario input, .formulario textarea {
+      font: inherit; font-weight: 400; color: var(--texto); background: #fff; border: 1px solid #cbd5e1; border-radius: .5rem;
+      min-height: 2.75rem; padding: .6rem .75rem; width: 100%;
+    }
+    .formulario textarea { resize: vertical; }
+    .formulario .isca { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+    .formulario .captcha { margin: 1.25rem 0 .5rem; }
+    .formulario .consentimento { font-size: .9rem; color: #94a3b8; margin: .75rem 0 1.25rem; text-align: left; max-width: none; }
+    .formulario .consentimento a, .chamada .alternativa a { color: #6ee7b7; }
+    .formulario button { cursor: pointer; }
+    .formulario button[disabled] { opacity: .6; cursor: wait; }
+    .formulario .status { margin: 1rem 0 0; font-weight: 600; text-align: left; max-width: none; min-height: 1.5em; }
+    .formulario .status.ok { color: #6ee7b7; }
+    .formulario .status.erro { color: #fca5a5; }
+    .chamada { position: relative; }
+    .chamada .alternativa { margin: 2rem auto 0; font-size: .95rem; }
+    .links-rodape { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+
     footer.rodape { padding: 2rem 0; color: var(--texto-3); font-size: .9rem; border-top: 1px solid var(--borda); }
     footer.rodape .container { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center; }
     footer.rodape a { color: var(--texto-2); }
@@ -192,7 +215,7 @@
           <h1 id="titulo">Atendimento e vendas pelo WhatsApp em um só lugar</h1>
           <p class="sub">Reúna as conversas dos seus vendedores, acompanhe os atendimentos e as oportunidades comerciais e conte com inteligência artificial para responder clientes e acionar sua equipe no momento certo.</p>
           <div class="acoes">
-            <a class="botao claro" href="https://wa.me/5541984871599?text=Ol%C3%A1!%20Quero%20conhecer%20o%20Livih." rel="noopener">Fale com a gente no WhatsApp</a>
+            <a class="botao claro" href="#solicitar">Solicite acesso</a>
             <a class="botao secundario" href="#como-funciona">Veja como funciona</a>
           </div>
         </div>
@@ -302,17 +325,31 @@
           </details>
           <details>
             <summary>Como começo a usar?</summary>
-            <p>O acesso é liberado pela nossa equipe, que ajuda a conectar os números e configurar o agente. <a href="https://wa.me/5541984871599?text=Ol%C3%A1!%20Quero%20conhecer%20o%20Livih." rel="noopener">Fale com a gente pelo WhatsApp</a>.</p>
+            <p>O acesso é liberado pela nossa equipe, que ajuda a conectar os números e configurar o agente. <a href="#solicitar">Preencha o pedido de acesso</a> ou <a href="https://wa.me/5541984871599?text=Ol%C3%A1!%20Quero%20conhecer%20o%20Livih." rel="noopener">fale com a gente pelo WhatsApp</a>.</p>
           </details>
         </div>
       </div>
     </section>
 
-    <section class="chamada" aria-labelledby="titulo-chamada">
+    <section class="chamada" id="solicitar" aria-labelledby="titulo-chamada">
       <div class="container">
         <h2 id="titulo-chamada">Organize o WhatsApp da sua equipe</h2>
-        <p>Converse com a gente e veja como o Livih funciona com os números da sua empresa.</p>
-        <a class="botao claro" href="https://wa.me/5541984871599?text=Ol%C3%A1!%20Quero%20conhecer%20o%20Livih." rel="noopener">Fale com a gente no WhatsApp</a>
+        <p>Peça o acesso ao Livih. Nossa equipe entra em contato para conhecer a sua operação e ajudar a conectar os números.</p>
+        <form id="form-pedido" class="formulario" novalidate>
+          <div class="campos">
+            <label><span>Empresa</span><input name="empresa" required maxlength="120" autocomplete="organization"></label>
+            <label><span>Seu nome</span><input name="nome" required maxlength="120" autocomplete="name"></label>
+            <label><span>E-mail</span><input name="email" type="email" required maxlength="160" autocomplete="email" inputmode="email"></label>
+            <label><span>WhatsApp <span class="opcional">(opcional)</span></span><input name="telefone" type="tel" maxlength="30" autocomplete="tel" inputmode="tel" placeholder="(41) 99999-9999"></label>
+            <label class="largo"><span>Conte rapidamente como a sua equipe atende hoje <span class="opcional">(opcional)</span></span><textarea name="mensagem" rows="3" maxlength="1500"></textarea></label>
+            <label class="isca" aria-hidden="true"><span>Não preencha</span><input name="site" tabindex="-1" autocomplete="off"></label>
+          </div>
+          <div id="turnstile" class="captcha"></div>
+          <p class="consentimento">Ao enviar, você concorda com a <a href="/privacidade/">Política de Privacidade</a>. Usamos esses dados só para responder ao seu pedido.</p>
+          <button class="botao claro" type="submit">Solicitar acesso</button>
+          <p id="pedido-status" class="status" role="status" aria-live="polite"></p>
+        </form>
+        <p class="alternativa">Prefere conversar agora? <a href="https://wa.me/5541984871599?text=Ol%C3%A1!%20Quero%20conhecer%20o%20Livih." rel="noopener">Fale com a gente no WhatsApp</a>.</p>
       </div>
     </section>
   </main>
@@ -320,8 +357,79 @@
   <footer class="rodape">
     <div class="container">
       <span>© 2026 Livih · um produto da F7 Tech</span>
-      <span><a href="https://app.livih.com.br/">Entrar na plataforma</a></span>
+      <nav aria-label="Rodapé" class="links-rodape">
+        <a href="/privacidade/">Política de Privacidade</a>
+        <a href="/termos/">Termos de Uso</a>
+        <a href="https://app.livih.com.br/">Entrar na plataforma</a>
+      </nav>
     </div>
   </footer>
+  <script>
+    // Formulário de pedido de acesso -> Edge Function pedido-acesso (Supabase do Livih). O captcha (Turnstile)
+    // só é carregado quando o visitante chega perto do formulário, para não pesar no carregamento da página.
+    (function () {
+      var CHAVE_TURNSTILE = "__TURNSTILE_SITE_KEY__";
+      var ENDPOINT = "https://przgftkiicuapbpwspjd.supabase.co/functions/v1/pedido-acesso";
+      var form = document.getElementById("form-pedido");
+      var status = document.getElementById("pedido-status");
+      var botao = form.querySelector("button[type=submit]");
+      var token = "", widget = null, carregado = false;
+
+      function carregarCaptcha() {
+        if (carregado) return;
+        carregado = true;
+        window.livihTurnstile = function () {
+          widget = window.turnstile.render("#turnstile", {
+            sitekey: CHAVE_TURNSTILE, language: "pt-br", theme: "dark", appearance: "interaction-only",
+            callback: function (t) { token = t; },
+            "expired-callback": function () { token = ""; },
+            "error-callback": function () { token = ""; }
+          });
+        };
+        var s = document.createElement("script");
+        s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=livihTurnstile";
+        s.async = true; s.defer = true;
+        document.head.appendChild(s);
+      }
+      if ("IntersectionObserver" in window) {
+        new IntersectionObserver(function (e, obs) {
+          if (e.some(function (x) { return x.isIntersecting; })) { carregarCaptcha(); obs.disconnect(); }
+        }, { rootMargin: "400px" }).observe(form);
+      } else { carregarCaptcha(); }
+      form.addEventListener("focusin", carregarCaptcha);
+
+      function mostrar(msg, tipo) { status.textContent = msg; status.className = "status " + (tipo || ""); }
+
+      form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var d = new FormData(form);
+        if (!String(d.get("empresa")).trim() || !String(d.get("nome")).trim()) return mostrar("Preencha a empresa e o seu nome.", "erro");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(d.get("email")).trim())) return mostrar("Informe um e-mail válido.", "erro");
+        if (!token) return mostrar("Aguarde a verificação de segurança terminar e tente de novo.", "erro");
+        botao.disabled = true;
+        mostrar("Enviando…");
+        var corpo = {
+          empresa: d.get("empresa"), nome: d.get("nome"), email: d.get("email"),
+          telefone: d.get("telefone"), mensagem: d.get("mensagem"), site: d.get("site"), turnstile: token
+        };
+        fetch(ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) })
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (res) {
+            if (res.ok) {
+              form.reset();
+              mostrar("Pedido recebido! Nossa equipe vai entrar em contato em breve.", "ok");
+            } else {
+              mostrar((res.j && res.j.erro) || "Não foi possível enviar agora. Tente de novo.", "erro");
+            }
+          })
+          .catch(function () { mostrar("Sem conexão com o servidor. Tente de novo em alguns instantes.", "erro"); })
+          .then(function () {
+            botao.disabled = false;
+            token = "";
+            if (widget !== null && window.turnstile) window.turnstile.reset(widget);
+          });
+      });
+    })();
+  </script>
 </body>
 </html>

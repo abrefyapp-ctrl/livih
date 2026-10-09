@@ -1,0 +1,36 @@
+/* Páginas legais do site (privacidade e termos): leitura confortável, mesmas cores da página inicial. */
+:root {
+  --petroleo: #092124; --primaria: #0f766e; --destaque: #10b981;
+  --texto: #0f172a; --texto-2: #334155; --texto-3: #64748b; --borda: #e2e8f0; --fundo: #f8fafc;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--texto); background: #fff; line-height: 1.7; -webkit-font-smoothing: antialiased;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: var(--primaria); }
+:focus-visible { outline: 3px solid var(--destaque); outline-offset: 2px; }
+.container { width: 100%; max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
+@media (min-width: 48rem) { .container { padding: 0 2rem; } }
+
+header.topo { border-bottom: 1px solid var(--borda); }
+.topo .container { display: flex; align-items: center; justify-content: space-between; height: 4rem; }
+.topo .voltar { color: var(--texto-2); font-weight: 500; text-decoration: none; }
+.topo .voltar:hover { color: var(--texto); }
+
+.documento { max-width: 48rem; padding-top: 2rem; padding-bottom: 4rem; }
+.trilha { font-size: .9rem; color: var(--texto-3); margin-bottom: 1rem; }
+.trilha a { color: var(--texto-3); }
+.documento h1 { font-size: clamp(1.9rem, 4vw, 2.5rem); line-height: 1.2; margin: 0 0 .25rem; letter-spacing: -.01em; }
+.documento .atualizado { color: var(--texto-3); margin: 0 0 2rem; }
+.documento h2 { font-size: 1.35rem; margin: 2.5rem 0 .75rem; line-height: 1.3; }
+.documento h3 { font-size: 1.05rem; margin: 1.5rem 0 .5rem; }
+.documento p, .documento li { color: var(--texto-2); }
+.documento ul { padding-left: 1.25rem; }
+.documento li { margin-bottom: .5rem; }
+
+footer.rodape { padding: 2rem 0; color: var(--texto-3); font-size: .9rem; border-top: 1px solid var(--borda); }
+footer.rodape .container { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center; }
+footer.rodape a { color: var(--texto-2); }
+.links-rodape { display: flex; flex-wrap: wrap; gap: 1.25rem; }
