@@ -165,6 +165,14 @@ async function transcreverEAvisar(
       if (t.ok && corpo?.text) {
         const { data } = await supabase.rpc("registrar_transcricao", { p_mensagem: mensagemId, p_transcricao: corpo.text });
         chamar = data?.chamar_agente ?? chamar;
+        // Consumo de IA (tabela uso_ia): falha aqui não atrapalha o atendimento.
+        const { error: erroUso } = await supabase.from("uso_ia").upsert({
+          org_id: entrada.org_id, conversa_id: entrada.conversa_id, mensagem_id: mensagemId,
+          tipo: "transcricao", modelo: "gpt-4o-transcribe",
+          tokens_entrada: Number(corpo.usage?.input_tokens ?? 0), tokens_saida: Number(corpo.usage?.output_tokens ?? 0),
+          segundos_audio: segundos || null, origem_ref: `audio:${mensagemId}`,
+        }, { onConflict: "origem_ref", ignoreDuplicates: true });
+        if (erroUso) console.error("uso_ia transcrição", erroUso.message);
       } else console.error("transcrição", t.status, JSON.stringify(corpo).slice(0, 200));
     } else console.error("download do áudio", audio.status);
   }

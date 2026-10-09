@@ -549,5 +549,41 @@ end $$;
 insert into resultado (teste, ok)
 select 'pedidos de acesso só para a plataforma', not exists (select 1 from public.pedidos_acesso);
 
+-- ---------- consumo de IA (uso_ia) ----------
+reset role;
+set local role service_role;
+insert into public.uso_ia (org_id, conversa_id, tipo, modelo, chamadas, tokens_entrada, tokens_saida, origem_ref)
+values (current_setting('teste.f7')::uuid, current_setting('teste.conversa')::uuid, 'resposta', 'gpt-5-mini', 2, 6000, 30, 'teste:n8n:1');
+insert into public.uso_ia (org_id, conversa_id, tipo, modelo, chamadas, tokens_entrada, tokens_saida, origem_ref)
+values (current_setting('teste.f7')::uuid, current_setting('teste.conversa')::uuid, 'resposta', 'gpt-5-mini', 2, 6000, 30, 'teste:n8n:1')
+on conflict (origem_ref) do nothing;
+insert into public.uso_ia (org_id, conversa_id, tipo, modelo, tokens_entrada, tokens_saida, segundos_audio, origem_ref)
+values (current_setting('teste.f7')::uuid, current_setting('teste.conversa')::uuid, 'transcricao', 'gpt-4o-transcribe', 500, 40, 12, 'teste:audio:1');
+insert into resultado (teste, ok)
+select 'consumo de IA não duplica pela mesma origem', (select count(*) from public.uso_ia where origem_ref like 'teste:%') = 2;
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'plataforma vê o consumo do mês com custo', exists (
+  select 1 from public.uso_ia_mensal where org_id = current_setting('teste.f7')::uuid
+     and respostas_agente >= 1 and conversas_com_agente >= 1 and audios_transcritos >= 1 and custo_usd > 0);
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'atendente não vê o consumo de IA', not exists (select 1 from public.uso_ia where origem_ref like 'teste:%');
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'outra empresa não vê o consumo da F7', not exists (
+  select 1 from public.uso_ia_mensal where org_id = current_setting('teste.f7')::uuid);
+do $$ begin
+  insert into public.uso_ia (org_id, tipo, modelo, origem_ref) values (current_setting('teste.f7')::uuid, 'resposta', 'x', 'teste:invasor');
+  insert into resultado (teste, ok) values ('usuário não grava consumo de IA', false);
+exception when others then
+  insert into resultado (teste, ok) values ('usuário não grava consumo de IA', true);
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;
