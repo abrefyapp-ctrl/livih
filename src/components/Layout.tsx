@@ -6,6 +6,8 @@ import { useNumerosCaidos } from '../hooks/useNumerosCaidos'
 import { Avatar } from './Avatar'
 import { Icone, type NomeIcone } from './Icone'
 import { Logo } from './Logo'
+import { Modal } from './Modal'
+import { useInstalarApp } from '../pwa'
 
 type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: number }
 
@@ -19,6 +21,8 @@ export function Layout() {
   const caidos = useNumerosCaidos(orgAtiva?.id)
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const [gaveta, setGaveta] = useState(false)
+  const app = useInstalarApp()
+  const [ajudaIos, setAjudaIos] = useState(false)
 
   // Título da aba avisa quem está em outra aba.
   useEffect(() => {
@@ -144,6 +148,16 @@ export function Layout() {
           )}
 
           <div className="ml-auto flex items-center gap-2">
+            {(app.pronto || app.ios) && (
+              <button
+                onClick={() => (app.pronto ? void app.instalar() : setAjudaIos(true))}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-pequeno font-medium text-primaria hover:bg-primaria-suave"
+              >
+                <Icone nome="instalar" className="size-4" />
+                <span className="hidden sm:inline">Instalar app</span>
+                <span className="sr-only sm:hidden">Instalar app</span>
+              </button>
+            )}
             <span className="hidden items-center gap-2 sm:flex">
               <Avatar nome={meuNome || '?'} tamanho="sm" />
               <span className="max-w-48 truncate text-pequeno font-medium text-texto-2">{meuNome}</span>
@@ -179,6 +193,19 @@ export function Layout() {
         <main className="min-h-0 flex-1 overflow-hidden">
           <Outlet />
         </main>
+
+        <Modal aberto={ajudaIos} titulo="Instalar o Livih no iPhone" aoFechar={() => setAjudaIos(false)}>
+          <ol className="list-decimal space-y-2 pl-5 text-pequeno text-texto-2">
+            <li>Abra o Livih no <strong>Safari</strong>.</li>
+            <li>
+              Toque em <strong>Compartilhar</strong> (o quadrado com a seta para cima).
+            </li>
+            <li>
+              Escolha <strong>Adicionar à Tela de Início</strong> e confirme em <strong>Adicionar</strong>.
+            </li>
+          </ol>
+          <p className="mt-3 text-legenda text-texto-3">O ícone do Livih aparece na tela inicial e abre como um app, sem a barra do navegador.</p>
+        </Modal>
       </div>
     </div>
   )

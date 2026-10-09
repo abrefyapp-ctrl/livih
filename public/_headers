@@ -1,0 +1,6 @@
+# O navegador precisa ver versões novas do service worker e do manifesto logo depois do deploy.
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: no-cache

@@ -14,6 +14,9 @@ import { Contatos } from './pages/Contatos'
 import { ContatoPerfil } from './pages/ContatoPerfil'
 import { Oportunidades } from './pages/Oportunidades'
 import { Empresas } from './pages/Empresas'
+import { registrarServiceWorker } from './pwa'
+
+registrarServiceWorker()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
