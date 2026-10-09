@@ -23,7 +23,7 @@ LOTE = 200
 
 
 def log(msg):
-    print(f"{datetime.datetime.utcnow():%Y-%m-%d %H:%M:%S} {msg}", flush=True)
+    print(f"{datetime.datetime.now(datetime.timezone.utc):%Y-%m-%d %H:%M:%S} {msg}", flush=True)
 
 
 def env():
