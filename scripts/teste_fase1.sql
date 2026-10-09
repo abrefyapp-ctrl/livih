@@ -696,5 +696,34 @@ reset role;
 insert into resultado (teste, ok)
 select 'atendente marca contato sem agente', sem_agente from public.contatos where telefone = '5541912345002';
 
+
+-- ============ criar contato pela tela (INSERT ... RETURNING, como o PostgREST faz) ============
+reset role;
+grant insert on resultado to authenticated;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare v_id uuid;
+begin
+  insert into public.contatos (org_id, origem, nome, telefone, empresa, sem_agente)
+  values (current_setting('teste.f7')::uuid, 'manual', 'Criado pela tela', '5541912345099', 'Teste', true)
+  returning id into v_id;
+  insert into resultado (teste, ok) values ('atendente cria contato pela tela (com RETURNING)', v_id is not null);
+exception when others then
+  insert into resultado (teste, ok) values ('atendente cria contato pela tela (com RETURNING): ' || sqlerrm, false);
+end $$;
+do $$
+declare v_id uuid;
+begin
+  insert into public.contatos (org_id, origem, nome, telefone)
+  values (current_setting('teste.f7')::uuid, 'manual', 'Repetido', '5541912345099')
+  returning id into v_id;
+  insert into resultado (teste, ok) values ('telefone repetido é recusado como duplicado', false);
+exception when unique_violation then
+  insert into resultado (teste, ok) values ('telefone repetido é recusado como duplicado', true);
+when others then
+  insert into resultado (teste, ok) values ('telefone repetido: ' || sqlstate || ' ' || sqlerrm, false);
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;
