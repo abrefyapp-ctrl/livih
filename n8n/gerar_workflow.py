@@ -85,9 +85,25 @@ ${c.base_conhecimento || '(vazia)'}
 
 Data e hora agora: ${agora} (horário de Brasília).`;
 
-const entrada = `Histórico da conversa no WhatsApp (mais antigas primeiro):
+// Ponto de retomada (migration 20261009130000): a conversa voltou para o agente (devolvida pela equipe, reaberta
+// ou agente religado). O que veio antes é só contexto: a equipe já tratou ou o assunto ficou para trás.
+const msgs = c.mensagens || [];
+const anteriores = msgs.filter((m) => m.anterior);
+const novas = msgs.filter((m) => !m.anterior);
 
-${(c.mensagens || []).map(linha).join('\n')}
+const entrada = anteriores.length
+  ? `Histórico ANTERIOR da conversa no WhatsApp (mais antigas primeiro). Você voltou a atender esta conversa em ${c.retomado_em}; estas mensagens já foram tratadas pela equipe ou são de um atendimento passado. Use só como contexto (nome, o que já foi combinado, o que a equipe respondeu). Não responda a perguntas daqui, não repita o que a equipe já disse e não retome esses assuntos, a não ser que o cliente volte a falar deles nas mensagens novas:
+
+${anteriores.map(linha).join('\n')}
+
+--- Mensagens NOVAS, depois que você voltou a atender (responda a estas) ---
+
+${novas.map(linha).join('\n')}
+
+Escreva a próxima resposta para o cliente, respondendo às mensagens novas.`
+  : `Histórico da conversa no WhatsApp (mais antigas primeiro):
+
+${msgs.map(linha).join('\n')}
 
 Escreva a próxima resposta para o cliente.`;
 

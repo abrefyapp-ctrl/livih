@@ -585,5 +585,59 @@ exception when others then
   insert into resultado (teste, ok) values ('usuário não grava consumo de IA', true);
 end $$;
 
+
+-- ============ ponto de retomada do agente ============
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+set local role service_role;
+do $$
+declare v_canal uuid; r jsonb; v_conv uuid; ctx jsonb; v_antes timestamptz; v_depois timestamptz;
+begin
+  select id into v_canal from public.canais where instance_id = 'INST-F7';
+  r := public.registrar_entrada(v_canal, 'RT-1', '5541912340000', null, 'Rita', 'texto', 'pergunta antiga', '{}');
+  v_conv := (r ->> 'conversa_id')::uuid;
+
+  ctx := public.agente_contexto(v_conv);
+  insert into resultado (teste, ok)
+  select 'sem volta ao agente, nada é anterior',
+    not exists (select 1 from jsonb_array_elements(ctx -> 'mensagens') m where (m ->> 'anterior')::boolean);
+
+  -- a equipe assume, responde e devolve ao agente; depois o cliente escreve de novo
+  update public.conversas set estado = 'humano' where id = v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (current_setting('teste.f7')::uuid, v_conv, 'saida', 'atendente', 'resolvido pela equipe', 'pendente');
+  update public.conversas set estado = 'bot' where id = v_conv;
+  r := public.registrar_entrada(v_canal, 'RT-2', '5541912340000', null, 'Rita', 'texto', 'pergunta nova', '{}');
+
+  ctx := public.agente_contexto(v_conv);
+  insert into resultado (teste, ok)
+  select 'devolvida ao agente: o que veio antes é anterior, a nova não',
+    ctx ->> 'retomado_em' is not null
+    and (select bool_and((m ->> 'anterior')::boolean) from jsonb_array_elements(ctx -> 'mensagens') m
+          where m ->> 'texto' in ('pergunta antiga', 'resolvido pela equipe'))
+    and (select not (m ->> 'anterior')::boolean from jsonb_array_elements(ctx -> 'mensagens') m
+          where m ->> 'texto' = 'pergunta nova');
+
+  -- religar o agente do número move o ponto para frente
+  select ativado_em into v_antes from public.agentes where canal_id = v_canal;
+  update public.agentes set ativo = false where canal_id = v_canal;
+  update public.agentes set ativo = true where canal_id = v_canal;
+  select ativado_em into v_depois from public.agentes where canal_id = v_canal;
+  insert into resultado (teste, ok) values ('religar o agente marca a hora', v_depois > coalesce(v_antes, '-infinity'));
+  ctx := public.agente_contexto(v_conv);
+  insert into resultado (teste, ok)
+  select 'depois de religar, a conversa toda vira anterior',
+    (select bool_and((m ->> 'anterior')::boolean) from jsonb_array_elements(ctx -> 'mensagens') m);
+
+  -- conversa encerrada reaberta pelo cliente
+  update public.conversas set estado = 'encerrada' where id = v_conv;
+  r := public.registrar_entrada(v_canal, 'RT-3', '5541912340000', null, 'Rita', 'texto', 'voltei', '{}');
+  ctx := public.agente_contexto(v_conv);
+  insert into resultado (teste, ok)
+  select 'conversa reaberta: só a mensagem que reabriu é nova',
+    (select count(*) from jsonb_array_elements(ctx -> 'mensagens') m where not (m ->> 'anterior')::boolean) = 1
+    and (select m ->> 'texto' from jsonb_array_elements(ctx -> 'mensagens') m where not (m ->> 'anterior')::boolean) = 'voltei';
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;
