@@ -169,8 +169,9 @@ export function SecaoAgente() {
             Saudação
           </label>
           <p className="text-legenda text-texto-3">
-            O agente começa a primeira resposta de cada conversa com este texto. Se o cliente já chegar dizendo o que
-            precisa, ele cumprimenta e já responde. Deixe vazio para o agente cumprimentar do jeito dele.
+            Enviada exatamente assim na primeira resposta de cada conversa (ou quando o cliente volta depois de 12 horas
+            sem resposta). Em seguida o agente continua: se o cliente já disse o que precisa, ele responde; se foi só um
+            “oi”, a saudação basta. Deixe vazio para o agente cumprimentar do jeito dele.
           </p>
           <textarea
             id="saudacao"

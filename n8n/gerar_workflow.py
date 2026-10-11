@@ -67,8 +67,20 @@ const textoHorario = horario
   : null;
 const saudacao = (c.agente?.saudacao || '').trim();
 const foraHorario = (c.agente?.mensagem_fora_horario || '').trim();
-const blocoSaudacao = saudacao && c.primeira_resposta
-  ? `Esta é a primeira resposta desta conversa: comece com a saudação da empresa, com estas palavras: "${saudacao}". Se o cliente já disse o que precisa, siga na mesma mensagem e responda.`
+
+// Saudação configurada: o próprio sistema manda o texto exato na primeira resposta (não depende da IA);
+// o agente continua em seguida. Em branco, o agente cumprimenta do jeito dele.
+const saudacaoAgora = saudacao && c.primeira_resposta;
+if (saudacaoAgora) {
+  const r = await rpc('agente_responder', { p_conversa: conversa_id, p_texto: saudacao, p_mensagem: mensagem_id });
+  if (r?.enviado === false) return [];
+}
+// Fora do horário o aviso precisa sair, então o "oi" sozinho não pode ficar sem resposta.
+const podeCalar = !textoHorario || c.dentro_do_horario;
+const blocoSaudacao = saudacaoAgora
+  ? `O sistema ACABOU de enviar ao cliente a saudação da empresa: "${saudacao}". Não cumprimente de novo nem repita a pergunta da saudação. ${podeCalar
+      ? 'Se as mensagens novas do cliente forem só um cumprimento (oi, olá, bom dia...) sem nenhum pedido ou pergunta, a saudação já basta: responda exatamente SEM_RESPOSTA. Se o cliente já disse o que precisa, responda direto ao assunto.'
+      : 'Se o cliente já disse o que precisa, responda direto ao assunto; se foi só um cumprimento, dê apenas o aviso de fora do horário, em uma mensagem curta.'}`
   : saudacao
     ? 'A conversa já está em andamento: não repita a saudação.'
     : '';
@@ -118,6 +130,11 @@ Data e hora agora: ${agora} (horário de Brasília).`;
 // Ponto de retomada (migration 20261009130000): a conversa voltou para o agente (devolvida pela equipe, reaberta
 // ou agente religado). O que veio antes é só contexto: a equipe já tratou ou o assunto ficou para trás.
 const msgs = c.mensagens || [];
+// O contexto foi lido antes de a saudação sair: ela entra no fim do histórico para o agente ver a ordem certa.
+if (saudacaoAgora) {
+  const em = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '');
+  msgs.push({ de: 'assistente (saudação automática)', tipo: 'texto', texto: saudacao, em, anterior: false });
+}
 const anteriores = msgs.filter((m) => m.anterior);
 const novas = msgs.filter((m) => !m.anterior);
 
@@ -140,9 +157,10 @@ Escreva a próxima resposta para o cliente.`;
 return [{ json: { conversa_id, mensagem_id, prompt_sistema, entrada } }];
 """
 
-RESPONDER = RPC + """
+RESPONDER = RPC + r"""
 const texto = String($input.first().json.output || '').trim();
-if (!texto) return [];
+// SEM_RESPOSTA: a saudação automática já respondeu um simples "oi" (ver Contexto).
+if (!texto || /^\W*SEM_RESPOSTA\W*$/i.test(texto)) return [];
 const { conversa_id, mensagem_id } = $('Contexto').first().json;
 const r = await rpc('agente_responder', { p_conversa: conversa_id, p_texto: texto, p_mensagem: mensagem_id });
 return [{ json: r }];
