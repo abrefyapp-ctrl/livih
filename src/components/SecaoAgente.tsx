@@ -7,9 +7,19 @@ import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
 import { EstadoVazio } from './EstadoVazio'
+import { erroDoHorario, horarioDoBanco, horarioParaBanco, type Horario } from '../services/horario'
+import { HorarioAtendimento } from './HorarioAtendimento'
 import { Icone } from './Icone'
 
-type Formulario = { prompt: string; casos: string[]; automaticas: string[]; telefone: string }
+type Formulario = {
+  prompt: string
+  saudacao: string
+  horario: Horario
+  foraHorario: string
+  casos: string[]
+  automaticas: string[]
+  telefone: string
+}
 
 const textosDe = (a: Agente, chave: 'casos' | 'mensagens_automaticas'): string[] => {
   const v = (a.regras_humano as Record<string, unknown> | null)?.[chave]
@@ -18,6 +28,9 @@ const textosDe = (a: Agente, chave: 'casos' | 'mensagens_automaticas'): string[]
 
 const paraFormulario = (a: Agente): Formulario => ({
   prompt: a.prompt,
+  saudacao: a.saudacao ?? '',
+  horario: horarioDoBanco(a.horario),
+  foraHorario: a.mensagem_fora_horario ?? '',
   casos: textosDe(a, 'casos'),
   automaticas: textosDe(a, 'mensagens_automaticas'),
   telefone: a.telefone_alerta ? formatarTelefone(a.telefone_alerta) : '',
@@ -72,6 +85,7 @@ export function SecaoAgente() {
   const alterado = JSON.stringify(form) !== JSON.stringify(original)
   const telefone = normalizarTelefone(form.telefone)
   const telefoneInvalido = telefone === undefined
+  const invalido = telefoneInvalido || !!erroDoHorario(form.horario)
 
   const mudar = (campos: Partial<Formulario>) => {
     setForm((f) => (f ? { ...f, ...campos } : f))
@@ -79,12 +93,15 @@ export function SecaoAgente() {
   }
 
   async function salvar() {
-    if (!atual?.dado || !form || telefoneInvalido) return
+    if (!atual?.dado || !form || invalido) return
     setSalvando(true)
     setErro(null)
     try {
       const campos = {
         prompt: form.prompt,
+        saudacao: form.saudacao.trim() || null,
+        horario: horarioParaBanco(form.horario),
+        mensagem_fora_horario: form.foraHorario.trim() || null,
         telefone_alerta: telefone ?? null,
         regras_humano: {
           ...((atual.dado.regras_humano as object) ?? {}),
@@ -146,6 +163,52 @@ export function SecaoAgente() {
           />
           <p className="text-right text-legenda text-texto-3">{form.prompt.length.toLocaleString('pt-BR')} caracteres</p>
         </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="saudacao" className="block text-pequeno font-medium text-texto-2">
+            Saudação
+          </label>
+          <p className="text-legenda text-texto-3">
+            O agente começa a primeira resposta de cada conversa com este texto. Se o cliente já chegar dizendo o que
+            precisa, ele cumprimenta e já responde. Deixe vazio para o agente cumprimentar do jeito dele.
+          </p>
+          <textarea
+            id="saudacao"
+            value={form.saudacao}
+            onChange={(e) => mudar({ saudacao: e.target.value })}
+            rows={2}
+            placeholder="Ex.: Olá! Agradecemos seu contato. Como podemos ajudar?"
+            className="block w-full rounded-md border border-borda bg-superficie px-3 py-2 text-pequeno placeholder:text-texto-3 focus:border-primaria focus:outline-none"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-pequeno font-medium text-texto-2">Horário de atendimento da equipe</p>
+          <p className="text-legenda text-texto-3">
+            O agente atende a qualquer hora. Fora deste horário, ele avisa que a equipe retorna depois e continua
+            ajudando o cliente. Horário de Brasília.
+          </p>
+          <HorarioAtendimento valor={form.horario} onChange={(horario) => mudar({ horario })} />
+        </div>
+
+        {!form.horario.vinteQuatro && (
+          <div className="space-y-1.5">
+            <label htmlFor="fora-horario" className="block text-pequeno font-medium text-texto-2">
+              Aviso fora do horário
+            </label>
+            <p className="text-legenda text-texto-3">
+              Opcional. O agente usa como base para avisar, uma vez na conversa, que a equipe está fora do horário.
+            </p>
+            <textarea
+              id="fora-horario"
+              value={form.foraHorario}
+              onChange={(e) => mudar({ foraHorario: e.target.value })}
+              rows={2}
+              placeholder="Ex.: Nossa equipe atende de segunda a sexta, das 8h às 18h. Já deixo tudo anotado para eles."
+              className="block w-full rounded-md border border-borda bg-superficie px-3 py-2 text-pequeno placeholder:text-texto-3 focus:border-primaria focus:outline-none"
+            />
+          </div>
+        )}
 
         <div className="space-y-2">
           <p className="text-pequeno font-medium text-texto-2">Quando chamar a equipe</p>
@@ -261,7 +324,7 @@ export function SecaoAgente() {
               <Botao variante="secundario" onClick={() => (setForm(original), setErro(null))} disabled={salvando}>
                 Descartar
               </Botao>
-              <Botao onClick={() => void salvar()} carregando={salvando} disabled={telefoneInvalido}>
+              <Botao onClick={() => void salvar()} carregando={salvando} disabled={invalido}>
                 Salvar alterações
               </Botao>
             </>

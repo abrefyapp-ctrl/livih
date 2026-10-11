@@ -51,7 +51,33 @@ const linha = (m) => {
   return `[${m.em}] ${m.de}: ${t}`;
 };
 
-const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+const agora = new Date().toLocaleString('pt-BR', {
+  timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
+  hour: '2-digit', minute: '2-digit',
+});
+
+// Saudação e horário (migration 20261010140000). "Dentro do horário" e "primeira resposta" vêm prontos do banco.
+const DIAS = ['', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo'];
+const horario = c.agente?.horario;
+const textoHorario = horario
+  ? DIAS.slice(1).map((d, i) => {
+      const f = horario[String(i + 1)];
+      return `${d} ${Array.isArray(f) ? `${f[0]} às ${f[1]}` : 'fechado'}`;
+    }).join('; ')
+  : null;
+const saudacao = (c.agente?.saudacao || '').trim();
+const foraHorario = (c.agente?.mensagem_fora_horario || '').trim();
+const blocoSaudacao = saudacao && c.primeira_resposta
+  ? `Esta é a primeira resposta desta conversa: comece com a saudação da empresa, com estas palavras: "${saudacao}". Se o cliente já disse o que precisa, siga na mesma mensagem e responda.`
+  : saudacao
+    ? 'A conversa já está em andamento: não repita a saudação.'
+    : '';
+const blocoHorario = !textoHorario
+  ? ''
+  : c.dentro_do_horario
+    ? `Horário de atendimento da equipe (Brasília): ${textoHorario}. Agora a equipe está DISPONÍVEL.`
+    : `Horário de atendimento da equipe (Brasília): ${textoHorario}. Agora estamos FORA do horário: a equipe não está disponível. Avise o cliente uma única vez na conversa (não repita se já avisou) que a equipe retorna no próximo horário de atendimento${foraHorario ? `, usando esta mensagem como base: "${foraHorario}"` : ''}. Continue ajudando normalmente: tire dúvidas, entenda a necessidade e anote os dados. Se precisar chamar a equipe, chame e diga que ela responde quando voltar.`;
+const blocoAbertura = [blocoSaudacao, blocoHorario].filter(Boolean).join('\n\n');
 
 const prompt_sistema = `${c.agente?.prompt || ''}
 
@@ -70,7 +96,11 @@ ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar co
   Depois de chamar, diga ao cliente, em uma frase, que um especialista vai continuar a conversa por aqui. Não continue o atendimento depois disso.
 
 Nunca fale de ferramentas, CRM ou sistema com o cliente. A sua resposta final é exatamente o texto que será enviado no WhatsApp.
+${blocoAbertura ? `
+# SAUDAÇÃO E HORÁRIO
 
+${blocoAbertura}
+` : ''}
 # O QUE JÁ SABEMOS DESTE CONTATO
 
 - Nome: ${contato.nome || contato.nome_whatsapp || 'não informado'}${contato.nome ? '' : ' (nome do perfil do WhatsApp, não confirmado)'}

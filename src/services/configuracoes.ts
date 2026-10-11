@@ -68,7 +68,10 @@ export async function buscarAgente(orgId: string): Promise<Agente | null> {
 
 export async function salvarAgente(
   id: string,
-  campos: Pick<Agente, 'prompt' | 'telefone_alerta' | 'regras_humano'>,
+  campos: Pick<
+    Agente,
+    'prompt' | 'telefone_alerta' | 'regras_humano' | 'saudacao' | 'horario' | 'mensagem_fora_horario'
+  >,
 ) {
   // As outras linhas da organização acompanham (trigger agentes_sincronizar).
   const { error } = await supabase.from('agentes').update(campos).eq('id', id)

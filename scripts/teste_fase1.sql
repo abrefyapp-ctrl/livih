@@ -858,5 +858,49 @@ begin
     not public.eh_mensagem_automatica(v_canal, 'Jogrampo agradece seu contato'));
 end $$;
 
+-- Saudação e horário do agente (migration 20261010140000)
+do $$
+declare v_canal uuid; r jsonb; v_conv uuid; v_ctx jsonb; h jsonb := '{"1":["08:00","18:00"],"2":["08:00","18:00"],"3":["08:00","18:00"],"4":["08:00","18:00"],"5":["08:00","18:00"],"6":["08:00","12:00"]}';
+begin
+  select id into v_canal from public.canais where instance_id = 'INST-F7';
+  -- 10/10/2026 é sábado
+  insert into resultado (teste, ok) values ('sábado 10h está no horário',
+    public.agente_no_horario(h, '2026-10-10 10:00-03'));
+  insert into resultado (teste, ok) values ('sábado 13h está fora do horário',
+    not public.agente_no_horario(h, '2026-10-10 13:00-03'));
+  insert into resultado (teste, ok) values ('domingo (sem faixa) está fora do horário',
+    not public.agente_no_horario(h, '2026-10-11 10:00-03'));
+  insert into resultado (teste, ok) values ('segunda 17:59 dentro, 18:00 fora (hora de Brasília)',
+    public.agente_no_horario(h, '2026-10-12 20:59+00') and not public.agente_no_horario(h, '2026-10-12 21:00+00'));
+  insert into resultado (teste, ok) values ('sem horário = 24 h', public.agente_no_horario(null, now()));
+  insert into resultado (teste, ok) values ('horário inválido é recusado',
+    not public.agente_horario_valido('{"1":["18:00","08:00"]}') and not public.agente_horario_valido('{"8":["08:00","18:00"]}')
+    and not public.agente_horario_valido('{"1":["8h","18h"]}') and public.agente_horario_valido(h));
+
+  -- a empresa F7 tem 2 números no teste? sincroniza para todos os agentes da org
+  update public.agentes set saudacao = 'Olá! Aqui é a F7.', horario = h, mensagem_fora_horario = 'Voltamos segunda.'
+   where canal_id = v_canal;
+  insert into resultado (teste, ok) select 'saudação e horário valem para todos os números da empresa',
+    bool_and(saudacao = 'Olá! Aqui é a F7.' and horario = h)
+    from public.agentes where org_id = (select org_id from public.canais where id = v_canal);
+
+  r := public.registrar_entrada(v_canal, 'SH-1', '5541911120001', null, 'Novo', 'texto', 'Oi', '{}');
+  v_conv := (r ->> 'conversa_id')::uuid;
+  v_ctx := public.agente_contexto(v_conv);
+  insert into resultado (teste, ok) values ('contexto traz saudação, primeira resposta e horário',
+    v_ctx -> 'agente' ->> 'saudacao' = 'Olá! Aqui é a F7.' and (v_ctx ->> 'primeira_resposta')::boolean
+    and v_ctx -> 'dentro_do_horario' is not null);
+  perform public.agente_responder(v_conv, 'Olá! Aqui é a F7. Como posso ajudar?', (r ->> 'mensagem_id')::uuid);
+  insert into resultado (teste, ok) values ('depois de responder, não é mais a primeira resposta',
+    not (public.agente_contexto(v_conv) ->> 'primeira_resposta')::boolean);
+
+  begin
+    update public.agentes set horario = '{"1":["18:00","08:00"]}' where canal_id = v_canal;
+    insert into resultado (teste, ok) values ('banco recusa horário invertido', false);
+  exception when check_violation then
+    insert into resultado (teste, ok) values ('banco recusa horário invertido', true);
+  end;
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

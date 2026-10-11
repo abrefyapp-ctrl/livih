@@ -68,6 +68,7 @@ export type Database = {
           org_id: string
           prompt: string
           regras_humano: Json
+          saudacao: string | null
           telefone_alerta: string | null
         }
         Insert: {
@@ -83,6 +84,7 @@ export type Database = {
           org_id: string
           prompt?: string
           regras_humano?: Json
+          saudacao?: string | null
           telefone_alerta?: string | null
         }
         Update: {
@@ -98,6 +100,7 @@ export type Database = {
           org_id?: string
           prompt?: string
           regras_humano?: Json
+          saudacao?: string | null
           telefone_alerta?: string | null
         }
         Relationships: [
