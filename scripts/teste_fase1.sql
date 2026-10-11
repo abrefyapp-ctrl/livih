@@ -342,6 +342,34 @@ begin
     motivo_humano like '%menos de 6 segundos%' from public.conversas where id = v_conv;
 end $$;
 
+-- Teto de respostas em 10 min (migration 20261010120000): venda rápida com gente de verdade não trava
+do $$
+declare v_canal uuid; r jsonb; v_conv uuid; v_org uuid; v_agora timestamptz; i integer;
+  caso record;
+begin
+  select id into v_canal from public.canais where instance_id = 'INST-F7';
+  for caso in select * from (values
+      ('5541922220001', 8, 'Sim', false, '8 respostas com o contato respondendo curto não travam'),
+      ('5541922220002', 8, repeat('Texto longo de resposta automática gerada por outra IA. ', 2), true,
+       '8 respostas com o contato escrevendo textos longos travam'),
+      ('5541922220003', 20, 'Ok', true, '20 respostas em 10 minutos travam mesmo com respostas curtas')
+    ) as t(fone, n, resposta, trava, nome)
+  loop
+    r := public.registrar_entrada(v_canal, 'TT-' || caso.fone, caso.fone, null, 'Cliente', 'texto', caso.resposta, '{}');
+    v_conv := (r ->> 'conversa_id')::uuid;
+    select org_id into v_org from public.conversas where id = v_conv;
+    v_agora := clock_timestamp();
+    -- agente a cada 25 s, cliente responde 15 s depois (lento demais para a regra de velocidade)
+    for i in 1..caso.n loop
+      insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em) values
+        (v_org, v_conv, 'saida', 'bot', 'pergunta ' || i, 'enviada', v_agora - (caso.n - i + 1) * interval '25 seconds' - interval '10 seconds'),
+        (v_org, v_conv, 'entrada', 'contato', caso.resposta, 'recebida', v_agora - (caso.n - i + 1) * interval '25 seconds' + interval '5 seconds');
+    end loop;
+    insert into resultado (teste, ok) values (caso.nome,
+      (public.agente_suspeita_robo(v_conv) is not null) = caso.trava);
+  end loop;
+end $$;
+
 -- Equipe (migration 20261007170000)
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
