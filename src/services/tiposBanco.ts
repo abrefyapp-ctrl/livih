@@ -609,6 +609,7 @@ export type Database = {
       mensagens: {
         Row: {
           autor_id: string | null
+          automatica: boolean
           autor_tipo: Database["public"]["Enums"]["autor_tipo"]
           conversa_id: string
           criado_em: string
@@ -626,6 +627,7 @@ export type Database = {
         }
         Insert: {
           autor_id?: string | null
+          automatica?: boolean
           autor_tipo: Database["public"]["Enums"]["autor_tipo"]
           conversa_id: string
           criado_em?: string
@@ -643,6 +645,7 @@ export type Database = {
         }
         Update: {
           autor_id?: string | null
+          automatica?: boolean
           autor_tipo?: Database["public"]["Enums"]["autor_tipo"]
           conversa_id?: string
           criado_em?: string

@@ -125,7 +125,13 @@ export function PainelConversa({
         : undefined
 
   const nomeAutor = (m: Mensagem) =>
-    m.autor_id === eu ? 'Você' : m.autor_id ? (equipe.get(m.autor_id)?.nome ?? 'Equipe') : 'Pelo celular'
+    m.automatica
+      ? 'Automática do celular'
+      : m.autor_id === eu
+        ? 'Você'
+        : m.autor_id
+          ? (equipe.get(m.autor_id)?.nome ?? 'Equipe')
+          : 'Pelo celular'
 
   return (
     <section aria-label={`Conversa com ${nome}`} className="flex h-full min-h-0 flex-col">

@@ -824,5 +824,39 @@ insert into resultado (teste, ok)
 select 'usuário não lê a fila nem as chaves', not has_function_privilege('authenticated', 'public.push_chaves()', 'execute')
   and not has_function_privilege('authenticated', 'public.push_reivindicar(integer)', 'execute');
 
+-- Mensagens automáticas do celular (migration 20261010130000): saudação/ausência não tiram a conversa do agente
+do $$
+declare v_canal uuid; r jsonb; v_conv uuid; x jsonb; v_ctx jsonb;
+begin
+  select id into v_canal from public.canais where instance_id = 'INST-F7';
+  update public.agentes set ativo = true,
+         regras_humano = coalesce(regras_humano, '{}'::jsonb)
+           || '{"mensagens_automaticas": ["Jogrampo agradece seu contato. Como podemos ajudar?"]}'
+   where canal_id = v_canal;
+
+  r := public.registrar_entrada(v_canal, 'AU-1', '5541911110001', null, 'Cliente', 'texto', 'Oi, vocês têm grampo?', '{}');
+  v_conv := (r ->> 'conversa_id')::uuid;
+  -- como chega do WhatsApp Business: marca de direção invisível no começo, espaço duplo
+  x := public.registrar_saida_celular(v_canal, 'AU-2', '5541911110001', null, 'texto',
+         E'\u200eJogrampo  agradece seu contato. Como podemos ajudar?', '{}');
+  insert into resultado (teste, ok) values ('saudação automática é reconhecida', (x ->> 'automatica')::boolean);
+  insert into resultado (teste, ok) select 'saudação automática não tira a conversa do agente',
+    estado = 'bot' from public.conversas where id = v_conv;
+  insert into resultado (teste, ok) values ('agente ainda responde depois da saudação',
+    public.agente_deve_responder(v_conv, (r ->> 'mensagem_id')::uuid));
+  insert into resultado (teste, ok) select 'saudação fica no histórico marcada como automática',
+    count(*) = 1 from public.mensagens where conversa_id = v_conv and automatica and autor_tipo = 'atendente';
+  v_ctx := public.agente_contexto(v_conv);
+  insert into resultado (teste, ok) values ('agente vê a saudação como automática',
+    v_ctx -> 'mensagens' @> '[{"de": "mensagem automática do celular"}]');
+
+  x := public.registrar_saida_celular(v_canal, 'AU-3', '5541911110001', null, 'texto', 'Temos sim, qual medida?', '{}');
+  insert into resultado (teste, ok) select 'mensagem digitada no celular continua assumindo a conversa',
+    not (x ->> 'automatica')::boolean and estado = 'humano' from public.conversas where id = v_conv;
+
+  insert into resultado (teste, ok) values ('texto diferente não é automático',
+    not public.eh_mensagem_automatica(v_canal, 'Jogrampo agradece seu contato'));
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;
