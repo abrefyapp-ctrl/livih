@@ -16,3 +16,4 @@ Coisas anotadas para corrigir depois. Tirar daqui quando entrar no commit.
   empresa, que nasce dos dados que o CRM já tem (contatos, oportunidades ganhas, pedidos anotados pelo
   agente). A definir: escopo do MVP (pedidos, estoque, financeiro, nota fiscal?), cobrança como add-on
   no plano, liberação por organização (feature flag) e integração com ERPs que o cliente já usa (ex.: Bling).
+  **Piloto: JoGrampo** (decidido em 10/10) — a Liv já anota pedidos lá (ex.: 5 caixinhas do pino F15).
