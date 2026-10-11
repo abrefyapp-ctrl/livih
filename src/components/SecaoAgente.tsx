@@ -17,13 +17,12 @@ type Formulario = {
   horario: Horario
   foraHorario: string
   casos: string[]
-  automaticas: string[]
   telefone: string
 }
 
-const textosDe = (a: Agente, chave: 'casos' | 'mensagens_automaticas'): string[] => {
-  const v = (a.regras_humano as Record<string, unknown> | null)?.[chave]
-  return Array.isArray(v) ? v.filter((c): c is string => typeof c === 'string') : []
+const casosDe = (a: Agente): string[] => {
+  const r = a.regras_humano as { casos?: unknown } | null
+  return Array.isArray(r?.casos) ? r.casos.filter((c): c is string => typeof c === 'string') : []
 }
 
 const paraFormulario = (a: Agente): Formulario => ({
@@ -31,8 +30,7 @@ const paraFormulario = (a: Agente): Formulario => ({
   saudacao: a.saudacao ?? '',
   horario: horarioDoBanco(a.horario),
   foraHorario: a.mensagem_fora_horario ?? '',
-  casos: textosDe(a, 'casos'),
-  automaticas: textosDe(a, 'mensagens_automaticas'),
+  casos: casosDe(a),
   telefone: a.telefone_alerta ? formatarTelefone(a.telefone_alerta) : '',
 })
 
@@ -103,11 +101,7 @@ export function SecaoAgente() {
         horario: horarioParaBanco(form.horario),
         mensagem_fora_horario: form.foraHorario.trim() || null,
         telefone_alerta: telefone ?? null,
-        regras_humano: {
-          ...((atual.dado.regras_humano as object) ?? {}),
-          casos: form.casos,
-          mensagens_automaticas: form.automaticas.map((t) => t.trim()).filter(Boolean),
-        },
+        regras_humano: { ...((atual.dado.regras_humano as object) ?? {}), casos: form.casos },
       }
       await salvarAgente(atual.dado.id, campos)
       setAgente({ orgId, dado: { ...atual.dado, ...campos } })
@@ -258,45 +252,6 @@ export function SecaoAgente() {
                 Adicionar
               </Botao>
             </div>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-pequeno font-medium text-texto-2">Mensagens automáticas do seu celular</p>
-          <p className="text-legenda text-texto-3">
-            Se o WhatsApp Business do celular tem saudação ou mensagem de ausência ligada, cole aqui o texto de cada uma,
-            igual está no celular. Sem isso, o Livih entende que alguém respondeu pelo celular e o agente para de atender
-            aquela conversa. O mais simples é desligar essas mensagens no celular: o agente já cumprimenta o cliente.
-          </p>
-          {form.automaticas.map((t, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <label htmlFor={`automatica-${i}`} className="sr-only">
-                Mensagem automática {i + 1}
-              </label>
-              <textarea
-                id={`automatica-${i}`}
-                value={t}
-                onChange={(e) => mudar({ automaticas: form.automaticas.map((x, j) => (j === i ? e.target.value : x)) })}
-                rows={3}
-                placeholder="Ex.: Agradecemos seu contato. Como podemos ajudar?"
-                className="block w-full flex-1 rounded-md border border-borda bg-superficie px-3 py-2 text-pequeno placeholder:text-texto-3 focus:border-primaria focus:outline-none"
-              />
-              {podeEditar && (
-                <button
-                  type="button"
-                  onClick={() => mudar({ automaticas: form.automaticas.filter((_, j) => j !== i) })}
-                  aria-label={`Remover mensagem automática ${i + 1}`}
-                  className="rounded-md p-2 text-texto-3 hover:bg-fundo hover:text-erro"
-                >
-                  <Icone nome="fechar" className="size-4" />
-                </button>
-              )}
-            </div>
-          ))}
-          {podeEditar && (
-            <Botao variante="secundario" icone="mais" onClick={() => mudar({ automaticas: [...form.automaticas, ''] })}>
-              Adicionar mensagem automática
-            </Botao>
           )}
         </div>
 
