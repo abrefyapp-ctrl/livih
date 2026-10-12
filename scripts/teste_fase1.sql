@@ -902,5 +902,52 @@ begin
   end;
 end $$;
 
+-- API oficial (Cloud API): canal pelo phone_number_id, token no Vault, entrada no mesmo fluxo
+reset role;
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+  v_canal uuid;
+  v_vault uuid;
+  r jsonb;
+begin
+  insert into public.canais (org_id, tipo, nome, instance_id, meta_waba_id, meta_coexistencia)
+  values (v_org, 'meta', 'Oficial teste', 'PNID-TESTE-1', 'WABA-TESTE', true)
+  returning id into v_canal;
+  insert into public.agentes (org_id, canal_id) values (v_org, v_canal);
+
+  insert into resultado (teste, ok) select 'meta: canal achado pelo phone_number_id',
+    (select canal_id from public.canal_por_numero_meta('PNID-TESTE-1')) = v_canal
+    and not exists (select 1 from public.canal_por_numero_meta('PNID-INEXISTENTE'));
+
+  perform public.meta_guardar_token(v_canal, 'token-1', now() + interval '60 days');
+  v_vault := (select vault_token_id from public.canais where id = v_canal);
+  perform public.meta_guardar_token(v_canal, 'token-2', null);
+  insert into resultado (teste, ok) select 'meta: token no Vault, trocado no mesmo segredo',
+    public.meta_token_do_canal(v_canal) = 'token-2'
+    and (select vault_token_id from public.canais where id = v_canal) = v_vault
+    and (select meta_token_expira_em from public.canais where id = v_canal) is null;
+
+  insert into resultado (teste, ok) select 'meta: usuário logado não lê token nem acha canal',
+    not has_function_privilege('authenticated', 'public.meta_token_do_canal(uuid)', 'execute')
+    and not has_function_privilege('anon', 'public.meta_guardar_token(uuid, text, timestamptz)', 'execute')
+    and not has_function_privilege('authenticated', 'public.canal_por_numero_meta(text)', 'execute');
+
+  update public.organizacoes set status = 'suspensa' where id = v_org;
+  insert into resultado (teste, ok) select 'meta: empresa suspensa não recebe pelo webhook',
+    not exists (select 1 from public.canal_por_numero_meta('PNID-TESTE-1'));
+  update public.organizacoes set status = 'ativa' where id = v_org;
+
+  r := public.registrar_entrada(v_canal, 'wamid.TESTE1', '5541988887777', null, 'Cliente Oficial', 'texto', 'Oi pela API', '{}');
+  insert into resultado (teste, ok) select 'meta: entrada da API oficial vira conversa no canal',
+    not (r ->> 'duplicada')::boolean
+    and exists (select 1 from public.conversas where id = (r ->> 'conversa_id')::uuid and canal_id = v_canal);
+
+  perform public.meta_guardar_pin(v_canal, '123456');
+  perform public.meta_guardar_pin(v_canal, '654321');
+  insert into resultado (teste, ok) select 'meta: PIN do número guardado no Vault (um segredo só)',
+    (select count(*) from vault.decrypted_secrets where name = 'meta_pin_' || v_canal::text and decrypted_secret = '654321') = 1;
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

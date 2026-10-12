@@ -1,7 +1,9 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useSessao } from '../hooks/useSessao'
+import { abrirCadastroMeta, carregarSdkMeta } from '../services/cadastroMeta'
 import {
   codigoNumero,
+  conectarOficial,
   criarNumero,
   desconectarNumero,
   editarNumero,
@@ -24,7 +26,7 @@ import { Icone } from './Icone'
 import { Modal } from './Modal'
 
 type Edicao = { id: string | null; nome: string; responsavel_id: string }
-type Confirmacao = { tipo: 'desconectar' | 'remover'; numero: NumeroWhatsapp }
+type Confirmacao = { tipo: 'desconectar' | 'remover' | 'oficial'; numero: NumeroWhatsapp }
 
 function Ponto({ cor }: { cor: string }) {
   return <span aria-hidden="true" className={`mt-1.5 size-2.5 shrink-0 rounded-full ${cor}`} />
@@ -37,7 +39,8 @@ function Situacao({ n }: { n: NumeroWhatsapp }) {
       <p className="flex gap-2 text-pequeno">
         <Ponto cor="bg-destaque" />
         <span>
-          Conectado{n.numero_conectado && ` · ${formatarTelefone(n.numero_conectado)}`}
+          {n.tipo === 'meta' ? 'Conectado pela API oficial' : 'Conectado'}
+          {n.numero_conectado && ` · ${formatarTelefone(n.numero_conectado)}`}
           {n.conectado_em && <span className="text-texto-3"> · desde {quandoCurto(n.conectado_em).toLowerCase()}</span>}
         </span>
       </p>
@@ -88,6 +91,35 @@ export function SecaoWhatsapp() {
 
   const lista = numeros?.orgId === orgId ? numeros.lista : null
   const recarregar = () => setVersao((v) => v + 1)
+
+  // SDK da Meta carregado antes do clique: o cadastro abre numa janela, que o navegador só deixa abrir
+  // direto do clique.
+  const sdkMeta = useRef<Awaited<ReturnType<typeof carregarSdkMeta>> | null>(null)
+  useEffect(() => {
+    if (!gerencia) return
+    carregarSdkMeta()
+      .then((fb) => (sdkMeta.current = fb))
+      .catch(() => undefined)
+  }, [gerencia])
+
+  /** Embedded Signup. Com canalId o número do WAHA passa para a API oficial no mesmo canal. */
+  function conectarPelaApiOficial(canalId: string | null) {
+    const fb = sdkMeta.current
+    if (!fb) {
+      setErro('O login da Meta ainda está carregando (ou foi bloqueado pelo navegador). Tente de novo em instantes.')
+      return
+    }
+    setOcupado(canalId ?? 'oficial')
+    setErro(null)
+    abrirCadastroMeta(fb)
+      .then((r) => conectarOficial(orgId, r, canalId ? { canal_id: canalId } : { nome: '', responsavel_id: null }))
+      .then(() => {
+        setConfirmacao(null)
+        recarregar()
+      })
+      .catch((e) => setErro((e as Error).message))
+      .finally(() => setOcupado(null))
+  }
 
   // Pareando, o estado muda em segundos; tudo conectado, basta conferir de vez em quando.
   useEffect(() => {
@@ -168,9 +200,14 @@ export function SecaoWhatsapp() {
           </p>
         </div>
         {gerencia && (
-          <Botao icone="mais" onClick={() => setEdicao({ id: null, nome: '', responsavel_id: '' })}>
-            Adicionar número
-          </Botao>
+          <div className="flex flex-wrap gap-2">
+            <Botao variante="secundario" carregando={ocupado === 'oficial'} onClick={() => conectarPelaApiOficial(null)}>
+              Conectar pela API oficial
+            </Botao>
+            <Botao icone="mais" onClick={() => setEdicao({ id: null, nome: '', responsavel_id: '' })}>
+              Adicionar número
+            </Botao>
+          </div>
         )}
       </div>
 
@@ -208,6 +245,7 @@ export function SecaoWhatsapp() {
                     <p className="font-medium">{n.nome}</p>
                     <p className="text-legenda text-texto-3">
                       {n.responsavel_id ? `Número de ${nomeDe(n.responsavel_id)} · só ele(a), dono e admin veem as conversas` : 'Número da empresa · toda a equipe vê'}
+                      {n.tipo === 'meta' && (n.meta_coexistencia ? ' · API oficial, também no app do celular' : ' · API oficial')}
                     </p>
                     <Situacao n={n} />
                   </div>
@@ -237,7 +275,7 @@ export function SecaoWhatsapp() {
 
                 {gerencia && (
                   <div className="flex flex-wrap gap-2 border-t border-borda px-4 py-3">
-                    {!conectado && (
+                    {!conectado && n.tipo === 'waha' && (
                       <Botao
                         tamanho="sm"
                         icone="telefone"
@@ -259,7 +297,12 @@ export function SecaoWhatsapp() {
                     >
                       Editar
                     </Botao>
-                    {conectado && (
+                    {n.tipo === 'waha' && (
+                      <Botao tamanho="sm" variante="secundario" onClick={() => setConfirmacao({ tipo: 'oficial', numero: n })}>
+                        Passar para a API oficial
+                      </Botao>
+                    )}
+                    {conectado && n.tipo === 'waha' && (
                       <Botao tamanho="sm" variante="fantasma" onClick={() => setConfirmacao({ tipo: 'desconectar', numero: n })}>
                         Desconectar
                       </Botao>
@@ -334,21 +377,33 @@ export function SecaoWhatsapp() {
 
       <DialogoConfirmacao
         aberto={!!confirmacao}
-        titulo={confirmacao?.tipo === 'remover' ? 'Remover este número?' : 'Desconectar este número?'}
-        rotuloConfirmar={confirmacao?.tipo === 'remover' ? 'Remover número' : 'Desconectar'}
-        perigo
+        titulo={
+          confirmacao?.tipo === 'oficial'
+            ? 'Passar para a API oficial?'
+            : confirmacao?.tipo === 'remover'
+              ? 'Remover este número?'
+              : 'Desconectar este número?'
+        }
+        rotuloConfirmar={
+          confirmacao?.tipo === 'oficial' ? 'Conectar com a Meta' : confirmacao?.tipo === 'remover' ? 'Remover número' : 'Desconectar'
+        }
+        perigo={confirmacao?.tipo !== 'oficial'}
         carregando={!!confirmacao && ocupado === confirmacao.numero.id}
-        aoConfirmar={() =>
-          confirmacao &&
+        aoConfirmar={() => {
+          if (!confirmacao) return
+          // O cadastro da Meta abre uma janela: tem que sair direto deste clique.
+          if (confirmacao.tipo === 'oficial') return conectarPelaApiOficial(confirmacao.numero.id)
           void executar(confirmacao.numero.id, async () => {
             if (confirmacao.tipo === 'remover') await removerNumero(orgId, confirmacao.numero.id)
             else await desconectarNumero(orgId, confirmacao.numero.id)
             setConfirmacao(null)
           })
-        }
+        }}
         aoCancelar={() => setConfirmacao(null)}
       >
-        {confirmacao?.tipo === 'remover'
+        {confirmacao?.tipo === 'oficial'
+          ? `“${confirmacao.numero.nome}” passa a funcionar pela API oficial do WhatsApp, com as mesmas conversas. Na janela da Meta, entre com o portfólio da empresa e escolha conectar o app WhatsApp Business que já existe: o celular continua funcionando. Os aparelhos conectados (WhatsApp Web) se desconectam nessa hora.`
+          : confirmacao?.tipo === 'remover'
           ? `“${confirmacao.numero.nome}” sai da Livih. As conversas antigas continuam no histórico, mas nada novo entra ou sai por ele.`
           : `Nada entra ou sai por “${confirmacao?.numero.nome}” até alguém conectar o celular de novo.`}
       </DialogoConfirmacao>

@@ -3,6 +3,7 @@
 // Eventos assinados: message.any (entrada e o que foi digitado no celular), message.ack, session.status.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { avisarAgente, emSegundoPlano, transcreverEAvisar } from "../_shared/atendimento.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -11,8 +12,6 @@ const supabase = createClient(
 );
 const WAHA_URL = (Deno.env.get("WAHA_URL") ?? "").replace(/\/$/, "");
 const WAHA_API_KEY = Deno.env.get("WAHA_API_KEY") ?? "";
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
-const AUDIO_MAX_SEGUNDOS = 5 * 60;
 
 type Tipo = "texto" | "audio" | "imagem" | "video" | "documento" | "figurinha" | "localizacao" | "contato";
 // deno-lint-ignore no-explicit-any
@@ -100,85 +99,6 @@ function enxugar(o: Json, prof = 0): Json {
   return saida;
 }
 
-function emSegundoPlano(p: Promise<unknown>) {
-  const tarefa = p.catch((e) => console.error("segundo plano", String(e)));
-  // @ts-ignore EdgeRuntime existe no runtime do Supabase
-  globalThis.EdgeRuntime?.waitUntil?.(tarefa);
-}
-
-// Conversa com o bot → avisa o agente no n8n. Só a referência vai; o n8n lê o resto do banco.
-// Se o agente não pode ser chamado, o cliente não pode ficar sem resposta em silêncio: a conversa vai para a
-// equipe (aguardando_humano) com o motivo. Aconteceu em 08/10/2026: os secrets do n8n sumiram do projeto e o
-// agente parou de responder sem nenhum aviso.
-async function avisarAgente(ref: { org_id: string; conversa_id: string; mensagem_id: string }) {
-  const agenteUrl = Deno.env.get("N8N_AGENTE_URL");
-  const token = Deno.env.get("N8N_AGENTE_TOKEN");
-  let falha: string | null = null;
-  if (!agenteUrl || !token) {
-    falha = "Agente indisponível (configuração do servidor)";
-  } else {
-    try {
-      const r = await fetch(agenteUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-livih-token": token },
-        body: JSON.stringify({ org_id: ref.org_id, conversa_id: ref.conversa_id, mensagem_id: ref.mensagem_id }),
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!r.ok) {
-        console.error("n8n", r.status, (await r.text()).slice(0, 200));
-        falha = `Agente indisponível (n8n respondeu ${r.status})`;
-      }
-    } catch (e) {
-      console.error("n8n", String(e));
-      falha = "Agente indisponível (n8n fora do ar)";
-    }
-  }
-  if (falha) {
-    console.error("agente não acionado:", falha, ref.conversa_id);
-    await supabase.from("conversas").update({ estado: "aguardando_humano", motivo_humano: falha })
-      .eq("id", ref.conversa_id).eq("estado", "bot");
-  }
-}
-
-// Baixa o áudio do WAHA (o arquivo não é guardado), transcreve e grava. Áudio longo demais não
-// é transcrito: o agente vê "[audio]" e pede um áudio mais curto ou texto.
-async function transcreverEAvisar(
-  mensagemId: string, mediaUrl: string, mime: string | undefined, segundos: number,
-  entrada: { org_id: string; conversa_id: string; mensagem_id: string; chamar_agente: boolean },
-) {
-  let chamar = entrada.chamar_agente;
-  if (!segundos || segundos <= AUDIO_MAX_SEGUNDOS) {
-    const audio = await fetch(mediaUrl, { headers: { "X-Api-Key": WAHA_API_KEY }, signal: AbortSignal.timeout(20000) });
-    if (audio.ok) {
-      const form = new FormData();
-      const ext = (mime ?? "").includes("mpeg") ? "mp3" : (mime ?? "").includes("mp4") ? "m4a" : "ogg";
-      form.append("file", new Blob([await audio.arrayBuffer()], { type: mime ?? "audio/ogg" }), `audio.${ext}`);
-      form.append("model", "gpt-4o-transcribe");
-      form.append("language", "pt");
-      const t = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
-        body: form,
-        signal: AbortSignal.timeout(60000),
-      });
-      const corpo = await t.json().catch(() => null);
-      if (t.ok && corpo?.text) {
-        const { data } = await supabase.rpc("registrar_transcricao", { p_mensagem: mensagemId, p_transcricao: corpo.text });
-        chamar = data?.chamar_agente ?? chamar;
-        // Consumo de IA (tabela uso_ia): falha aqui não atrapalha o atendimento.
-        const { error: erroUso } = await supabase.from("uso_ia").upsert({
-          org_id: entrada.org_id, conversa_id: entrada.conversa_id, mensagem_id: mensagemId,
-          tipo: "transcricao", modelo: "gpt-4o-transcribe",
-          tokens_entrada: Number(corpo.usage?.input_tokens ?? 0), tokens_saida: Number(corpo.usage?.output_tokens ?? 0),
-          segundos_audio: segundos || null, origem_ref: `audio:${mensagemId}`,
-        }, { onConflict: "origem_ref", ignoreDuplicates: true });
-        if (erroUso) console.error("uso_ia transcrição", erroUso.message);
-      } else console.error("transcrição", t.status, JSON.stringify(corpo).slice(0, 200));
-    } else console.error("download do áudio", audio.status);
-  }
-  if (chamar) await avisarAgente(entrada);
-}
-
 Deno.serve(async (req) => {
   if (req.method !== "POST") return resposta(405, { erro: "método" });
 
@@ -190,6 +110,9 @@ Deno.serve(async (req) => {
   });
   if (erroCanal || !canais?.length) return resposta(401, { erro: "canal" });
   const canal = canais[0];
+  // Número que passou para a API oficial: a sessão do WAHA pode continuar ligada (alertas), mas a entrada agora
+  // vem pelo meta-webhook. Gravar daqui duplicaria cada mensagem.
+  if (canal.tipo !== "waha") return resposta(200, { ignorado: "canal não é WAHA" });
 
   let body: Json;
   try {
@@ -267,10 +190,11 @@ Deno.serve(async (req) => {
 
   // Áudio: transcreve depois de responder ao WAHA e só então acorda o agente, que já recebe o texto.
   const segundos = Number(p._data?.Message?.audioMessage?.seconds ?? p._data?.message?.audioMessage?.seconds ?? 0);
-  if (tipo === "audio" && p.media?.url && OPENAI_API_KEY) {
-    emSegundoPlano(transcreverEAvisar(entrada.mensagem_id, p.media.url, p.media.mimetype, segundos, entrada));
+  if (tipo === "audio" && p.media?.url) {
+    const baixar = () => fetch(p.media.url, { headers: { "X-Api-Key": WAHA_API_KEY }, signal: AbortSignal.timeout(20000) });
+    emSegundoPlano(transcreverEAvisar(supabase, baixar, p.media.mimetype, segundos, entrada));
   } else if (entrada?.chamar_agente) {
-    emSegundoPlano(avisarAgente(entrada));
+    emSegundoPlano(avisarAgente(supabase, entrada));
   }
 
   return resposta(200, { ok: true, duplicada: entrada?.duplicada ?? false });

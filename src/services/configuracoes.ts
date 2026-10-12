@@ -108,6 +108,8 @@ export async function removerConteudo(id: string) {
 
 export type NumeroWhatsapp = {
   id: string
+  tipo: 'waha' | 'meta'
+  meta_coexistencia: boolean
   nome: string
   responsavel_id: string | null
   status_conexao: string | null
@@ -139,6 +141,13 @@ export const codigoNumero = (orgId: string, canalId: string, telefone: string) =
   conexao<{ codigo: string }>(orgId, 'codigo', { canal_id: canalId, telefone })
 export const desconectarNumero = (orgId: string, canalId: string) => conexao(orgId, 'desconectar', { canal_id: canalId })
 export const removerNumero = (orgId: string, canalId: string) => conexao(orgId, 'remover', { canal_id: canalId })
+
+/** Depois do Embedded Signup: com canalId o número do WAHA passa para a API oficial no mesmo canal. */
+export const conectarOficial = (
+  orgId: string,
+  dados: { code: string; waba_id: string; phone_number_id?: string; evento: string },
+  destino: { canal_id: string } | { nome: string; responsavel_id: string | null },
+) => conexao<{ canal: NumeroWhatsapp }>(orgId, 'oficial', { ...dados, ...destino })
 
 export async function editarNumero(canalId: string, campos: { nome: string; responsavel_id: string | null }) {
   const { error } = await supabase.from('canais').update(campos).eq('id', canalId)

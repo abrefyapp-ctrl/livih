@@ -11,13 +11,19 @@
 //       { org_id, acao: 'criar', nome, responsavel_id? }           → { canal } (dono/admin)
 //       { org_id, canal_id, acao: 'iniciar' | 'desconectar' | 'remover' } (dono/admin)
 //       { org_id, canal_id, acao: 'qr' }  /  { ..., acao: 'codigo', telefone } (dono/admin)
-// A chave do WAHA nunca sai daqui.
+//       { org_id, acao: 'oficial', code, waba_id, phone_number_id?, evento, canal_id? | nome, responsavel_id? }
+//         → API oficial pelo Embedded Signup: com canal_id, o número do WAHA vira 'meta' no mesmo canal
+//           (o histórico fica); sem, nasce um canal novo. (dono/admin)
+// A chave do WAHA e os tokens da Meta nunca saem daqui.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const URL_SUPABASE = Deno.env.get("SUPABASE_URL")!;
 const WAHA_URL = (Deno.env.get("WAHA_URL") ?? "").replace(/\/$/, "");
 const WAHA_API_KEY = Deno.env.get("WAHA_API_KEY") ?? "";
+const META_APP_ID = Deno.env.get("META_APP_ID") ?? "2190905941640235";
+const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
+const GRAPH = "https://graph.facebook.com/v25.0";
 
 const admin = createClient(URL_SUPABASE, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
   auth: { persistSession: false },
@@ -36,6 +42,8 @@ class ErroUsuario extends Error {}
 type Canal = {
   id: string;
   org_id: string;
+  tipo: string;
+  meta_coexistencia: boolean;
   nome: string;
   instance_id: string | null;
   responsavel_id: string | null;
@@ -48,7 +56,7 @@ type Canal = {
   criado_em: string;
 };
 const CAMPOS =
-  "id, org_id, nome, instance_id, responsavel_id, status_conexao, numero_conectado, conectado_em, caiu_em, alerta_queda_em, desconectado_em, criado_em";
+  "id, org_id, tipo, meta_coexistencia, nome, instance_id, responsavel_id, status_conexao, numero_conectado, conectado_em, caiu_em, alerta_queda_em, desconectado_em, criado_em";
 
 function waha(caminho: string, init: RequestInit = {}, timeoutMs = 15_000) {
   return fetch(`${WAHA_URL}${caminho}`, {
@@ -72,7 +80,10 @@ async function sessoesWaha(): Promise<Map<string, { status: string; numero: stri
   }
 }
 
-async function registrarCanais(canais: { id: string; instance_id: string | null }[]) {
+async function registrarCanais(canais: { id: string; tipo: string; instance_id: string | null }[]) {
+  // Número da API oficial não tem sessão no WAHA: consultar o marcaria como caído.
+  canais = canais.filter((c) => c.tipo === "waha");
+  if (!canais.length) return;
   const sessoes = await sessoesWaha();
   for (const c of canais) {
     if (!c.instance_id) continue;
@@ -128,16 +139,116 @@ async function iniciar(canal: Canal) {
 }
 
 // Número novo: o agente é o da empresa (mesmas instruções, casos e alerta), desligado neste número.
-async function criarCanal(orgId: string, nome: string, responsavelId: string | null): Promise<Canal> {
+async function criarCanal(
+  orgId: string, nome: string, responsavelId: string | null, extra: Record<string, unknown> = {},
+): Promise<Canal> {
   const id = crypto.randomUUID();
   const { data, error } = await admin.from("canais")
-    .insert({ id, org_id: orgId, tipo: "waha", nome, instance_id: `c-${id.replace(/-/g, "").slice(0, 16)}`, responsavel_id: responsavelId })
+    .insert({ id, org_id: orgId, tipo: "waha", nome, instance_id: `c-${id.replace(/-/g, "").slice(0, 16)}`, responsavel_id: responsavelId, ...extra })
     .select(CAMPOS).single();
   if (error) throw new Error(`canal: ${error.message}`);
   const { data: modelo } = await admin.from("agentes").select("prompt, regras_humano, telefone_alerta, modelo")
     .eq("org_id", orgId).limit(1).maybeSingle();
   await admin.from("agentes").insert({ org_id: orgId, canal_id: id, ativo: false, ...(modelo ?? {}) });
   return data as Canal;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// API oficial (Embedded Signup)
+
+// deno-lint-ignore no-explicit-any
+async function graph(caminho: string, token: string, init: RequestInit = {}): Promise<any> {
+  const r = await fetch(`${GRAPH}${caminho}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(init.headers ?? {}) },
+    signal: AbortSignal.timeout(15_000),
+  });
+  const corpo = await r.json().catch(() => null);
+  if (!r.ok) throw new Error(`Meta ${caminho.split("?")[0]}: ${r.status} ${JSON.stringify(corpo?.error ?? corpo).slice(0, 300)}`);
+  return corpo;
+}
+
+type Oficial = {
+  code?: string;
+  waba_id?: string;
+  phone_number_id?: string;
+  evento?: string;
+};
+
+async function conectarOficial(orgId: string, p: Oficial & { canal_id?: string; nome?: string; responsavel_id?: string | null }): Promise<Canal> {
+  if (!META_APP_SECRET) throw new Error("META_APP_SECRET não configurado");
+  if (!p.code || !p.waba_id) throw new ErroUsuario("A Meta não devolveu os dados da conta. Tente conectar de novo.");
+
+  // 1. O código vale 30 s: troca primeiro, valida o resto depois.
+  const q = new URLSearchParams({ client_id: META_APP_ID, client_secret: META_APP_SECRET, code: p.code });
+  const r = await fetch(`${GRAPH}/oauth/access_token?${q}`, { signal: AbortSignal.timeout(15_000) });
+  const troca = await r.json().catch(() => null);
+  if (!r.ok || !troca?.access_token) {
+    console.error("troca do código", r.status, JSON.stringify(troca).slice(0, 300));
+    throw new ErroUsuario("A Meta recusou a conexão (o código expirou?). Tente conectar de novo.");
+  }
+  const token = String(troca.access_token);
+  const expira = troca.expires_in ? new Date(Date.now() + Number(troca.expires_in) * 1000).toISOString() : null;
+  const coexistencia = p.evento === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING";
+
+  // 2. O número: na coexistência a Meta às vezes manda só a WABA.
+  const numeros = await graph(`/${p.waba_id}/phone_numbers?fields=id,display_phone_number,verified_name`, token);
+  const lista = (numeros?.data ?? []) as { id: string; display_phone_number?: string; verified_name?: string }[];
+  const numero = lista.find((n) => n.id === p.phone_number_id) ?? (lista.length === 1 ? lista[0] : null);
+  if (!numero) throw new ErroUsuario("Não achamos o número nessa conta do WhatsApp. Tente conectar de novo.");
+  const telefone = (numero.display_phone_number ?? "").replace(/\D/g, "") || null;
+
+  // 3. O mesmo número não pode estar ativo em dois canais.
+  let outros = admin.from("canais").select("id, ativo").eq("tipo", "meta").eq("instance_id", numero.id);
+  if (p.canal_id) outros = outros.neq("id", p.canal_id);
+  const { data: outro } = await outros.maybeSingle();
+  if (outro?.ativo) throw new ErroUsuario("Este número já está conectado na Livih em outro lugar.");
+  if (outro) await admin.from("canais").update({ instance_id: null }).eq("id", outro.id);
+
+  // 4. Canal: o do WAHA vira 'meta' (mesmo id, o histórico fica) ou nasce um novo.
+  const campos = {
+    tipo: "meta",
+    instance_id: numero.id,
+    meta_waba_id: p.waba_id,
+    meta_coexistencia: coexistencia,
+    desconectado_em: null,
+    desconectado_por: null,
+  };
+  let canal: Canal;
+  if (p.canal_id) {
+    const { data, error } = await admin.from("canais").update(campos)
+      .eq("id", p.canal_id).eq("org_id", orgId).eq("ativo", true).select(CAMPOS).maybeSingle();
+    if (error) throw new Error(`canal: ${error.message}`);
+    if (!data) throw new ErroUsuario("Número não encontrado.");
+    canal = data as Canal;
+  } else {
+    canal = await criarCanal(orgId, (p.nome ?? "").trim() || numero.verified_name || "WhatsApp oficial", p.responsavel_id || null, campos);
+  }
+  const { error: erroToken } = await admin.rpc("meta_guardar_token", { p_canal: canal.id, p_token: token, p_expira_em: expira });
+  if (erroToken) throw new Error(`token: ${erroToken.message}`);
+
+  // 5. Os eventos desta WABA passam a chegar no meta-webhook.
+  await graph(`/${p.waba_id}/subscribed_apps`, token, { method: "POST" });
+
+  // 6. Número novo precisa ser registrado (com PIN de duas etapas). Na coexistência ele já está registrado:
+  //    em vez disso, pede ao app do celular os contatos e o histórico — só dá uma vez, até 24 h depois.
+  if (coexistencia) {
+    for (const sync_type of ["smb_app_state_sync", "history"]) {
+      try {
+        await graph(`/${numero.id}/smb_app_data`, token, { method: "POST", body: JSON.stringify({ messaging_product: "whatsapp", sync_type }) });
+      } catch (e) {
+        console.error("smb_app_data", sync_type, String(e));
+      }
+    }
+    await admin.from("canais").update({ meta_sync_pedido_em: new Date().toISOString() }).eq("id", canal.id);
+  } else {
+    const pin = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
+    await graph(`/${numero.id}/register`, token, { method: "POST", body: JSON.stringify({ messaging_product: "whatsapp", pin }) });
+    await admin.rpc("meta_guardar_pin", { p_canal: canal.id, p_pin: pin });
+  }
+
+  await admin.rpc("canal_atualizar_status", { p_canal: canal.id, p_status: "WORKING", p_numero: telefone });
+  return canal;
 }
 
 async function listar(orgId: string, userId: string, gerencia: boolean) {
@@ -160,7 +271,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json(405, { erro: "use POST" });
 
-  let p: { acao?: string; org_id?: string; canal_id?: string; telefone?: string; nome?: string; responsavel_id?: string | null };
+  let p: { acao?: string; org_id?: string; canal_id?: string; telefone?: string; nome?: string; responsavel_id?: string | null } & Oficial;
   try {
     p = await req.json();
   } catch {
@@ -174,7 +285,7 @@ Deno.serve(async (req) => {
       const { data: ok } = await admin.rpc("verificar_segredo_interno", { p_segredo: segredo });
       if (ok !== true) return json(401, { erro: "não autorizado" });
       if (p.acao === "verificar") {
-        const { data: canais } = await admin.from("canais").select("id, instance_id").eq("tipo", "waha").eq("ativo", true);
+        const { data: canais } = await admin.from("canais").select("id, tipo, instance_id").eq("tipo", "waha").eq("ativo", true);
         await registrarCanais(canais ?? []);
       }
       return json(200, { ok: true });
@@ -209,11 +320,29 @@ Deno.serve(async (req) => {
       return json(200, { canal });
     }
 
+    if (p.acao === "oficial") {
+      if (!p.canal_id && p.responsavel_id) {
+        const { data: ok } = await admin.from("membros_org").select("user_id")
+          .eq("org_id", p.org_id).eq("user_id", p.responsavel_id).eq("ativo", true).maybeSingle();
+        if (!ok) throw new ErroUsuario("O responsável precisa estar ativo na equipe.");
+      }
+      return json(200, { canal: await conectarOficial(p.org_id, p) });
+    }
+
     // Demais ações: um canal desta organização.
     const { data: achado } = await admin.from("canais").select(CAMPOS)
       .eq("id", p.canal_id ?? "").eq("org_id", p.org_id).eq("ativo", true).maybeSingle();
     const canal = achado as Canal | null;
     if (!canal?.instance_id) return json(404, { erro: "Número não encontrado." });
+
+    if (canal.tipo === "meta") {
+      // Número da API oficial: conectar é pelo Embedded Signup; aqui ele só sai da Livih.
+      if (p.acao !== "remover") throw new ErroUsuario("Este número está na API oficial. Para reconectar, use “Conectar pela API oficial”.");
+      await admin.from("canais").update({ ativo: false, desconectado_em: new Date().toISOString(), desconectado_por: quem.user.id })
+        .eq("id", canal.id);
+      await admin.from("agentes").update({ ativo: false }).eq("canal_id", canal.id);
+      return json(200, { ok: true });
+    }
 
     if (p.acao === "iniciar") {
       await iniciar(canal);
