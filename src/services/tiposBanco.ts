@@ -1193,6 +1193,16 @@ export type Database = {
         Args: { p_conversa: string; p_texto: string }
         Returns: string
       }
+      funil_salvar: {
+        Args: {
+          p_abertas: Json
+          p_ganho: string
+          p_mover?: Json
+          p_org: string
+          p_perdido: string
+        }
+        Returns: undefined
+      }
       enviar_modelo: {
         Args: {
           p_conversa: string

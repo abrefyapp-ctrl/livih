@@ -1022,5 +1022,63 @@ exception when others then
   insert into resultado (teste, ok) values ('modelo: não muda depois de gravado', sqlerrm like 'o conteúdo%');
 end $$;
 
+-- Funil editável (dono da F7 de teste = admin a1)
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+  v_novo uuid := (select id from public.etapas_funil where org_id = v_org and nome = 'Novo');
+  v_diag uuid := (select id from public.etapas_funil where org_id = v_org and nome = 'Em diagnóstico');
+  v_reuniao uuid := (select id from public.etapas_funil where org_id = v_org and nome = 'Reunião marcada');
+  v_proposta uuid := (select id from public.etapas_funil where org_id = v_org and nome = 'Proposta');
+  v_contato uuid := (select id from public.contatos where org_id = v_org limit 1);
+  v_op uuid;
+begin
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo)
+  values (v_org, v_contato, v_proposta, 'Teste funil') returning id into v_op;
+
+  begin
+    perform public.funil_salvar(v_org,
+      jsonb_build_array(jsonb_build_object('id', v_novo, 'nome', 'Novo')), 'Ganho', 'Perdido');
+    insert into resultado (teste, ok) values ('funil: remover etapa com cartões exige destino', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('funil: remover etapa com cartões exige destino', sqlerrm like 'escolha para onde%');
+  end;
+  begin
+    perform public.funil_salvar(v_org, jsonb_build_array(jsonb_build_object('id', null, 'nome', 'Ganho')), 'ganho', 'Perdido');
+    insert into resultado (teste, ok) values ('funil: nome repetido recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('funil: nome repetido recusado', sqlerrm = 'há etapas com o mesmo nome');
+  end;
+
+  -- troca dois nomes de lugar, reordena, cria uma, remove Proposta (cartão vai para Reunião) e renomeia Ganho
+  perform public.funil_salvar(v_org, jsonb_build_array(
+      jsonb_build_object('id', v_diag, 'nome', 'Novo'),
+      jsonb_build_object('id', v_novo, 'nome', 'Em diagnóstico'),
+      jsonb_build_object('id', null, 'nome', 'Visita técnica'),
+      jsonb_build_object('id', v_reuniao, 'nome', 'Orçamento')),
+    'Fechado', 'Perdido', jsonb_build_object(v_proposta::text, v_reuniao::text));
+
+  insert into resultado (teste, ok) select 'funil: renomeia, reordena, cria e remove numa vez só',
+    (select string_agg(nome || ':' || tipo, ',' order by ordem) from public.etapas_funil where org_id = v_org)
+      = 'Novo:aberta,Em diagnóstico:aberta,Visita técnica:aberta,Orçamento:aberta,Fechado:ganho,Perdido:perdido';
+  insert into resultado (teste, ok) select 'funil: cartão da etapa removida vai para o destino, com histórico',
+    (select etapa_id = v_reuniao from public.oportunidades where id = v_op)
+    and exists (select 1 from public.oportunidade_historico
+                 where oportunidade_id = v_op and etapa_para = v_reuniao and autor_tipo = 'atendente');
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.funil_salvar((select id from public.organizacoes where slug = 'teste-f7'),
+    '[{"id": null, "nome": "X"}]', 'Ganho', 'Perdido');
+  insert into resultado (teste, ok) values ('funil: atendente não muda o funil', false);
+exception when others then
+  insert into resultado (teste, ok) values ('funil: atendente não muda o funil', sqlerrm = 'só dono e admin mudam o funil');
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

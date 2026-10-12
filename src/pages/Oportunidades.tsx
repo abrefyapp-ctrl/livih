@@ -8,6 +8,7 @@ import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { Icone } from '../components/Icone'
+import { ModalEtapas } from '../components/ModalEtapas'
 import { ModalOportunidade } from '../components/ModalOportunidade'
 
 const DIAS_FECHADAS = 30
@@ -30,6 +31,8 @@ export function Oportunidades() {
   const [abertura, setAbertura] = useState<Abertura | null>(null)
   const [arrastando, setArrastando] = useState<string | null>(null)
   const [sobre, setSobre] = useState<string | null>(null)
+  const [editandoEtapas, setEditandoEtapas] = useState(false)
+  const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
 
   useEffect(() => {
     let ativo = true
@@ -106,9 +109,16 @@ export function Oportunidades() {
             <h1 className="text-h1 font-semibold">Oportunidades</h1>
             <p className="text-pequeno text-texto-3">Arraste os cartões entre as etapas. O agente cria e avança; ganho e perdido são da equipe.</p>
           </div>
-          <Botao icone="mais" onClick={() => setAbertura({})} disabled={!atual?.etapas.length}>
-            Nova oportunidade
-          </Botao>
+          <div className="flex flex-wrap gap-2">
+            {gerencia && (
+              <Botao variante="secundario" icone="config" onClick={() => setEditandoEtapas(true)} disabled={!atual?.etapas.length}>
+                Editar etapas
+              </Botao>
+            )}
+            <Botao icone="mais" onClick={() => setAbertura({})} disabled={!atual?.etapas.length}>
+              Nova oportunidade
+            </Botao>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="relative min-w-64 flex-1 sm:max-w-sm">
@@ -219,6 +229,19 @@ export function Oportunidades() {
             })}
           </div>
         </div>
+      )}
+
+      {editandoEtapas && atual && (
+        <ModalEtapas
+          orgId={orgId}
+          etapas={atual.etapas}
+          cartoes={atual.lista.reduce((m, o) => m.set(o.etapa_id, (m.get(o.etapa_id) ?? 0) + 1), new Map<string, number>())}
+          aoFechar={() => setEditandoEtapas(false)}
+          aoSalvar={() => {
+            setEditandoEtapas(false)
+            recarregar()
+          }}
+        />
       )}
 
       {abertura && atual && (

@@ -116,6 +116,34 @@ export async function listarEtapas(orgId: string): Promise<Etapa[]> {
   return data ?? []
 }
 
+/**
+ * Salva o funil inteiro de uma vez: etapas abertas na ordem do quadro (id null = nova), nomes de Ganho e Perdido
+ * e, para cada etapa removida que tem cartões, a etapa que os recebe.
+ */
+export async function salvarFunil(
+  orgId: string,
+  abertas: { id: string | null; nome: string }[],
+  ganho: string,
+  perdido: string,
+  mover: Record<string, string>,
+) {
+  const { error } = await supabase.rpc('funil_salvar', {
+    p_org: orgId,
+    p_abertas: abertas,
+    p_ganho: ganho,
+    p_perdido: perdido,
+    p_mover: mover,
+  })
+  if (error) {
+    const m = error.message
+    throw new Error(
+      m.includes('mesmo nome') || m.includes('precisa de nome') || m.includes('escolha para onde') || m.includes('no máximo')
+        ? m.charAt(0).toUpperCase() + m.slice(1) + '.'
+        : 'Não foi possível salvar as etapas. Tente de novo.',
+    )
+  }
+}
+
 const CAMPOS_OPORTUNIDADE =
   'id, titulo, resumo, valor_estimado, responsavel_id, origem, fechada_em, motivo_perda, etapa_id, contato_id, criado_em, atualizado_em, ' +
   'contato:contatos(id, nome, nome_whatsapp, telefone)'
