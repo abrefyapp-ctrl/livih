@@ -275,7 +275,7 @@ export function SecaoWhatsapp() {
 
                 {gerencia && (
                   <div className="flex flex-wrap gap-2 border-t border-borda px-4 py-3">
-                    {!conectado && n.tipo === 'waha' && (
+                    {!conectado && n.tipo !== 'meta' && (
                       <Botao
                         tamanho="sm"
                         icone="telefone"
@@ -297,12 +297,12 @@ export function SecaoWhatsapp() {
                     >
                       Editar
                     </Botao>
-                    {n.tipo === 'waha' && (
+                    {n.tipo !== 'meta' && (
                       <Botao tamanho="sm" variante="secundario" onClick={() => setConfirmacao({ tipo: 'oficial', numero: n })}>
                         Passar para a API oficial
                       </Botao>
                     )}
-                    {conectado && n.tipo === 'waha' && (
+                    {conectado && n.tipo !== 'meta' && (
                       <Botao tamanho="sm" variante="fantasma" onClick={() => setConfirmacao({ tipo: 'desconectar', numero: n })}>
                         Desconectar
                       </Botao>
