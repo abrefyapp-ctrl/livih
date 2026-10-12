@@ -5,13 +5,16 @@ import { Icone, type NomeIcone } from '../components/Icone'
 import { SecaoAgente } from '../components/SecaoAgente'
 import { SecaoBase } from '../components/SecaoBase'
 import { SecaoEquipe } from '../components/SecaoEquipe'
+import { SecaoModelos } from '../components/SecaoModelos'
 import { SecaoNotificacoes } from '../components/SecaoNotificacoes'
 import { SecaoUsoIa } from '../components/SecaoUsoIa'
 import { SecaoWhatsapp } from '../components/SecaoWhatsapp'
 
-const SECOES: { id: string; rotulo: string; icone: NomeIcone }[] = [
+const SECOES: { id: string; rotulo: string; icone: NomeIcone; soPlataforma?: boolean }[] = [
   { id: 'equipe', rotulo: 'Equipe', icone: 'equipe' },
   { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone' },
+  // Modelos só existem na API oficial, que por enquanto só a equipe da plataforma conecta.
+  { id: 'modelos', rotulo: 'Modelos', icone: 'arquivo', soPlataforma: true },
   { id: 'agente', rotulo: 'Agente', icone: 'agente' },
   { id: 'base', rotulo: 'Base de conhecimento', icone: 'livro' },
   { id: 'uso', rotulo: 'Uso da IA', icone: 'painel' },
@@ -20,9 +23,10 @@ const SECOES: { id: string; rotulo: string; icone: NomeIcone }[] = [
 
 export function Configuracoes() {
   const { secao } = useParams()
-  const { orgAtiva } = useSessao()
+  const { orgAtiva, adminPlataforma } = useSessao()
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
-  if (!SECOES.some((s) => s.id === secao)) return <Navigate to="/configuracoes/equipe" replace />
+  const secoes = SECOES.filter((s) => !s.soPlataforma || adminPlataforma)
+  if (!secoes.some((s) => s.id === secao)) return <Navigate to="/configuracoes/equipe" replace />
 
   return (
     <div className="relative h-full overflow-y-auto">
@@ -34,7 +38,7 @@ export function Configuracoes() {
           </div>
         )}
         <nav aria-label="Seções" className="mt-4 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-borda [scrollbar-width:none]">
-          {SECOES.map((s) => (
+          {secoes.map((s) => (
             <NavLink
               key={s.id}
               to={`/configuracoes/${s.id}`}
@@ -52,6 +56,7 @@ export function Configuracoes() {
         <div className="py-6">
           {secao === 'equipe' && <SecaoEquipe />}
           {secao === 'whatsapp' && <SecaoWhatsapp />}
+          {secao === 'modelos' && <SecaoModelos />}
           {secao === 'agente' && <SecaoAgente />}
           {secao === 'base' && <SecaoBase />}
           {secao === 'uso' && <SecaoUsoIa />}

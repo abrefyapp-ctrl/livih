@@ -149,6 +149,10 @@ export const conectarOficial = (
   destino: { canal_id: string } | { nome: string; responsavel_id: string | null },
 ) => conexao<{ canal: NumeroWhatsapp }>(orgId, 'oficial', { ...dados, ...destino })
 
+/** Número que já está no portfólio da F7 (ex.: o de teste da Meta), com o token de usuário do sistema. Só plataforma. */
+export const conectarNumeroDoPortfolio = (orgId: string, dados: { nome: string; waba_id: string; phone_number_id: string }) =>
+  conexao<{ canal: NumeroWhatsapp }>(orgId, 'oficial_sistema', dados)
+
 export async function editarNumero(canalId: string, campos: { nome: string; responsavel_id: string | null }) {
   const { error } = await supabase.from('canais').update(campos).eq('id', canalId)
   if (error) throw new Error('Não foi possível salvar o número. Tente de novo.')

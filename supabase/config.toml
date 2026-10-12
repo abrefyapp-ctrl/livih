@@ -439,3 +439,7 @@ verify_jwt = false
 # meta-webhook: chamado pela Meta (sem login); confere a assinatura X-Hub-Signature-256 dentro da função.
 [functions.meta-webhook]
 verify_jwt = false
+
+# whatsapp-modelos: modelos da API oficial; login validado dentro da função (mesmo padrão da whatsapp-conexao).
+[functions.whatsapp-modelos]
+verify_jwt = false

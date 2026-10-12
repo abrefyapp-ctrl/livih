@@ -23,6 +23,7 @@ const WAHA_URL = (Deno.env.get("WAHA_URL") ?? "").replace(/\/$/, "");
 const WAHA_API_KEY = Deno.env.get("WAHA_API_KEY") ?? "";
 const META_APP_ID = Deno.env.get("META_APP_ID") ?? "2190905941640235";
 const META_APP_SECRET = Deno.env.get("META_APP_SECRET") ?? "";
+const META_SYSTEM_TOKEN = Deno.env.get("META_SYSTEM_TOKEN") ?? "";
 const GRAPH = "https://graph.facebook.com/v25.0";
 
 const admin = createClient(URL_SUPABASE, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -251,6 +252,33 @@ async function conectarOficial(orgId: string, p: Oficial & { canal_id?: string; 
   return canal;
 }
 
+// Número do portfólio da F7: sem cadastro, sem token próprio no canal (o envio cai no META_SYSTEM_TOKEN).
+// O número precisa já estar registrado na Cloud API (o de teste da Meta já vem assim).
+async function conectarComTokenSistema(orgId: string, p: { waba_id?: string; phone_number_id?: string; nome?: string }): Promise<Canal> {
+  if (!META_SYSTEM_TOKEN) throw new ErroUsuario("Falta configurar o token de usuário do sistema da Meta (META_SYSTEM_TOKEN).");
+  const waba = (p.waba_id ?? "").trim();
+  const phone = (p.phone_number_id ?? "").trim();
+  if (!/^\d+$/.test(waba) || !/^\d+$/.test(phone)) throw new ErroUsuario("Informe os IDs da conta (WABA) e do número, só dígitos.");
+
+  const numeros = await graph(`/${waba}/phone_numbers?fields=id,display_phone_number,verified_name`, META_SYSTEM_TOKEN);
+  const numero = ((numeros?.data ?? []) as { id: string; display_phone_number?: string; verified_name?: string }[])
+    .find((n) => n.id === phone);
+  if (!numero) throw new ErroUsuario("Esse número não está nessa conta do WhatsApp (ou o token não tem acesso a ela).");
+
+  const { data: outro } = await admin.from("canais").select("id").eq("tipo", "meta").eq("instance_id", phone).eq("ativo", true).maybeSingle();
+  if (outro) throw new ErroUsuario("Este número já está conectado na Livih.");
+
+  const canal = await criarCanal(orgId, (p.nome ?? "").trim() || numero.verified_name || "WhatsApp oficial", null, {
+    tipo: "meta",
+    instance_id: phone,
+    meta_waba_id: waba,
+  });
+  await graph(`/${waba}/subscribed_apps`, META_SYSTEM_TOKEN, { method: "POST" });
+  const telefone = (numero.display_phone_number ?? "").replace(/\D/g, "") || null;
+  await admin.rpc("canal_atualizar_status", { p_canal: canal.id, p_status: "WORKING", p_numero: telefone });
+  return canal;
+}
+
 async function listar(orgId: string, userId: string, gerencia: boolean) {
   let consulta = admin.from("canais").select(CAMPOS).eq("org_id", orgId).eq("ativo", true).order("criado_em");
   if (!gerencia) consulta = consulta.or(`responsavel_id.is.null,responsavel_id.eq.${userId}`);
@@ -330,6 +358,12 @@ Deno.serve(async (req) => {
         if (!ok) throw new ErroUsuario("O responsável precisa estar ativo na equipe.");
       }
       return json(200, { canal: await conectarOficial(p.org_id, p) });
+    }
+
+    if (p.acao === "oficial_sistema") {
+      const { data: plataforma } = await admin.from("admins_plataforma").select("user_id").eq("user_id", quem.user.id).maybeSingle();
+      if (!plataforma) return json(403, { erro: "Só a equipe da Livih conecta números do portfólio da F7." });
+      return json(200, { canal: await conectarComTokenSistema(p.org_id, p) });
     }
 
     // Demais ações: um canal desta organização.

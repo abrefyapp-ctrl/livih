@@ -3,6 +3,7 @@ import { useSessao } from '../hooks/useSessao'
 import { abrirCadastroMeta, carregarSdkMeta } from '../services/cadastroMeta'
 import {
   codigoNumero,
+  conectarNumeroDoPortfolio,
   conectarOficial,
   criarNumero,
   desconectarNumero,
@@ -26,6 +27,7 @@ import { Icone } from './Icone'
 import { Modal } from './Modal'
 
 type Edicao = { id: string | null; nome: string; responsavel_id: string }
+type Portfolio = { nome: string; waba_id: string; phone_number_id: string }
 type Confirmacao = { tipo: 'desconectar' | 'remover' | 'oficial'; numero: NumeroWhatsapp }
 
 function Ponto({ cor }: { cor: string }) {
@@ -91,6 +93,7 @@ export function SecaoWhatsapp() {
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [edicao, setEdicao] = useState<Edicao | null>(null)
   const [confirmacao, setConfirmacao] = useState<Confirmacao | null>(null)
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
 
   const lista = numeros?.orgId === orgId ? numeros.lista : null
   const recarregar = () => setVersao((v) => v + 1)
@@ -191,6 +194,15 @@ export function SecaoWhatsapp() {
     })
   }
 
+  async function salvarPortfolio(e: FormEvent) {
+    e.preventDefault()
+    if (!portfolio) return
+    await executar('portfolio', async () => {
+      await conectarNumeroDoPortfolio(orgId, portfolio)
+      setPortfolio(null)
+    })
+  }
+
   return (
     <section aria-labelledby="titulo-whatsapp" className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -207,6 +219,11 @@ export function SecaoWhatsapp() {
             {oficial && (
               <Botao variante="secundario" carregando={ocupado === 'oficial'} onClick={() => conectarPelaApiOficial(null)}>
                 Conectar pela API oficial
+              </Botao>
+            )}
+            {oficial && (
+              <Botao variante="secundario" onClick={() => setPortfolio({ nome: '', waba_id: '', phone_number_id: '' })}>
+                Número do portfólio da F7
               </Botao>
             )}
             <Botao icone="mais" onClick={() => setEdicao({ id: null, nome: '', responsavel_id: '' })}>
@@ -376,6 +393,57 @@ export function SecaoWhatsapp() {
                 O agente começa desligado neste número. Ele usa as mesmas instruções e a mesma base da empresa.
               </p>
             )}
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        aberto={!!portfolio}
+        titulo="Número do portfólio da F7"
+        aoFechar={() => setPortfolio(null)}
+        rodape={
+          <>
+            <Botao variante="secundario" onClick={() => setPortfolio(null)} disabled={ocupado === 'portfolio'}>
+              Cancelar
+            </Botao>
+            <Botao
+              type="submit"
+              form="form-portfolio"
+              carregando={ocupado === 'portfolio'}
+              disabled={!portfolio?.waba_id.trim() || !portfolio?.phone_number_id.trim()}
+            >
+              Conectar
+            </Botao>
+          </>
+        }
+      >
+        {portfolio && (
+          <form id="form-portfolio" onSubmit={salvarPortfolio} className="space-y-4">
+            <p className="text-pequeno text-texto-2">
+              Para números que já estão na conta do WhatsApp da própria F7, como o número de teste da Meta. Não passa pelo
+              cadastro da Meta: usa o token de usuário do sistema. Os IDs ficam em WhatsApp → Configuração da API, no painel
+              do app.
+            </p>
+            <CampoTexto
+              rotulo="Nome do número"
+              value={portfolio.nome}
+              onChange={(e) => setPortfolio({ ...portfolio, nome: e.target.value })}
+              placeholder="Ex.: Teste da Meta"
+            />
+            <CampoTexto
+              rotulo="ID da conta do WhatsApp Business (WABA)"
+              required
+              inputMode="numeric"
+              value={portfolio.waba_id}
+              onChange={(e) => setPortfolio({ ...portfolio, waba_id: e.target.value.replace(/\D/g, '') })}
+            />
+            <CampoTexto
+              rotulo="ID do número de telefone"
+              required
+              inputMode="numeric"
+              value={portfolio.phone_number_id}
+              onChange={(e) => setPortfolio({ ...portfolio, phone_number_id: e.target.value.replace(/\D/g, '') })}
+            />
           </form>
         )}
       </Modal>
