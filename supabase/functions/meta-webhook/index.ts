@@ -135,8 +135,13 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
 
   if (req.method === "GET") {
-    const ok = url.searchParams.get("hub.mode") === "subscribe" && VERIFY_TOKEN &&
-      url.searchParams.get("hub.verify_token") === VERIFY_TOKEN;
+    // Espaço ou aspas nas pontas aparecem fácil ao colar o token no terminal ou no painel.
+    const limpar = (t: string | null) => (t ?? "").trim().replace(/^["']|["']$/g, "");
+    const esperado = limpar(VERIFY_TOKEN);
+    const recebido = limpar(url.searchParams.get("hub.verify_token"));
+    const ok = url.searchParams.get("hub.mode") === "subscribe" && esperado !== "" && recebido === esperado;
+    // Só tamanhos no log, nunca o token.
+    if (!ok) console.error("verificação recusada", { modo: url.searchParams.get("hub.mode"), esperado: esperado.length, recebido: recebido.length });
     return ok ? resposta(200, url.searchParams.get("hub.challenge") ?? "") : resposta(403, "verify token");
   }
   if (req.method !== "POST") return resposta(405, { erro: "método" });
