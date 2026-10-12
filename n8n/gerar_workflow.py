@@ -70,15 +70,21 @@ const foraHorario = (c.agente?.mensagem_fora_horario || '').trim();
 
 // Saudação configurada: o próprio sistema manda o texto exato na primeira resposta (não depende da IA);
 // o agente continua em seguida. Em branco, o agente cumprimenta do jeito dele.
+// Fora do horário, com aviso configurado, saudação e aviso saem JUNTOS numa mensagem só (antes eram duas
+// seguidas: a saudação do sistema e o aviso escrito pela IA).
 const saudacaoAgora = saudacao && c.primeira_resposta;
+const foraAgora = !!textoHorario && !c.dentro_do_horario;
+const avisoJunto = saudacaoAgora && foraAgora && !!foraHorario;
+const textoAbertura = avisoJunto ? `${saudacao}\n\n${foraHorario}` : saudacao;
 if (saudacaoAgora) {
-  const r = await rpc('agente_responder', { p_conversa: conversa_id, p_texto: saudacao, p_mensagem: mensagem_id });
+  const r = await rpc('agente_responder', { p_conversa: conversa_id, p_texto: textoAbertura, p_mensagem: mensagem_id });
   if (r?.enviado === false) return [];
 }
-// Fora do horário o aviso precisa sair, então o "oi" sozinho não pode ficar sem resposta.
-const podeCalar = !textoHorario || c.dentro_do_horario;
+// Fora do horário o aviso precisa sair, então o "oi" sozinho não pode ficar sem resposta (a menos que o aviso já
+// tenha ido junto com a saudação).
+const podeCalar = !foraAgora || avisoJunto;
 const blocoSaudacao = saudacaoAgora
-  ? `O sistema ACABOU de enviar ao cliente a saudação da empresa: "${saudacao}". Não cumprimente de novo nem repita a pergunta da saudação. ${podeCalar
+  ? `O sistema ACABOU de enviar ao cliente a saudação da empresa${avisoJunto ? ' junto com o aviso de fora do horário' : ''}: "${textoAbertura}". Não cumprimente de novo nem repita a pergunta da saudação${avisoJunto ? ', e não repita o aviso de horário' : ''}. ${podeCalar
       ? 'Se as mensagens novas do cliente forem só um cumprimento (oi, olá, bom dia...) sem nenhum pedido ou pergunta, a saudação já basta: responda exatamente SEM_RESPOSTA. Se o cliente já disse o que precisa, responda direto ao assunto.'
       : 'Se o cliente já disse o que precisa, responda direto ao assunto; se foi só um cumprimento, dê apenas o aviso de fora do horário, em uma mensagem curta.'}`
   : saudacao
@@ -88,7 +94,7 @@ const blocoHorario = !textoHorario
   ? ''
   : c.dentro_do_horario
     ? `Horário de atendimento da equipe (Brasília): ${textoHorario}. Agora a equipe está DISPONÍVEL.`
-    : `Horário de atendimento da equipe (Brasília): ${textoHorario}. Agora estamos FORA do horário: a equipe não está disponível. Avise o cliente uma única vez na conversa (não repita se já avisou) que a equipe retorna no próximo horário de atendimento${foraHorario ? `, usando esta mensagem como base: "${foraHorario}"` : ''}. Continue ajudando normalmente: tire dúvidas, entenda a necessidade e anote os dados. Se precisar chamar a equipe, chame e diga que ela responde quando voltar.`;
+    : `Horário de atendimento da equipe (Brasília): ${textoHorario}. Agora estamos FORA do horário: a equipe não está disponível. ${avisoJunto ? 'O aviso de fora do horário JÁ foi enviado junto com a saudação: não avise de novo.' : `Avise o cliente uma única vez na conversa (não repita se já avisou) que a equipe retorna no próximo horário de atendimento${foraHorario ? `, usando esta mensagem como base: "${foraHorario}"` : ''}.`} Continue ajudando normalmente: tire dúvidas, entenda a necessidade e anote os dados. Se precisar chamar a equipe, chame e diga que ela responde quando voltar.`;
 const blocoAbertura = [blocoSaudacao, blocoHorario].filter(Boolean).join('\n\n');
 
 const prompt_sistema = `${c.agente?.prompt || ''}
@@ -133,7 +139,7 @@ const msgs = c.mensagens || [];
 // O contexto foi lido antes de a saudação sair: ela entra no fim do histórico para o agente ver a ordem certa.
 if (saudacaoAgora) {
   const em = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '');
-  msgs.push({ de: 'assistente (saudação automática)', tipo: 'texto', texto: saudacao, em, anterior: false });
+  msgs.push({ de: 'assistente (saudação automática)', tipo: 'texto', texto: textoAbertura, em, anterior: false });
 }
 const anteriores = msgs.filter((m) => m.anterior);
 const novas = msgs.filter((m) => !m.anterior);
