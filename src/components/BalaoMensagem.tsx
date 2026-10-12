@@ -89,6 +89,7 @@ export function BalaoMensagem({ m, nomeAutor }: { m: Mensagem; nomeAutor?: strin
           <p className={`mb-0.5 flex items-center gap-1 text-legenda font-semibold ${bot ? 'text-primaria' : 'text-verde-100'}`}>
             {bot && <Icone nome="agente" className="size-3.5" />}
             {bot ? 'Agente' : (nomeAutor ?? 'Equipe')}
+            {m.modelo && <span className="font-normal opacity-90">· modelo</span>}
           </p>
         )}
         <Conteudo m={m} />

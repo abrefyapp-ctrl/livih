@@ -621,6 +621,7 @@ export type Database = {
           id: string
           midia_mime: string | null
           midia_path: string | null
+          modelo: Json | null
           org_id: string
           status_entrega: Database["public"]["Enums"]["status_entrega"]
           texto: string | null
@@ -639,6 +640,7 @@ export type Database = {
           id?: string
           midia_mime?: string | null
           midia_path?: string | null
+          modelo?: Json | null
           org_id: string
           status_entrega: Database["public"]["Enums"]["status_entrega"]
           texto?: string | null
@@ -657,6 +659,7 @@ export type Database = {
           id?: string
           midia_mime?: string | null
           midia_path?: string | null
+          modelo?: Json | null
           org_id?: string
           status_entrega?: Database["public"]["Enums"]["status_entrega"]
           texto?: string | null
@@ -1188,6 +1191,16 @@ export type Database = {
       }
       enviar_mensagem: {
         Args: { p_conversa: string; p_texto: string }
+        Returns: string
+      }
+      enviar_modelo: {
+        Args: {
+          p_conversa: string
+          p_idioma: string
+          p_nome: string
+          p_parametros: string[]
+          p_texto: string
+        }
         Returns: string
       }
       equipe_listar: {

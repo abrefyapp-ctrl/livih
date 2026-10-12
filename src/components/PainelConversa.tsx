@@ -23,8 +23,19 @@ import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { EstadoVazio } from './EstadoVazio'
 import { EtiquetaEstado } from './EtiquetaEstado'
 import { Icone } from './Icone'
+import { ModalEnviarModelo } from './ModalEnviarModelo'
 
 type Acao = 'assumir' | 'devolver' | 'encerrar'
+
+/** Hora atual, renovada a cada minuto (para a janela de 24 h fechar sozinha com a tela aberta). */
+function useAgora() {
+  const [agora, setAgora] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setAgora(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  return agora
+}
 
 export function PainelConversa({
   conversaId,
@@ -37,12 +48,14 @@ export function PainelConversa({
   contatoAberto: boolean
   aoAlternarContato: () => void
 }) {
-  const { sessao, equipe } = useSessao()
+  const { sessao, equipe, orgAtiva } = useSessao()
   const eu = sessao?.user.id
   const [conversa, setConversa] = useState<ConversaLista | null | undefined>(undefined)
   const [confirmar, setConfirmar] = useState<Acao | null>(null)
   const [executando, setExecutando] = useState<Acao | null>(null)
   const [erroAcao, setErroAcao] = useState<string | null>(null)
+  const [enviandoModelo, setEnviandoModelo] = useState(false)
+  const agora = useAgora()
   const { mensagens, carregando, erro } = useMensagens(conversaId)
   const rolagem = useRef<HTMLDivElement>(null)
   const noFim = useRef(true)
@@ -123,6 +136,17 @@ export function PainelConversa({
       : !minha
         ? 'Ao enviar, você assume a conversa e o agente para de responder.'
         : undefined
+
+  // API oficial: 24 h depois da última mensagem do cliente, só modelo aprovado é entregue.
+  const oficial = conversa?.canal?.tipo === 'meta'
+  const ultimaEntrada = oficial ? mensagens.findLast((m) => m.direcao === 'entrada') : undefined
+  const janelaFechada =
+    oficial && !carregando && (!ultimaEntrada || agora - new Date(ultimaEntrada.criado_em).getTime() > 24 * 3600_000)
+  const botaoModelo = oficial && (
+    <Botao variante="secundario" icone="arquivo" onClick={() => setEnviandoModelo(true)}>
+      <span className={janelaFechada ? '' : 'sr-only'}>Enviar modelo</span>
+    </Botao>
+  )
 
   const nomeAutor = (m: Mensagem) =>
     m.automatica
@@ -227,7 +251,25 @@ export function PainelConversa({
         )}
       </div>
 
-      <Compositor dica={dica} aoEnviar={(t) => enviarMensagem(conversaId, t)} />
+      <Compositor
+        dica={dica}
+        aoEnviar={(t) => enviarMensagem(conversaId, t)}
+        acao={botaoModelo}
+        bloqueio={
+          janelaFechada &&
+          `Faz mais de 24 horas que ${nome} escreveu. Pela API oficial do WhatsApp, só dá para retomar com um modelo aprovado.`
+        }
+      />
+      {oficial && conversa?.canal && orgAtiva && (
+        <ModalEnviarModelo
+          aberto={enviandoModelo}
+          orgId={orgAtiva.id}
+          canalId={conversa.canal.id}
+          conversaId={conversaId}
+          nomeContato={nome}
+          aoFechar={() => setEnviandoModelo(false)}
+        />
+      )}
 
       <DialogoConfirmacao
         aberto={confirmar === 'devolver'}

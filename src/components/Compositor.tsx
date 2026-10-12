@@ -1,9 +1,22 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 
-/** Caixa de resposta. Enter envia; Shift+Enter quebra a linha. */
-export function Compositor({ dica, aoEnviar }: { dica?: string; aoEnviar: (texto: string) => Promise<void> }) {
+/**
+ * Caixa de resposta. Enter envia; Shift+Enter quebra a linha.
+ * `acao` fica ao lado da caixa (ex.: enviar modelo); com `bloqueio`, a caixa dá lugar ao aviso.
+ */
+export function Compositor({
+  dica,
+  aoEnviar,
+  acao,
+  bloqueio,
+}: {
+  dica?: string
+  aoEnviar: (texto: string) => Promise<void>
+  acao?: ReactNode
+  bloqueio?: ReactNode
+}) {
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -23,6 +36,14 @@ export function Compositor({ dica, aoEnviar }: { dica?: string; aoEnviar: (texto
     }
   }
 
+  if (bloqueio)
+    return (
+      <div className="flex flex-wrap items-center gap-3 border-t border-borda bg-superficie p-3">
+        <div className="min-w-0 flex-1 text-pequeno text-texto-2">{bloqueio}</div>
+        {acao}
+      </div>
+    )
+
   return (
     <form
       onSubmit={(e) => {
@@ -34,6 +55,7 @@ export function Compositor({ dica, aoEnviar }: { dica?: string; aoEnviar: (texto
       {erro && <Aviso tom="erro">{erro}</Aviso>}
       {dica && <p className="text-legenda text-texto-3">{dica}</p>}
       <div className="flex items-end gap-2">
+        {acao}
         <label htmlFor="resposta" className="sr-only">
           Mensagem
         </label>

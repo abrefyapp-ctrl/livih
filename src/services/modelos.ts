@@ -85,3 +85,22 @@ export const ROTULO_IDIOMA: Record<string, string> = {
   en_US: 'Inglês (EUA)',
   es: 'Espanhol',
 }
+
+/** Partes de texto de um modelo aprovado, para a prévia e para o histórico. */
+export function partesDe(m: Modelo) {
+  const de = (tipo: ComponenteModelo['type']) => m.components.find((c) => c.type === tipo)
+  const cabecalho = de('HEADER')
+  return {
+    cabecalho: cabecalho?.format === 'TEXT' ? (cabecalho.text ?? '') : '',
+    corpo: de('BODY')?.text ?? '',
+    rodape: de('FOOTER')?.text ?? '',
+    botoes: (de('BUTTONS')?.buttons ?? []).filter((b) => b.type === 'QUICK_REPLY').map((b) => b.text),
+  }
+}
+
+/** Texto que fica no histórico da conversa: o que o cliente leu, com as variáveis preenchidas. */
+export function textoEnviado(m: Modelo, valores: string[]) {
+  const p = partesDe(m)
+  const corpo = p.corpo.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => valores[Number(n) - 1]?.trim() ?? '')
+  return [p.cabecalho && `*${p.cabecalho}*`, corpo, p.rodape && `_${p.rodape}_`].filter(Boolean).join('\n\n')
+}

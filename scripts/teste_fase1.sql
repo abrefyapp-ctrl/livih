@@ -947,6 +947,79 @@ begin
   perform public.meta_guardar_pin(v_canal, '654321');
   insert into resultado (teste, ok) select 'meta: PIN do número guardado no Vault (um segredo só)',
     (select count(*) from vault.decrypted_secrets where name = 'meta_pin_' || v_canal::text and decrypted_secret = '654321') = 1;
+  perform set_config('teste.conv_meta', r ->> 'conversa_id', true);
+end $$;
+
+-- Envio de modelo pela conversa (atendente da F7)
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_msg uuid;
+begin
+  v_msg := public.enviar_modelo(current_setting('teste.conv_meta')::uuid, 'retorno_pedido', 'pt_BR',
+    array['Maria', 'Ana'], 'Olá, Maria! Aqui é Ana.');
+  insert into resultado (teste, ok) select 'modelo: enviado entra na fila com nome, idioma e variáveis',
+    (select modelo = '{"nome":"retorno_pedido","idioma":"pt_BR","parametros":["Maria","Ana"]}'::jsonb
+            and texto = 'Olá, Maria! Aqui é Ana.' and status_entrega = 'pendente'
+       from public.mensagens where id = v_msg)
+    and exists (select 1 from public.fila_envio where mensagem_id = v_msg);
+  insert into resultado (teste, ok) select 'modelo: quem envia assume a conversa',
+    (select estado = 'humano' and atribuida_a = '00000000-0000-0000-0000-0000000000b1'
+       from public.conversas where id = current_setting('teste.conv_meta')::uuid);
+  perform set_config('teste.msg_modelo', v_msg::text, true);
+
+  begin
+    perform public.enviar_modelo(current_setting('teste.conversa')::uuid, 'retorno_pedido', 'pt_BR', '{}', 'x');
+    insert into resultado (teste, ok) values ('modelo: recusado em número do WAHA', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('modelo: recusado em número do WAHA', sqlerrm like 'modelo só pode%');
+  end;
+  begin
+    perform public.enviar_modelo(current_setting('teste.conv_meta')::uuid, 'retorno_pedido', 'pt_BR', array['Maria', ' '], 'x');
+    insert into resultado (teste, ok) values ('modelo: variável vazia recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('modelo: variável vazia recusada', sqlerrm like 'preencha%');
+  end;
+  begin
+    perform public.enviar_modelo(current_setting('teste.conv_meta')::uuid, 'Retorno Pedido', 'pt_BR', '{}', 'x');
+    insert into resultado (teste, ok) values ('modelo: nome inválido recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('modelo: nome inválido recusado', sqlerrm = 'modelo inválido');
+  end;
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.enviar_modelo(current_setting('teste.conv_meta')::uuid, 'retorno_pedido', 'pt_BR', '{}', 'invasão');
+  insert into resultado (teste, ok) values ('modelo: outra empresa não envia', false);
+exception when others then
+  insert into resultado (teste, ok) values ('modelo: outra empresa não envia', sqlerrm = 'conversa não encontrada');
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+set local role service_role;
+do $$
+declare
+  r record;
+  v_achou boolean := false;
+begin
+  for r in select * from public.fila_reivindicar(50) loop
+    if r.mensagem_id = current_setting('teste.msg_modelo')::uuid then
+      v_achou := r.modelo ->> 'nome' = 'retorno_pedido' and r.canal_tipo = 'meta';
+    end if;
+  end loop;
+  insert into resultado (teste, ok) values ('modelo: fila entrega o modelo para a função de envio', v_achou);
+end $$;
+reset role;
+do $$
+begin
+  update public.mensagens set modelo = null where id = current_setting('teste.msg_modelo')::uuid;
+  insert into resultado (teste, ok) values ('modelo: não muda depois de gravado', false);
+exception when others then
+  insert into resultado (teste, ok) values ('modelo: não muda depois de gravado', sqlerrm like 'o conteúdo%');
 end $$;
 
 reset role;

@@ -13,7 +13,7 @@ export type ConversaLista = Pick<
   'id' | 'estado' | 'atribuida_a' | 'motivo_humano' | 'ultima_mensagem_em' | 'ultima_mensagem_resumo' | 'nao_lidas'
 > & {
   contato: Pick<Contato, 'id' | 'nome' | 'nome_whatsapp' | 'telefone' | 'sem_agente'> | null
-  canal: { id: string; nome: string } | null
+  canal: { id: string; nome: string; tipo: string } | null
 }
 
 export type Organizacao = { id: string; nome: string; status: string; papel: Database['public']['Enums']['papel_org'] }
@@ -23,7 +23,7 @@ export type Oportunidade = Pick<Tabelas['oportunidades']['Row'], 'id' | 'titulo'
 }
 
 const CAMPOS_CONVERSA =
-  'id, estado, atribuida_a, motivo_humano, ultima_mensagem_em, ultima_mensagem_resumo, nao_lidas, contato:contatos(id, nome, nome_whatsapp, telefone, sem_agente), canal:canais(id, nome)'
+  'id, estado, atribuida_a, motivo_humano, ultima_mensagem_em, ultima_mensagem_resumo, nao_lidas, contato:contatos(id, nome, nome_whatsapp, telefone, sem_agente), canal:canais(id, nome, tipo)'
 
 export async function listarOrganizacoes(userId: string): Promise<Organizacao[]> {
   const { data, error } = await supabase
@@ -111,6 +111,18 @@ export async function listarMensagens(conversaId: string): Promise<Mensagem[]> {
 /** Responde pelo sistema. O backend coloca a conversa em atendimento por quem enviou. */
 export async function enviarMensagem(conversaId: string, texto: string) {
   const { error } = await supabase.rpc('enviar_mensagem', { p_conversa: conversaId, p_texto: texto })
+  if (error) throw error
+}
+
+/** Envia um modelo aprovado da API oficial (fora da janela de 24 h). `texto` é o que fica no histórico. */
+export async function enviarModelo(conversaId: string, nome: string, idioma: string, parametros: string[], texto: string) {
+  const { error } = await supabase.rpc('enviar_modelo', {
+    p_conversa: conversaId,
+    p_nome: nome,
+    p_idioma: idioma,
+    p_parametros: parametros,
+    p_texto: texto,
+  })
   if (error) throw error
 }
 

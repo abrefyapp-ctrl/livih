@@ -21,7 +21,7 @@ import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { EstadoVazio } from './EstadoVazio'
 import { Icone } from './Icone'
 import { Modal } from './Modal'
-import { TextoWhatsapp } from './TextoWhatsapp'
+import { PreviaModelo } from './PreviaModelo'
 
 const TONS = {
   ok: 'bg-primaria-suave text-primaria',
@@ -47,30 +47,6 @@ const CLASSE_CAMPO =
 function Etiqueta({ status }: { status: string }) {
   const s = ROTULO_STATUS[status] ?? { texto: status, tom: 'neutro' as const }
   return <span className={`inline-flex rounded-sm px-1.5 py-0.5 text-legenda font-medium ${TONS[s.tom]}`}>{s.texto}</span>
-}
-
-/** Como a mensagem chega no WhatsApp, com os exemplos no lugar das variáveis. */
-function Previa({ cabecalho, corpo, rodape, botoes, exemplos }: Pick<ModeloNovo, 'cabecalho' | 'corpo' | 'rodape' | 'botoes' | 'exemplos'>) {
-  const texto = corpo.replace(/\{\{\s*(\d+)\s*\}\}/g, (marca, n) => exemplos[Number(n) - 1]?.trim() || marca)
-  const listaBotoes = botoes.filter((b) => b.trim())
-  return (
-    <div className="rounded-lg bg-[#efeae2] p-3">
-      <div className="max-w-xs overflow-hidden rounded-lg bg-white text-pequeno shadow-sm">
-        <div className="space-y-1 px-3 py-2">
-          {cabecalho.trim() && <p className="font-semibold">{cabecalho}</p>}
-          <p className="break-words whitespace-pre-wrap">
-            {texto.trim() ? <TextoWhatsapp texto={texto} /> : <span className="text-texto-3">O texto da mensagem aparece aqui.</span>}
-          </p>
-          {rodape.trim() && <p className="text-legenda text-texto-3">{rodape}</p>}
-        </div>
-        {listaBotoes.map((b, i) => (
-          <p key={i} className="border-t border-borda py-2 text-center font-medium text-info">
-            {b}
-          </p>
-        ))}
-      </div>
-    </div>
-  )
 }
 
 function corpoDe(m: Modelo) {
@@ -463,7 +439,7 @@ export function SecaoModelos() {
 
             <div className="space-y-2 md:sticky md:top-0 md:self-start">
               <p className="text-pequeno font-medium text-texto-2">Prévia</p>
-              <Previa {...novo} />
+              <PreviaModelo {...novo} valores={novo.exemplos} />
             </div>
           </form>
         )}

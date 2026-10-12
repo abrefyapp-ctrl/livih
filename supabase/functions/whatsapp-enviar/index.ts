@@ -26,6 +26,8 @@ type ItemFila = {
   whatsapp_lid: string | null;
   texto: string;
   tentativas: number;
+  // Modelo da API oficial (fora da janela de 24 h); null = texto livre.
+  modelo: { nome: string; idioma: string; parametros: string[] } | null;
 };
 type Resultado = { ok: boolean; id?: string; erro?: string };
 
@@ -80,9 +82,28 @@ async function sendTextWaha(sessao: string, chatId: string | null, mensagem: str
 const ERROS_META: Record<number, string> = {
   131047: "Passaram mais de 24 h desde a última mensagem do cliente. Fora dessa janela a API oficial só envia modelo aprovado.",
   131026: "O número não recebe mensagens (sem WhatsApp ou versão antiga).",
+  132001: "Esse modelo não existe (ou não neste idioma) na conta do WhatsApp. Confira em Configurações → Modelos.",
+  132000: "A quantidade de variáveis não bate com o modelo aprovado.",
+  132015: "O modelo foi pausado pela Meta por baixa qualidade.",
+  132016: "O modelo foi desativado pela Meta.",
   130497: "Envio bloqueado para o país deste número.",
   190: "O acesso ao WhatsApp oficial expirou. Conecte o número de novo em Configurações → WhatsApp.",
 };
+
+function conteudoMeta(item: ItemFila) {
+  if (!item.modelo) return { type: "text", text: { body: item.texto } };
+  const parametros = item.modelo.parametros ?? [];
+  return {
+    type: "template",
+    template: {
+      name: item.modelo.nome,
+      language: { code: item.modelo.idioma },
+      ...(parametros.length
+        ? { components: [{ type: "body", parameters: parametros.map((text) => ({ type: "text", text })) }] }
+        : {}),
+    },
+  };
+}
 
 async function enviarMeta(item: ItemFila): Promise<Resultado> {
   if (!item.instance_id) return { ok: false, erro: "canal sem phone_number_id" };
@@ -93,7 +114,7 @@ async function enviarMeta(item: ItemFila): Promise<Resultado> {
   const r = await fetch(`https://graph.facebook.com/v25.0/${item.instance_id}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: item.telefone, type: "text", text: { body: item.texto } }),
+    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: item.telefone, ...conteudoMeta(item) }),
     signal: AbortSignal.timeout(20000),
   });
   // deno-lint-ignore no-explicit-any
