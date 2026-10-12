@@ -76,9 +76,12 @@ function Situacao({ n }: { n: NumeroWhatsapp }) {
 }
 
 export function SecaoWhatsapp() {
-  const { orgAtiva, sessao } = useSessao()
+  const { orgAtiva, sessao, adminPlataforma } = useSessao()
   const orgId = orgAtiva!.id
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
+  // API oficial: só a equipe da plataforma conecta, até a Meta liberar a F7 como Provedor de Tecnologia e o
+  // fluxo estar validado com o número da própria F7.
+  const oficial = gerencia && adminPlataforma
   const eu = sessao?.user.id
   const [numeros, setNumeros] = useState<{ orgId: string; lista: NumeroWhatsapp[] } | null>(null)
   const [equipe, setEquipe] = useState<MembroEquipe[]>([])
@@ -96,11 +99,11 @@ export function SecaoWhatsapp() {
   // direto do clique.
   const sdkMeta = useRef<Awaited<ReturnType<typeof carregarSdkMeta>> | null>(null)
   useEffect(() => {
-    if (!gerencia) return
+    if (!oficial) return
     carregarSdkMeta()
       .then((fb) => (sdkMeta.current = fb))
       .catch(() => undefined)
-  }, [gerencia])
+  }, [oficial])
 
   /** Embedded Signup. Com canalId o número do WAHA passa para a API oficial no mesmo canal. */
   function conectarPelaApiOficial(canalId: string | null) {
@@ -201,9 +204,11 @@ export function SecaoWhatsapp() {
         </div>
         {gerencia && (
           <div className="flex flex-wrap gap-2">
-            <Botao variante="secundario" carregando={ocupado === 'oficial'} onClick={() => conectarPelaApiOficial(null)}>
-              Conectar pela API oficial
-            </Botao>
+            {oficial && (
+              <Botao variante="secundario" carregando={ocupado === 'oficial'} onClick={() => conectarPelaApiOficial(null)}>
+                Conectar pela API oficial
+              </Botao>
+            )}
             <Botao icone="mais" onClick={() => setEdicao({ id: null, nome: '', responsavel_id: '' })}>
               Adicionar número
             </Botao>
@@ -297,7 +302,7 @@ export function SecaoWhatsapp() {
                     >
                       Editar
                     </Botao>
-                    {n.tipo !== 'meta' && (
+                    {oficial && n.tipo !== 'meta' && (
                       <Botao tamanho="sm" variante="secundario" onClick={() => setConfirmacao({ tipo: 'oficial', numero: n })}>
                         Passar para a API oficial
                       </Botao>

@@ -321,6 +321,9 @@ Deno.serve(async (req) => {
     }
 
     if (p.acao === "oficial") {
+      // Só a equipe da plataforma, até o fluxo estar liberado pela Meta e validado com o número da F7.
+      const { data: plataforma } = await admin.from("admins_plataforma").select("user_id").eq("user_id", quem.user.id).maybeSingle();
+      if (!plataforma) return json(403, { erro: "A conexão pela API oficial ainda não está liberada. Fale com a equipe da Livih." });
       if (!p.canal_id && p.responsavel_id) {
         const { data: ok } = await admin.from("membros_org").select("user_id")
           .eq("org_id", p.org_id).eq("user_id", p.responsavel_id).eq("ativo", true).maybeSingle();
