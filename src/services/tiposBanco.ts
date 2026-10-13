@@ -56,6 +56,7 @@ export type Database = {
       }
       agentes: {
         Row: {
+          ativado_em: string | null
           ativo: boolean
           atualizado_em: string
           atualizado_por: string | null
@@ -72,6 +73,7 @@ export type Database = {
           telefone_alerta: string | null
         }
         Insert: {
+          ativado_em?: string | null
           ativo?: boolean
           atualizado_em?: string
           atualizado_por?: string | null
@@ -88,6 +90,7 @@ export type Database = {
           telefone_alerta?: string | null
         }
         Update: {
+          ativado_em?: string | null
           ativo?: boolean
           atualizado_em?: string
           atualizado_por?: string | null
@@ -268,6 +271,10 @@ export type Database = {
           desconectado_por: string | null
           id: string
           instance_id: string | null
+          meta_coexistencia: boolean
+          meta_sync_pedido_em: string | null
+          meta_token_expira_em: string | null
+          meta_waba_id: string | null
           nome: string
           numero_conectado: string | null
           org_id: string
@@ -289,6 +296,10 @@ export type Database = {
           desconectado_por?: string | null
           id?: string
           instance_id?: string | null
+          meta_coexistencia?: boolean
+          meta_sync_pedido_em?: string | null
+          meta_token_expira_em?: string | null
+          meta_waba_id?: string | null
           nome: string
           numero_conectado?: string | null
           org_id: string
@@ -310,6 +321,10 @@ export type Database = {
           desconectado_por?: string | null
           id?: string
           instance_id?: string | null
+          meta_coexistencia?: boolean
+          meta_sync_pedido_em?: string | null
+          meta_token_expira_em?: string | null
+          meta_waba_id?: string | null
           nome?: string
           numero_conectado?: string | null
           org_id?: string
@@ -324,6 +339,82 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "canais_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compromissos: {
+        Row: {
+          atualizado_em: string
+          contato_id: string | null
+          criado_em: string
+          criado_por: string | null
+          fim: string
+          id: string
+          inicio: string
+          local: string | null
+          observacao: string | null
+          oportunidade_id: string | null
+          org_id: string
+          origem: string
+          responsavel_id: string | null
+          status: Database["public"]["Enums"]["status_compromisso"]
+          titulo: string
+        }
+        Insert: {
+          atualizado_em?: string
+          contato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          fim: string
+          id?: string
+          inicio: string
+          local?: string | null
+          observacao?: string | null
+          oportunidade_id?: string | null
+          org_id: string
+          origem?: string
+          responsavel_id?: string | null
+          status?: Database["public"]["Enums"]["status_compromisso"]
+          titulo: string
+        }
+        Update: {
+          atualizado_em?: string
+          contato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          fim?: string
+          id?: string
+          inicio?: string
+          local?: string | null
+          observacao?: string | null
+          oportunidade_id?: string | null
+          org_id?: string
+          origem?: string
+          responsavel_id?: string | null
+          status?: Database["public"]["Enums"]["status_compromisso"]
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compromissos_contato_id_org_id_fkey"
+            columns: ["contato_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "compromissos_oportunidade_id_org_id_fkey"
+            columns: ["oportunidade_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "oportunidades"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "compromissos_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizacoes"
@@ -396,6 +487,7 @@ export type Database = {
       conversas: {
         Row: {
           atribuida_a: string | null
+          bot_desde: string | null
           canal_id: string
           contato_id: string
           criado_em: string
@@ -409,6 +501,7 @@ export type Database = {
         }
         Insert: {
           atribuida_a?: string | null
+          bot_desde?: string | null
           canal_id: string
           contato_id: string
           criado_em?: string
@@ -422,6 +515,7 @@ export type Database = {
         }
         Update: {
           atribuida_a?: string | null
+          bot_desde?: string | null
           canal_id?: string
           contato_id?: string
           criado_em?: string
@@ -611,8 +705,8 @@ export type Database = {
       }
       mensagens: {
         Row: {
-          autor_id: string | null
           automatica: boolean
+          autor_id: string | null
           autor_tipo: Database["public"]["Enums"]["autor_tipo"]
           conversa_id: string
           criado_em: string
@@ -630,8 +724,8 @@ export type Database = {
           wa_id: string | null
         }
         Insert: {
-          autor_id?: string | null
           automatica?: boolean
+          autor_id?: string | null
           autor_tipo: Database["public"]["Enums"]["autor_tipo"]
           conversa_id: string
           criado_em?: string
@@ -649,8 +743,8 @@ export type Database = {
           wa_id?: string | null
         }
         Update: {
-          autor_id?: string | null
           automatica?: boolean
+          autor_id?: string | null
           autor_tipo?: Database["public"]["Enums"]["autor_tipo"]
           conversa_id?: string
           criado_em?: string
@@ -674,6 +768,41 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "conversas"
             referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      meta_sincronizacao: {
+        Row: {
+          campo: string
+          canal_id: string
+          id: number
+          importado_em: string | null
+          payload: Json
+          recebido_em: string
+        }
+        Insert: {
+          campo: string
+          canal_id: string
+          id?: never
+          importado_em?: string | null
+          payload: Json
+          recebido_em?: string
+        }
+        Update: {
+          campo?: string
+          canal_id?: string
+          id?: never
+          importado_em?: string | null
+          payload?: Json
+          recebido_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_sincronizacao_canal_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "canais"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -870,12 +999,6 @@ export type Database = {
         }
         Relationships: []
       }
-      push_config: {
-        Row: { chave_publica: string; criado_em: string; id: number }
-        Insert: { chave_publica: string; criado_em?: string; id?: number }
-        Update: { chave_publica?: string; criado_em?: string; id?: number }
-        Relationships: []
-      }
       pedidos_acesso: {
         Row: {
           criado_em: string
@@ -994,6 +1117,98 @@ export type Database = {
         }
         Relationships: []
       }
+      push_config: {
+        Row: {
+          chave_publica: string
+          criado_em: string
+          id: number
+        }
+        Insert: {
+          chave_publica: string
+          criado_em?: string
+          id?: number
+        }
+        Update: {
+          chave_publica?: string
+          criado_em?: string
+          id?: number
+        }
+        Relationships: []
+      }
+      push_fila: {
+        Row: {
+          conversa_id: string | null
+          corpo: string
+          criado_em: string
+          enviado_em: string | null
+          erro: string | null
+          id: number
+          titulo: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          conversa_id?: string | null
+          corpo: string
+          criado_em?: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: never
+          titulo: string
+          url?: string
+          user_id: string
+        }
+        Update: {
+          conversa_id?: string | null
+          corpo?: string
+          criado_em?: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: never
+          titulo?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_fila_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_inscricoes: {
+        Row: {
+          auth: string
+          criado_em: string
+          dispositivo: string | null
+          endpoint: string
+          id: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          criado_em?: string
+          dispositivo?: string | null
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          criado_em?: string
+          dispositivo?: string | null
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       uso_ia: {
         Row: {
           chamadas: number
@@ -1096,10 +1311,15 @@ export type Database = {
         Args: { p_conversa: string; p_mensagem: string }
         Returns: boolean
       }
+      agente_horario_valido: { Args: { p: Json }; Returns: boolean }
       agente_marcar: { Args: never; Returns: undefined }
       agente_mover_etapa: {
         Args: { p_conversa: string; p_etapa: string }
         Returns: Json
+      }
+      agente_no_horario: {
+        Args: { p_horario: Json; p_quando: string }
+        Returns: boolean
       }
       agente_nota: {
         Args: { p_conversa: string; p_texto: string }
@@ -1147,6 +1367,13 @@ export type Database = {
         Args: { p_canal: string; p_numero?: string; p_status: string }
         Returns: undefined
       }
+      canal_por_numero_meta: {
+        Args: { p_phone_number_id: string }
+        Returns: {
+          canal_id: string
+          org_id: string
+        }[]
+      }
       canal_por_webhook: {
         Args: { p_canal: string; p_segredo: string }
         Returns: {
@@ -1180,6 +1407,10 @@ export type Database = {
       }
       eh_admin_plataforma: { Args: never; Returns: boolean }
       eh_membro: { Args: { p_org: string }; Returns: boolean }
+      eh_mensagem_automatica: {
+        Args: { p_canal: string; p_texto: string }
+        Returns: boolean
+      }
       enfileirar_saida: {
         Args: {
           p_autor: Database["public"]["Enums"]["autor_tipo"]
@@ -1192,16 +1423,6 @@ export type Database = {
       enviar_mensagem: {
         Args: { p_conversa: string; p_texto: string }
         Returns: string
-      }
-      funil_salvar: {
-        Args: {
-          p_abertas: Json
-          p_ganho: string
-          p_mover?: Json
-          p_org: string
-          p_perdido: string
-        }
-        Returns: undefined
       }
       enviar_modelo: {
         Args: {
@@ -1235,6 +1456,7 @@ export type Database = {
           fila_id: number
           instance_id: string
           mensagem_id: string
+          modelo: Json
           telefone: string
           tentativas: number
           texto: string
@@ -1250,7 +1472,26 @@ export type Database = {
         }
         Returns: undefined
       }
+      funil_salvar: {
+        Args: {
+          p_abertas: Json
+          p_ganho: string
+          p_mover?: Json
+          p_org: string
+          p_perdido: string
+        }
+        Returns: undefined
+      }
       gerar_segredo_webhook: { Args: { p_canal: string }; Returns: string }
+      meta_guardar_pin: {
+        Args: { p_canal: string; p_pin: string }
+        Returns: undefined
+      }
+      meta_guardar_token: {
+        Args: { p_canal: string; p_expira_em?: string; p_token: string }
+        Returns: undefined
+      }
+      meta_token_do_canal: { Args: { p_canal: string }; Returns: string }
       org_primeiros_passos: {
         Args: { p_org: string }
         Returns: {
@@ -1285,12 +1526,52 @@ export type Database = {
         }[]
       }
       pode_ver_canal: { Args: { p_canal: string }; Returns: boolean }
+      pode_ver_compromisso: {
+        Args: { p_contato: string; p_org: string; p_responsavel: string }
+        Returns: boolean
+      }
       pode_ver_contato: { Args: { p_contato: string }; Returns: boolean }
+      pode_ver_contato_linha: {
+        Args: { p_contato: string; p_org: string; p_responsavel: string }
+        Returns: boolean
+      }
       pode_ver_conversa: { Args: { p_conversa: string }; Returns: boolean }
       push_cancelar: { Args: { p_endpoint: string }; Returns: undefined }
-      push_inscrever: {
-        Args: { p_auth: string; p_dispositivo?: string; p_endpoint: string; p_p256dh: string }
+      push_chaves: { Args: never; Returns: Json }
+      push_enfileirar: {
+        Args: {
+          p_conversa: string
+          p_corpo: string
+          p_titulo: string
+          p_users: string[]
+        }
         Returns: undefined
+      }
+      push_equipe_do_canal: { Args: { p_canal: string }; Returns: string[] }
+      push_inscrever: {
+        Args: {
+          p_auth: string
+          p_dispositivo?: string
+          p_endpoint: string
+          p_p256dh: string
+        }
+        Returns: undefined
+      }
+      push_nome_contato: { Args: { p_contato: string }; Returns: string }
+      push_reivindicar: {
+        Args: { p_limite?: number }
+        Returns: {
+          conversa_id: string
+          corpo: string
+          fila_id: number
+          titulo: string
+          url: string
+          user_id: string
+        }[]
+      }
+      push_salvar_chaves: {
+        Args: { p_chaves: Json; p_publica: string }
+        Returns: Json
       }
       push_testar: { Args: never; Returns: undefined }
       registrar_entrada: {
@@ -1343,6 +1624,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      texto_comparavel: { Args: { p: string }; Returns: string }
       usuario_por_email: {
         Args: { p_email: string }
         Returns: {
@@ -1360,6 +1642,12 @@ export type Database = {
       direcao_msg: "entrada" | "saida"
       estado_conversa: "bot" | "aguardando_humano" | "humano" | "encerrada"
       papel_org: "dono" | "admin" | "atendente"
+      status_compromisso:
+        | "marcado"
+        | "confirmado"
+        | "realizado"
+        | "nao_compareceu"
+        | "cancelado"
       status_entrega:
         | "recebida"
         | "pendente"
@@ -1513,6 +1801,13 @@ export const Constants = {
       direcao_msg: ["entrada", "saida"],
       estado_conversa: ["bot", "aguardando_humano", "humano", "encerrada"],
       papel_org: ["dono", "admin", "atendente"],
+      status_compromisso: [
+        "marcado",
+        "confirmado",
+        "realizado",
+        "nao_compareceu",
+        "cancelado",
+      ],
       status_entrega: [
         "recebida",
         "pendente",

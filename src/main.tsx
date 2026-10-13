@@ -12,6 +12,7 @@ import { NaoEncontrada } from './pages/NaoEncontrada'
 import { Configuracoes } from './pages/Configuracoes'
 import { Contatos } from './pages/Contatos'
 import { ContatoPerfil } from './pages/ContatoPerfil'
+import { Agenda } from './pages/Agenda'
 import { Oportunidades } from './pages/Oportunidades'
 import { Empresas } from './pages/Empresas'
 import { registrarServiceWorker } from './pwa'
@@ -37,6 +38,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="contatos" element={<Contatos />} />
             <Route path="contatos/:id" element={<ContatoPerfil />} />
             <Route path="oportunidades" element={<Oportunidades />} />
+            <Route path="agenda" element={<Agenda />} />
             <Route path="configuracoes/:secao?" element={<Configuracoes />} />
             <Route path="empresas" element={<Empresas />} />
             <Route path="*" element={<NaoEncontrada />} />

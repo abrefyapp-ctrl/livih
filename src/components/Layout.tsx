@@ -33,6 +33,7 @@ export function Layout() {
     { para: '/conversas', rotulo: 'Conversas', icone: 'conversas', contador: aguardando },
     { para: '/contatos', rotulo: 'Contatos', icone: 'usuario' },
     { para: '/oportunidades', rotulo: 'Oportunidades', icone: 'funil' },
+    { para: '/agenda', rotulo: 'Agenda', icone: 'calendario' },
     { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
     ...(adminPlataforma ? [{ para: '/empresas', rotulo: 'Empresas', icone: 'empresa' as const }] : []),
   ]

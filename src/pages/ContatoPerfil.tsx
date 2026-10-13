@@ -18,7 +18,9 @@ import { EtiquetaEstado } from '../components/EtiquetaEstado'
 import { EtiquetaEtapa } from '../components/EtiquetaEtapa'
 import { Icone, type NomeIcone } from '../components/Icone'
 import { ModalContato } from '../components/ModalContato'
+import { ModalCompromisso } from '../components/ModalCompromisso'
 import { ModalOportunidade } from '../components/ModalOportunidade'
+import { horaCurta, proximosDoContato, ROTULO_STATUS, type Compromisso } from '../services/agenda'
 import { NotasContato } from '../components/NotasContato'
 
 function Bloco({ titulo, acao, children }: { titulo: string; acao?: ReactNode; children: ReactNode }) {
@@ -46,20 +48,21 @@ export function ContatoPerfil() {
   const { id } = useParams()
   const { orgAtiva, sessao, equipe } = useSessao()
   const orgId = orgAtiva!.id
-  const [dados, setDados] = useState<{ id: string; perfil: Perfil | null; oportunidades: Oportunidade[] } | null>(null)
+  const [dados, setDados] = useState<{ id: string; perfil: Perfil | null; oportunidades: Oportunidade[]; compromissos: Compromisso[] } | null>(null)
   const [etapas, setEtapas] = useState<Etapa[]>([])
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
   const [editando, setEditando] = useState(false)
   const [oportunidade, setOportunidade] = useState<Oportunidade | 'nova' | null>(null)
+  const [compromisso, setCompromisso] = useState<Compromisso | 'novo' | null>(null)
 
   useEffect(() => {
     if (!id) return
     let ativo = true
-    Promise.all([buscarContatoPerfil(id), listarOportunidades(orgId, id), listarEtapas(orgId)])
-      .then(([perfil, ops, et]) => {
+    Promise.all([buscarContatoPerfil(id), listarOportunidades(orgId, id), listarEtapas(orgId), proximosDoContato(id)])
+      .then(([perfil, ops, et, comps]) => {
         if (!ativo) return
-        setDados({ id, perfil, oportunidades: ops })
+        setDados({ id, perfil, oportunidades: ops, compromissos: comps })
         setEtapas(et)
         setErro(null)
       })
@@ -154,6 +157,33 @@ export function ContatoPerfil() {
               )}
             </Bloco>
 
+            <Bloco
+              titulo="Próximos compromissos"
+              acao={
+                <Botao tamanho="sm" variante="secundario" icone="calendario" onClick={() => setCompromisso('novo')}>
+                  Agendar
+                </Botao>
+              }
+            >
+              {atual.compromissos.length ? (
+                <ul className="divide-y divide-borda">
+                  {atual.compromissos.map((m) => (
+                    <li key={m.id}>
+                      <button onClick={() => setCompromisso(m)} className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-left hover:bg-fundo">
+                        <span className="text-pequeno font-semibold tabular-nums first-letter:uppercase">
+                          {new Date(m.inicio).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })} · {horaCurta(m.inicio)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate font-medium">{m.titulo}</span>
+                        {m.status !== 'marcado' && <span className="text-legenda text-texto-3">{ROTULO_STATUS[m.status]}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-pequeno text-texto-3">Nada marcado com este cliente.</p>
+              )}
+            </Bloco>
+
             <Bloco titulo="Conversas">
               {conversas.length ? (
                 <ul className="divide-y divide-borda">
@@ -189,6 +219,18 @@ export function ContatoPerfil() {
           aoFechar={() => setEditando(false)}
           aoSalvar={() => {
             setEditando(false)
+            recarregar()
+          }}
+        />
+      )}
+      {compromisso && (
+        <ModalCompromisso
+          compromisso={compromisso === 'novo' ? undefined : compromisso}
+          contatoFixo={compromisso === 'novo' ? { id: c.id, nome } : undefined}
+          outros={atual.compromissos}
+          aoFechar={() => setCompromisso(null)}
+          aoSalvar={() => {
+            setCompromisso(null)
             recarregar()
           }}
         />
