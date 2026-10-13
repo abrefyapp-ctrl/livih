@@ -7,7 +7,7 @@ import { Modal } from './Modal'
 
 /** Painel da plataforma: liga e desliga os módulos de uma empresa (o que ela paga à parte fica marcado). */
 export function ModalModulos({ empresa, aoFechar }: { empresa: { id: string; nome: string }; aoFechar: () => void }) {
-  const { orgAtiva, recarregarModulos } = useSessao()
+  const { recarregarModulos } = useSessao()
   const [modulos, setModulos] = useState<Modulo[] | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -28,8 +28,8 @@ export function ModalModulos({ empresa, aoFechar }: { empresa: { id: string; nom
     try {
       await definirModulo(empresa.id, m.codigo, !m.ativo)
       setModulos((l) => l?.map((x) => (x.codigo === m.codigo ? { ...x, ativo: !m.ativo } : x)) ?? null)
-      // Se a empresa mexida é a que está aberta, o menu acompanha na hora.
-      if (orgAtiva?.id === empresa.id) recarregarModulos()
+      // O menu acompanha na hora (e, se for outra empresa, já fica certo quando trocar para ela).
+      recarregarModulos()
     } catch (e) {
       setErro((e as Error).message)
     } finally {

@@ -94,8 +94,16 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
       ativo = false
     }
   }, [orgAtivaId, chaveModulos])
-  const modulosAtivos = modulos?.chave === chaveModulos ? modulos.ligados : null
+  // Mantém o que já está na tela enquanto relê (sem piscar o menu); só some quando a empresa muda.
+  const modulosAtivos = modulos?.chave.split('|')[0] === orgAtivaId ? modulos.ligados : null
   const recarregarModulos = useCallback(() => setVersaoModulos((v) => v + 1), [])
+
+  // Módulo ligado pela plataforma em outra aba ou outro aparelho: o menu acompanha quando a pessoa volta para a aba.
+  useEffect(() => {
+    const aoVoltar = () => document.visibilityState === 'visible' && recarregarModulos()
+    document.addEventListener('visibilitychange', aoVoltar)
+    return () => document.removeEventListener('visibilitychange', aoVoltar)
+  }, [recarregarModulos])
 
   const trocarOrganizacao = useCallback((id: string) => {
     setOrgId(id)
