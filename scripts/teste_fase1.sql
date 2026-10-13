@@ -1080,5 +1080,56 @@ exception when others then
   insert into resultado (teste, ok) values ('funil: atendente não muda o funil', sqlerrm = 'só dono e admin mudam o funil');
 end $$;
 
+-- Agenda (atendente da F7)
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+  v_contato uuid := (select contato_id from public.conversas where id = current_setting('teste.conversa')::uuid);
+  v_outra_op uuid := (select id from public.oportunidades where org_id = v_org and contato_id <> v_contato limit 1);
+  v_id uuid;
+begin
+  insert into public.compromissos (org_id, titulo, inicio, fim, responsavel_id, contato_id)
+  values (v_org, 'Reunião de diagnóstico', '2026-10-20 13:00-03', '2026-10-20 14:00-03',
+          '00000000-0000-0000-0000-0000000000b1', v_contato)
+  returning id into v_id;
+  insert into resultado (teste, ok) select 'agenda: atendente marca compromisso com cliente que vê',
+    (select criado_por = '00000000-0000-0000-0000-0000000000b1' and status = 'marcado' and origem = 'equipe'
+       from public.compromissos where id = v_id);
+  perform set_config('teste.compromisso', v_id::text, true);
+
+  begin
+    insert into public.compromissos (org_id, titulo, inicio, fim) values (v_org, 'x', '2026-10-20 14:00-03', '2026-10-20 13:00-03');
+    insert into resultado (teste, ok) values ('agenda: fim antes do início recusado', false);
+  exception when check_violation then
+    insert into resultado (teste, ok) values ('agenda: fim antes do início recusado', true);
+  end;
+  begin
+    insert into public.compromissos (org_id, titulo, inicio, fim, contato_id, oportunidade_id)
+    values (v_org, 'x', '2026-10-20 13:00-03', '2026-10-20 14:00-03', v_contato, v_outra_op);
+    insert into resultado (teste, ok) values ('agenda: oportunidade de outro cliente recusada', v_outra_op is null);
+  exception when others then
+    insert into resultado (teste, ok) values ('agenda: oportunidade de outro cliente recusada', sqlerrm = 'a oportunidade é de outro cliente');
+  end;
+  begin
+    insert into public.compromissos (org_id, titulo, inicio, fim, responsavel_id)
+    values (v_org, 'x', '2026-10-20 13:00-03', '2026-10-20 14:00-03', '00000000-0000-0000-0000-0000000000c1');
+    insert into resultado (teste, ok) values ('agenda: responsável de fora da equipe recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('agenda: responsável de fora da equipe recusado', sqlerrm = 'o responsável precisa ser da equipe');
+  end;
+  begin
+    delete from public.compromissos where id = v_id;
+    insert into resultado (teste, ok) select 'agenda: atendente não apaga (cancela)',
+      exists (select 1 from public.compromissos where id = v_id);
+  end;
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'agenda: outra empresa não vê o compromisso',
+  not exists (select 1 from public.compromissos where id = current_setting('teste.compromisso')::uuid);
+
 reset role;
 select n, teste, ok from resultado order by n;
