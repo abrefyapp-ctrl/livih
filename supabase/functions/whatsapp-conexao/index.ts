@@ -253,26 +253,49 @@ async function conectarOficial(orgId: string, p: Oficial & { canal_id?: string; 
 }
 
 // Número do portfólio da F7: sem cadastro, sem token próprio no canal (o envio cai no META_SYSTEM_TOKEN).
-// O número precisa já estar registrado na Cloud API (o de teste da Meta já vem assim).
+// O de teste da Meta já vem registrado na Cloud API. Um número novo, adicionado pelo Gerenciador e confirmado
+// por SMS, ainda não: aqui ele é registrado com um PIN de duas etapas aleatório, guardado no Vault.
 async function conectarComTokenSistema(orgId: string, p: { waba_id?: string; phone_number_id?: string; nome?: string }): Promise<Canal> {
   if (!META_SYSTEM_TOKEN) throw new ErroUsuario("Falta configurar o token de usuário do sistema da Meta (META_SYSTEM_TOKEN).");
   const waba = (p.waba_id ?? "").trim();
   const phone = (p.phone_number_id ?? "").trim();
   if (!/^\d+$/.test(waba) || !/^\d+$/.test(phone)) throw new ErroUsuario("Informe os IDs da conta (WABA) e do número, só dígitos.");
 
-  const numeros = await graph(`/${waba}/phone_numbers?fields=id,display_phone_number,verified_name`, META_SYSTEM_TOKEN);
-  const numero = ((numeros?.data ?? []) as { id: string; display_phone_number?: string; verified_name?: string }[])
-    .find((n) => n.id === phone);
+  const numeros = await graph(
+    `/${waba}/phone_numbers?fields=id,display_phone_number,verified_name,platform_type,code_verification_status`,
+    META_SYSTEM_TOKEN,
+  );
+  const numero = ((numeros?.data ?? []) as {
+    id: string; display_phone_number?: string; verified_name?: string; platform_type?: string; code_verification_status?: string;
+  }[]).find((n) => n.id === phone);
   if (!numero) throw new ErroUsuario("Esse número não está nessa conta do WhatsApp (ou o token não tem acesso a ela).");
 
   const { data: outro } = await admin.from("canais").select("id").eq("tipo", "meta").eq("instance_id", phone).eq("ativo", true).maybeSingle();
   if (outro) throw new ErroUsuario("Este número já está conectado na Livih.");
+
+  // Registro na Cloud API antes de criar o canal: se a Meta recusar, nada fica pela metade.
+  let pin: string | null = null;
+  if (numero.platform_type !== "CLOUD_API") {
+    if (numero.code_verification_status && numero.code_verification_status !== "VERIFIED") {
+      throw new ErroUsuario("O número ainda não foi confirmado pelo código SMS no Gerenciador do WhatsApp.");
+    }
+    pin = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
+    try {
+      await graph(`/${phone}/register`, META_SYSTEM_TOKEN, { method: "POST", body: JSON.stringify({ messaging_product: "whatsapp", pin }) });
+    } catch (e) {
+      console.error("register", String(e));
+      throw new ErroUsuario(
+        "A Meta não registrou o número. Se ele já tem verificação em duas etapas com outro PIN, desative em Gerenciador do WhatsApp → Números de telefone → Configurações e tente de novo.",
+      );
+    }
+  }
 
   const canal = await criarCanal(orgId, (p.nome ?? "").trim() || numero.verified_name || "WhatsApp oficial", null, {
     tipo: "meta",
     instance_id: phone,
     meta_waba_id: waba,
   });
+  if (pin) await admin.rpc("meta_guardar_pin", { p_canal: canal.id, p_pin: pin });
   await graph(`/${waba}/subscribed_apps`, META_SYSTEM_TOKEN, { method: "POST" });
   const telefone = (numero.display_phone_number ?? "").replace(/\D/g, "") || null;
   await admin.rpc("canal_atualizar_status", { p_canal: canal.id, p_status: "WORKING", p_numero: telefone });
