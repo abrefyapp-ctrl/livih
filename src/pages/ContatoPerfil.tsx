@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   buscarContatoPerfil,
   listarEtapas,
@@ -19,6 +19,7 @@ import { EtiquetaEtapa } from '../components/EtiquetaEtapa'
 import { Icone, type NomeIcone } from '../components/Icone'
 import { ModalContato } from '../components/ModalContato'
 import { ModalCompromisso } from '../components/ModalCompromisso'
+import { ModalNovaConversa } from '../components/ModalNovaConversa'
 import { ModalOportunidade } from '../components/ModalOportunidade'
 import { horaCurta, proximosDoContato, ROTULO_STATUS, type Compromisso } from '../services/agenda'
 import { NotasContato } from '../components/NotasContato'
@@ -55,6 +56,8 @@ export function ContatoPerfil() {
   const [editando, setEditando] = useState(false)
   const [oportunidade, setOportunidade] = useState<Oportunidade | 'nova' | null>(null)
   const [compromisso, setCompromisso] = useState<Compromisso | 'novo' | null>(null)
+  const [mensagem, setMensagem] = useState(false)
+  const navegar = useNavigate()
 
   useEffect(() => {
     if (!id) return
@@ -122,9 +125,16 @@ export function ContatoPerfil() {
               </ul>
             )}
           </div>
-          <Botao variante="secundario" icone="nota" onClick={() => setEditando(true)}>
-            Editar
-          </Botao>
+          <div className="flex flex-wrap gap-2">
+            {c.telefone && (
+              <Botao variante="secundario" icone="enviar" onClick={() => setMensagem(true)}>
+                Enviar mensagem
+              </Botao>
+            )}
+            <Botao variante="secundario" icone="nota" onClick={() => setEditando(true)}>
+              Editar
+            </Botao>
+          </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
@@ -223,6 +233,13 @@ export function ContatoPerfil() {
             setEditando(false)
             recarregar()
           }}
+        />
+      )}
+      {mensagem && c.telefone && (
+        <ModalNovaConversa
+          inicial={{ nome, telefone: c.telefone }}
+          aoFechar={() => setMensagem(false)}
+          aoIniciar={(conversaId, precisaModelo) => navegar(`/conversas/${conversaId}?aba=humano${precisaModelo ? '&modelo=1' : ''}`)}
         />
       )}
       {compromisso && (

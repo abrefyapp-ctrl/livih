@@ -141,6 +141,9 @@ export const codigoNumero = (orgId: string, canalId: string, telefone: string) =
   conexao<{ codigo: string }>(orgId, 'codigo', { canal_id: canalId, telefone })
 export const desconectarNumero = (orgId: string, canalId: string) => conexao(orgId, 'desconectar', { canal_id: canalId })
 export const removerNumero = (orgId: string, canalId: string) => conexao(orgId, 'remover', { canal_id: canalId })
+/** Contatos salvos na agenda do celular do número (só WAHA), para a prospecção. */
+export const agendaDoCelular = (orgId: string, canalId: string) =>
+  conexao<{ contatos: { nome: string; telefone: string }[] }>(orgId, 'agenda', { canal_id: canalId }).then((r) => r.contatos)
 
 /** Depois do Embedded Signup: com canalId o número do WAHA passa para a API oficial no mesmo canal. */
 export const conectarOficial = (

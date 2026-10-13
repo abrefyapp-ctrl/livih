@@ -31,6 +31,7 @@ type Props = {
   numeros: { id: string; nome: string }[]
   numero?: string
   aoTrocarNumero: (id: string | undefined) => void
+  aoNovaConversa: () => void
 }
 
 export function ListaConversas({
@@ -45,6 +46,7 @@ export function ListaConversas({
   numeros,
   numero,
   aoTrocarNumero,
+  aoNovaConversa,
 }: Props) {
   // Com um número só, o nome do número em cada conversa é ruído.
   const variosNumeros = numeros.length > 1
@@ -113,7 +115,8 @@ export function ListaConversas({
             <Icone nome="abaixo" className="pointer-events-none absolute top-2.5 right-2.5 size-4 text-texto-3" />
           </label>
         )}
-        <label className="relative block">
+        <div className="flex gap-2">
+        <label className="relative block min-w-0 flex-1">
           <span className="sr-only">Buscar por nome ou telefone</span>
           <Icone nome="busca" className="pointer-events-none absolute top-2.5 left-3 size-4 text-texto-3" />
           <input
@@ -124,6 +127,16 @@ export function ListaConversas({
             className="h-9 w-full rounded-md border border-borda bg-superficie pr-3 pl-9 text-pequeno placeholder:text-texto-3 focus:border-primaria focus:outline-none"
           />
         </label>
+        <button
+          type="button"
+          onClick={aoNovaConversa}
+          title="Nova conversa"
+          className="flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-primaria px-3 text-pequeno font-medium text-white hover:bg-primaria-hover"
+        >
+          <Icone nome="mais" className="size-4" />
+          <span>Nova</span>
+        </button>
+        </div>
         {aba === 'humano' && (
           <label className="flex cursor-pointer items-center gap-2 text-pequeno text-texto-2">
             <input

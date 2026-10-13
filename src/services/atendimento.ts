@@ -49,9 +49,16 @@ export async function listarEquipe(orgId: string): Promise<Perfil[]> {
   return data ?? []
 }
 
+export type NumeroVisivel = { id: string; nome: string; tipo: string; responsavel_id: string | null }
+
 /** Números que a pessoa vê (a RLS já tira os de outros vendedores). */
-export async function listarNumerosVisiveis(orgId: string): Promise<{ id: string; nome: string }[]> {
-  const { data, error } = await supabase.from('canais').select('id, nome').eq('org_id', orgId).order('criado_em')
+export async function listarNumerosVisiveis(orgId: string): Promise<NumeroVisivel[]> {
+  const { data, error } = await supabase
+    .from('canais')
+    .select('id, nome, tipo, responsavel_id')
+    .eq('org_id', orgId)
+    .eq('ativo', true)
+    .order('criado_em')
   if (error) throw error
   return data ?? []
 }
@@ -124,6 +131,29 @@ export async function enviarModelo(conversaId: string, nome: string, idioma: str
     p_texto: texto,
   })
   if (error) throw error
+}
+
+/** Prospecção: abre (ou reabre) a conversa com o número e, se houver texto, já envia. Devolve o id da conversa. */
+export async function iniciarConversa(canalId: string, telefone: string, nome: string | null, texto: string | null): Promise<string> {
+  const { data, error } = await supabase.rpc('iniciar_conversa', {
+    p_canal: canalId,
+    p_telefone: telefone,
+    p_nome: nome ?? undefined,
+    p_texto: texto ?? undefined,
+  })
+  if (error) {
+    const m = error.message
+    throw new Error(
+      m.includes('outro vendedor')
+        ? 'Esse número já é cliente de outro vendedor. Peça para ele, ou para o dono, passar o contato para você.'
+        : m.includes('telefone inválido')
+          ? 'Número inválido. Use o celular com DDD.'
+          : m.includes('suspensa')
+            ? 'Esta empresa está suspensa.'
+            : 'Não foi possível iniciar a conversa. Tente de novo.',
+    )
+  }
+  return data
 }
 
 async function atualizarConversa(id: string, campos: Database['public']['Tables']['conversas']['Update']) {

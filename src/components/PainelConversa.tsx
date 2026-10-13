@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../services/supabaseClient'
 import {
   assumirConversa,
@@ -54,7 +54,9 @@ export function PainelConversa({
   const [confirmar, setConfirmar] = useState<Acao | null>(null)
   const [executando, setExecutando] = useState<Acao | null>(null)
   const [erroAcao, setErroAcao] = useState<string | null>(null)
-  const [enviandoModelo, setEnviandoModelo] = useState(false)
+  // Vindo de "Nova conversa" num número da API oficial: a janela de modelo já abre.
+  const [params] = useSearchParams()
+  const [enviandoModelo, setEnviandoModelo] = useState(() => params.get('modelo') === '1')
   const agora = useAgora()
   const { mensagens, carregando, erro } = useMensagens(conversaId)
   const rolagem = useRef<HTMLDivElement>(null)

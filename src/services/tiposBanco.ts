@@ -1868,6 +1868,15 @@ export type Database = {
         Returns: undefined
       }
       gerar_segredo_webhook: { Args: { p_canal: string }; Returns: string }
+      iniciar_conversa: {
+        Args: {
+          p_canal: string
+          p_nome?: string
+          p_telefone: string
+          p_texto?: string
+        }
+        Returns: string
+      }
       meta_guardar_pin: {
         Args: { p_canal: string; p_pin: string }
         Returns: undefined

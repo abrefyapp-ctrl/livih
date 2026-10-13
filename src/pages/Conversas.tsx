@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
-import { buscarConversa, listarNumerosVisiveis, type EstadoConversa } from '../services/atendimento'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { buscarConversa, listarNumerosVisiveis, type EstadoConversa, type NumeroVisivel } from '../services/atendimento'
 import { useConversas } from '../hooks/useConversas'
 import { useSessao } from '../hooks/useSessao'
 import { ListaConversas } from '../components/ListaConversas'
@@ -10,6 +10,7 @@ import { PainelContato } from '../components/PainelContato'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { Icone } from '../components/Icone'
 import { PrimeirosPassos } from '../components/PrimeirosPassos'
+import { ModalNovaConversa } from '../components/ModalNovaConversa'
 
 /**
  * ≥1280: lista + conversa + contato. 768–1279: lista + conversa (contato em gaveta).
@@ -23,7 +24,9 @@ export function Conversas() {
   const aba: EstadoConversa = ehAba(parametro) ? parametro : 'aguardando_humano'
   const numero = params.get('numero') ?? undefined
   const { conversas, contagem, carregando, erro, recarregar } = useConversas(orgAtiva?.id, aba, numero)
-  const [numeros, setNumeros] = useState<{ orgId: string; lista: { id: string; nome: string }[] } | null>(null)
+  const [numeros, setNumeros] = useState<{ orgId: string; lista: NumeroVisivel[] } | null>(null)
+  const [novaConversa, setNovaConversa] = useState(false)
+  const navegar = useNavigate()
   const orgId = orgAtiva?.id
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   useEffect(() => {
@@ -82,6 +85,7 @@ export function Conversas() {
           erro={erro}
           aoTentarDeNovo={recarregar}
           selecionada={id}
+          aoNovaConversa={() => setNovaConversa(true)}
         />
       </div>
 
@@ -107,6 +111,16 @@ export function Conversas() {
           </div>
         )}
       </div>
+
+      {novaConversa && (
+        <ModalNovaConversa
+          aoFechar={() => setNovaConversa(false)}
+          aoIniciar={(conversaId, precisaModelo) => {
+            setNovaConversa(false)
+            navegar(`/conversas/${conversaId}?aba=humano${precisaModelo ? '&modelo=1' : ''}`)
+          }}
+        />
+      )}
 
       {id && contatoAberto && (
         <>
