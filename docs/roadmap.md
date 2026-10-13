@@ -5,7 +5,10 @@ Planejamento do produto combinado em 12/10/2026. As pendências pequenas de tela
 ## Ordem
 
 1. **Base de módulos por empresa.** Liga e desliga pacotes adicionais por organização (o ERP é o primeiro).
-   Pequena, e destrava o resto.
+   Pequena, e destrava o resto. **Feito em 13/10**: catálogo `modulos` (agenda ligada por padrão, ERP adicional),
+   exceções em `organizacao_modulos`, regra única `modulo_ativo(org, codigo)` para usar nas políticas das tabelas
+   de cada módulo, e botão Módulos na tela Empresas. Módulo novo = uma linha no catálogo + `modulo_ativo` nas
+   políticas + item de menu condicionado a `modulos.has(codigo)`.
 2. **Agenda própria** — em todos os planos.
 3. **ERP: MVP de pedidos**, com a JoGrampo como piloto, assim que o levantamento estiver fechado.
 4. **Sincronização com o Google Agenda**, quando a verificação do app no Google sair.
