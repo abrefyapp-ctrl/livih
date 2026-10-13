@@ -1131,5 +1131,57 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 insert into resultado (teste, ok) select 'agenda: outra empresa não vê o compromisso',
   not exists (select 1 from public.compromissos where id = current_setting('teste.compromisso')::uuid);
 
+-- Módulos por empresa
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+begin
+  insert into resultado (teste, ok) select 'módulos: padrão = agenda ligada, ERP desligado',
+    (select ativo from public.org_modulos(v_org) where codigo = 'agenda')
+    and not (select ativo from public.org_modulos(v_org) where codigo = 'erp');
+  perform public.plataforma_definir_modulo(v_org, 'erp', true);
+  perform public.plataforma_definir_modulo(v_org, 'agenda', false);
+  insert into resultado (teste, ok) select 'módulos: plataforma liga o ERP e desliga a agenda, com auditoria',
+    public.modulo_ativo(v_org, 'erp') and not public.modulo_ativo(v_org, 'agenda')
+    and (select count(*) from public.auditoria where org_id = v_org and acao = 'definir_modulo') = 2;
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+begin
+  begin
+    insert into public.compromissos (org_id, titulo, inicio, fim) values (v_org, 'x', '2026-10-21 10:00-03', '2026-10-21 11:00-03');
+    insert into resultado (teste, ok) values ('módulos: agenda desligada não aceita compromisso', false);
+  exception when insufficient_privilege then
+    insert into resultado (teste, ok) values ('módulos: agenda desligada não aceita compromisso', true);
+  end;
+  begin
+    perform public.plataforma_definir_modulo(v_org, 'agenda', true);
+    insert into resultado (teste, ok) values ('módulos: membro da empresa não liga módulo', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('módulos: membro da empresa não liga módulo', sqlerrm = 'só a equipe da plataforma');
+  end;
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'módulos: outra empresa não lê os módulos da F7',
+  not exists (select 1 from public.org_modulos((select id from public.organizacoes where slug = 'teste-f7')));
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+begin
+  perform public.plataforma_definir_modulo(v_org, 'agenda', true);
+  insert into resultado (teste, ok) select 'módulos: voltar ao padrão apaga a exceção',
+    public.modulo_ativo(v_org, 'agenda')
+    and not exists (select 1 from public.organizacao_modulos where org_id = v_org and modulo = 'agenda');
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;
