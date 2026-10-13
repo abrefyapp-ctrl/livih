@@ -1287,5 +1287,49 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 insert into resultado (teste, ok) select 'erp: módulo desligado esconde pedidos',
   not exists (select 1 from public.pedidos where org_id = (select id from public.organizacoes where slug = 'teste-f7'));
 
+-- Prospecção: iniciar conversa pelo Livih (atendente da F7, número da empresa)
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_canal uuid := (select canal_id from public.conversas where id = current_setting('teste.conversa')::uuid);
+  v_conv uuid;
+  v_conv2 uuid;
+begin
+  v_conv := public.iniciar_conversa(v_canal, '5541961236547', 'Prospect Novo', 'Olá! Tudo bem?');
+  insert into resultado (teste, ok) select 'prospecção: contato novo entra na carteira de quem iniciou',
+    (select ct.responsavel_id = '00000000-0000-0000-0000-0000000000b1' and ct.origem = 'prospeccao' and ct.nome = 'Prospect Novo'
+       from public.conversas cv join public.contatos ct on ct.id = cv.contato_id where cv.id = v_conv);
+  insert into resultado (teste, ok) select 'prospecção: conversa nasce em atendimento com quem iniciou e a mensagem vai para a fila',
+    (select estado = 'humano' and atribuida_a = '00000000-0000-0000-0000-0000000000b1' from public.conversas where id = v_conv)
+    and exists (select 1 from public.mensagens m join public.fila_envio f on f.mensagem_id = m.id
+                 where m.conversa_id = v_conv and m.texto = 'Olá! Tudo bem?');
+  v_conv2 := public.iniciar_conversa(v_canal, '5541961236547', 'Outro nome', null);
+  insert into resultado (teste, ok) select 'prospecção: mesmo número reaproveita contato e conversa', v_conv2 = v_conv
+    and (select count(*) from public.contatos where telefone = '5541961236547') = 1;
+  begin
+    perform public.iniciar_conversa(v_canal, '5541977771111', 'Cliente do Vítor', 'oi');
+    insert into resultado (teste, ok) values ('prospecção: cliente da carteira de outro vendedor é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('prospecção: cliente da carteira de outro vendedor é recusado', sqlerrm = 'esse número é cliente de outro vendedor');
+  end;
+  begin
+    perform public.iniciar_conversa(v_canal, '12345', null, 'oi');
+    insert into resultado (teste, ok) values ('prospecção: telefone inválido recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('prospecção: telefone inválido recusado', sqlerrm = 'telefone inválido');
+  end;
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.iniciar_conversa((select canal_id from public.conversas where id = current_setting('teste.conversa')::uuid), '5541955554444', null, 'oi');
+  insert into resultado (teste, ok) values ('prospecção: outra empresa não usa o número da F7', false);
+exception when others then
+  insert into resultado (teste, ok) values ('prospecção: outra empresa não usa o número da F7', sqlerrm = 'número não encontrado');
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

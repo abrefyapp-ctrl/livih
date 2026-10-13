@@ -14,6 +14,10 @@
 //       { org_id, acao: 'oficial', code, waba_id, phone_number_id?, evento, canal_id? | nome, responsavel_id? }
 //         → API oficial pelo Embedded Signup: com canal_id, o número do WAHA vira 'meta' no mesmo canal
 //           (o histórico fica); sem, nasce um canal novo. (dono/admin)
+//       { org_id, acao: 'oficial_sistema', waba_id, phone_number_id, nome? }
+//         → número que já está no portfólio da F7, pelo token de usuário do sistema. Só admin da plataforma.
+//       { org_id, canal_id, acao: 'agenda' }                        → { contatos: [{ nome, telefone }] }
+//         → contatos salvos na agenda do celular do número (WAHA), para a prospecção. Quem vê o número.
 // A chave do WAHA e os tokens da Meta nunca saem daqui.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -302,6 +306,27 @@ async function conectarComTokenSistema(orgId: string, p: { waba_id?: string; pho
   return canal;
 }
 
+// Agenda do celular: só os contatos salvos (com nome), números individuais, com o 9 como no resto do Livih.
+async function agendaDoCelular(sessao: string, eu: string | null) {
+  const vistos = new Map<string, string>();
+  for (let offset = 0; offset < 20_000; offset += 1000) {
+    const r = await waha(`/api/contacts/all?session=${encodeURIComponent(sessao)}&limit=1000&offset=${offset}`, {}, 30_000);
+    if (!r.ok) throw new ErroUsuario("O WhatsApp deste número não respondeu. Confira se ele está conectado.");
+    const lote = (await r.json()) as { id?: string; name?: string }[];
+    for (const c of lote) {
+      const m = String(c.id ?? "").match(/^(\d+)@c\.us$/);
+      const nome = (c.name ?? "").trim();
+      if (!m || !nome) continue;
+      const br = m[1].match(/^55(\d{2})(\d{8})$/);
+      const tel = br && /^[6-9]/.test(br[2]) ? `55${br[1]}9${br[2]}` : m[1];
+      if (!/^\d{10,15}$/.test(tel) || tel === eu) continue;
+      if (!vistos.has(tel)) vistos.set(tel, nome);
+    }
+    if (lote.length < 1000) break;
+  }
+  return [...vistos].map(([telefone, nome]) => ({ nome, telefone })).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
 async function listar(orgId: string, userId: string, gerencia: boolean) {
   let consulta = admin.from("canais").select(CAMPOS).eq("org_id", orgId).eq("ativo", true).order("criado_em");
   if (!gerencia) consulta = consulta.or(`responsavel_id.is.null,responsavel_id.eq.${userId}`);
@@ -353,6 +378,16 @@ Deno.serve(async (req) => {
     const gerencia = membro.papel === "dono" || membro.papel === "admin";
 
     if (p.acao === "listar") return json(200, { canais: await listar(p.org_id, quem.user.id, gerencia) });
+
+    if (p.acao === "agenda") {
+      // Mesma regra de pode_ver_canal: número de vendedor só ele, dono e admin.
+      const { data: c } = await admin.from("canais").select("id, tipo, instance_id, responsavel_id, numero_conectado")
+        .eq("id", p.canal_id ?? "").eq("org_id", p.org_id).eq("ativo", true).maybeSingle();
+      if (!c || (!gerencia && c.responsavel_id && c.responsavel_id !== quem.user.id)) return json(404, { erro: "Número não encontrado." });
+      if (c.tipo !== "waha" || !c.instance_id) throw new ErroUsuario("A agenda do celular só existe nos números conectados pelo celular.");
+      const eu = (c.numero_conectado ?? "").replace(/\D/g, "") || null;
+      return json(200, { contatos: await agendaDoCelular(c.instance_id, eu) });
+    }
     if (!gerencia) return json(403, { erro: "Só dono e admin mexem nos números de WhatsApp." });
     // Empresa suspensa não conecta nem reconecta número (o resto do sistema já a bloqueia por eh_membro/tem_papel).
     const { data: org } = await admin.from("organizacoes").select("status").eq("id", p.org_id).maybeSingle();
