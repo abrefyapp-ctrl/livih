@@ -806,6 +806,33 @@ export type Database = {
           },
         ]
       }
+      modulos: {
+        Row: {
+          adicional: boolean
+          codigo: string
+          descricao: string
+          nome: string
+          ordem: number
+          padrao: boolean
+        }
+        Insert: {
+          adicional?: boolean
+          codigo: string
+          descricao: string
+          nome: string
+          ordem?: number
+          padrao?: boolean
+        }
+        Update: {
+          adicional?: boolean
+          codigo?: string
+          descricao?: string
+          nome?: string
+          ordem?: number
+          padrao?: boolean
+        }
+        Relationships: []
+      }
       notas: {
         Row: {
           autor_id: string | null
@@ -969,6 +996,45 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "etapas_funil"
             referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      organizacao_modulos: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          atualizado_por: string | null
+          modulo: string
+          org_id: string
+        }
+        Insert: {
+          ativo: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          modulo: string
+          org_id: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          modulo?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizacao_modulos_modulo_fkey"
+            columns: ["modulo"]
+            isOneToOne: false
+            referencedRelation: "modulos"
+            referencedColumns: ["codigo"]
+          },
+          {
+            foreignKeyName: "organizacao_modulos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1492,6 +1558,21 @@ export type Database = {
         Returns: undefined
       }
       meta_token_do_canal: { Args: { p_canal: string }; Returns: string }
+      modulo_ativo: {
+        Args: { p_modulo: string; p_org: string }
+        Returns: boolean
+      }
+      org_modulos: {
+        Args: { p_org: string }
+        Returns: {
+          adicional: boolean
+          ativo: boolean
+          codigo: string
+          descricao: string
+          nome: string
+          padrao: boolean
+        }[]
+      }
       org_primeiros_passos: {
         Args: { p_org: string }
         Returns: {
@@ -1503,6 +1584,10 @@ export type Database = {
         }[]
       }
       plataforma_criar_empresa: { Args: { p_nome: string }; Returns: string }
+      plataforma_definir_modulo: {
+        Args: { p_ativo: boolean; p_modulo: string; p_org: string }
+        Returns: undefined
+      }
       plataforma_definir_status: {
         Args: { p_org: string; p_status: string }
         Returns: undefined

@@ -13,6 +13,7 @@ import { nomeDoContato } from '../services/formato'
 import { useSessao } from '../hooks/useSessao'
 import { useEquipe } from '../hooks/useEquipe'
 import { Aviso } from '../components/Aviso'
+import { EstadoVazio } from '../components/EstadoVazio'
 import { Botao } from '../components/Botao'
 import { Icone } from '../components/Icone'
 import { ModalCompromisso } from '../components/ModalCompromisso'
@@ -58,6 +59,18 @@ function colunas(lista: Compromisso[]) {
 }
 
 export function Agenda() {
+  const { modulos } = useSessao()
+  if (modulos && !modulos.has('agenda')) {
+    return (
+      <EstadoVazio icone="calendario" titulo="A agenda não está ligada nesta empresa">
+        Fale com a equipe da Livih para ativar.
+      </EstadoVazio>
+    )
+  }
+  return <AgendaSemana />
+}
+
+function AgendaSemana() {
   const { orgAtiva, sessao } = useSessao()
   const orgId = orgAtiva!.id
   const eu = sessao?.user.id

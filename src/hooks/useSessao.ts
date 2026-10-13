@@ -15,6 +15,10 @@ export type Sessao = {
   orgAtiva: Organizacao | null
   carregandoOrgs: boolean
   equipe: Map<string, Perfil>
+  /** Módulos ligados na empresa ativa; null enquanto carrega. */
+  modulos: Set<string> | null
+  /** Recarrega os módulos (depois que a plataforma muda algum). */
+  recarregarModulos: () => void
   trocarOrganizacao: (id: string) => void
   sair: () => Promise<void>
 }

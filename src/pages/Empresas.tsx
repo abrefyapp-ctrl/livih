@@ -20,6 +20,7 @@ import { Icone } from '../components/Icone'
 import { LinkConvite } from '../components/LinkConvite'
 import { Modal } from '../components/Modal'
 import { ModalEmpresa, type ModoEmpresa } from '../components/ModalEmpresa'
+import { ModalModulos } from '../components/ModalModulos'
 import { NaoEncontrada } from './NaoEncontrada'
 
 type LinkGerado = { link: string; nome: string; nomeOrg: string; tipo: 'dono' | 'senha' }
@@ -36,6 +37,7 @@ export function Empresas() {
   const [busca, setBusca] = useState('')
   const [modal, setModal] = useState<ModoEmpresa | null>(null)
   const [suspender, setSuspender] = useState<Empresa | null>(null)
+  const [modulosDe, setModulosDe] = useState<Empresa | null>(null)
   const [recusar, setRecusar] = useState<PedidoAcesso | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [linkGerado, setLinkGerado] = useState<LinkGerado | null>(null)
@@ -245,6 +247,9 @@ export function Empresas() {
                     <Botao tamanho="sm" variante="secundario" icone="link" carregando={ocupado === e.id && !suspender} onClick={() => void acessoDoDono(e)}>
                       {!e.dono_email ? 'Definir dono' : e.dono_senha_definida ? 'Senha do dono' : 'Link do dono'}
                     </Botao>
+                    <Botao tamanho="sm" variante="secundario" icone="painel" onClick={() => setModulosDe(e)}>
+                      Módulos
+                    </Botao>
                     {suspensa ? (
                       <Botao tamanho="sm" variante="secundario" onClick={() => void mudarStatus(e, 'ativa')} disabled={ocupado === e.id}>
                         Reativar
@@ -261,6 +266,8 @@ export function Empresas() {
           </ul>
         )}
       </div>
+
+      {modulosDe && <ModalModulos empresa={modulosDe} aoFechar={() => setModulosDe(null)} />}
 
       {modal && (
         <ModalEmpresa

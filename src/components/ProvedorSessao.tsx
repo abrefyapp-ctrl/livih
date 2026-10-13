@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../services/supabaseClient'
 import { listarEquipe, listarOrganizacoes, type Organizacao, type Perfil } from '../services/atendimento'
 import { ehAdminPlataforma } from '../services/plataforma'
+import { listarModulos } from '../services/modulos'
 import { desativarNotificacoes } from '../services/notificacoes'
 import { ContextoSessao } from '../hooks/useSessao'
 
@@ -21,12 +22,15 @@ function lerOrgSalva(): string | null {
 // descarta o antigo sem precisar zerar estado dentro de efeito.
 type Orgs = { userId: string; lista: Organizacao[]; admin: boolean }
 type Equipe = { orgId: string; mapa: Map<string, Perfil> }
+type Modulos = { chave: string; ligados: Set<string> }
 
 export function ProvedorSessao({ children }: { children: ReactNode }) {
   const [sessao, setSessao] = useState<Session | null | undefined>(undefined)
   const [orgs, setOrgs] = useState<Orgs | null>(null)
   const [orgId, setOrgId] = useState<string | null>(lerOrgSalva)
   const [equipe, setEquipe] = useState<Equipe | null>(null)
+  const [modulos, setModulos] = useState<Modulos | null>(null)
+  const [versaoModulos, setVersaoModulos] = useState(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSessao(data.session))
@@ -78,6 +82,21 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
 
   const mapaEquipe = equipe && equipe.orgId === orgAtivaId ? equipe.mapa : SEM_EQUIPE
 
+  // Sem resposta do banco, vale o padrão (agenda ligada): melhor mostrar a tela do que sumir com ela por um erro de rede.
+  const chaveModulos = `${orgAtivaId}|${versaoModulos}`
+  useEffect(() => {
+    if (!orgAtivaId) return
+    let ativo = true
+    listarModulos(orgAtivaId)
+      .then((l) => ativo && setModulos({ chave: chaveModulos, ligados: new Set(l.filter((m) => m.ativo).map((m) => m.codigo)) }))
+      .catch(() => ativo && setModulos({ chave: chaveModulos, ligados: new Set(['agenda']) }))
+    return () => {
+      ativo = false
+    }
+  }, [orgAtivaId, chaveModulos])
+  const modulosAtivos = modulos?.chave === chaveModulos ? modulos.ligados : null
+  const recarregarModulos = useCallback(() => setVersaoModulos((v) => v + 1), [])
+
   const trocarOrganizacao = useCallback((id: string) => {
     setOrgId(id)
     try {
@@ -94,8 +113,20 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
   }, [])
 
   const valor = useMemo(
-    () => ({ sessao, organizacoes, suspensas, adminPlataforma, orgAtiva, carregandoOrgs, equipe: mapaEquipe, trocarOrganizacao, sair }),
-    [sessao, organizacoes, suspensas, adminPlataforma, orgAtiva, carregandoOrgs, mapaEquipe, trocarOrganizacao, sair],
+    () => ({
+      sessao,
+      organizacoes,
+      suspensas,
+      adminPlataforma,
+      orgAtiva,
+      carregandoOrgs,
+      equipe: mapaEquipe,
+      modulos: modulosAtivos,
+      recarregarModulos,
+      trocarOrganizacao,
+      sair,
+    }),
+    [sessao, organizacoes, suspensas, adminPlataforma, orgAtiva, carregandoOrgs, mapaEquipe, modulosAtivos, recarregarModulos, trocarOrganizacao, sair],
   )
 
   return <ContextoSessao.Provider value={valor}>{children}</ContextoSessao.Provider>

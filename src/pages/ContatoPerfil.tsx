@@ -46,7 +46,7 @@ function Dado({ icone, children }: { icone: NomeIcone; children: ReactNode }) {
 
 export function ContatoPerfil() {
   const { id } = useParams()
-  const { orgAtiva, sessao, equipe } = useSessao()
+  const { orgAtiva, sessao, equipe, modulos } = useSessao()
   const orgId = orgAtiva!.id
   const [dados, setDados] = useState<{ id: string; perfil: Perfil | null; oportunidades: Oportunidade[]; compromissos: Compromisso[] } | null>(null)
   const [etapas, setEtapas] = useState<Etapa[]>([])
@@ -157,6 +157,7 @@ export function ContatoPerfil() {
               )}
             </Bloco>
 
+            {modulos?.has('agenda') && (
             <Bloco
               titulo="Próximos compromissos"
               acao={
@@ -183,6 +184,7 @@ export function ContatoPerfil() {
                 <p className="text-pequeno text-texto-3">Nada marcado com este cliente.</p>
               )}
             </Bloco>
+            )}
 
             <Bloco titulo="Conversas">
               {conversas.length ? (

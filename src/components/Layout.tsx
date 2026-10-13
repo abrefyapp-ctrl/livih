@@ -16,7 +16,7 @@ type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: num
  * Celular: barra lateral vira gaveta aberta pelo botão de menu.
  */
 export function Layout() {
-  const { orgAtiva, organizacoes, trocarOrganizacao, sessao, equipe, sair, adminPlataforma } = useSessao()
+  const { orgAtiva, organizacoes, trocarOrganizacao, sessao, equipe, sair, adminPlataforma, modulos } = useSessao()
   const aguardando = useContagemAguardando(orgAtiva?.id)
   const caidos = useNumerosCaidos(orgAtiva?.id)
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
@@ -33,7 +33,7 @@ export function Layout() {
     { para: '/conversas', rotulo: 'Conversas', icone: 'conversas', contador: aguardando },
     { para: '/contatos', rotulo: 'Contatos', icone: 'usuario' },
     { para: '/oportunidades', rotulo: 'Oportunidades', icone: 'funil' },
-    { para: '/agenda', rotulo: 'Agenda', icone: 'calendario' },
+    ...(modulos?.has('agenda') ? [{ para: '/agenda', rotulo: 'Agenda', icone: 'calendario' as const }] : []),
     { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
     ...(adminPlataforma ? [{ para: '/empresas', rotulo: 'Empresas', icone: 'empresa' as const }] : []),
   ]
