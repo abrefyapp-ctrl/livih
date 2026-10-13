@@ -1183,5 +1183,109 @@ begin
     and not exists (select 1 from public.organizacao_modulos where org_id = v_org and modulo = 'agenda');
 end $$;
 
+-- ERP: produtos, pedidos e estoque (a1 é dono da F7 de teste e admin da plataforma)
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+  v_contato uuid := (select contato_id from public.conversas where id = current_setting('teste.conversa')::uuid);
+  v_a uuid; v_b uuid; v_ped uuid; v_ped2 uuid;
+  saldo_a numeric;
+begin
+  perform public.plataforma_definir_modulo(v_org, 'erp', true);
+  insert into public.produtos (org_id, codigo, nome, unidade, preco) values (v_org, 'PF15', 'Pino F15', 'cx', 12.50) returning id into v_a;
+  insert into public.produtos (org_id, nome, preco, controla_estoque) values (v_org, 'Instalação', 80, false) returning id into v_b;
+  perform public.estoque_lancar(v_a, 10, 'entrada');
+
+  insert into public.pedidos (org_id, contato_id, frete) values (v_org, v_contato, 5) returning id into v_ped;
+  insert into public.pedido_itens (org_id, pedido_id, produto_id, descricao, quantidade, preco_unitario)
+  values (v_org, v_ped, v_a, 'Pino F15', 3, 12.50), (v_org, v_ped, v_b, 'Instalação', 1, 80);
+  insert into resultado (teste, ok) select 'erp: pedido soma itens e frete',
+    (select subtotal = 117.50 and total = 122.50 and status = 'rascunho' and numero = 1 from public.pedidos where id = v_ped);
+
+  perform public.pedido_mudar_status(v_ped, 'confirmado');
+  select saldo into saldo_a from public.produtos_saldo where id = v_a;
+  insert into resultado (teste, ok) select 'erp: confirmar baixa o estoque só do que controla estoque',
+    saldo_a = 7 and (select count(*) from public.estoque_movimentos where pedido_id = v_ped) = 1;
+
+  begin
+    update public.pedido_itens set quantidade = 9 where pedido_id = v_ped and produto_id = v_a;
+    insert into resultado (teste, ok) values ('erp: item não muda depois de confirmado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('erp: item não muda depois de confirmado', sqlerrm like 'só dá para mudar os itens%');
+  end;
+  begin
+    update public.pedidos set status = 'entregue' where id = v_ped;
+    insert into resultado (teste, ok) values ('erp: situação só muda pela função', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('erp: situação só muda pela função', sqlerrm like 'use pedido_mudar_status%');
+  end;
+  begin
+    perform public.pedido_mudar_status(v_ped, 'rascunho');
+    perform public.pedido_mudar_status(v_ped, 'confirmado');
+    perform public.pedido_mudar_status(v_ped, 'cancelado');
+    select saldo into saldo_a from public.produtos_saldo where id = v_a;
+    insert into resultado (teste, ok) select 'erp: voltar ao rascunho e cancelar devolvem o estoque certo', saldo_a = 10;
+  end;
+  begin
+    perform public.pedido_mudar_status(v_ped, 'confirmado');
+    insert into resultado (teste, ok) values ('erp: cancelado não volta', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('erp: cancelado não volta', sqlerrm like 'não dá para passar%');
+  end;
+  -- Pela tela nem chega a mudar (sem policy de UPDATE); a trava do gatilho é testada como dono do banco abaixo.
+  update public.estoque_movimentos set quantidade = 99 where produto_id = v_a;
+  insert into resultado (teste, ok) select 'erp: usuário não altera movimento de estoque',
+    not exists (select 1 from public.estoque_movimentos where produto_id = v_a and quantidade = 99);
+  delete from public.produtos where id = v_a;
+  insert into resultado (teste, ok) select 'erp: produto com histórico não é apagado', exists (select 1 from public.produtos where id = v_a);
+
+  insert into public.pedidos (org_id) values (v_org) returning id into v_ped2;
+  insert into resultado (teste, ok) select 'erp: número segue a sequência da empresa', (select numero from public.pedidos where id = v_ped2) = 2;
+  perform set_config('teste.produto_a', v_a::text, true);
+end $$;
+
+reset role;
+do $$
+begin
+  update public.estoque_movimentos set quantidade = 99 where produto_id = current_setting('teste.produto_a')::uuid;
+  insert into resultado (teste, ok) values ('erp: movimento de estoque é imutável até para o banco', false);
+exception when others then
+  insert into resultado (teste, ok) values ('erp: movimento de estoque é imutável até para o banco', sqlerrm like 'movimentos de estoque não mudam%');
+end $$;
+set local role authenticated;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+  v_ped uuid;
+begin
+  begin
+    insert into public.produtos (org_id, nome) values (v_org, 'x');
+    insert into resultado (teste, ok) values ('erp: atendente não cadastra produto', false);
+  exception when insufficient_privilege then
+    insert into resultado (teste, ok) values ('erp: atendente não cadastra produto', true);
+  end;
+  insert into public.pedidos (org_id) values (v_org) returning id into v_ped;
+  insert into public.pedido_itens (org_id, pedido_id, produto_id, descricao, quantidade, preco_unitario)
+  values (v_org, v_ped, current_setting('teste.produto_a')::uuid, 'Pino F15', 2, 12.50);
+  perform public.pedido_mudar_status(v_ped, 'confirmado');
+  insert into resultado (teste, ok) select 'erp: atendente cria e confirma pedido', (select status from public.pedidos where id = v_ped) = 'confirmado';
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'erp: outra empresa não vê pedidos nem produtos',
+  not exists (select 1 from public.pedidos where org_id = (select id from public.organizacoes where slug = 'teste-f7'))
+  and not exists (select 1 from public.produtos where org_id = (select id from public.organizacoes where slug = 'teste-f7'));
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+select public.plataforma_definir_modulo((select id from public.organizacoes where slug = 'teste-f7'), 'erp', false);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'erp: módulo desligado esconde pedidos',
+  not exists (select 1 from public.pedidos where org_id = (select id from public.organizacoes where slug = 'teste-f7'));
+
 reset role;
 select n, teste, ok from resultado order by n;
