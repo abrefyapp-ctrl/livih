@@ -10,7 +10,10 @@ Planejamento do produto combinado em 12/10/2026. As pendências pequenas de tela
    de cada módulo, e botão Módulos na tela Empresas. Módulo novo = uma linha no catálogo + `modulo_ativo` nas
    políticas + item de menu condicionado a `modulos.has(codigo)`.
 2. **Agenda própria** — em todos os planos.
-3. **ERP: MVP de pedidos**, com a JoGrampo como piloto, assim que o levantamento estiver fechado.
+3. **ERP: MVP de pedidos** — genérico para PME (decisão de 13/10: a JoGrampo valida, não trava). **Primeira entrega
+   feita em 13/10**: produtos (com importação CSV), pedidos (rascunho → confirmado → separando → enviado → entregue,
+   ou cancelado) e estoque como livro-razão com baixa na confirmação e devolução no cancelamento. Próximo: o agente
+   montar o rascunho do pedido pela conversa; pedidos no perfil do contato; vários estoques/CNPJs se precisar.
 4. **Sincronização com o Google Agenda**, quando a verificação do app no Google sair.
 5. **ERP: cobrança** (Asaas) e depois **nota fiscal** (NF-e).
 
