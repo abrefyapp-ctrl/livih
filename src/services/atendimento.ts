@@ -151,7 +151,11 @@ export async function iniciarConversa(canalId: string, telefone: string, nome: s
           ? 'Número inválido. Use o celular com DDD.'
           : m.includes('suspensa')
             ? 'Esta empresa está suspensa.'
-            : `Não foi possível iniciar a conversa (${m}).`,
+            : m.includes('Failed to fetch') || m.includes('NetworkError')
+              ? 'A conexão com o Livih falhou e nada foi enviado. Confira a internet e tente de novo.'
+              : m.includes('JWT')
+                ? 'Sua sessão expirou. Recarregue a página e tente de novo.'
+                : `Não foi possível iniciar a conversa (${m}).`,
     )
   }
   return data
