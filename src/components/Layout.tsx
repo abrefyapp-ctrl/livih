@@ -34,6 +34,12 @@ export function Layout() {
     { para: '/contatos', rotulo: 'Contatos', icone: 'usuario' },
     { para: '/oportunidades', rotulo: 'Oportunidades', icone: 'funil' },
     ...(modulos?.has('agenda') ? [{ para: '/agenda', rotulo: 'Agenda', icone: 'calendario' as const }] : []),
+    ...(modulos?.has('erp')
+      ? [
+          { para: '/pedidos', rotulo: 'Pedidos', icone: 'pedido' as const },
+          { para: '/produtos', rotulo: 'Produtos', icone: 'caixa' as const },
+        ]
+      : []),
     { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
     ...(adminPlataforma ? [{ para: '/empresas', rotulo: 'Empresas', icone: 'empresa' as const }] : []),
   ]

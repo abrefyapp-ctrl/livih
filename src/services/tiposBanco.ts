@@ -544,6 +544,64 @@ export type Database = {
           },
         ]
       }
+      estoque_movimentos: {
+        Row: {
+          autor_id: string | null
+          criado_em: string
+          id: number
+          motivo: string | null
+          org_id: string
+          pedido_id: string | null
+          produto_id: string
+          quantidade: number
+          tipo: string
+        }
+        Insert: {
+          autor_id?: string | null
+          criado_em?: string
+          id?: never
+          motivo?: string | null
+          org_id: string
+          pedido_id?: string | null
+          produto_id: string
+          quantidade: number
+          tipo: string
+        }
+        Update: {
+          autor_id?: string | null
+          criado_em?: string
+          id?: never
+          motivo?: string | null
+          org_id?: string
+          pedido_id?: string | null
+          produto_id?: string
+          quantidade?: number
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estoque_movimentos_pedido_id_org_id_fkey"
+            columns: ["pedido_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "estoque_movimentos_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "estoque_movimentos_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos_saldo"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       etapas_funil: {
         Row: {
           cor: string | null
@@ -1065,6 +1123,149 @@ export type Database = {
         }
         Relationships: []
       }
+      pedido_itens: {
+        Row: {
+          descricao: string
+          id: string
+          ordem: number
+          org_id: string
+          pedido_id: string
+          preco_unitario: number
+          produto_id: string | null
+          quantidade: number
+          subtotal: number | null
+        }
+        Insert: {
+          descricao: string
+          id?: string
+          ordem?: number
+          org_id: string
+          pedido_id: string
+          preco_unitario: number
+          produto_id?: string | null
+          quantidade: number
+          subtotal?: number | null
+        }
+        Update: {
+          descricao?: string
+          id?: string
+          ordem?: number
+          org_id?: string
+          pedido_id?: string
+          preco_unitario?: number
+          produto_id?: string | null
+          quantidade?: number
+          subtotal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_itens_pedido_id_org_id_fkey"
+            columns: ["pedido_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "pedido_itens_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "pedido_itens_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos_saldo"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      pedidos: {
+        Row: {
+          atualizado_em: string
+          confirmado_em: string | null
+          contato_id: string | null
+          criado_em: string
+          criado_por: string | null
+          desconto: number
+          estoque_baixado: boolean
+          frete: number
+          id: string
+          numero: number
+          observacao: string | null
+          oportunidade_id: string | null
+          org_id: string
+          origem: string
+          responsavel_id: string | null
+          status: string
+          subtotal: number
+          total: number
+        }
+        Insert: {
+          atualizado_em?: string
+          confirmado_em?: string | null
+          contato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          desconto?: number
+          estoque_baixado?: boolean
+          frete?: number
+          id?: string
+          numero: number
+          observacao?: string | null
+          oportunidade_id?: string | null
+          org_id: string
+          origem?: string
+          responsavel_id?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+        }
+        Update: {
+          atualizado_em?: string
+          confirmado_em?: string | null
+          contato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          desconto?: number
+          estoque_baixado?: boolean
+          frete?: number
+          id?: string
+          numero?: number
+          observacao?: string | null
+          oportunidade_id?: string | null
+          org_id?: string
+          origem?: string
+          responsavel_id?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_contato_id_org_id_fkey"
+            columns: ["contato_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "pedidos_oportunidade_id_org_id_fkey"
+            columns: ["oportunidade_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "oportunidades"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "pedidos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedidos_acesso: {
         Row: {
           criado_em: string
@@ -1182,6 +1383,59 @@ export type Database = {
           usd_por_milhao_saida?: number
         }
         Relationships: []
+      }
+      produtos: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          codigo: string | null
+          controla_estoque: boolean
+          criado_em: string
+          descricao: string | null
+          estoque_minimo: number | null
+          id: string
+          nome: string
+          org_id: string
+          preco: number
+          unidade: string
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          codigo?: string | null
+          controla_estoque?: boolean
+          criado_em?: string
+          descricao?: string | null
+          estoque_minimo?: number | null
+          id?: string
+          nome: string
+          org_id: string
+          preco?: number
+          unidade?: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          codigo?: string | null
+          controla_estoque?: boolean
+          criado_em?: string
+          descricao?: string | null
+          estoque_minimo?: number | null
+          id?: string
+          nome?: string
+          org_id?: string
+          preco?: number
+          unidade?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       push_config: {
         Row: {
@@ -1337,6 +1591,62 @@ export type Database = {
       }
     }
     Views: {
+      produtos_saldo: {
+        Row: {
+          ativo: boolean | null
+          atualizado_em: string | null
+          codigo: string | null
+          controla_estoque: boolean | null
+          criado_em: string | null
+          descricao: string | null
+          estoque_minimo: number | null
+          id: string | null
+          nome: string | null
+          org_id: string | null
+          preco: number | null
+          saldo: number | null
+          unidade: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          atualizado_em?: string | null
+          codigo?: string | null
+          controla_estoque?: boolean | null
+          criado_em?: string | null
+          descricao?: string | null
+          estoque_minimo?: number | null
+          id?: string | null
+          nome?: string | null
+          org_id?: string | null
+          preco?: number | null
+          saldo?: never
+          unidade?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          atualizado_em?: string | null
+          codigo?: string | null
+          controla_estoque?: boolean | null
+          criado_em?: string | null
+          descricao?: string | null
+          estoque_minimo?: number | null
+          id?: string | null
+          nome?: string | null
+          org_id?: string | null
+          preco?: number | null
+          saldo?: never
+          unidade?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uso_ia_mensal: {
         Row: {
           audios_transcritos: number | null
@@ -1513,6 +1823,15 @@ export type Database = {
           user_id: string
         }[]
       }
+      estoque_lancar: {
+        Args: {
+          p_motivo?: string
+          p_produto: string
+          p_quantidade: number
+          p_tipo: string
+        }
+        Returns: undefined
+      }
       fila_manutencao: { Args: never; Returns: undefined }
       fila_reivindicar: {
         Args: { p_limite?: number }
@@ -1583,6 +1902,10 @@ export type Database = {
           whatsapp: boolean
         }[]
       }
+      pedido_mudar_status: {
+        Args: { p_pedido: string; p_status: string }
+        Returns: undefined
+      }
       plataforma_criar_empresa: { Args: { p_nome: string }; Returns: string }
       plataforma_definir_modulo: {
         Args: { p_ativo: boolean; p_modulo: string; p_org: string }
@@ -1621,6 +1944,10 @@ export type Database = {
         Returns: boolean
       }
       pode_ver_conversa: { Args: { p_conversa: string }; Returns: boolean }
+      pode_ver_pedido: {
+        Args: { p_contato: string; p_org: string; p_responsavel: string }
+        Returns: boolean
+      }
       push_cancelar: { Args: { p_endpoint: string }; Returns: undefined }
       push_chaves: { Args: never; Returns: Json }
       push_enfileirar: {

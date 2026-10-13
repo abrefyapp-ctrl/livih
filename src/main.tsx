@@ -14,6 +14,9 @@ import { Contatos } from './pages/Contatos'
 import { ContatoPerfil } from './pages/ContatoPerfil'
 import { Agenda } from './pages/Agenda'
 import { Oportunidades } from './pages/Oportunidades'
+import { PedidoDetalhe } from './pages/PedidoDetalhe'
+import { Pedidos } from './pages/Pedidos'
+import { Produtos } from './pages/Produtos'
 import { Empresas } from './pages/Empresas'
 import { registrarServiceWorker } from './pwa'
 
@@ -39,6 +42,9 @@ createRoot(document.getElementById('root')!).render(
             <Route path="contatos/:id" element={<ContatoPerfil />} />
             <Route path="oportunidades" element={<Oportunidades />} />
             <Route path="agenda" element={<Agenda />} />
+            <Route path="pedidos" element={<Pedidos />} />
+            <Route path="pedidos/:id" element={<PedidoDetalhe />} />
+            <Route path="produtos" element={<Produtos />} />
             <Route path="configuracoes/:secao?" element={<Configuracoes />} />
             <Route path="empresas" element={<Empresas />} />
             <Route path="*" element={<NaoEncontrada />} />
