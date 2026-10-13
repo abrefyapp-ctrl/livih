@@ -143,6 +143,7 @@ export async function iniciarConversa(canalId: string, telefone: string, nome: s
   })
   if (error) {
     const m = error.message
+    console.error('iniciar_conversa', error)
     throw new Error(
       m.includes('outro vendedor')
         ? 'Esse número já é cliente de outro vendedor. Peça para ele, ou para o dono, passar o contato para você.'
@@ -150,7 +151,7 @@ export async function iniciarConversa(canalId: string, telefone: string, nome: s
           ? 'Número inválido. Use o celular com DDD.'
           : m.includes('suspensa')
             ? 'Esta empresa está suspensa.'
-            : 'Não foi possível iniciar a conversa. Tente de novo.',
+            : `Não foi possível iniciar a conversa (${m}).`,
     )
   }
   return data
