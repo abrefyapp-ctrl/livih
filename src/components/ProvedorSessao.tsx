@@ -95,7 +95,8 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
     }
   }, [orgAtivaId, chaveModulos])
   // Mantém o que já está na tela enquanto relê (sem piscar o menu); só some quando a empresa muda.
-  const modulosAtivos = modulos?.chave.split('|')[0] === orgAtivaId ? modulos.ligados : null
+  // `modulos &&` explícito: com `modulos?.` o lado esquerdo vira undefined e casa com orgAtivaId undefined (sem login).
+  const modulosAtivos = modulos && modulos.chave.split('|')[0] === orgAtivaId ? modulos.ligados : null
   const recarregarModulos = useCallback(() => setVersaoModulos((v) => v + 1), [])
 
   // Módulo ligado pela plataforma em outra aba ou outro aparelho: o menu acompanha quando a pessoa volta para a aba.
