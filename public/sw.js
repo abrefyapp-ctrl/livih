@@ -1,8 +1,11 @@
 // Service worker do Livih (PWA). Simples de propósito:
 // - páginas: rede primeiro; sem internet, devolve a última casca salva (o app abre, sem dados até a conexão voltar);
-// - /assets/* (nomes com hash do Vite, nunca mudam): cache primeiro;
+// - /assets/* (nomes com hash do Vite, nunca mudam): cache primeiro — mas só guarda o arquivo de verdade.
+//   Durante o deploy, um asset que ainda não chegou ao servidor volta como index.html com 200 (o Worker é SPA);
+//   guardar isso deixava o app sem CSS para sempre (14/10). Por isso o tipo tem que bater com a extensão.
 // - todo o resto (Supabase, fontes, outros domínios) passa direto, sem cache: dados sempre frescos.
-const CACHE = 'livih-v2'
+// Trocar o nome apaga o cache antigo de todo mundo (v3: limpa o CSS envenenado de 14/10).
+const CACHE = 'livih-v3'
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icon-192.png'])))
@@ -17,6 +20,14 @@ self.addEventListener('activate', (e) => {
       .then(() => self.clients.claim()),
   )
 })
+
+function assetDeVerdade(caminho, res) {
+  const tipo = res.headers.get('content-type') || ''
+  if (tipo.includes('text/html')) return false
+  if (caminho.endsWith('.css')) return tipo.includes('text/css')
+  if (caminho.endsWith('.js')) return tipo.includes('javascript')
+  return true
+}
 
 self.addEventListener('fetch', (e) => {
   const req = e.request
@@ -45,7 +56,7 @@ self.addEventListener('fetch', (e) => {
         (salvo) =>
           salvo ||
           fetch(req).then((res) => {
-            if (res.ok) {
+            if (res.ok && assetDeVerdade(url.pathname, res)) {
               const copia = res.clone()
               caches.open(CACHE).then((c) => c.put(req, copia))
             }
