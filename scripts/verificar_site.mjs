@@ -3,14 +3,52 @@
 //
 // Uso:  npm run verificar                       (produção: https://app.livih.com.br)
 //       npm run verificar -- http://localhost:4173
+//       npm run publicar                        (build + push + espera a Cloudflare publicar + verifica)
 // Chrome em outro lugar: CHROME_PATH="C:\...\chrome.exe"
+//
+// --esperar: o deploy é feito pela Cloudflare a cada push na main, alguns minutos depois. Antes de
+// verificar, espera o site servir o mesmo bundle do dist/ local (o hash do build bate com o da Cloudflare).
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const url = process.argv[2] ?? 'https://app.livih.com.br/'
+const args = process.argv.slice(2)
+const esperar = args.includes('--esperar')
+const url = args.find((a) => !a.startsWith('--')) ?? 'https://app.livih.com.br/'
+
+const bundleDe = (html) => html.match(/assets\/(index-[\w-]+\.js)/)?.[1]
+
+if (esperar) {
+  const esperado = existsSync('dist/index.html') ? bundleDe(readFileSync('dist/index.html', 'utf8')) : undefined
+  if (!esperado) {
+    console.error('--esperar precisa do build local (dist/index.html). Rode npm run build antes.')
+    process.exit(2)
+  }
+  const LIMITE_MS = 10 * 60_000
+  const inicio = Date.now()
+  let noAr
+  console.log(`Esperando a Cloudflare publicar ${esperado}…`)
+  while (Date.now() - inicio < LIMITE_MS) {
+    try {
+      noAr = bundleDe(await (await fetch(url, { cache: 'no-store' })).text())
+    } catch {
+      noAr = undefined
+    }
+    if (noAr === esperado) break
+    await new Promise((ok) => setTimeout(ok, 15_000))
+  }
+  if (noAr !== esperado) {
+    console.error(
+      `\nFALHOU: depois de 10 min o site ainda serve ${noAr ?? '(sem resposta)'}, não ${esperado}.\n` +
+        'Veja o build no painel da Cloudflare (Workers → livih → Deployments). Se o dist/ local tinha ' +
+        'mudanças não commitadas, o hash não bate mesmo; rode npm run verificar direto.',
+    )
+    process.exit(1)
+  }
+  console.log(`No ar após ${Math.round((Date.now() - inicio) / 1000)} s.\n`)
+}
 
 const candidatos = [
   process.env.CHROME_PATH,
@@ -51,7 +89,7 @@ if (r.error) {
 }
 
 const dom = r.stdout ?? ''
-const bundle = dom.match(/assets\/(index-[\w-]+\.js)/)?.[1] ?? '?'
+const bundle = bundleDe(dom) ?? '?'
 const root = dom.match(/<div id="root">([\s\S]*?)<\/div>/)?.[1]?.trim() ?? ''
 
 // Só erros do próprio site; o aviso de CacheStorage do sw.js é do perfil headless e não indica bug.

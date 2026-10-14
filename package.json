@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "verificar": "node scripts/verificar_site.mjs"
+    "verificar": "node scripts/verificar_site.mjs",
+    "publicar": "git diff --quiet HEAD -- src public index.html && npm run build && git push && node scripts/verificar_site.mjs --esperar"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
