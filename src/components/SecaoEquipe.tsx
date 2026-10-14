@@ -17,6 +17,7 @@ import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { Icone } from './Icone'
 import { LinkConvite } from './LinkConvite'
 import { Modal } from './Modal'
+import { MeusDados } from './MeusDados'
 
 const PAPEIS: Record<Papel, { rotulo: string; descricao: string }> = {
   dono: { rotulo: 'Dono', descricao: 'Tudo, inclusive a equipe.' },
@@ -32,7 +33,7 @@ function Situacao({ m }: { m: MembroEquipe }) {
 }
 
 export function SecaoEquipe() {
-  const { orgAtiva, sessao } = useSessao()
+  const { orgAtiva, sessao, equipe: perfis } = useSessao()
   const orgId = orgAtiva!.id
   const souDono = orgAtiva?.papel === 'dono'
   const eu = sessao?.user.id
@@ -109,6 +110,9 @@ export function SecaoEquipe() {
           </Botao>
         )}
       </div>
+
+      {/* Recria quando o perfil chega, para o formulário abrir já preenchido. */}
+      <MeusDados key={eu && perfis.has(eu) ? 'pronto' : 'carregando'} />
 
       {!souDono && <Aviso>Só o dono da organização convida pessoas e muda papéis.</Aviso>}
       {erroAcao && <Aviso tom="erro">{erroAcao}</Aviso>}

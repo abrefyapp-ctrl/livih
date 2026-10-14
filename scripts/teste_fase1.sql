@@ -1402,5 +1402,66 @@ insert into resultado (teste, ok) select 'arquivo: fila entrega tipo, caminho e 
   bool_or(tipo = 'documento' and midia_nome = 'Proposta Comercial.pdf' and midia_path like '%/a1-proposta.pdf')
   from public.fila_reivindicar(100);
 
+-- ============================================================================
+-- Empresas emissoras (orçamento) e telefone do vendedor
+-- ============================================================================
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.f7')::uuid; v_a uuid; v_b uuid;
+begin
+  insert into public.emissoras (org_id, razao_social, cnpj) values (v_org, 'F7 Tech Ltda', '11222333000181') returning id into v_a;
+  insert into resultado (teste, ok) select 'emissora: a primeira nasce padrão', padrao from public.emissoras where id = v_a;
+  insert into public.emissoras (org_id, razao_social, cnpj, padrao) values (v_org, 'F7 Filial', '11444777000161', true) returning id into v_b;
+  insert into resultado (teste, ok) select 'emissora: marcar outra como padrão desmarca a anterior',
+    (select padrao from public.emissoras where id = v_b) and not (select padrao from public.emissoras where id = v_a);
+  update public.emissoras set padrao = false where id = v_b;
+  insert into resultado (teste, ok) select 'emissora: a única padrão não fica sem padrão', padrao from public.emissoras where id = v_b;
+  delete from public.emissoras where id = v_b;
+  insert into resultado (teste, ok) select 'emissora: apagar a padrão promove a que sobrou', padrao from public.emissoras where id = v_a;
+  begin
+    insert into public.emissoras (org_id, razao_social, cnpj) values (v_org, 'Errada', '11222333000182');
+    insert into resultado (teste, ok) values ('emissora: CNPJ com dígito errado é recusado', false);
+  exception when check_violation then
+    insert into resultado (teste, ok) values ('emissora: CNPJ com dígito errado é recusado', true);
+  end;
+  insert into storage.objects (bucket_id, name, owner_id, metadata)
+  values ('logos', v_org || '/' || v_a || '/logo.png', auth.uid()::text, '{"mimetype":"image/png","size":1000}');
+  insert into resultado (teste, ok) values ('logo: dono/admin sobe a logo', true);
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'emissora: atendente vê a emissora e a logo',
+  (select count(*) from public.emissoras) = 1 and (select count(*) from storage.objects where bucket_id = 'logos') = 1;
+do $$
+begin
+  insert into public.emissoras (org_id, razao_social, cnpj) values (current_setting('teste.f7')::uuid, 'Atendente', '62213016000130');
+  insert into resultado (teste, ok) values ('emissora: atendente não cadastra', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('emissora: atendente não cadastra', true);
+end $$;
+do $$
+begin
+  insert into storage.objects (bucket_id, name, owner_id, metadata)
+  values ('logos', current_setting('teste.f7') || '/x/outra.png', auth.uid()::text, '{"mimetype":"image/png","size":10}');
+  insert into resultado (teste, ok) values ('logo: atendente não sobe logo', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('logo: atendente não sobe logo', true);
+end $$;
+update public.perfis set telefone = '5541999998888' where user_id = auth.uid();
+insert into resultado (teste, ok) select 'perfil: vendedor grava o próprio telefone', telefone = '5541999998888'
+  from public.perfis where user_id = auth.uid();
+do $$
+begin
+  update public.perfis set telefone = '123' where user_id = auth.uid();
+  insert into resultado (teste, ok) values ('perfil: telefone inválido recusado', false);
+exception when check_violation then
+  insert into resultado (teste, ok) values ('perfil: telefone inválido recusado', true);
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'emissora: outra empresa não vê emissora nem logo',
+  (select count(*) from public.emissoras) = 0 and (select count(*) from storage.objects where bucket_id = 'logos') = 0;
+
 reset role;
 select n, teste, ok from resultado order by n;

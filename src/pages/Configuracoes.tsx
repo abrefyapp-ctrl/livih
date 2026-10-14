@@ -4,6 +4,7 @@ import { PrimeirosPassos } from '../components/PrimeirosPassos'
 import { Icone, type NomeIcone } from '../components/Icone'
 import { SecaoAgente } from '../components/SecaoAgente'
 import { SecaoBase } from '../components/SecaoBase'
+import { SecaoEmpresa } from '../components/SecaoEmpresa'
 import { SecaoEquipe } from '../components/SecaoEquipe'
 import { SecaoModelos } from '../components/SecaoModelos'
 import { SecaoNotificacoes } from '../components/SecaoNotificacoes'
@@ -12,6 +13,7 @@ import { SecaoWhatsapp } from '../components/SecaoWhatsapp'
 
 const SECOES: { id: string; rotulo: string; icone: NomeIcone; soPlataforma?: boolean }[] = [
   { id: 'equipe', rotulo: 'Equipe', icone: 'equipe' },
+  { id: 'empresa', rotulo: 'Empresa', icone: 'empresa' },
   { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone' },
   // Modelos só existem na API oficial, que por enquanto só a equipe da plataforma conecta.
   { id: 'modelos', rotulo: 'Modelos', icone: 'arquivo', soPlataforma: true },
@@ -55,6 +57,7 @@ export function Configuracoes() {
         </nav>
         <div className="py-6">
           {secao === 'equipe' && <SecaoEquipe />}
+          {secao === 'empresa' && <SecaoEmpresa />}
           {secao === 'whatsapp' && <SecaoWhatsapp />}
           {secao === 'modelos' && <SecaoModelos />}
           {secao === 'agente' && <SecaoAgente />}

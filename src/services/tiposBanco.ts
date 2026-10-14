@@ -544,6 +544,87 @@ export type Database = {
           },
         ]
       }
+      emissoras: {
+        Row: {
+          atualizado_em: string
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          cnpj: string
+          complemento: string | null
+          condicoes_pagamento: string | null
+          criado_em: string
+          email: string | null
+          id: string
+          inscricao_estadual: string | null
+          logo_path: string | null
+          logradouro: string | null
+          nome_fantasia: string | null
+          numero: string | null
+          org_id: string
+          padrao: boolean
+          prazo_entrega: string | null
+          razao_social: string
+          rodape: string | null
+          site: string | null
+          telefone: string | null
+          uf: string | null
+          validade_dias: number
+        }
+        Insert: {
+          atualizado_em?: string
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj: string
+          complemento?: string | null
+          condicoes_pagamento?: string | null
+          criado_em?: string
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          logo_path?: string | null
+          logradouro?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          org_id: string
+          padrao?: boolean
+          prazo_entrega?: string | null
+          razao_social: string
+          rodape?: string | null
+          site?: string | null
+          telefone?: string | null
+          uf?: string | null
+          validade_dias?: number
+        }
+        Update: {
+          atualizado_em?: string
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string
+          complemento?: string | null
+          condicoes_pagamento?: string | null
+          criado_em?: string
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          logo_path?: string | null
+          logradouro?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          org_id?: string
+          padrao?: boolean
+          prazo_entrega?: string | null
+          razao_social?: string
+          rodape?: string | null
+          site?: string | null
+          telefone?: string | null
+          uf?: string | null
+          validade_dias?: number
+        }
+        Relationships: []
+      }
       estoque_movimentos: {
         Row: {
           autor_id: string | null
@@ -1324,18 +1405,21 @@ export type Database = {
           avatar_url: string | null
           criado_em: string
           nome: string | null
+          telefone: string | null
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
           criado_em?: string
           nome?: string | null
+          telefone?: string | null
           user_id: string
         }
         Update: {
           avatar_url?: string | null
           criado_em?: string
           nome?: string | null
+          telefone?: string | null
           user_id?: string
         }
         Relationships: []
