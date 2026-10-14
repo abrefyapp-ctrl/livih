@@ -121,6 +121,42 @@ export async function enviarMensagem(conversaId: string, texto: string) {
   if (error) throw error
 }
 
+/** Limite do bucket `midias` (upload do Supabase). */
+export const LIMITE_ARQUIVO = 50 * 1024 * 1024
+
+/**
+ * Sobe o arquivo no bucket privado e envia. O backend decide se vai como imagem, vídeo ou documento
+ * (pelo formato e tamanho guardados), e quem envia assume a conversa.
+ */
+export async function enviarArquivo(orgId: string, conversaId: string, arquivo: File, legenda: string) {
+  // A chave do storage não aceita qualquer caractere; o nome original vai para a mensagem.
+  const nomeChave =
+    arquivo.name
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^\w.-]+/g, '_')
+      .slice(-80) || 'arquivo'
+  const path = `${orgId}/${conversaId}/${crypto.randomUUID()}-${nomeChave}`
+  const { error: erroUpload } = await supabase.storage
+    .from('midias')
+    .upload(path, arquivo, { contentType: arquivo.type || 'application/octet-stream', upsert: false })
+  if (erroUpload) throw erroUpload
+  const { error } = await supabase.rpc('enviar_arquivo', {
+    p_conversa: conversaId,
+    p_path: path,
+    p_nome: arquivo.name,
+    p_legenda: legenda,
+  })
+  if (error) throw error
+}
+
+/** URL temporária para abrir/baixar um arquivo da conversa. */
+export async function urlArquivo(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from('midias').createSignedUrl(path, 3600)
+  if (error) throw error
+  return data.signedUrl
+}
+
 /** Envia um modelo aprovado da API oficial (fora da janela de 24 h). `texto` é o que fica no histórico. */
 export async function enviarModelo(conversaId: string, nome: string, idioma: string, parametros: string[], texto: string) {
   const { error } = await supabase.rpc('enviar_modelo', {

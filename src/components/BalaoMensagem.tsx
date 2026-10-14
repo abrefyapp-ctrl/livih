@@ -1,4 +1,5 @@
-import type { Mensagem } from '../services/atendimento'
+import { useEffect, useState } from 'react'
+import { urlArquivo, type Mensagem } from '../services/atendimento'
 import { hora } from '../services/formato'
 import { Icone, type NomeIcone } from './Icone'
 import { TextoWhatsapp } from './TextoWhatsapp'
@@ -22,7 +23,60 @@ const ENTREGA: Record<Mensagem['status_entrega'], { icone: NomeIcone; rotulo: st
   erro: { icone: 'erro', rotulo: 'Não enviada' },
 }
 
+/** Arquivo guardado no Livih (enviado pela equipe): imagem e vídeo aparecem; o resto vira link de baixar. */
+function Arquivo({ m, saida }: { m: Mensagem; saida: boolean }) {
+  const [url, setUrl] = useState<{ path: string; url: string | null } | null>(null)
+  useEffect(() => {
+    let ativo = true
+    urlArquivo(m.midia_path!)
+      .then((u) => ativo && setUrl({ path: m.midia_path!, url: u }))
+      .catch(() => ativo && setUrl({ path: m.midia_path!, url: null }))
+    return () => {
+      ativo = false
+    }
+  }, [m.midia_path])
+  const link = url?.path === m.midia_path ? url.url : undefined
+  const nome = m.midia_nome ?? 'arquivo'
+
+  if (link && m.tipo === 'imagem')
+    return (
+      <a href={link} target="_blank" rel="noreferrer" className="block">
+        <img src={link} alt={nome} className="max-h-64 rounded-md object-contain" />
+      </a>
+    )
+  if (link && m.tipo === 'video') return <video src={link} controls preload="metadata" className="max-h-64 rounded-md" />
+
+  return (
+    <a
+      href={link ?? undefined}
+      target="_blank"
+      rel="noreferrer"
+      download={nome}
+      aria-disabled={!link}
+      className={`flex items-center gap-2 rounded-md px-2 py-1.5 ${saida ? 'bg-white/10 hover:bg-white/20' : 'bg-fundo hover:bg-slate-100'}`}
+    >
+      <Icone nome="arquivo" className="size-5 shrink-0" />
+      <span className="min-w-0 flex-1 truncate font-medium">{nome}</span>
+      <Icone nome="baixar" className="size-4 shrink-0 opacity-80" />
+      <span className="sr-only">{link === null ? 'Arquivo indisponível' : 'Baixar'}</span>
+    </a>
+  )
+}
+
 function Conteudo({ m }: { m: Mensagem }) {
+  if (m.midia_path) {
+    return (
+      <div className="space-y-1">
+        <Arquivo m={m} saida={m.direcao === 'saida' && m.autor_tipo !== 'bot'} />
+        {m.texto && (
+          <p className="break-words whitespace-pre-wrap">
+            <TextoWhatsapp texto={m.texto} />
+          </p>
+        )}
+      </div>
+    )
+  }
+
   if (m.tipo === 'texto') {
     return (
       <p className="break-words whitespace-pre-wrap">

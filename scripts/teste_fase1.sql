@@ -1331,5 +1331,76 @@ exception when others then
   insert into resultado (teste, ok) values ('prospecção: outra empresa não usa o número da F7', sqlerrm = 'número não encontrado');
 end $$;
 
+-- ============================================================================
+-- Envio de arquivo (bucket midias + enviar_arquivo)
+-- ============================================================================
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_conv uuid := current_setting('teste.conversa')::uuid;
+  v_base text := current_setting('teste.f7') || '/' || current_setting('teste.conversa') || '/';
+  v_msg uuid;
+  m public.mensagens;
+begin
+  insert into storage.objects (bucket_id, name, owner_id, metadata) values
+    ('midias', v_base || 'a1-proposta.pdf', auth.uid()::text, '{"mimetype":"application/pdf","size":1000}'),
+    ('midias', v_base || 'a2-foto.png', auth.uid()::text, '{"mimetype":"image/png","size":100000}'),
+    ('midias', v_base || 'a3-grande.jpg', auth.uid()::text, '{"mimetype":"image/jpeg","size":6000000}');
+  insert into resultado (teste, ok) values ('arquivo: atendente sobe na conversa que vê', true);
+
+  v_msg := public.enviar_arquivo(v_conv, v_base || 'a1-proposta.pdf', 'Proposta Comercial.pdf', '  Segue a proposta ');
+  select * into m from public.mensagens where id = v_msg;
+  insert into resultado (teste, ok) values ('arquivo: PDF vira documento com nome e legenda',
+    m.tipo = 'documento' and m.midia_nome = 'Proposta Comercial.pdf' and m.texto = 'Segue a proposta'
+    and m.midia_mime = 'application/pdf' and m.status_entrega = 'pendente' and m.autor_tipo = 'atendente');
+  insert into resultado (teste, ok) select 'arquivo: entra na fila e no resumo da conversa',
+    exists (select 1 from public.fila_envio where mensagem_id = v_msg)
+    and (select ultima_mensagem_resumo from public.conversas where id = v_conv) = '📎 Segue a proposta';
+
+  v_msg := public.enviar_arquivo(v_conv, v_base || 'a2-foto.png', 'foto.png');
+  insert into resultado (teste, ok) select 'arquivo: PNG pequeno vira imagem, sem legenda',
+    tipo = 'imagem' and texto is null from public.mensagens where id = v_msg;
+  v_msg := public.enviar_arquivo(v_conv, v_base || 'a3-grande.jpg', 'grande.jpg');
+  insert into resultado (teste, ok) select 'arquivo: JPG acima de 5 MB vai como documento',
+    tipo = 'documento' from public.mensagens where id = v_msg;
+
+  begin
+    perform public.enviar_arquivo(v_conv, v_base || 'a1-proposta.pdf', 'de novo.pdf');
+    insert into resultado (teste, ok) values ('arquivo: o mesmo arquivo não vira duas mensagens', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('arquivo: o mesmo arquivo não vira duas mensagens', sqlerrm = 'arquivo já enviado');
+  end;
+  begin
+    perform public.enviar_arquivo(v_conv, v_base || 'nao-existe.pdf', 'x.pdf');
+    insert into resultado (teste, ok) values ('arquivo: caminho sem arquivo é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('arquivo: caminho sem arquivo é recusado', sqlerrm = 'arquivo não encontrado');
+  end;
+  begin
+    update public.mensagens set midia_nome = 'trocado.pdf' where midia_path = v_base || 'a1-proposta.pdf';
+    insert into resultado (teste, ok) values ('arquivo: nome do arquivo não muda depois de gravado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('arquivo: nome do arquivo não muda depois de gravado', true);
+  end;
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'arquivo: outra organização não vê os arquivos', count(*) = 0
+  from storage.objects where bucket_id = 'midias';
+do $$
+begin
+  insert into storage.objects (bucket_id, name, owner_id, metadata) values
+    ('midias', current_setting('teste.f7') || '/' || current_setting('teste.conversa') || '/x-invasao.pdf',
+     auth.uid()::text, '{"mimetype":"application/pdf","size":10}');
+  insert into resultado (teste, ok) values ('arquivo: outra organização não sobe na conversa', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('arquivo: outra organização não sobe na conversa', true);
+end $$;
+
+reset role;
+insert into resultado (teste, ok) select 'arquivo: fila entrega tipo, caminho e nome para o envio',
+  bool_or(tipo = 'documento' and midia_nome = 'Proposta Comercial.pdf' and midia_path like '%/a1-proposta.pdf')
+  from public.fila_reivindicar(100);
+
 reset role;
 select n, teste, ok from resultado order by n;

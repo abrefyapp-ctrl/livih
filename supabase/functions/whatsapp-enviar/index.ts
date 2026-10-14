@@ -28,8 +28,20 @@ type ItemFila = {
   tentativas: number;
   // Modelo da API oficial (fora da janela de 24 h); null = texto livre.
   modelo: { nome: string; idioma: string; parametros: string[] } | null;
+  // Arquivo (bucket `midias`); null = só texto. Com arquivo, `texto` é a legenda (pode ser null).
+  tipo: string;
+  midia_path: string | null;
+  midia_mime: string | null;
+  midia_nome: string | null;
 };
 type Resultado = { ok: boolean; id?: string; erro?: string };
+
+// O provedor baixa o arquivo por esta URL. 1 h basta: a fila tenta de novo com URL nova.
+async function urlArquivo(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from("midias").createSignedUrl(path, 3600);
+  if (error || !data?.signedUrl) throw new Error(`arquivo indisponível no storage: ${error?.message ?? path}`);
+  return data.signedUrl;
+}
 
 // Para quem enviar. O LID é o identificador que o WhatsApp realmente usa, então tem preferência.
 // Sem LID, pergunta ao WAHA o id certo do número: contas brasileiras antigas existem SEM o nono
@@ -56,16 +68,35 @@ async function enviarWaha(item: ItemFila): Promise<Resultado> {
   if (!WAHA_URL || !WAHA_API_KEY) return { ok: false, erro: "WAHA_URL/WAHA_API_KEY não configurados" };
   if (!item.instance_id) return { ok: false, erro: "canal sem sessão" };
   const chatId = await chatIdWaha(item);
+  if (item.midia_path) return await sendArquivoWaha(item, chatId);
   return await sendTextWaha(item.instance_id, chatId, item.texto, item.telefone);
+}
+
+// Imagem e vídeo aparecem na conversa; o resto vai como documento, com o nome original.
+// O WAHA da VPS é CORE: sendFile é comprovado (Casos Info); se sendImage/sendVideo for recusado (resposta de
+// erro, não timeout — aí pode ter saído), manda como arquivo para não travar o envio.
+async function sendArquivoWaha(item: ItemFila, chatId: string | null): Promise<Resultado> {
+  if (!chatId) return { ok: false, erro: `número sem WhatsApp: ${item.telefone}` };
+  const rota = item.tipo === "imagem" ? "sendImage" : item.tipo === "video" ? "sendVideo" : "sendFile";
+  const file = { mimetype: item.midia_mime, filename: item.midia_nome, url: await urlArquivo(item.midia_path!) };
+  const corpo = { session: item.instance_id, chatId, file, caption: item.texto ?? undefined };
+  const r = await postWaha(rota, corpo, 60000);
+  if (r.ok || rota === "sendFile") return r;
+  console.warn(`WAHA ${rota} recusado, indo por sendFile: ${r.erro}`);
+  return await postWaha("sendFile", corpo, 60000);
 }
 
 async function sendTextWaha(sessao: string, chatId: string | null, mensagem: string, telefone: string | null): Promise<Resultado> {
   if (!chatId) return { ok: false, erro: `número sem WhatsApp: ${telefone}` };
-  const r = await fetch(`${WAHA_URL}/api/sendText`, {
+  return await postWaha("sendText", { session: sessao, chatId, text: mensagem }, 20000);
+}
+
+async function postWaha(rota: string, corpoEnvio: unknown, prazoMs: number): Promise<Resultado> {
+  const r = await fetch(`${WAHA_URL}/api/${rota}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Api-Key": WAHA_API_KEY },
-    body: JSON.stringify({ session: sessao, chatId, text: mensagem }),
-    signal: AbortSignal.timeout(20000),
+    body: JSON.stringify(corpoEnvio),
+    signal: AbortSignal.timeout(prazoMs),
   });
   const texto = await r.text();
   if (!r.ok) return { ok: false, erro: `HTTP ${r.status}: ${texto.slice(0, 300)}` };
@@ -82,6 +113,8 @@ async function sendTextWaha(sessao: string, chatId: string | null, mensagem: str
 const ERROS_META: Record<number, string> = {
   131047: "Passaram mais de 24 h desde a última mensagem do cliente. Fora dessa janela a API oficial só envia modelo aprovado.",
   131026: "O número não recebe mensagens (sem WhatsApp ou versão antiga).",
+  131052: "A Meta não conseguiu baixar o arquivo. Tente enviar de novo.",
+  131053: "A Meta recusou o arquivo (formato ou tamanho não aceito pelo WhatsApp).",
   132001: "Esse modelo não existe (ou não neste idioma) na conta do WhatsApp. Confira em Configurações → Modelos.",
   132000: "A quantidade de variáveis não bate com o modelo aprovado.",
   132015: "O modelo foi pausado pela Meta por baixa qualidade.",
@@ -90,7 +123,14 @@ const ERROS_META: Record<number, string> = {
   190: "O acesso ao WhatsApp oficial expirou. Conecte o número de novo em Configurações → WhatsApp.",
 };
 
-function conteudoMeta(item: ItemFila) {
+async function conteudoMeta(item: ItemFila) {
+  if (item.midia_path) {
+    const link = await urlArquivo(item.midia_path);
+    const legenda = item.texto ? { caption: item.texto } : {};
+    if (item.tipo === "imagem") return { type: "image", image: { link, ...legenda } };
+    if (item.tipo === "video") return { type: "video", video: { link, ...legenda } };
+    return { type: "document", document: { link, filename: item.midia_nome ?? "arquivo", ...legenda } };
+  }
   if (!item.modelo) return { type: "text", text: { body: item.texto } };
   const parametros = item.modelo.parametros ?? [];
   return {
@@ -114,7 +154,7 @@ async function enviarMeta(item: ItemFila): Promise<Resultado> {
   const r = await fetch(`https://graph.facebook.com/v25.0/${item.instance_id}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: item.telefone, ...conteudoMeta(item) }),
+    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: item.telefone, ...(await conteudoMeta(item)) }),
     signal: AbortSignal.timeout(20000),
   });
   // deno-lint-ignore no-explicit-any

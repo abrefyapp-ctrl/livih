@@ -772,6 +772,7 @@ export type Database = {
           erro: string | null
           id: string
           midia_mime: string | null
+          midia_nome: string | null
           midia_path: string | null
           modelo: Json | null
           org_id: string
@@ -791,6 +792,7 @@ export type Database = {
           erro?: string | null
           id?: string
           midia_mime?: string | null
+          midia_nome?: string | null
           midia_path?: string | null
           modelo?: Json | null
           org_id: string
@@ -810,6 +812,7 @@ export type Database = {
           erro?: string | null
           id?: string
           midia_mime?: string | null
+          midia_nome?: string | null
           midia_path?: string | null
           modelo?: Json | null
           org_id?: string
@@ -1798,6 +1801,15 @@ export type Database = {
       }
       enviar_mensagem: {
         Args: { p_conversa: string; p_texto: string }
+        Returns: string
+      }
+      enviar_arquivo: {
+        Args: {
+          p_conversa: string
+          p_legenda?: string
+          p_nome: string
+          p_path: string
+        }
         Returns: string
       }
       enviar_modelo: {

@@ -6,6 +6,7 @@ import {
   buscarConversa,
   devolverAoAgente,
   encerrarConversa,
+  enviarArquivo,
   enviarMensagem,
   marcarComoLida,
   type ConversaLista,
@@ -256,6 +257,7 @@ export function PainelConversa({
       <Compositor
         dica={dica}
         aoEnviar={(t) => enviarMensagem(conversaId, t)}
+        aoEnviarArquivo={orgAtiva ? (f, legenda) => enviarArquivo(orgAtiva.id, conversaId, f, legenda) : undefined}
         acao={botaoModelo}
         bloqueio={
           janelaFechada &&
