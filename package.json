@@ -12,6 +12,7 @@
     "publicar": "git diff --quiet HEAD -- src public index.html && npm run build && git push && node scripts/verificar_site.mjs --esperar"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.9.0",
     "@supabase/supabase-js": "^2.117.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

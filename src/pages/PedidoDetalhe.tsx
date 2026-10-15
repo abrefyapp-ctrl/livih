@@ -18,6 +18,7 @@ import {
   type StatusPedido,
 } from '../services/erp'
 import { listarEmissoras, type Emissora } from '../services/empresa'
+import { gerarPdfOrcamento, montarOrcamento, nomeArquivoOrcamento } from '../services/orcamento'
 import { moeda, nomeDoContato, quandoCurto } from '../services/formato'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
@@ -92,6 +93,25 @@ export function PedidoDetalhe() {
     }
   }
 
+  // Gera no navegador e baixa. Lê do banco (não da tela): sai exatamente o que está salvo.
+  async function baixarPdf() {
+    setOcupado('pdf')
+    setErro(null)
+    try {
+      const dadosPdf = await montarOrcamento(orgId, pedido.id)
+      const url = URL.createObjectURL(await gerarPdfOrcamento(dadosPdf))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = nomeArquivoOrcamento(dadosPdf)
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    } catch {
+      setErro('Não foi possível gerar o PDF. Tente de novo.')
+    } finally {
+      setOcupado(null)
+    }
+  }
+
   // Ações destrutivas (cancelar, voltar ao rascunho, apagar) pedem confirmação; o resto vai direto.
   function acao(s: StatusPedido) {
     if (s === 'cancelado' || s === 'rascunho') setConfirmar(s)
@@ -123,6 +143,17 @@ export function PedidoDetalhe() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Botao
+              tamanho="sm"
+              variante="secundario"
+              icone="baixar"
+              carregando={ocupado === 'pdf'}
+              disabled={!!ocupado || !itens.length}
+              title={itens.length ? undefined : 'Adicione itens para gerar o PDF'}
+              onClick={() => void baixarPdf()}
+            >
+              {rascunho ? 'Orçamento em PDF' : 'PDF do pedido'}
+            </Botao>
             {PROXIMOS[pedido.status].map((s) => (
               <Botao
                 key={s}
