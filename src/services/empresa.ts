@@ -111,3 +111,14 @@ export async function salvarMeusDados(userId: string, nome: string, telefone: st
   const { error } = await supabase.from('perfis').update({ nome, telefone }).eq('user_id', userId)
   if (error) throw new Error('Não foi possível salvar seus dados. Tente de novo.')
 }
+
+/** Avisa a tela (cabeçalho) que a logo da empresa padrão pode ter mudado. */
+export const EVENTO_LOGO = 'livih:logo-alterada'
+export const avisarLogoAlterada = () => window.dispatchEvent(new Event(EVENTO_LOGO))
+
+/** URL temporária da logo da empresa padrão; null se não houver. */
+export async function logoPadrao(orgId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('emissoras').select('logo_path').eq('org_id', orgId).eq('padrao', true).maybeSingle()
+  if (error || !data?.logo_path) return null
+  return urlLogo(data.logo_path)
+}

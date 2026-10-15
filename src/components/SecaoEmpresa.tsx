@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, t
 import { useSessao } from '../hooks/useSessao'
 import { normalizarTelefone } from '../services/crm'
 import {
+  avisarLogoAlterada,
   buscarCep,
   cnpjValido,
   definirPadrao,
@@ -178,7 +179,8 @@ export function SecaoEmpresa() {
   useEffect(() => () => void (previaLogo && URL.revokeObjectURL(previaLogo)), [previaLogo])
 
   const lista = dados?.orgId === orgId ? dados.lista : null
-  const recarregar = () => setVersao((v) => v + 1)
+  // Toda mudança aqui pode trocar a logo do cabeçalho (logo nova, outra empresa padrão, empresa removida).
+  const recarregar = () => (setVersao((v) => v + 1), avisarLogoAlterada())
 
   function abrir(f: Form) {
     setForm(f)

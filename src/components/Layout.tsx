@@ -4,6 +4,7 @@ import { useSessao } from '../hooks/useSessao'
 import { useContagemAguardando } from '../hooks/useConversas'
 import { useNumerosCaidos } from '../hooks/useNumerosCaidos'
 import { Avatar } from './Avatar'
+import { LogoOrganizacao } from './LogoOrganizacao'
 import { Icone, type NomeIcone } from './Icone'
 import { Logo } from './Logo'
 import { Modal } from './Modal'
@@ -130,7 +131,7 @@ export function Layout() {
 
           {orgAtiva && (
             <div className="flex min-w-0 items-center gap-2">
-              <Avatar nome={orgAtiva.nome} tamanho="sm" tom="organizacao" />
+              <LogoOrganizacao orgId={orgAtiva.id} nome={orgAtiva.nome} />
               {organizacoes.length > 1 ? (
                 <label className="relative flex min-w-0 items-center">
                   <span className="sr-only">Organização</span>
