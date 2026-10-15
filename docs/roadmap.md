@@ -16,6 +16,8 @@ Planejamento do produto combinado em 12/10/2026. As pendências pequenas de tela
    montar o rascunho do pedido pela conversa; pedidos no perfil do contato; vários estoques/CNPJs se precisar.
 4. **Sincronização com o Google Agenda**, quando a verificação do app no Google sair.
 5. **ERP: cobrança** (Asaas) e depois **nota fiscal** (NF-e).
+6. **Orientador do agente** (ver seção abaixo). Começar pela peça 1, o painel Saúde do agente: protege a margem dos
+   planos e é rápida.
 
 Se a JoGrampo estiver esperando, os itens 2 e 3 trocam de lugar.
 
@@ -64,6 +66,34 @@ MVP:
 
 Depois: cobrança pelo Asaas ligada ao pedido (reaproveitar o código do VibePark, adaptado) e NF-e por API
 especializada com o certificado A1 de cada CNPJ.
+
+## Orientador do agente (proposto em 15/10)
+
+Problema: quem escreve as instruções e a base do agente é o cliente, e o jeito natural de escrever sai caro e pior.
+Caso real (JoGrampo, 15/10): catálogo de 277 produtos colado na base, um segundo catálogo duplicado, 154 linhas
+"=====" no prompt e regras de chamar a equipe repetindo o prompt. O agente lia ~100 mil tokens por resposta
+(R$ 0,14). Corrigido à mão: catálogo em Produtos com a ferramenta `buscar_produtos`, bases desativadas, separadores
+removidos (R$ 0,048 por resposta e caindo). Ainda é ~6x a estimativa de 09/10 (R$ 0,008).
+
+Por que importa: com 4,3 respostas por conversa (média da JoGrampo), R$ 0,048 por resposta dá ~R$ 0,21 por conversa,
+ou ~R$ 100 de IA nas 500 conversas do Essencial (R$ 147). O custo do agente depende de como o cliente configura.
+
+Quatro peças, nesta ordem:
+
+1. **Saúde do agente** (sem IA): em Configurações → Agente, o tamanho que o agente lê por resposta, o custo
+   estimado e o real dos últimos 7 dias, e alertas com conserto de um clique quando é seguro (catálogo na base,
+   conteúdo duplicado, separadores, itens longos, trechos repetidos). Especificação: [saude-do-agente.md](saude-do-agente.md).
+2. **Importador inteligente de catálogo**: texto colado, planilha ou PDF de tabela de preços → a IA extrai os
+   produtos para a prévia de importação que já existe. Liga com o alerta "parece catálogo" da peça 1.
+3. **Simulador de conversa**: tela "Testar agente" que conversa com o próprio agente sem WhatsApp (mesmo workflow do
+   n8n, com marca de teste para não enviar) e mostra resposta, buscas feitas e custo daquela resposta.
+4. **Assistente orientador**: conversa guiada que entrevista o dono (o que vende, horário, pagamento, frete, quando
+   chamar a equipe) e escreve instruções e base enxutas; num agente existente, revisa e aponta repetições. Sempre
+   como proposta com antes/depois para aprovar, nunca aplica sozinho. Edge Function chamando o modelo, consumo
+   registrado em `uso_ia` (tipo "assistente") e limite por empresa.
+
+Decidir antes da peça 4: o modelo do assistente (vale um mais forte que o gpt-5-mini: uso raro, texto que importa),
+quem usa (dono/admin e a plataforma no modo suporte) e se entra em todos os planos.
 
 ## Planos (decidido em 12/10)
 
