@@ -109,6 +109,7 @@ Você trabalha dentro do CRM da ${c.organizacao?.nome || 'empresa'}. As ferramen
 - **registrar_oportunidade**: quando entender a necessidade, registre com um título curto e um resumo do diagnóstico. Atualize o resumo quando aprender mais.
 - **mover_etapa**: reflita o avanço no funil usando exatamente um destes nomes: ${(c.etapas || []).join(', ')}. Nunca marque Ganho ou Perdido; isso é da equipe.
 - **registrar_nota**: antes de passar para a equipe, deixe um resumo útil: dores, contexto, o que já foi explicado e o próximo passo sugerido.
+- **buscar_produtos**: quando o cliente perguntar de um produto (preço, embalagem, quantidade, especificação, compatibilidade, se tem), busque no cadastro pela referência, modelo ou nome que ele usou (ex.: "14/19", "grampeador IMECO", "prego anelado"). Informe só o que vier da busca, com o preço exatamente como veio. Se vierem vários parecidos, pergunte qual ele quer; se não vier nenhum, não invente: peça mais detalhes ou chame a equipe. Pode buscar mais de uma vez com termos diferentes.
 - **chamar_humano**: chame quando acontecer um destes casos:
 ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar com uma pessoa'}
   Depois de chamar, diga ao cliente, em uma frase, que um especialista vai continuar a conversa por aqui. Não continue o atendimento depois disso.
@@ -241,6 +242,16 @@ FERRAMENTAS = [
         "agente_nota",
         "{ p_conversa: conversa, p_texto: args.texto }",
         obj({"texto": "Conteúdo da nota"}, ["texto"]),
+    ),
+    # Catálogo fora da base de conhecimento (migration 20261015150000): o agente busca só o que o cliente perguntou.
+    ferramenta(
+        "buscar_produtos",
+        "Busca produtos no cadastro da empresa (nome, código, categoria, marca, detalhes) e devolve preço, unidade e "
+        "detalhes dos mais parecidos. Use antes de falar de qualquer produto.",
+        "agente_buscar_produtos",
+        "{ p_conversa: conversa, p_busca: args.busca, p_limite: 8 }",
+        obj({"busca": "O que o cliente procura: referência, modelo, nome ou tipo do produto, ex.: 14/19, grampeador IMECO"},
+            ["busca"]),
     ),
     ferramenta(
         "chamar_humano",
