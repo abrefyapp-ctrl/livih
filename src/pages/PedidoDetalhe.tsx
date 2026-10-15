@@ -18,7 +18,14 @@ import {
   type StatusPedido,
 } from '../services/erp'
 import { listarEmissoras, type Emissora } from '../services/empresa'
-import { gerarPdfOrcamento, montarOrcamento, nomeArquivoOrcamento } from '../services/orcamento'
+import {
+  conversaDoCliente,
+  enviarOrcamentoWhatsapp,
+  gerarPdfOrcamento,
+  montarOrcamento,
+  nomeArquivoOrcamento,
+  type ConversaEnvio,
+} from '../services/orcamento'
 import { moeda, nomeDoContato, quandoCurto } from '../services/formato'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
@@ -50,6 +57,9 @@ export function PedidoDetalhe() {
   const [erro, setErro] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [confirmar, setConfirmar] = useState<StatusPedido | 'apagar' | null>(null)
+  const [conversa, setConversa] = useState<{ contatoId: string; info: ConversaEnvio | null } | null>(null)
+  const [confirmarEnvio, setConfirmarEnvio] = useState(false)
+  const [enviadoEm, setEnviadoEm] = useState<string | null>(null)
 
   const chave = `${id}|${versao}`
   useEffect(() => {
@@ -62,6 +72,20 @@ export function PedidoDetalhe() {
       ativo = false
     }
   }, [id, chave])
+
+  // Conversa do cliente por onde o PDF sai (a mais recente que a pessoa vê).
+  const contatoId = dados?.pedido.contato_id ?? null
+  useEffect(() => {
+    if (!contatoId) return
+    let ativo = true
+    conversaDoCliente(contatoId)
+      .then((info) => ativo && setConversa({ contatoId, info }))
+      .catch(() => ativo && setConversa({ contatoId, info: null }))
+    return () => {
+      ativo = false
+    }
+  }, [contatoId])
+  const envio = conversa && conversa.contatoId === contatoId ? conversa.info : undefined
 
   if (modulos && !modulos.has('erp')) {
     return <EstadoVazio icone="pedido" titulo="Pedidos e estoque não está ligado nesta empresa" />
@@ -112,6 +136,38 @@ export function PedidoDetalhe() {
     }
   }
 
+  // Antes de confirmar o envio, explica por que não dá (sem cliente, sem conversa, janela da API oficial).
+  function pedirEnvio() {
+    setEnviadoEm(null)
+    if (!pedido.contato) return setErro('Escolha o cliente do pedido para enviar pelo WhatsApp.')
+    if (envio === undefined) return setErro('Procurando a conversa do cliente. Tente de novo em instantes.')
+    if (!envio)
+      return setErro(
+        `${nomeDoContato(pedido.contato)} ainda não tem conversa no Livih. Comece uma em Conversas → Nova conversa e envie o PDF de lá, ou baixe e mande por outro canal.`,
+      )
+    if (envio.janelaFechada)
+      return setErro(
+        `Faz mais de 24 horas que ${nomeDoContato(pedido.contato)} escreveu no número ${envio.numero} (API oficial): só dá para retomar com um modelo aprovado. Depois que o cliente responder, o PDF pode ir.`,
+      )
+    setErro(null)
+    setConfirmarEnvio(true)
+  }
+
+  async function enviarWhatsapp() {
+    if (!envio) return
+    setOcupado('whatsapp')
+    setErro(null)
+    try {
+      await enviarOrcamentoWhatsapp(orgId, envio.id, await montarOrcamento(orgId, pedido.id))
+      setEnviadoEm(envio.id)
+    } catch {
+      setErro('O PDF não foi enviado. Confira a conexão e tente de novo.')
+    } finally {
+      setOcupado(null)
+      setConfirmarEnvio(false)
+    }
+  }
+
   // Ações destrutivas (cancelar, voltar ao rascunho, apagar) pedem confirmação; o resto vai direto.
   function acao(s: StatusPedido) {
     if (s === 'cancelado' || s === 'rascunho') setConfirmar(s)
@@ -154,6 +210,16 @@ export function PedidoDetalhe() {
             >
               {rascunho ? 'Orçamento em PDF' : 'PDF do pedido'}
             </Botao>
+            <Botao
+              tamanho="sm"
+              variante="secundario"
+              icone="enviar"
+              carregando={ocupado === 'whatsapp'}
+              disabled={!!ocupado || !itens.length}
+              onClick={pedirEnvio}
+            >
+              Enviar pelo WhatsApp
+            </Botao>
             {PROXIMOS[pedido.status].map((s) => (
               <Botao
                 key={s}
@@ -175,6 +241,14 @@ export function PedidoDetalhe() {
         </div>
 
         {erro && <Aviso tom="erro">{erro}</Aviso>}
+        {enviadoEm && (
+          <Aviso>
+            PDF enviado. Ele aparece na conversa como “Enviando” e muda para entregue quando chegar.{' '}
+            <Link to={`/conversas/${enviadoEm}`} className="font-medium text-primaria underline">
+              Ver na conversa
+            </Link>
+          </Aviso>
+        )}
         {rascunho && <Aviso>Rascunho: ajuste os itens e confirme. Só na confirmação o estoque baixa.</Aviso>}
 
         <Itens orgId={orgId} pedido={pedido} itens={itens} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />
@@ -186,6 +260,18 @@ export function PedidoDetalhe() {
 
         <Observacao pedido={pedido} aoErro={setErro} />
       </div>
+
+      <DialogoConfirmacao
+        aberto={confirmarEnvio}
+        titulo={`Enviar ${rascunho ? 'o orçamento' : 'o pedido'} pelo WhatsApp?`}
+        rotuloConfirmar="Enviar PDF"
+        carregando={ocupado === 'whatsapp'}
+        aoConfirmar={() => void enviarWhatsapp()}
+        aoCancelar={() => setConfirmarEnvio(false)}
+      >
+        {rascunho ? 'O orçamento' : 'O pedido'} nº {pedido.numero} vai em PDF para {pedido.contato ? nomeDoContato(pedido.contato) : 'o cliente'} pelo
+        número {envio?.numero}. Sai exatamente o que está salvo agora, fica no histórico da conversa e você assume o atendimento.
+      </DialogoConfirmacao>
 
       <DialogoConfirmacao
         aberto={!!confirmar}

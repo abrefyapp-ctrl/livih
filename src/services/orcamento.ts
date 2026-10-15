@@ -1,3 +1,4 @@
+import { enviarArquivo } from './atendimento'
 import { listarEquipeCompleta } from './configuracoes'
 import { listarEmissoras, urlLogo, type Emissora } from './empresa'
 import { buscarPedido, type ItemPedido, type Pedido } from './erp'
@@ -91,4 +92,46 @@ export function nomeArquivoOrcamento(d: DadosOrcamento): string {
 export async function gerarPdfOrcamento(d: DadosOrcamento): Promise<Blob> {
   const { gerarPdf } = await import('../components/DocumentoOrcamento')
   return gerarPdf(d)
+}
+
+export type ConversaEnvio = { id: string; numero: string; oficial: boolean; janelaFechada: boolean }
+
+/**
+ * Conversa do cliente por onde o orçamento sai: a mais recente que a pessoa vê (a RLS já filtra a carteira).
+ * Na API oficial, passadas 24 h da última mensagem do cliente, arquivo não sai (só modelo aprovado).
+ */
+export async function conversaDoCliente(contatoId: string): Promise<ConversaEnvio | null> {
+  const { data, error } = await supabase
+    .from('conversas')
+    .select('id, canal:canais(nome, tipo)')
+    .eq('contato_id', contatoId)
+    .order('ultima_mensagem_em', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  const canal = data.canal as unknown as { nome: string; tipo: string } | null
+  const oficial = canal?.tipo === 'meta'
+  let janelaFechada = false
+  if (oficial) {
+    const { data: ultima } = await supabase
+      .from('mensagens')
+      .select('criado_em')
+      .eq('conversa_id', data.id)
+      .eq('direcao', 'entrada')
+      .order('criado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    janelaFechada = !ultima || Date.now() - new Date(ultima.criado_em).getTime() > 24 * 3600_000
+  }
+  return { id: data.id, numero: canal?.nome ?? 'WhatsApp', oficial, janelaFechada }
+}
+
+/** Gera o PDF e manda na conversa (fica no histórico imutável, como qualquer arquivo enviado). */
+export async function enviarOrcamentoWhatsapp(orgId: string, conversaId: string, d: DadosOrcamento) {
+  const blob = await gerarPdfOrcamento(d)
+  const arquivo = new File([blob], nomeArquivoOrcamento(d), { type: 'application/pdf' })
+  const tipo = d.pedido.status === 'rascunho' ? 'Orçamento' : 'Pedido'
+  const empresa = d.emissora?.nome_fantasia || d.emissora?.razao_social
+  await enviarArquivo(orgId, conversaId, arquivo, `${tipo} nº ${d.pedido.numero}${empresa ? ` – ${empresa}` : ''}`)
 }
