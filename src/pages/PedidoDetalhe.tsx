@@ -25,6 +25,7 @@ import {
   montarOrcamento,
   nomeArquivoOrcamento,
   type ConversaEnvio,
+  type DadosOrcamento,
 } from '../services/orcamento'
 import { moeda, nomeDoContato, quandoCurto } from '../services/formato'
 import { useSessao } from '../hooks/useSessao'
@@ -35,6 +36,7 @@ import { DialogoConfirmacao } from '../components/DialogoConfirmacao'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { EtiquetaPedido } from '../components/EtiquetaPedido'
 import { Icone } from '../components/Icone'
+import { VisualizadorPdf } from '../components/VisualizadorPdf'
 
 const ROTULO_ACAO: Partial<Record<StatusPedido, string>> = {
   confirmado: 'Confirmar pedido',
@@ -60,6 +62,7 @@ export function PedidoDetalhe() {
   const [conversa, setConversa] = useState<{ contatoId: string; info: ConversaEnvio | null } | null>(null)
   const [confirmarEnvio, setConfirmarEnvio] = useState(false)
   const [enviadoEm, setEnviadoEm] = useState<string | null>(null)
+  const [previa, setPrevia] = useState<{ dados: DadosOrcamento | null; pdf: Blob | null; erro: string | null } | null>(null)
 
   const chave = `${id}|${versao}`
   useEffect(() => {
@@ -118,22 +121,26 @@ export function PedidoDetalhe() {
   }
 
   // Gera no navegador e baixa. Lê do banco (não da tela): sai exatamente o que está salvo.
-  async function baixarPdf() {
-    setOcupado('pdf')
+  // Prévia dentro do app. Gera do banco (não da tela): é exatamente o que sai no download e no WhatsApp.
+  async function abrirPrevia() {
     setErro(null)
+    setPrevia({ dados: null, pdf: null, erro: null })
     try {
       const dadosPdf = await montarOrcamento(orgId, pedido.id)
-      const url = URL.createObjectURL(await gerarPdfOrcamento(dadosPdf))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = nomeArquivoOrcamento(dadosPdf)
-      a.click()
-      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      setPrevia({ dados: dadosPdf, pdf: await gerarPdfOrcamento(dadosPdf), erro: null })
     } catch {
-      setErro('Não foi possível gerar o PDF. Tente de novo.')
-    } finally {
-      setOcupado(null)
+      setPrevia({ dados: null, pdf: null, erro: 'Não foi possível gerar o PDF. Feche e tente de novo.' })
     }
+  }
+
+  function baixarPdf() {
+    if (!previa?.dados || !previa.pdf) return
+    const url = URL.createObjectURL(previa.pdf)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = nomeArquivoOrcamento(previa.dados)
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
   }
 
   // Antes de confirmar o envio, explica por que não dá (sem cliente, sem conversa, janela da API oficial).
@@ -202,13 +209,12 @@ export function PedidoDetalhe() {
             <Botao
               tamanho="sm"
               variante="secundario"
-              icone="baixar"
-              carregando={ocupado === 'pdf'}
+              icone="arquivo"
               disabled={!!ocupado || !itens.length}
               title={itens.length ? undefined : 'Adicione itens para gerar o PDF'}
-              onClick={() => void baixarPdf()}
+              onClick={() => void abrirPrevia()}
             >
-              {rascunho ? 'Orçamento em PDF' : 'PDF do pedido'}
+              {rascunho ? 'Ver orçamento em PDF' : 'Ver PDF do pedido'}
             </Botao>
             <Botao
               tamanho="sm"
@@ -260,6 +266,31 @@ export function PedidoDetalhe() {
 
         <Observacao pedido={pedido} aoErro={setErro} />
       </div>
+
+      <VisualizadorPdf
+        aberto={!!previa}
+        titulo={`${rascunho ? 'Orçamento' : 'Pedido'} nº ${pedido.numero}`}
+        arquivo={previa?.pdf ?? null}
+        erro={previa?.erro}
+        aoFechar={() => setPrevia(null)}
+        acoes={
+          <>
+            <Botao variante="secundario" icone="baixar" disabled={!previa?.pdf} onClick={baixarPdf}>
+              Baixar
+            </Botao>
+            <Botao
+              icone="enviar"
+              disabled={!previa?.pdf}
+              onClick={() => {
+                setPrevia(null)
+                pedirEnvio()
+              }}
+            >
+              Enviar pelo WhatsApp
+            </Botao>
+          </>
+        }
+      />
 
       <DialogoConfirmacao
         aberto={confirmarEnvio}
