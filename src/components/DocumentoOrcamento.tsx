@@ -18,8 +18,25 @@ const moeda = (v: number) => reais.format(v)
 const COR = { texto: '#1f2933', suave: '#616e7c', linha: '#d9dee3', fundo: '#f4f6f8', destaque: '#111827' }
 
 const s = StyleSheet.create({
-  pagina: { paddingTop: 36, paddingBottom: 56, paddingHorizontal: 40, fontFamily: 'Helvetica', fontSize: 9, color: COR.texto, lineHeight: 1.35 },
-  topo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
+  // Cabeçalho compacto (logo pequena + nome) é fixo em toda página, com o espaço reservado no paddingTop. Na 1ª,
+  // o cabeçalho completo sobe para dentro desse espaço (marginTop negativo) e, com fundo branco, cobre o compacto.
+  // Não dá para montar o compacto só da 2ª em diante (render): imagem dentro de render não é carregada.
+  pagina: { paddingTop: 80, paddingBottom: 56, paddingHorizontal: 40, fontFamily: 'Helvetica', fontSize: 9, color: COR.texto, lineHeight: 1.35 },
+  topo: { marginTop: -44, minHeight: 40, backgroundColor: '#ffffff', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
+  compacto: {
+    position: 'absolute',
+    top: 36,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COR.linha,
+  },
+  logoCompacto: { maxWidth: 80, maxHeight: 24, objectFit: 'contain' },
+  nomeCompacto: { flexGrow: 1, fontSize: 10, fontFamily: 'Helvetica-Bold', color: COR.destaque },
   logo: { maxWidth: 150, maxHeight: 64, objectFit: 'contain' },
   empresa: { flexGrow: 1, alignItems: 'flex-end', textAlign: 'right' },
   empresaNome: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: COR.destaque, marginBottom: 2 },
@@ -64,7 +81,9 @@ const s = StyleSheet.create({
   condicoes: { marginTop: 18, flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   condicao: { width: '47%' },
   rodape: { marginTop: 18, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: COR.linha, color: COR.suave },
-  pagina_rodape: { position: 'absolute', bottom: 24, left: 40, right: 40, fontSize: 7.5, color: COR.suave },
+  // Texto calculado por página (render) só se posiciona certo com `top`: com `bottom`, a referência é a altura
+  // do conteúdo inteiro e ele vai parar fora da folha (y negativo).
+  pagina_rodape: { position: 'absolute', top: 804, left: 40, fontSize: 7.5, color: COR.suave },
 })
 
 const data = (iso: string | null | undefined) =>
@@ -83,6 +102,12 @@ function Documento({ d }: { d: DadosOrcamento }) {
   return (
     <Document title={titulo} author={e?.nome_fantasia || e?.razao_social || undefined} creator="Livih" producer="Livih">
       <Page size="A4" style={s.pagina}>
+        <View style={s.compacto} fixed>
+          {d.logo && <Image src={d.logo} style={s.logoCompacto} />}
+          <Text style={s.nomeCompacto}>{e?.nome_fantasia || e?.razao_social || ''}</Text>
+          <Text style={s.suave}>{titulo}</Text>
+        </View>
+
         <View style={s.topo}>
           {d.logo ? <Image src={d.logo} style={s.logo} /> : <View />}
           {e && (
@@ -194,11 +219,17 @@ function Documento({ d }: { d: DadosOrcamento }) {
           </View>
         )}
 
-        {/* Rodapé em toda página: identifica a folha solta. Sem "página x de y": o texto calculado por página
-            (render) sumia neste layout no @react-pdf 4.9. */}
-        <Text style={s.pagina_rodape} fixed>
+
+
+        {/* Rodapé em toda página: identifica a folha solta. */}
+        <Text style={[s.pagina_rodape, { width: 360 }]} fixed>
           {juntar([e?.nome_fantasia || e?.razao_social, titulo])}
         </Text>
+        <Text
+          style={[s.pagina_rodape, { left: 435, width: 120, textAlign: 'right' }]}
+          fixed
+          render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+        />
       </Page>
     </Document>
   )
