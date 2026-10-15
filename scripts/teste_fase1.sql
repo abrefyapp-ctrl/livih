@@ -1514,6 +1514,38 @@ begin
   end;
 end $$;
 
+-- Busca de produtos do agente (só a chave de serviço chama).
+reset role;
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_conv uuid := current_setting('teste.conversa')::uuid;
+  r jsonb;
+begin
+  insert into public.produtos (org_id, codigo, nome, unidade, preco, categoria, marca, ncm, descricao, controla_estoque) values
+    (v_org, '14/19', '14/19', 'cx', 102.70, 'Família 14', null, null, 'Caixinha com 9.450 unidades.', false),
+    (v_org, 'Prego 2,30x35 Anelado', 'Prego 2,30x35 Anelado', 'cx', 477.20, 'Família Prego', null, null, null, false),
+    (v_org, 'PACAR 2.038', 'PREGADOR PI-83', 'un', 7551.03, 'Pregadores', 'PACAR', '84671900', 'Pregador pneumático.', false),
+    (v_org, 'IMECO 4.003', 'GRAMPEADOR FIXALEV 2002', 'un', 777.13, 'Grampeadores', 'IMECO', '84671900', 'Compatível com a linha 92.', false);
+  r := public.agente_buscar_produtos(v_conv, '14/19');
+  insert into resultado (teste, ok) values ('busca: referência exata acha o produto', r -> 'produtos' -> 0 ->> 'nome' = '14/19' and r ->> 'aviso' is null);
+  r := public.agente_buscar_produtos(v_conv, 'prego');
+  insert into resultado (teste, ok) values ('busca: palavra inteira no nome vem antes (prego antes de pregador)', r -> 'produtos' -> 0 ->> 'nome' = 'Prego 2,30x35 Anelado');
+  r := public.agente_buscar_produtos(v_conv, 'grampeador imeço');
+  insert into resultado (teste, ok) values ('busca: ignora acento e maiúscula', r -> 'produtos' -> 0 ->> 'codigo' = 'IMECO 4.003' and (r -> 'produtos' -> 0 ->> 'preco')::numeric = 777.13);
+  r := public.agente_buscar_produtos(v_conv, 'parafusadeira dewalt');
+  insert into resultado (teste, ok) values ('busca: sem resultado avisa para não inventar', (r ->> 'encontrados')::int = 0 and r ->> 'aviso' like 'Nenhum produto encontrado%');
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.agente_buscar_produtos(current_setting('teste.conversa')::uuid, 'prego');
+  insert into resultado (teste, ok) values ('busca: usuário logado não chama a função do agente', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('busca: usuário logado não chama a função do agente', true);
+end $$;
+
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
 reset role;
 insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');
