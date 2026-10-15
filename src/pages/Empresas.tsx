@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { convidarDono, linkNovaSenha } from '../services/configuracoes'
 import { haQuanto } from '../services/formato'
 import {
@@ -30,7 +31,19 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 
 /** Painel da equipe F7: empresas clientes, acesso do dono, suspender/reativar e pedidos vindos do site. */
 export function Empresas() {
-  const { adminPlataforma, sessao } = useSessao()
+  const { adminPlataforma, sessao, organizacoes, trocarOrganizacao, acessarComoSuporte, sairDoSuporte } = useSessao()
+  const navegar = useNavigate()
+
+  // Suporte: entra na empresa sem virar membro da equipe dela. Se já for membro, só troca de empresa.
+  function acessar(e: Empresa) {
+    if (organizacoes.some((o) => o.id === e.id)) {
+      sairDoSuporte()
+      trocarOrganizacao(e.id)
+    } else {
+      acessarComoSuporte({ id: e.id, nome: e.nome, status: e.status })
+    }
+    navegar('/conversas')
+  }
   const [dados, setDados] = useState<{ empresas: Empresa[]; pedidos: PedidoAcesso[]; uso: Map<string, UsoIaMes> } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
@@ -244,6 +257,9 @@ export function Empresas() {
                   </div>
 
                   <div className="flex flex-wrap gap-2 lg:justify-end">
+                    <Botao tamanho="sm" icone="olho" onClick={() => acessar(e)} title="Abrir a empresa em modo suporte">
+                      Acessar
+                    </Botao>
                     <Botao tamanho="sm" variante="secundario" icone="link" carregando={ocupado === e.id && !suspender} onClick={() => void acessoDoDono(e)}>
                       {!e.dono_email ? 'Definir dono' : e.dono_senha_definida ? 'Senha do dono' : 'Link do dono'}
                     </Botao>

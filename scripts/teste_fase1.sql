@@ -1514,5 +1514,23 @@ begin
   end;
 end $$;
 
+-- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
+reset role;
+insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-suporte');
+  p public.pedidos;
+begin
+  perform public.plataforma_definir_modulo(v_org, 'erp', true);
+  insert into public.pedidos (org_id) values (v_org) returning * into p;
+  insert into resultado (teste, ok) values ('suporte: plataforma cria pedido sem ser da equipe (sem responsável)',
+    p.responsavel_id is null and p.criado_por = auth.uid());
+exception when others then
+  insert into resultado (teste, ok) values ('suporte: plataforma cria pedido sem ser da equipe (sem responsável)', false);
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

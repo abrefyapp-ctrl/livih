@@ -55,7 +55,10 @@ export function ModalOportunidade({
   // etapaInicial também vale para uma existente: arrastar para Perdido abre aqui já na etapa, pedindo o motivo.
   const [etapaId, setEtapaId] = useState(etapaInicial ?? oportunidade?.etapa_id ?? abertas[0]?.id ?? '')
   const [valor, setValor] = useState(oportunidade?.valor_estimado != null ? String(oportunidade.valor_estimado).replace('.', ',') : '')
-  const [responsavel, setResponsavel] = useState(oportunidade ? (oportunidade.responsavel_id ?? '') : (sessao?.user.id ?? ''))
+  // Em modo suporte a plataforma não é da equipe: começa sem responsável.
+  const [responsavel, setResponsavel] = useState(
+    oportunidade ? (oportunidade.responsavel_id ?? '') : orgAtiva?.suporte ? '' : (sessao?.user.id ?? ''),
+  )
   const [resumo, setResumo] = useState(oportunidade?.resumo ?? '')
   const [motivoPerda, setMotivoPerda] = useState(oportunidade?.motivo_perda ?? '')
   const [contatoId, setContatoId] = useState(contatoFixo?.id ?? oportunidade?.contato_id ?? '')

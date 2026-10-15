@@ -16,7 +16,14 @@ export type ConversaLista = Pick<
   canal: { id: string; nome: string; tipo: string } | null
 }
 
-export type Organizacao = { id: string; nome: string; status: string; papel: Database['public']['Enums']['papel_org'] }
+export type Organizacao = {
+  id: string
+  nome: string
+  status: string
+  papel: Database['public']['Enums']['papel_org']
+  /** Equipe da plataforma dentro de uma empresa da qual não é membro (modo suporte). */
+  suporte?: boolean
+}
 
 export type Oportunidade = Pick<Tabelas['oportunidades']['Row'], 'id' | 'titulo' | 'valor_estimado' | 'resumo'> & {
   etapa: { nome: string; tipo: Database['public']['Enums']['tipo_etapa'] } | null

@@ -8,7 +8,19 @@ import { desativarNotificacoes } from '../services/notificacoes'
 import { ContextoSessao } from '../hooks/useSessao'
 
 const CHAVE_ORG = 'livih.org'
+const CHAVE_SUPORTE = 'livih.suporte'
 const SEM_EQUIPE = new Map<string, Perfil>()
+
+// Empresa aberta em modo suporte (equipe da plataforma). Sobrevive ao recarregar; só vale para admin da plataforma.
+type OrgSuporte = Pick<Organizacao, 'id' | 'nome' | 'status'>
+function lerSuporte(): OrgSuporte | null {
+  try {
+    const v = localStorage.getItem(CHAVE_SUPORTE)
+    return v ? (JSON.parse(v) as OrgSuporte) : null
+  } catch {
+    return null
+  }
+}
 
 function lerOrgSalva(): string | null {
   try {
@@ -28,6 +40,7 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
   const [sessao, setSessao] = useState<Session | null | undefined>(undefined)
   const [orgs, setOrgs] = useState<Orgs | null>(null)
   const [orgId, setOrgId] = useState<string | null>(lerOrgSalva)
+  const [suporte, setSuporte] = useState<OrgSuporte | null>(lerSuporte)
   const [equipe, setEquipe] = useState<Equipe | null>(null)
   const [modulos, setModulos] = useState<Modulos | null>(null)
   const [versaoModulos, setVersaoModulos] = useState(0)
@@ -63,10 +76,13 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
   )
   const carregandoOrgs = !!userId && orgs?.userId !== userId
 
-  const orgAtiva = useMemo(
-    () => organizacoes.find((o) => o.id === orgId) ?? organizacoes[0] ?? null,
-    [organizacoes, orgId],
-  )
+  // Modo suporte: a tela trata a plataforma como dono (o banco já libera tudo para eh_admin_plataforma).
+  const orgAtiva = useMemo<Organizacao | null>(() => {
+    if (adminPlataforma && suporte) {
+      return organizacoes.find((o) => o.id === suporte.id) ?? { ...suporte, papel: 'dono', suporte: true }
+    }
+    return organizacoes.find((o) => o.id === orgId) ?? organizacoes[0] ?? null
+  }, [organizacoes, orgId, adminPlataforma, suporte])
 
   const orgAtivaId = orgAtiva?.id
   useEffect(() => {
@@ -115,11 +131,30 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const acessarComoSuporte = useCallback((org: OrgSuporte) => {
+    setSuporte(org)
+    try {
+      localStorage.setItem(CHAVE_SUPORTE, JSON.stringify(org))
+    } catch {
+      /* sem armazenamento: vale só nesta aba */
+    }
+  }, [])
+
+  const sairDoSuporte = useCallback(() => {
+    setSuporte(null)
+    try {
+      localStorage.removeItem(CHAVE_SUPORTE)
+    } catch {
+      /* nada salvo */
+    }
+  }, [])
+
   const sair = useCallback(async () => {
     // Aparelho compartilhado: quem sai não continua recebendo as notificações da conta.
     await desativarNotificacoes().catch(() => undefined)
+    sairDoSuporte()
     await supabase.auth.signOut()
-  }, [])
+  }, [sairDoSuporte])
 
   const valor = useMemo(
     () => ({
@@ -133,9 +168,25 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
       modulos: modulosAtivos,
       recarregarModulos,
       trocarOrganizacao,
+      acessarComoSuporte,
+      sairDoSuporte,
       sair,
     }),
-    [sessao, organizacoes, suspensas, adminPlataforma, orgAtiva, carregandoOrgs, mapaEquipe, modulosAtivos, recarregarModulos, trocarOrganizacao, sair],
+    [
+      sessao,
+      organizacoes,
+      suspensas,
+      adminPlataforma,
+      orgAtiva,
+      carregandoOrgs,
+      mapaEquipe,
+      modulosAtivos,
+      recarregarModulos,
+      trocarOrganizacao,
+      acessarComoSuporte,
+      sairDoSuporte,
+      sair,
+    ],
   )
 
   return <ContextoSessao.Provider value={valor}>{children}</ContextoSessao.Provider>

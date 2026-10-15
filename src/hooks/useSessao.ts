@@ -20,6 +20,9 @@ export type Sessao = {
   /** Recarrega os módulos (depois que a plataforma muda algum). */
   recarregarModulos: () => void
   trocarOrganizacao: (id: string) => void
+  /** Equipe da plataforma: abre uma empresa cliente sem ser membro (modo suporte). */
+  acessarComoSuporte: (org: Pick<Organizacao, 'id' | 'nome' | 'status'>) => void
+  sairDoSuporte: () => void
   sair: () => Promise<void>
 }
 

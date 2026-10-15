@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useSessao } from '../hooks/useSessao'
 import { useContagemAguardando } from '../hooks/useConversas'
 import { useNumerosCaidos } from '../hooks/useNumerosCaidos'
@@ -17,7 +17,8 @@ type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: num
  * Celular: barra lateral vira gaveta aberta pelo botão de menu.
  */
 export function Layout() {
-  const { orgAtiva, organizacoes, trocarOrganizacao, sessao, equipe, sair, adminPlataforma, modulos } = useSessao()
+  const { orgAtiva, organizacoes, trocarOrganizacao, sessao, equipe, sair, adminPlataforma, modulos, sairDoSuporte } = useSessao()
+  const navegar = useNavigate()
   const aguardando = useContagemAguardando(orgAtiva?.id)
   const caidos = useNumerosCaidos(orgAtiva?.id)
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
@@ -132,7 +133,8 @@ export function Layout() {
           {orgAtiva && (
             <div className="flex min-w-0 items-center gap-2">
               <LogoOrganizacao orgId={orgAtiva.id} nome={orgAtiva.nome} />
-              {organizacoes.length > 1 ? (
+              {/* Em modo suporte a empresa não está na lista: só o nome (sai-se pela faixa de suporte). */}
+              {organizacoes.length > 1 && !orgAtiva.suporte ? (
                 <label className="relative flex min-w-0 items-center">
                   <span className="sr-only">Organização</span>
                   <select
@@ -180,6 +182,29 @@ export function Layout() {
             </button>
           </div>
         </header>
+
+        {orgAtiva?.suporte && (
+          <div
+            role="status"
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-atencao/30 bg-atencao-suave px-4 py-2 text-pequeno text-texto lg:px-6"
+          >
+            <Icone nome="olho" className="size-4 shrink-0 text-atencao" />
+            <span className="font-semibold">Modo suporte: {orgAtiva.nome}.</span>
+            <span className="text-texto-2">
+              Você está dentro da empresa como equipe da plataforma. O que fizer aqui (responder, editar) fica com o seu nome.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                sairDoSuporte()
+                navegar('/empresas')
+              }}
+              className="ml-auto font-semibold text-atencao underline"
+            >
+              Sair do modo suporte
+            </button>
+          </div>
+        )}
 
         {caidos.length > 0 && (
           <div role="alert" className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-erro px-4 py-2 text-pequeno text-white lg:px-6">

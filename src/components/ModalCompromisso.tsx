@@ -57,7 +57,10 @@ export function ModalCompromisso({
   const [data, setData] = useState(dataInput(base))
   const [inicio, setInicio] = useState(horaInput(base))
   const [fim, setFim] = useState(horaInput(fimBase))
-  const [responsavel, setResponsavel] = useState(compromisso ? (compromisso.responsavel_id ?? '') : (sessao?.user.id ?? ''))
+  // Em modo suporte a plataforma não é da equipe: começa sem responsável.
+  const [responsavel, setResponsavel] = useState(
+    compromisso ? (compromisso.responsavel_id ?? '') : orgAtiva?.suporte ? '' : (sessao?.user.id ?? ''),
+  )
   const [contatoId, setContatoId] = useState(contatoFixo?.id ?? compromisso?.contato_id ?? '')
   const [oportunidadeId, setOportunidadeId] = useState(compromisso?.oportunidade_id ?? '')
   const [local, setLocal] = useState(compromisso?.local ?? '')

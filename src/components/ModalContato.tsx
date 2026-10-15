@@ -30,7 +30,10 @@ export function ModalContato({
   const [empresa, setEmpresa] = useState(inicial?.empresa ?? '')
   const [email, setEmail] = useState(inicial?.email ?? '')
   const [semAgente, setSemAgente] = useState(inicial?.sem_agente ?? false)
-  const [responsavel, setResponsavel] = useState(editando ? (inicial?.responsavel_id ?? '') : (sessao?.user.id ?? ''))
+  // Em modo suporte a plataforma não é da equipe: começa sem responsável.
+  const [responsavel, setResponsavel] = useState(
+    editando ? (inicial?.responsavel_id ?? '') : orgAtiva?.suporte ? '' : (sessao?.user.id ?? ''),
+  )
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
