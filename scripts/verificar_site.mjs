@@ -66,26 +66,37 @@ if (!chrome) {
 }
 
 // Perfil descartável: sem cookies nem sessão = visitante sem login, e sem service worker antigo.
-const perfil = mkdtempSync(join(tmpdir(), 'livih-verificar-'))
-const r = spawnSync(
-  chrome,
-  [
-    '--headless=new',
-    '--disable-gpu',
-    `--user-data-dir=${perfil}`,
-    '--enable-logging=stderr',
-    '--v=0',
-    '--virtual-time-budget=10000',
-    '--dump-dom',
-    url,
-  ],
-  { encoding: 'utf8', timeout: 60_000 },
-)
-rmSync(perfil, { recursive: true, force: true })
+function abrir() {
+  const perfil = mkdtempSync(join(tmpdir(), 'livih-verificar-'))
+  const r = spawnSync(
+    chrome,
+    [
+      '--headless=new',
+      '--disable-gpu',
+      `--user-data-dir=${perfil}`,
+      '--enable-logging=stderr',
+      '--v=0',
+      '--virtual-time-budget=10000',
+      '--dump-dom',
+      url,
+    ],
+    { encoding: 'utf8', timeout: 60_000 },
+  )
+  rmSync(perfil, { recursive: true, force: true })
+  if (r.error) {
+    console.error(`Falha ao rodar o Chrome: ${r.error.message}`)
+    process.exit(2)
+  }
+  return r
+}
 
-if (r.error) {
-  console.error(`Falha ao rodar o Chrome: ${r.error.message}`)
-  process.exit(2)
+let r = abrir()
+// Logo depois do deploy, partes da Cloudflare ainda servem a versão anterior por alguns segundos (bundle trocado,
+// tela branca). Antes de acusar falha, tenta mais uma vez.
+if (esperar && (!bundleDe(r.stdout ?? '') || !(r.stdout ?? '').match(/<div id="root">\s*<\w/))) {
+  console.log('A primeira abertura pegou o deploy no meio; tentando de novo em 30 s…')
+  await new Promise((ok) => setTimeout(ok, 30_000))
+  r = abrir()
 }
 
 const dom = r.stdout ?? ''
