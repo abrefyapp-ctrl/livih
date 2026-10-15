@@ -40,7 +40,7 @@ const amigavel = (m: string, padrao: string) => {
   const conhecidos = [
     'o pedido não tem itens',
     'só dá para mudar os itens',
-    'cliente, desconto e frete só mudam no rascunho',
+    'cliente, valores e condições só mudam no rascunho',
     'ajuste precisa de motivo',
     'quantidade inválida',
     'o responsável precisa ser da equipe',
@@ -142,7 +142,18 @@ export async function criarPedido(orgId: string, contatoId: string | null): Prom
 
 export async function atualizarPedido(
   id: string,
-  dados: Partial<Pick<Tabelas['pedidos']['Update'], 'contato_id' | 'desconto' | 'frete' | 'observacao' | 'responsavel_id'>>,
+  dados: Partial<Pick<
+      Tabelas['pedidos']['Update'],
+      | 'contato_id'
+      | 'desconto'
+      | 'frete'
+      | 'observacao'
+      | 'responsavel_id'
+      | 'emissora_id'
+      | 'validade'
+      | 'condicoes_pagamento'
+      | 'prazo_entrega'
+    >>,
 ) {
   const { error } = await supabase.from('pedidos').update(dados).eq('id', id)
   if (error) throw amigavel(error.message, 'Não foi possível salvar o pedido.')

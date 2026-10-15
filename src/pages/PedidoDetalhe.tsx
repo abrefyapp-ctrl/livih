@@ -17,6 +17,7 @@ import {
   type Produto,
   type StatusPedido,
 } from '../services/erp'
+import { listarEmissoras, type Emissora } from '../services/empresa'
 import { moeda, nomeDoContato, quandoCurto } from '../services/formato'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
@@ -148,6 +149,9 @@ export function PedidoDetalhe() {
         <Itens orgId={orgId} pedido={pedido} itens={itens} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />
 
         <Totais pedido={pedido} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />
+
+        {/* Recria ao trocar a empresa: o banco recarrega validade, condições e prazo. */}
+        <Orcamento key={pedido.emissora_id ?? 'sem'} orgId={orgId} pedido={pedido} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />
 
         <Observacao pedido={pedido} aoErro={setErro} />
       </div>
@@ -491,3 +495,178 @@ function Observacao({ pedido, aoErro }: { pedido: Pedido; aoErro: (m: string | n
   )
 }
 
+const hojeBrasil = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+const dataCurta = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR')
+
+/** De qual empresa (CNPJ) o orçamento sai, vendedor, validade, condições e prazo. Tudo vai para o PDF. */
+function Orcamento({
+  orgId,
+  pedido,
+  editavel,
+  aoMudar,
+  aoErro,
+}: {
+  orgId: string
+  pedido: Pedido
+  editavel: boolean
+  aoMudar: () => void
+  aoErro: (m: string | null) => void
+}) {
+  const { equipe } = useSessao()
+  const [emissoras, setEmissoras] = useState<{ orgId: string; lista: Emissora[] } | null>(null)
+  const [validade, setValidade] = useState(pedido.validade ?? '')
+  const [prazo, setPrazo] = useState(pedido.prazo_entrega ?? '')
+  const [condicoes, setCondicoes] = useState(pedido.condicoes_pagamento ?? '')
+
+  useEffect(() => {
+    let ativo = true
+    listarEmissoras(orgId)
+      .then((lista) => ativo && setEmissoras({ orgId, lista }))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [orgId])
+
+  const lista = emissoras?.orgId === orgId ? emissoras.lista : null
+  const emissora = lista?.find((e) => e.id === pedido.emissora_id)
+  const vencido = editavel && !!pedido.validade && pedido.validade < hojeBrasil()
+  const vendedores = [...equipe.values()].sort((a, b) => (a.nome ?? '').localeCompare(b.nome ?? ''))
+
+  async function salvar(dados: Parameters<typeof atualizarPedido>[1]) {
+    aoErro(null)
+    try {
+      await atualizarPedido(pedido.id, dados)
+      aoMudar()
+    } catch (e) {
+      aoErro((e as Error).message)
+    }
+  }
+
+  const rotulo = 'block text-pequeno font-medium text-texto-2'
+  const caixa = 'block h-10 w-full rounded-md border border-borda bg-superficie px-3 focus:border-primaria focus:outline-none disabled:bg-fundo disabled:text-texto-2'
+  const nomeEmissora = (e: Emissora) => e.nome_fantasia || e.razao_social
+
+  return (
+    <section aria-labelledby="titulo-orcamento" className="rounded-lg border border-borda bg-superficie">
+      <h2 id="titulo-orcamento" className="border-b border-borda px-4 py-3 font-semibold">
+        Orçamento
+      </h2>
+      <div className="space-y-4 p-4">
+        {vencido && (
+          <Aviso tom="atencao">
+            A validade deste orçamento venceu em {dataCurta(pedido.validade!)}. Confira preços e condições antes de reenviar.
+          </Aviso>
+        )}
+        {lista && !lista.length && (
+          <Aviso>
+            Nenhuma empresa cadastrada: o orçamento sai sem logo e sem CNPJ.{' '}
+            <Link to="/configuracoes/empresa" className="font-medium text-primaria underline">
+              Cadastrar em Configurações → Empresa
+            </Link>
+          </Aviso>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {!!lista?.length && (
+            <div className="space-y-1.5">
+              <label htmlFor="orc-emissora" className={rotulo}>
+                Empresa (CNPJ)
+              </label>
+              {lista.length > 1 ? (
+                <select
+                  id="orc-emissora"
+                  value={pedido.emissora_id ?? ''}
+                  disabled={!editavel}
+                  onChange={(e) => void salvar({ emissora_id: e.target.value || null })}
+                  className={caixa}
+                >
+                  {!emissora && <option value="">Escolha</option>}
+                  {lista.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {nomeEmissora(e)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p id="orc-emissora" className="flex h-10 items-center text-pequeno">
+                  {emissora ? nomeEmissora(emissora) : nomeEmissora(lista[0])}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label htmlFor="orc-vendedor" className={rotulo}>
+              Vendedor responsável
+            </label>
+            <select
+              id="orc-vendedor"
+              value={pedido.responsavel_id ?? ''}
+              onChange={(e) => void salvar({ responsavel_id: e.target.value || null })}
+              className={caixa}
+            >
+              <option value="">Ninguém</option>
+              {vendedores.map((v) => (
+                <option key={v.user_id} value={v.user_id}>
+                  {v.nome ?? 'Sem nome'}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="orc-validade" className={rotulo}>
+              Válido até
+            </label>
+            <input
+              id="orc-validade"
+              type="date"
+              value={validade}
+              disabled={!editavel}
+              onChange={(e) => setValidade(e.target.value)}
+              onBlur={() => validade !== (pedido.validade ?? '') && void salvar({ validade: validade || null })}
+              className={caixa}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="orc-prazo" className={rotulo}>
+              Prazo de entrega
+            </label>
+            <input
+              id="orc-prazo"
+              value={prazo}
+              maxLength={500}
+              disabled={!editavel}
+              placeholder="Ex.: 10 dias úteis"
+              onChange={(e) => setPrazo(e.target.value)}
+              onBlur={() => prazo.trim() !== (pedido.prazo_entrega ?? '') && void salvar({ prazo_entrega: prazo.trim() || null })}
+              className={caixa}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="orc-condicoes" className={rotulo}>
+            Condições de pagamento
+          </label>
+          <textarea
+            id="orc-condicoes"
+            rows={2}
+            maxLength={1000}
+            value={condicoes}
+            disabled={!editavel}
+            placeholder="Ex.: 50% na aprovação e 50% na entrega"
+            onChange={(e) => setCondicoes(e.target.value)}
+            onBlur={() =>
+              condicoes.trim() !== (pedido.condicoes_pagamento ?? '') && void salvar({ condicoes_pagamento: condicoes.trim() || null })
+            }
+            className="block w-full rounded-md border border-borda bg-superficie px-3 py-2 text-pequeno focus:border-primaria focus:outline-none disabled:bg-fundo disabled:text-texto-2"
+          />
+        </div>
+        {!editavel && <p className="text-legenda text-texto-3">Depois de confirmado, só o vendedor responsável muda.</p>}
+      </div>
+    </section>
+  )
+}

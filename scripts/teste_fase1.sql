@@ -1463,5 +1463,56 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 insert into resultado (teste, ok) select 'emissora: outra empresa não vê emissora nem logo',
   (select count(*) from public.emissoras) = 0 and (select count(*) from storage.objects where bucket_id = 'logos') = 0;
 
+-- ============================================================================
+-- Orçamento no pedido (emissora, validade, condições, prazo, responsável)
+-- ============================================================================
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_padrao uuid := (select id from public.emissoras where org_id = current_setting('teste.f7')::uuid and padrao);
+  v_outra uuid;
+  v_ped uuid;
+  p public.pedidos;
+begin
+  perform public.plataforma_definir_modulo(v_org, 'erp', true);
+  update public.emissoras set validade_dias = 10, condicoes_pagamento = 'Pix à vista', prazo_entrega = '5 dias úteis' where id = v_padrao;
+  insert into public.emissoras (org_id, razao_social, cnpj, validade_dias, condicoes_pagamento, prazo_entrega)
+  values (v_org, 'F7 Filial', '11444777000161', 30, 'Boleto 30 dias', '15 dias') returning id into v_outra;
+
+  insert into public.pedidos (org_id) values (v_org) returning * into p;
+  v_ped := p.id;
+  insert into resultado (teste, ok) values ('orçamento: pedido novo vem com a emissora padrão e os padrões dela',
+    p.emissora_id = v_padrao and p.validade = public.hoje_brasil() + 10
+    and p.condicoes_pagamento = 'Pix à vista' and p.prazo_entrega = '5 dias úteis');
+  insert into resultado (teste, ok) values ('orçamento: quem cria vira o responsável', p.responsavel_id = auth.uid());
+
+  update public.pedidos set prazo_entrega = 'Combinado: 2 dias' where id = v_ped;
+  update public.pedidos set emissora_id = v_outra where id = v_ped returning * into p;
+  insert into resultado (teste, ok) values ('orçamento: trocar a emissora recarrega só o que ainda era padrão',
+    p.validade = public.hoje_brasil() + 30 and p.condicoes_pagamento = 'Boleto 30 dias' and p.prazo_entrega = 'Combinado: 2 dias');
+
+  insert into public.pedido_itens (org_id, pedido_id, descricao, quantidade, preco_unitario) values (v_org, v_ped, 'Serviço', 1, 100);
+  perform public.pedido_mudar_status(v_ped, 'confirmado');
+  begin
+    update public.pedidos set condicoes_pagamento = 'mudou' where id = v_ped;
+    insert into resultado (teste, ok) values ('orçamento: condições não mudam depois de confirmado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('orçamento: condições não mudam depois de confirmado', sqlerrm like 'cliente, valores e condições só mudam no rascunho%');
+  end;
+  update public.pedidos set responsavel_id = '00000000-0000-0000-0000-0000000000b1' where id = v_ped;
+  insert into resultado (teste, ok) select 'orçamento: responsável ainda muda depois de confirmado',
+    responsavel_id = '00000000-0000-0000-0000-0000000000b1' from public.pedidos where id = v_ped;
+
+  begin
+    delete from public.emissoras where id = v_outra;
+    insert into resultado (teste, ok) values ('orçamento: empresa usada em pedido não é apagada', false);
+  exception when foreign_key_violation then
+    insert into resultado (teste, ok) values ('orçamento: empresa usada em pedido não é apagada', true);
+  end;
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

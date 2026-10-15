@@ -1267,6 +1267,10 @@ export type Database = {
       }
       pedidos: {
         Row: {
+          condicoes_pagamento: string | null
+          emissora_id: string | null
+          prazo_entrega: string | null
+          validade: string | null
           atualizado_em: string
           confirmado_em: string | null
           contato_id: string | null
@@ -1287,6 +1291,10 @@ export type Database = {
           total: number
         }
         Insert: {
+          condicoes_pagamento?: string | null
+          emissora_id?: string | null
+          prazo_entrega?: string | null
+          validade?: string | null
           atualizado_em?: string
           confirmado_em?: string | null
           contato_id?: string | null
@@ -1307,6 +1315,10 @@ export type Database = {
           total?: number
         }
         Update: {
+          condicoes_pagamento?: string | null
+          emissora_id?: string | null
+          prazo_entrega?: string | null
+          validade?: string | null
           atualizado_em?: string
           confirmado_em?: string | null
           contato_id?: string | null

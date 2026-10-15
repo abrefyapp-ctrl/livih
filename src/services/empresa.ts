@@ -58,7 +58,12 @@ export async function definirPadrao(id: string) {
 
 export async function removerEmissora(e: Emissora) {
   const { error } = await supabase.from('emissoras').delete().eq('id', e.id)
-  if (error) throw new Error('Não foi possível remover. Tente de novo.')
+  if (error)
+    throw new Error(
+      error.code === '23503'
+        ? 'Essa empresa já está em pedidos e não pode sair: eles precisam continuar mostrando de qual CNPJ saíram.'
+        : 'Não foi possível remover. Tente de novo.',
+    )
   if (e.logo_path) await supabase.storage.from('logos').remove([e.logo_path])
 }
 
