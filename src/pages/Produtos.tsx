@@ -58,12 +58,35 @@ function lerCsv(texto: string): string[][] {
   return linhas
 }
 
-const COLUNAS: Record<keyof Pick<DadosProduto, 'codigo' | 'nome' | 'unidade' | 'preco' | 'estoque_minimo'>, string[]> = {
+type ColunaPlanilha = 'codigo' | 'nome' | 'unidade' | 'preco' | 'estoque_minimo' | 'categoria' | 'marca' | 'ncm' | 'descricao' | 'controla_estoque'
+const COLUNAS: Record<ColunaPlanilha, string[]> = {
   codigo: ['codigo', 'cod', 'sku', 'referencia', 'ref'],
   nome: ['nome', 'produto', 'descricao', 'item'],
   unidade: ['unidade', 'un', 'und', 'medida'],
   preco: ['preco', 'valor', 'preco de venda', 'preco venda'],
   estoque_minimo: ['estoque minimo', 'estoque_minimo', 'minimo'],
+  categoria: ['categoria', 'familia', 'grupo', 'linha'],
+  marca: ['marca', 'fabricante', 'fornecedor'],
+  ncm: ['ncm'],
+  // "descricao" já é sinônimo de nome (planilhas antigas); o texto longo vem em "detalhes".
+  descricao: ['detalhes', 'especificacoes', 'observacoes'],
+  controla_estoque: ['controla estoque', 'controla_estoque', 'estoque controlado'],
+}
+
+/** sim/não, s/n, 1/0, x; vazio → null; outra coisa → undefined. */
+function lerSimNao(v: string): boolean | null | undefined {
+  const t = semAcento(v)
+  if (!t) return null
+  if (['sim', 's', '1', 'x', 'true'].includes(t)) return true
+  if (['nao', 'n', '0', 'false'].includes(t)) return false
+  return undefined
+}
+
+/** "8467.19.00" → "84671900"; vazio → null; inválido → undefined. */
+function lerNcm(v: string): string | null | undefined {
+  const d = v.replace(/\D/g, '')
+  if (!d) return null
+  return d.length === 8 ? d : undefined
 }
 
 function planilhaParaProdutos(texto: string): { linhas: DadosProduto[]; erros: string[] } {
@@ -80,8 +103,10 @@ function planilhaParaProdutos(texto: string): { linhas: DadosProduto[]; erros: s
     if (!nome) return
     const preco = idx.preco >= 0 ? lerNumero((l[idx.preco] ?? '').replace(/r\$\s*/i, '')) : 0
     const minimo = idx.estoque_minimo >= 0 ? lerNumero(l[idx.estoque_minimo] ?? '') : null
-    if (preco === undefined || minimo === undefined) {
-      erros.push(`"${nome}": preço ou estoque mínimo inválido.`)
+    const ncm = idx.ncm >= 0 ? lerNcm(l[idx.ncm] ?? '') : null
+    const controla = idx.controla_estoque >= 0 ? lerSimNao(l[idx.controla_estoque] ?? '') : null
+    if (preco === undefined || minimo === undefined || ncm === undefined || controla === undefined) {
+      erros.push(`"${nome}": preço, estoque mínimo, NCM ou "controla estoque" inválido.`)
       return
     }
     linhas.push({
@@ -90,6 +115,12 @@ function planilhaParaProdutos(texto: string): { linhas: DadosProduto[]; erros: s
       unidade: (idx.unidade >= 0 ? l[idx.unidade]?.trim() : '') || 'un',
       preco: preco ?? 0,
       estoque_minimo: minimo,
+      // Coluna ausente não entra: atualizar por código não apaga o que já estava cadastrado.
+      ...(idx.categoria >= 0 && { categoria: l[idx.categoria]?.trim().slice(0, 100) || null }),
+      ...(idx.marca >= 0 && { marca: l[idx.marca]?.trim().slice(0, 100) || null }),
+      ...(idx.ncm >= 0 && { ncm }),
+      ...(idx.descricao >= 0 && { descricao: l[idx.descricao]?.trim().slice(0, 2000) || null }),
+      ...(controla !== null && { controla_estoque: controla }),
     })
   })
   return { linhas, erros }
@@ -134,7 +165,7 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
   const lista = useMemo(() => {
     const t = semAcento(busca)
     return (todos ?? []).filter(
-      (p) => (!t || semAcento(`${p.nome} ${p.codigo ?? ''}`).includes(t)) && (!soAbaixo || abaixo(p)),
+      (p) => (!t || semAcento(`${p.nome} ${p.codigo ?? ''} ${p.categoria ?? ''} ${p.marca ?? ''}`).includes(t)) && (!soAbaixo || abaixo(p)),
     )
   }, [todos, busca, soAbaixo])
   const qtdAbaixo = (todos ?? []).filter(abaixo).length
@@ -175,7 +206,7 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
               type="search"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar por nome ou código"
+              placeholder="Buscar por nome, código, categoria ou marca"
               className="h-10 w-full rounded-md border border-borda bg-superficie pr-3 pl-9 placeholder:text-texto-3 focus:border-primaria focus:outline-none"
             />
           </label>
@@ -207,7 +238,7 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
                 )
               }
             >
-              Cadastre um a um ou importe uma planilha (CSV) com as colunas nome, código, unidade, preço e estoque mínimo.
+              Cadastre um a um ou importe uma planilha (CSV) com as colunas nome, código, unidade, preço, estoque mínimo, categoria, marca e NCM.
             </EstadoVazio>
           </div>
         ) : (
@@ -229,6 +260,9 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
                         {p.nome}
                       </button>
                       {!p.ativo && <span className="ml-2 text-legenda text-texto-3">inativo</span>}
+                      {(p.categoria || p.marca) && (
+                        <p className="text-legenda text-texto-3">{[p.categoria, p.marca].filter(Boolean).join(' · ')}</p>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-texto-2">{p.codigo ?? '—'}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{moeda(Number(p.preco))}</td>
@@ -296,16 +330,24 @@ function ModalProduto({
   const [controla, setControla] = useState(produto?.controla_estoque ?? true)
   const [ativoProd, setAtivoProd] = useState(produto?.ativo ?? true)
   const [descricao, setDescricao] = useState(produto?.descricao ?? '')
+  const [categoria, setCategoria] = useState(produto?.categoria ?? '')
+  const [marca, setMarca] = useState(produto?.marca ?? '')
+  const [ncm, setNcm] = useState(produto?.ncm ?? '')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
   const precoNum = lerNumero(preco)
   const minimoNum = lerNumero(minimo)
+  const ncmNum = lerNcm(ncm)
 
   async function salvar(e: FormEvent) {
     e.preventDefault()
     if (precoNum === undefined || (precoNum ?? 0) < 0 || minimoNum === undefined) {
       setErro('Confira o preço e o estoque mínimo.')
+      return
+    }
+    if (ncmNum === undefined) {
+      setErro('O NCM tem 8 números (ex.: 8467.19.00).')
       return
     }
     setSalvando(true)
@@ -320,6 +362,9 @@ function ModalProduto({
         controla_estoque: controla,
         ativo: ativoProd,
         descricao: descricao.trim() || null,
+        categoria: categoria.trim() || null,
+        marca: marca.trim() || null,
+        ncm: ncmNum,
       })
       aoSalvar()
     } catch (e) {
@@ -356,6 +401,19 @@ function ModalProduto({
               <CampoTexto rotulo="Código (opcional)" maxLength={60} value={codigo} onChange={(e) => setCodigo(e.target.value)} />
               <CampoTexto rotulo="Unidade" maxLength={10} value={unidade} onChange={(e) => setUnidade(e.target.value)} placeholder="un, cx, kg" />
               <CampoTexto rotulo="Preço (R$)" inputMode="decimal" value={preco} onChange={(e) => setPreco(e.target.value)} placeholder="0,00" />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <CampoTexto rotulo="Categoria (opcional)" maxLength={100} value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder="Ex.: Grampos" />
+              <CampoTexto rotulo="Marca (opcional)" maxLength={100} value={marca} onChange={(e) => setMarca(e.target.value)} />
+              <CampoTexto
+                rotulo="NCM (opcional)"
+                inputMode="numeric"
+                value={ncm}
+                onChange={(e) => setNcm(e.target.value)}
+                placeholder="0000.00.00"
+                erro={ncmNum === undefined ? '8 números' : undefined}
+                ajuda="Vai ser usado na nota fiscal."
+              />
             </div>
             <label className="flex items-center gap-2 text-pequeno text-texto-2">
               <input type="checkbox" checked={controla} onChange={(e) => setControla(e.target.checked)} className="size-4 accent-primaria" />
@@ -598,7 +656,7 @@ function ModalImportacao({
         )}
         <p className="text-legenda text-texto-3">
           No Excel ou Planilhas Google: Arquivo → Salvar como (ou Fazer download) → CSV. Colunas reconhecidas: nome (ou produto), código,
-          unidade, preço e estoque mínimo.
+          unidade, preço, estoque mínimo, categoria (ou família), marca (ou fornecedor), NCM, detalhes e controla estoque (sim/não).
         </p>
         {erro && <Aviso tom="erro">{erro}</Aviso>}
       </div>

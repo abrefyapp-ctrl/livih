@@ -5,7 +5,7 @@ type Tabelas = Database['public']['Tables']
 export type Produto = Database['public']['Views']['produtos_saldo']['Row']
 export type DadosProduto = Pick<
   Tabelas['produtos']['Insert'],
-  'codigo' | 'nome' | 'descricao' | 'unidade' | 'preco' | 'controla_estoque' | 'estoque_minimo' | 'ativo'
+  'codigo' | 'nome' | 'descricao' | 'unidade' | 'preco' | 'controla_estoque' | 'estoque_minimo' | 'ativo' | 'categoria' | 'marca' | 'ncm'
 >
 export type StatusPedido = 'rascunho' | 'confirmado' | 'separando' | 'enviado' | 'entregue' | 'cancelado'
 export type ItemPedido = Tabelas['pedido_itens']['Row']

@@ -1485,6 +1485,9 @@ export type Database = {
       }
       produtos: {
         Row: {
+          categoria: string | null
+          marca: string | null
+          ncm: string | null
           ativo: boolean
           atualizado_em: string
           codigo: string | null
@@ -1499,6 +1502,9 @@ export type Database = {
           unidade: string
         }
         Insert: {
+          categoria?: string | null
+          marca?: string | null
+          ncm?: string | null
           ativo?: boolean
           atualizado_em?: string
           codigo?: string | null
@@ -1513,6 +1519,9 @@ export type Database = {
           unidade?: string
         }
         Update: {
+          categoria?: string | null
+          marca?: string | null
+          ncm?: string | null
           ativo?: boolean
           atualizado_em?: string
           codigo?: string | null
@@ -1692,6 +1701,9 @@ export type Database = {
     Views: {
       produtos_saldo: {
         Row: {
+          categoria: string | null
+          marca: string | null
+          ncm: string | null
           ativo: boolean | null
           atualizado_em: string | null
           codigo: string | null
