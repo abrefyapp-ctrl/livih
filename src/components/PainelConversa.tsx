@@ -20,6 +20,7 @@ import { Aviso } from './Aviso'
 import { BalaoMensagem } from './BalaoMensagem'
 import { Botao } from './Botao'
 import { Compositor } from './Compositor'
+import { ModalNovoOrcamento } from './ModalNovoOrcamento'
 import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { EstadoVazio } from './EstadoVazio'
 import { EtiquetaEstado } from './EtiquetaEstado'
@@ -49,7 +50,8 @@ export function PainelConversa({
   contatoAberto: boolean
   aoAlternarContato: () => void
 }) {
-  const { sessao, equipe, orgAtiva } = useSessao()
+  const { sessao, equipe, orgAtiva, modulos } = useSessao()
+  const [novoOrcamento, setNovoOrcamento] = useState(false)
   const eu = sessao?.user.id
   const [conversa, setConversa] = useState<ConversaLista | null | undefined>(undefined)
   const [confirmar, setConfirmar] = useState<Acao | null>(null)
@@ -186,6 +188,11 @@ export function PainelConversa({
               Devolver ao agente
             </Botao>
           )}
+          {modulos?.has('erp') && conversa.contato && (
+            <Botao tamanho="sm" variante="secundario" icone="pedido" onClick={() => setNovoOrcamento(true)}>
+              Orçamento
+            </Botao>
+          )}
           {estado !== 'encerrada' && (
             <Botao tamanho="sm" variante="fantasma" icone="check" onClick={() => setConfirmar('encerrar')}>
               Encerrar
@@ -264,6 +271,9 @@ export function PainelConversa({
           `Faz mais de 24 horas que ${nome} escreveu. Pela API oficial do WhatsApp, só dá para retomar com um modelo aprovado.`
         }
       />
+      {novoOrcamento && conversa.contato && (
+        <ModalNovoOrcamento contato={conversa.contato} aoFechar={() => setNovoOrcamento(false)} />
+      )}
       {oficial && conversa?.canal && orgAtiva && (
         <ModalEnviarModelo
           aberto={enviandoModelo}
