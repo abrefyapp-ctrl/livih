@@ -30,24 +30,27 @@ Depois do orçamento em PDF, do envio de arquivos e da busca de produtos pelo ag
 2. ✅ **O agente monta e envia o orçamento** (16/10, [agente-pedido.md](agente-pedido.md)): o cliente pede, o agente
    cria o rascunho com preço do cadastro e, quando o cliente pede, envia o PDF ele mesmo (serviço `livih-pdf` na VPS,
    mesmo layout da tela). A equipe vê o aviso na conversa e o rascunho em Pedidos.
-3. **Guardar a mídia recebida** (incluído em 16/10): hoje o Livih não guarda os arquivos que o cliente manda (imagem,
+3. ✅ **Guardar a mídia recebida** (feito em 16/10): hoje o Livih não guarda os arquivos que o cliente manda (imagem,
    PDF, vídeo, áudio): só registra que chegou um documento, com o nome. A equipe não abre o arquivo no Livih (só no
    celular) e o histórico de auditoria fica incompleto, o que pesa contra a promessa do produto. Baixar a mídia na
    entrada (WAHA e API oficial) para o bucket `midias`, no mesmo caminho do que a equipe envia, e mostrar na conversa
-   (imagem, vídeo, link para baixar), como já acontece com o envio. É a base do item 6.
+   (imagem, vídeo, link para baixar), como já acontece com o envio. É a base do item 7.
 4. **Saúde do agente** (peça 1 do Orientador, especificada em [saude-do-agente.md](saude-do-agente.md)): preventivo,
-   antes do próximo cliente.
-5. **Simulador de conversa** (peça 3): o cliente e nós testamos o agente sem mandar mensagem pelo celular.
-6. **O agente lê PDF e imagem, e o importador inteligente de catálogo** (incluído em 16/10; peça 2): os dois extraem
+   antes do próximo cliente. Implementada em 16/10, aguardando teste na tela (R$ só para a plataforma).
+5. **Biblioteca de documentos e catálogo de fornecedor** (incluído em 16/10, seção abaixo): o agente envia
+   vista explodida, manual e catálogo que estejam cadastrados. Começar pela parte 1 (biblioteca e `enviar_documento`).
+6. **Simulador de conversa** (peça 3): o cliente e nós testamos o agente sem mandar mensagem pelo celular.
+7. **O agente lê PDF e imagem, e o importador inteligente de catálogo** (incluído em 16/10; peça 2): os dois extraem
    produtos e quantidades de um arquivo.
-   - No atendimento: texto do PDF e a imagem vão para o modelo, e uma requisição de compra vira orçamento montado.
+   - ✅ No atendimento (16/10): a imagem e as 5 primeiras páginas do PDF do cliente viram uma descrição em texto
+     (gpt-5-mini, `uso_ia` tipo "descricao") que o agente lê antes de responder.
      Caso real: JoGrampo, 15/10, cliente mandou `requisicao_compra.pdf` para orçar e o agente, sem ler, entrou em
      laço. Corrigido só o comportamento: ele agora diz que não abre o arquivo e pede os itens por escrito.
    - Na configuração: catálogo em PDF ou texto vira a prévia de importação de produtos.
    - Cuidar do custo: imagem e PDF longo pesam em tokens; limitar páginas e tamanho, e medir em `uso_ia`.
-7. **Assistente orientador** (peça 4): por último, usa as peças anteriores.
+8. **Assistente orientador** (peça 4): por último, usa as peças anteriores.
 
-Se um cliente novo for entrar nas próximas semanas, os itens 4 e 6 sobem: a implantação dele já sai com o custo sob
+Se um cliente novo for entrar nas próximas semanas, os itens 4 e 7 sobem: a implantação dele já sai com o custo sob
 controle e sem catálogo manual.
 
 Em paralelo, sem código: conferir o custo da JoGrampo depois da limpeza (uso_ia e tokens em cache no painel da
@@ -99,6 +102,60 @@ MVP:
 
 Depois: cobrança pelo Asaas ligada ao pedido (reaproveitar o código do VibePark, adaptado) e NF-e por API
 especializada com o certificado A1 de cada CNPJ.
+
+## Biblioteca de documentos e catálogo de fornecedor (proposto em 16/10)
+
+Problema: o cliente pede vista explodida, manual ou catálogo, e o agente não tem o que enviar. O único arquivo que ele
+envia é o PDF do orçamento. Casos reais na JoGrampo:
+- **Wyllis Ferramentas, 15/10:** o agente disse "enviei" a vista explodida do PACAR 14/45 três vezes, sem enviar
+  nada, mesmo com o prompt proibindo (seções 57 e 58).
+- **Mundo Dos Compressores, 16/10:** catálogos prometidos e não enviados.
+
+A regra "nunca prometa arquivo" (16/10) tapa o sintoma; a solução é o agente ter o que enviar.
+
+Fonte encontrada: o site da PACAR carrega um cadastro público em `pacar.com.br/api/produtos.json`.
+- 3.467 itens: código, descrição, grupo, unidade e anexos. São 2.662 peças importadas, ~400 nacionais e ~35
+  grampeadores.
+- 126 PDFs em 77 máquinas, em geral dois por máquina: a **vista explodida**, com a tabela ITEM | CÓDIGO | DESCRIÇÃO,
+  e o **certificado de garantia**.
+
+Serve para qualquer cliente do Livih, em três camadas:
+
+1. **Biblioteca de documentos por empresa** (todos os clientes):
+   - Arquivos no bucket do Livih, com tipo configurável por empresa (vista explodida, manual, ficha, preparo de exame,
+     planta...).
+   - Ligação opcional a um produto, palavras-chave e a data e a fonte de cada documento.
+   - Upload manual pela equipe.
+   - Ferramenta do agente `enviar_documento`, que busca e envia só o que está cadastrado. Fora da biblioteca, chama
+     um humano.
+2. **Catálogo de fornecedor compartilhado** (nível plataforma):
+   - Importado e atualizado uma vez por nós, só leitura.
+   - Cada empresa liga os fornecedores que revende ("Fornecedores: PACAR ✓") e o agente dela passa a enxergar aqueles
+     documentos.
+   - Cada fornecedor importado vira argumento de venda para outras revendas do mesmo setor.
+3. **Importadores:**
+   - Automático para fornecedor com dados abertos (PACAR primeiro, com atualização semanal que marca o que sumiu).
+   - Importador inteligente de PDF (item 7) para quem só tem catálogo em PDF.
+   - Upload manual para o resto.
+
+Ordem:
+1. Biblioteca e `enviar_documento`, já genéricas. Nada "de ferramentas" nos campos; o documento guarda a origem
+   ("da empresa" ou "do fornecedor X"), para a camada 2 entrar sem refazer.
+2. Importador da PACAR, já como catálogo compartilhado.
+3. Tabela de peças extraída da vista explodida (item → código → descrição): o agente responde "a peça 14 do 80W é o
+   código X" e busca o preço em Produtos, se a empresa vender a peça.
+4. Importador inteligente de PDF para os outros fornecedores.
+
+Cuidados:
+- **Não importar as peças do fornecedor em Produtos.** Produtos é a lista de preços da empresa, e o cadastro do
+  fornecedor fica como referência separada.
+- **Direito de uso:** a JoGrampo confirma com a PACAR o uso do material. Vale propor à PACAR uma parceria formal
+  ("suas revendas atendem melhor").
+- **Isolamento:** o catálogo compartilhado é só leitura. Os documentos próprios seguem isolados por empresa (RLS).
+
+Perguntar à JoGrampo:
+- Quais outros fornecedores eles atendem, para decidir se vale fazer outros importadores.
+- Se os códigos dos produtos deles batem com os da PACAR, o que decide se a etapa 3 chega ao preço.
 
 ## Orientador do agente (proposto em 15/10)
 

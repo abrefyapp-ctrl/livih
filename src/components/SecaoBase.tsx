@@ -1,13 +1,25 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useSessao } from '../hooks/useSessao'
 import { listarBase, removerConteudo, salvarConteudo, type ConteudoBase } from '../services/configuracoes'
 import { quandoCurto } from '../services/formato'
+import { alertas, type Alerta } from '../services/saudeAgente'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
 import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { EstadoVazio } from './EstadoVazio'
 import { Modal } from './Modal'
+
+// Selo ao lado do item, com o alerta da Saúde do agente (o detalhe e o conserto ficam em Configurações → Agente).
+const SELO: Record<Alerta['codigo'], string> = {
+  A1: 'Parece catálogo',
+  A2: 'Repete outro conteúdo',
+  A3: 'Tem separadores',
+  A4: 'Muito longo',
+  A5: 'Trechos repetidos',
+  A6: '',
+}
 
 type Edicao = { id: string | null; titulo: string; conteudo: string; ativo: boolean }
 
@@ -36,6 +48,12 @@ export function SecaoBase() {
   const lista = base?.orgId === orgId ? base.lista : null
   const ativos = lista?.filter((c) => c.ativo) ?? []
   const totalCaracteres = ativos.reduce((s, c) => s + c.conteudo.length, 0)
+  const selos = new Map<string, string[]>()
+  for (const a of lista ? alertas(null, lista) : []) {
+    if (a.alvo?.tipo !== 'base' || !SELO[a.codigo]) continue
+    const atuais = selos.get(a.alvo.id) ?? []
+    if (!atuais.includes(SELO[a.codigo])) selos.set(a.alvo.id, [...atuais, SELO[a.codigo]])
+  }
 
   async function salvar(e: FormEvent) {
     e.preventDefault()
@@ -124,6 +142,11 @@ export function SecaoBase() {
                         Inativo — o agente não lê
                       </span>
                     )}
+                    {selos.get(c.id)?.map((s) => (
+                      <span key={s} className="rounded-sm bg-atencao-suave px-1.5 py-0.5 text-legenda font-normal text-atencao">
+                        {s}
+                      </span>
+                    ))}
                   </p>
                   <p className="mt-0.5 line-clamp-2 text-pequeno text-texto-3">{c.conteudo}</p>
                   <p className="mt-1 text-legenda text-texto-3">
@@ -149,6 +172,15 @@ export function SecaoBase() {
             {ativos.length} {ativos.length === 1 ? 'conteúdo ativo' : 'conteúdos ativos'} ·{' '}
             {totalCaracteres.toLocaleString('pt-BR')} caracteres que o agente lê a cada mensagem.
             {totalCaracteres > 30000 && ' Uma base muito grande deixa as respostas mais lentas e caras.'}
+            {podeEditar && (
+              <>
+                {' '}
+                <Link to="/configuracoes/agente" className="font-medium text-primaria underline">
+                  Ver a Saúde do agente
+                </Link>
+                {selos.size > 0 && ` (${selos.size} ${selos.size === 1 ? 'conteúdo com alerta' : 'conteúdos com alerta'})`}.
+              </>
+            )}
           </p>
         </>
       )}

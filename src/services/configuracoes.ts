@@ -78,6 +78,12 @@ export async function salvarAgente(
   if (error) throw new Error('Não foi possível salvar o agente. Tente de novo.')
 }
 
+/** Consertos da Saúde do agente: só o texto (instruções ou regras), sem tocar no resto do formulário. */
+export async function atualizarTextoAgente(id: string, campos: Partial<Pick<Agente, 'prompt' | 'regras_humano'>>) {
+  const { error } = await supabase.from('agentes').update(campos).eq('id', id)
+  if (error) throw new Error('Não foi possível salvar o agente. Tente de novo.')
+}
+
 export async function listarBase(orgId: string): Promise<ConteudoBase[]> {
   const { data, error } = await supabase
     .from('base_conhecimento')

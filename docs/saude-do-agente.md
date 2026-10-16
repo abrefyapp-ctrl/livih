@@ -12,6 +12,9 @@ Teria evitado o caso da JoGrampo (15/10): catálogo na base, catálogo duplicado
 ## Quem vê e onde
 
 - Dono e admin da empresa, e a equipe da plataforma (inclusive no modo suporte). Atendente não vê.
+- **Valores em R$ só para a plataforma** (decidido em 16/10, mantendo a decisão de 09/10 de não mostrar o custo da
+  IA à empresa cliente): a empresa vê caracteres, a faixa, o consumo real em leituras e a economia em caracteres e
+  %; o custo estimado, o real, a projeção e a economia em R$/mês aparecem num bloco "Só a plataforma vê".
 - Cartão no topo de **Configurações → Agente**. Na aba **Base de conhecimento**, uma linha-resumo com o total e o
   link para o cartão. Os alertas de um item específico também aparecem ao lado dele na lista da base.
 - Empresa com mais de um número: o prompt e as regras são de cada agente (por número), a base é da empresa. O cartão
@@ -28,8 +31,8 @@ Por número, em caracteres, com barra por parte:
 | Instruções | `agentes.prompt` |
 | Regras de chamar a equipe | `agentes.regras_humano.casos` (soma) |
 | Base de conhecimento | `base_conhecimento.conteudo` dos itens ativos da empresa |
-| Parte fixa do sistema | ~4 mil caracteres (bloco CRM, horário, dados do contato), constante no código |
-| Histórico | média das últimas 40 mensagens das conversas recentes; se não houver, 3 mil |
+| Parte fixa do sistema | 10 mil caracteres (bloco CRM, regras de arquivos, horário, dados do contato e a definição das ferramentas), constante no código. Medido em 16/10: o lido de fato na JoGrampo (~64 mil) menos instruções, regras, base e histórico |
+| Histórico | o lido de fato nos últimos 7 dias menos o configurado e a parte fixa, entre 1 mil e 8 mil; sem consumo, 3 mil (na JoGrampo, ~1,9 mil) |
 
 ### 2. Custo por resposta
 
@@ -63,7 +66,7 @@ Cada alerta tem condição, mensagem para o cliente, economia estimada (caracter
 | A2 | Dois itens ativos da base em que 80% ou mais das linhas (com mais de 30 caracteres) de um estão no outro | "X repete o conteúdo de Y." | **Desativar X** (um clique, com confirmação). |
 | A3 | Linhas só de decoração em prompt, regras ou base: 5 ou mais de `= - _ * ~ #` sozinhos na linha | "N caracteres de separadores: o agente lê e você paga, sem mudar nada no atendimento." | **Limpar** (um clique): remove essas linhas e junta quebras de linha triplas. Mesma regra aplicada à mão em 15/10. |
 | A4 | Prompt acima de 20 mil caracteres; item de regra acima de 3 mil; item da base acima de 15 mil | "Muito longo para ler em toda resposta." | Só orientação (não há conserto automático seguro). |
-| A5 | Trechos repetidos entre prompt, regras e base: sequências de 8 palavras em comum acima de 15% do menor texto | "Estes trechos aparecem em mais de um lugar" + até 3 exemplos | Só orientação. Na peça 4, o assistente propõe a versão unificada. |
+| A5 | Trechos repetidos entre prompt, regras e base, e entre dois itens da base (menos os que já têm A1 ou A2): sequências de 8 palavras em comum acima de 15% do menor texto | "Estes trechos aparecem em mais de um lugar" + até 3 exemplos | Só orientação. Na peça 4, o assistente propõe a versão unificada. |
 | A6 | Prompt vazio, ou base vazia com o agente ligado | "O agente responde só com o conhecimento geral dele." | Link para editar. |
 
 Ordem dos alertas: pela economia estimada, do maior para o menor.
@@ -95,6 +98,11 @@ Sem migration: tudo o que o cartão precisa já é legível por dono/admin pela 
 
 ## Como testar
 
+- **Resultado (16/10):** bateu A1 nos dois catálogos, A3 com 7.854 caracteres, A4 no prompt e na regra e faixa
+  vermelha (~238 mil caracteres, R$ 0,127 com 1,75 leitura). Não saíram o A2 nem o A5, e as regras estavam certas:
+  "Máquinas" tem só 40% das linhas (56% dos trechos) no catálogo unificado, porque as especificações técnicas só
+  existem nela, e as regras repetem 8 a 10% das instruções. Hoje: amarelo (~64 mil), A4 na regra e A3 com 44 linhas
+  "=====" (2,2 mil caracteres) que ainda estão nas instruções.
 - **Fixture real:** o estado da JoGrampo antes de 15/10. O prompt original está em
   `claude_code/backup_prompt_agente_jogrampo_20261015.md`; os catálogos estão desativados na base, que mantém o
   histórico. Tem que gerar:

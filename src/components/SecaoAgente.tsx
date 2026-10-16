@@ -10,6 +10,7 @@ import { EstadoVazio } from './EstadoVazio'
 import { erroDoHorario, horarioDoBanco, horarioParaBanco, type Horario } from '../services/horario'
 import { HorarioAtendimento } from './HorarioAtendimento'
 import { Icone } from './Icone'
+import { SecaoSaudeAgente } from './SecaoSaudeAgente'
 
 type Formulario = {
   prompt: string
@@ -130,6 +131,20 @@ export function SecaoAgente() {
       </div>
 
       {!podeEditar && <Aviso>Só dono e admin alteram o agente. Você está vendo as configurações atuais.</Aviso>}
+
+      {podeEditar && (
+        <SecaoSaudeAgente
+          agente={atual.dado}
+          formAlterado={alterado}
+          aoAlterarAgente={(campos) => {
+            // Conserto do cartão (limpar separadores): o formulário estava igual ao salvo, então acompanha.
+            const dado = { ...atual.dado!, ...campos }
+            setAgente({ orgId, dado })
+            setForm(paraFormulario(dado))
+            setSalvo(false)
+          }}
+        />
+      )}
 
       <fieldset disabled={!podeEditar} className="space-y-6">
         <Aviso>
