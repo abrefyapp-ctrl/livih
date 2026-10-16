@@ -1546,6 +1546,68 @@ exception when insufficient_privilege then
   insert into resultado (teste, ok) values ('busca: usuário logado não chama a função do agente', true);
 end $$;
 
+-- O agente monta o rascunho e envia o orçamento (chave de serviço; conversa com o agente).
+reset role;
+update public.conversas set estado = 'bot', atribuida_a = null where id = current_setting('teste.conversa')::uuid;
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_conv uuid := current_setting('teste.conversa')::uuid;
+  v_contato uuid := (select contato_id from public.conversas where id = current_setting('teste.conversa')::uuid);
+  r jsonb; r2 jsonb; v_num integer; v_manual uuid; v_path text;
+begin
+  insert into public.pedidos (org_id, contato_id) values (v_org, v_contato) returning id into v_manual;
+  r := public.agente_montar_pedido(v_conv, '[{"codigo":"14/19","quantidade":10},{"codigo":"XYZ-999","quantidade":1},{"codigo":"pacar 2.038","quantidade":"2"}]');
+  v_num := (r ->> 'pedido_numero')::int;
+  insert into resultado (teste, ok) values ('agente pedido: monta com preço do cadastro e separa código desconhecido',
+    (r ->> 'sucesso')::boolean and jsonb_array_length(r -> 'itens') = 2 and (r ->> 'total')::numeric = 10 * 102.70 + 2 * 7551.03
+    and jsonb_array_length(r -> 'nao_encontrados') = 1 and r ->> 'total_formatado' = 'R$ 16.129,06');
+  insert into resultado (teste, ok) select 'agente pedido: rascunho de origem agente e aviso na conversa',
+    exists (select 1 from public.pedidos where numero = v_num and org_id = v_org and origem = 'agente' and status = 'rascunho')
+    and exists (select 1 from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema' and texto like 'O agente montou o orçamento #' || v_num || '%');
+
+  r2 := public.agente_montar_pedido(v_conv, '[{"codigo":"14/19","quantidade":3}]', 'Entregar na portaria');
+  insert into resultado (teste, ok) select 'agente pedido: nova lista atualiza o mesmo rascunho sem duplicar',
+    (r2 ->> 'pedido_numero')::int = v_num and jsonb_array_length(r2 -> 'itens') = 1 and (r2 ->> 'total')::numeric = 308.10
+    and (select count(*) from public.pedidos where org_id = v_org and contato_id = v_contato and origem = 'agente') = 1
+    and (select observacao from public.pedidos where numero = v_num and org_id = v_org) = 'Entregar na portaria';
+  insert into resultado (teste, ok) select 'agente pedido: não mexe no rascunho da equipe',
+    not exists (select 1 from public.pedido_itens where pedido_id = v_manual);
+
+  r := public.agente_dados_orcamento(v_conv);
+  insert into resultado (teste, ok) values ('agente pedido: dados do PDF com itens, código, empresa e cliente',
+    (r ->> 'sucesso')::boolean and (r -> 'pedido' ->> 'numero')::int = v_num and r -> 'itens' -> 0 ->> 'codigo' = '14/19'
+    and r -> 'emissora' ->> 'cnpj' is not null and r -> 'cliente' ->> 'nome' is not null);
+
+  v_path := v_org || '/' || v_conv || '/orc-' || v_num || '.pdf';
+  insert into storage.objects (bucket_id, name, metadata) values ('midias', v_path, '{"mimetype":"application/pdf","size":12000}');
+  r := public.agente_enviar_arquivo(v_conv, v_path, 'Orcamento-' || v_num || '.pdf', 'Orçamento nº ' || v_num);
+  insert into resultado (teste, ok) select 'agente pedido: PDF vai na conversa como mensagem do agente e entra na fila',
+    (r ->> 'enviado')::boolean and m.autor_tipo = 'bot' and m.tipo = 'documento' and m.midia_nome = 'Orcamento-' || v_num || '.pdf'
+    and exists (select 1 from public.fila_envio f where f.mensagem_id = m.id)
+    from public.mensagens m where m.id = (r ->> 'mensagem_id')::uuid;
+
+  perform public.pedido_mudar_status((select id from public.pedidos where numero = v_num and org_id = v_org), 'confirmado');
+  r := public.agente_montar_pedido(v_conv, '[{"codigo":"14/19","quantidade":1}]');
+  insert into resultado (teste, ok) select 'agente pedido: pedido confirmado não muda (o agente abre outro rascunho)',
+    (r ->> 'pedido_numero')::int <> v_num
+    and (select count(*) from public.pedido_itens i join public.pedidos p on p.id = i.pedido_id where p.numero = v_num and p.org_id = v_org) = 1
+    and (select quantidade from public.pedido_itens i join public.pedidos p on p.id = i.pedido_id where p.numero = v_num and p.org_id = v_org) = 3;
+
+  update public.conversas set estado = 'humano' where id = v_conv;
+  r := public.agente_montar_pedido(v_conv, '[{"codigo":"14/19","quantidade":5}]');
+  insert into resultado (teste, ok) values ('agente pedido: conversa com a equipe, o agente não monta', not (r ->> 'sucesso')::boolean);
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.agente_montar_pedido(current_setting('teste.conversa')::uuid, '[{"codigo":"14/19","quantidade":1}]');
+  insert into resultado (teste, ok) values ('agente pedido: usuário logado não chama as funções do agente', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('agente pedido: usuário logado não chama as funções do agente', true);
+end $$;
+
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
 reset role;
 insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');
