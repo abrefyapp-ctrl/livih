@@ -8,7 +8,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { avisarAgente, emSegundoPlano, normalizarTelefone, transcreverEAvisar } from "../_shared/atendimento.ts";
-import { guardarMidiaRecebida } from "../_shared/midia.ts";
+import { descreve, guardarDescreverEAvisar, guardarMidiaRecebida } from "../_shared/midia.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -117,13 +117,23 @@ async function entrada(canalId: string, m: Json, nomes: Map<string, string>, val
   });
   if (error) throw new Error(`registrar_entrada: ${error.message}`);
   if (e?.duplicada) return;
-  emSegundoPlano(guardarMidia(canalId, m, lida));
 
+  // Áudio: transcreve; imagem e PDF: guarda e a IA descreve. Nos dois casos o agente é chamado depois, já com o texto.
   if (lida.tipo === "audio" && lida.midia?.id) {
+    emSegundoPlano(guardarMidia(canalId, m, lida));
     const token = await tokenDoCanal(canalId);
     emSegundoPlano(transcreverEAvisar(supabase, () => baixarMidia(lida.midia!.id, token), lida.midia.mime, 0, e));
-  } else if (e?.chamar_agente) {
-    emSegundoPlano(avisarAgente(supabase, e));
+  } else if (lida.midia?.id && descreve(lida.tipo, lida.midia.mime)) {
+    const token = await tokenDoCanal(canalId);
+    const legenda = lida.tipo === "documento" ? (m.document?.caption ?? null) : lida.texto;
+    emSegundoPlano(guardarDescreverEAvisar(
+      supabase,
+      { canal_id: canalId, wa_id: String(m.id), tipo: lida.tipo, mime: lida.midia.mime, nome: lida.midia.nome },
+      () => baixarMidia(lida.midia!.id, token), e, legenda,
+    ));
+  } else {
+    emSegundoPlano(guardarMidia(canalId, m, lida));
+    if (e?.chamar_agente) emSegundoPlano(avisarAgente(supabase, e));
   }
 }
 

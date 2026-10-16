@@ -4,7 +4,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { avisarAgente, emSegundoPlano, transcreverEAvisar } from "../_shared/atendimento.ts";
-import { guardarMidiaRecebida } from "../_shared/midia.ts";
+import { descreve, guardarDescreverEAvisar, guardarMidiaRecebida } from "../_shared/midia.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -168,13 +168,10 @@ Deno.serve(async (req) => {
     p_payload: enxugar(body),
   };
   // Arquivo da mensagem (imagem, PDF, vídeo, áudio) para o bucket `midias`, depois de gravar a mensagem.
+  const refMidia = { canal_id: canalId, wa_id: String(p.id), tipo, mime: p.media?.mimetype, nome: p.media?.filename };
+  const baixarMidia = () => fetch(p.media.url, { headers: { "X-Api-Key": WAHA_API_KEY }, signal: AbortSignal.timeout(30000) });
   const guardarMidia = () => {
-    if (!p.media?.url) return;
-    emSegundoPlano(guardarMidiaRecebida(
-      supabase,
-      { canal_id: canalId, wa_id: String(p.id), tipo, mime: p.media.mimetype, nome: p.media.filename },
-      () => fetch(p.media.url, { headers: { "X-Api-Key": WAHA_API_KEY }, signal: AbortSignal.timeout(30000) }),
-    ));
+    if (p.media?.url) emSegundoPlano(guardarMidiaRecebida(supabase, refMidia, baixarMidia));
   };
 
   if (p.fromMe) {
@@ -198,15 +195,20 @@ Deno.serve(async (req) => {
   }
 
   if (entrada?.duplicada) return resposta(200, { ok: true, duplicada: true });
-  guardarMidia();
 
   // Áudio: transcreve depois de responder ao WAHA e só então acorda o agente, que já recebe o texto.
+  // Imagem e PDF: guarda, a IA descreve e só então acorda o agente, que já recebe a descrição.
   const segundos = Number(p._data?.Message?.audioMessage?.seconds ?? p._data?.message?.audioMessage?.seconds ?? 0);
+  const legenda = typeof p.body === "string" && p.body.trim() ? p.body : null;
   if (tipo === "audio" && p.media?.url) {
+    guardarMidia();
     const baixar = () => fetch(p.media.url, { headers: { "X-Api-Key": WAHA_API_KEY }, signal: AbortSignal.timeout(20000) });
     emSegundoPlano(transcreverEAvisar(supabase, baixar, p.media.mimetype, segundos, entrada));
-  } else if (entrada?.chamar_agente) {
-    emSegundoPlano(avisarAgente(supabase, entrada));
+  } else if (p.media?.url && descreve(tipo, p.media?.mimetype)) {
+    emSegundoPlano(guardarDescreverEAvisar(supabase, refMidia, baixarMidia, entrada, legenda));
+  } else {
+    guardarMidia();
+    if (entrada?.chamar_agente) emSegundoPlano(avisarAgente(supabase, entrada));
   }
 
   return resposta(200, { ok: true, duplicada: entrada?.duplicada ?? false });

@@ -81,6 +81,13 @@ function Conteudo({ m }: { m: Mensagem }) {
             <TextoWhatsapp texto={m.texto} />
           </p>
         )}
+        {/* Imagem/PDF do cliente: a IA descreve na entrada, e o agente responde a partir disto (como a transcrição). */}
+        {m.descricao && (
+          <div className="mt-1 border-t border-current/15 pt-1">
+            <p className="text-legenda font-medium opacity-80">Descrição automática</p>
+            <p className="text-pequeno break-words whitespace-pre-wrap opacity-90">{m.descricao}</p>
+          </div>
+        )}
       </div>
     )
   }

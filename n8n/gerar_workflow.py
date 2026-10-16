@@ -51,8 +51,11 @@ const linha = (m) => {
   if (m.tipo === 'texto') t = m.texto || '';
   else if (m.tipo === 'audio') {
     t = m.texto || '[áudio que não deu para transcrever — peça para escrever ou mandar um áudio mais curto]';
+  } else if (m.de === 'cliente' && m.descricao) {
+    // Imagem/PDF descritos pela IA na entrada (migration 20261016140000): o agente lê a descrição, não o arquivo.
+    t = `[o cliente enviou ${MIDIA[m.tipo] || 'um arquivo'}${m.texto ? ` (${m.texto})` : ''} — descrição automática do arquivo: ${m.descricao}]`;
   } else if (m.de === 'cliente') {
-    t = `[o cliente enviou ${MIDIA[m.tipo] || 'um arquivo'}${m.texto ? ` (${m.texto})` : ''} — você NÃO consegue abrir arquivos, documentos nem imagens]`;
+    t = `[o cliente enviou ${MIDIA[m.tipo] || 'um arquivo'}${m.texto ? ` (${m.texto})` : ''} — você NÃO consegue abrir este arquivo]`;
   } else {
     t = `[${MIDIA[m.tipo] || 'arquivo'} enviado${m.texto ? `: ${m.texto}` : ''}]`;
   }
@@ -121,13 +124,13 @@ Você trabalha dentro do CRM da ${c.organizacao?.nome || 'empresa'}. As ferramen
 - **mover_etapa**: reflita o avanço no funil usando exatamente um destes nomes: ${(c.etapas || []).join(', ')}. Nunca marque Ganho ou Perdido; isso é da equipe.
 - **registrar_nota**: antes de passar para a equipe, deixe um resumo útil: dores, contexto, o que já foi explicado e o próximo passo sugerido.
 - **buscar_produtos**: quando o cliente perguntar de um produto (preço, embalagem, quantidade, especificação, compatibilidade, se tem), busque no cadastro pela referência, modelo ou nome que ele usou (ex.: "14/19", "grampeador IMECO", "prego anelado"). Informe só o que vier da busca, com o preço exatamente como veio. Se vierem vários parecidos, pergunte qual ele quer; se não vier nenhum, não invente: peça mais detalhes ou chame a equipe. Pode buscar mais de uma vez com termos diferentes.
-- **montar_pedido**: quando o cliente disser o que quer comprar E as quantidades, monte o pedido com o código exato que veio da busca (campo codigo) e a quantidade na unidade do produto (ex.: 10 caixinhas = quantidade 10). Mande SEMPRE a lista completa do pedido (se o cliente mudar algo, reenvie tudo). O preço vem do cadastro: confirme ao cliente os itens e o total exatamente como a ferramenta devolveu, e diga que o frete não está incluso e é calculado pela equipe. Se algum código voltar em nao_encontrados, busque de novo antes de remontar. Para o cliente, o que você monta é um ORÇAMENTO: chame sempre de "orçamento nº X" (o mesmo número do PDF), nunca de "pedido", porque ainda não foi confirmado pela equipe.
+- **montar_pedido**: quando o cliente disser o que quer comprar E as quantidades, monte o pedido com o código exato que veio da busca (campo codigo) e a quantidade na unidade do produto (ex.: 10 caixinhas = quantidade 10). Mande SEMPRE a lista completa do pedido (se o cliente mudar algo, reenvie tudo). O preço vem do cadastro: confirme ao cliente os itens e o total exatamente como a ferramenta devolveu, e diga que o frete não está incluso e é calculado pela equipe. Se algum código voltar em nao_encontrados, busque de novo antes de remontar. Para o cliente, o que você monta é um ORÇAMENTO: chame sempre de "orçamento nº X", usando o campo orcamento_numero (o mesmo número do PDF), nunca de "pedido", porque ainda não foi confirmado pela equipe.
 - **enviar_orcamento**: envia ao cliente o PDF do pedido montado. Use quando o cliente pedir o orçamento, a proposta ou o PDF, ou confirmar os itens. Antes, monte (ou atualize) com montar_pedido. Depois de enviar, diga em uma frase que o orçamento foi enviado e que a equipe confirma frete e pagamento.
 - **chamar_humano**: chame quando acontecer um destes casos:
 ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar com uma pessoa'}
   Depois de chamar, diga ao cliente, em uma frase, que um especialista vai continuar a conversa por aqui. Não continue o atendimento depois disso.
 
-- **Arquivos e imagens**: você NÃO consegue abrir documentos, PDFs, planilhas nem ver imagens. Quando o cliente mandar um, diga com clareza, uma única vez, que por aqui você não consegue abrir o arquivo, e peça para escrever na conversa o que precisa (produtos e quantidades). Se for um pedido de orçamento em arquivo (lista, requisição de compra) e o cliente preferir não digitar, chame a equipe com chamar_humano. Nunca fale do conteúdo do arquivo como se tivesse visto, nem peça "a linha do PDF".
+- **Arquivos e imagens**: você não vê o arquivo em si. Quando a foto ou o PDF do cliente vier com "descrição automática", use a descrição para entender o que ele quer: busque os produtos citados (buscar_produtos) e, se for uma lista de itens com quantidades, monte o orçamento (montar_pedido). Se a descrição estiver incompleta, ilegível ou não bastar para identificar o produto, pergunte o que faltar, sem inventar. Quando NÃO houver descrição (arquivo que não deu para ler, planilha, vídeo), diga com clareza, uma única vez, que por aqui você não consegue abrir o arquivo e peça para escrever na conversa o que precisa; se for pedido de orçamento em arquivo e o cliente preferir não digitar, chame a equipe com chamar_humano. Nunca fale de detalhes do arquivo que não estejam na descrição.
 - **Nome do cliente**: use o nome que está em "O que já sabemos deste contato". Um nome que o cliente escreve num cumprimento ("boa tarde, Flávio") é de quem ele espera que atenda, não o dele.
 
 Nunca fale de ferramentas, CRM ou sistema com o cliente. A sua resposta final é exatamente o texto que será enviado no WhatsApp.
@@ -287,7 +290,7 @@ const env = await rpc('agente_enviar_arquivo', {
   p_conversa: conversa, p_path: path, p_nome: nome,
   p_legenda: `${tipo} nº ${d.pedido.numero}${empresa ? ` – ${empresa}` : ''}`,
 });
-return JSON.stringify({ enviado: !!env?.enviado, numero: d.pedido.numero, total: d.pedido.total, aviso: env?.aviso || env?.erro || null });
+return JSON.stringify({ enviado: !!env?.enviado, orcamento_numero: d.pedido.numero, total: d.pedido.total, aviso: env?.aviso || env?.erro || null });
 """
 
 
@@ -342,8 +345,8 @@ FERRAMENTAS = [
     ),
     ferramenta(
         "montar_pedido",
-        "Monta (ou atualiza) o pedido do cliente com a lista COMPLETA de itens. O preço vem do cadastro. Devolve "
-        "número, itens, total e códigos não encontrados.",
+        "Monta (ou atualiza) o orçamento do cliente com a lista COMPLETA de itens. O preço vem do cadastro. Devolve "
+        "orcamento_numero, itens, total e códigos não encontrados.",
         "agente_montar_pedido",
         "{ p_conversa: conversa, p_itens: args.itens, p_observacao: args.observacao || null }",
         {

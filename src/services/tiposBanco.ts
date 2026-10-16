@@ -849,6 +849,7 @@ export type Database = {
           autor_tipo: Database["public"]["Enums"]["autor_tipo"]
           conversa_id: string
           criado_em: string
+          descricao: string | null
           direcao: Database["public"]["Enums"]["direcao_msg"]
           erro: string | null
           id: string
@@ -869,6 +870,7 @@ export type Database = {
           autor_tipo: Database["public"]["Enums"]["autor_tipo"]
           conversa_id: string
           criado_em?: string
+          descricao?: string | null
           direcao: Database["public"]["Enums"]["direcao_msg"]
           erro?: string | null
           id?: string
@@ -889,6 +891,7 @@ export type Database = {
           autor_tipo?: Database["public"]["Enums"]["autor_tipo"]
           conversa_id?: string
           criado_em?: string
+          descricao?: string | null
           direcao?: Database["public"]["Enums"]["direcao_msg"]
           erro?: string | null
           id?: string

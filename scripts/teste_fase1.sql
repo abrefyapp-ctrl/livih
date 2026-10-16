@@ -1558,7 +1558,7 @@ declare
 begin
   insert into public.pedidos (org_id, contato_id) values (v_org, v_contato) returning id into v_manual;
   r := public.agente_montar_pedido(v_conv, '[{"codigo":"14/19","quantidade":10},{"codigo":"XYZ-999","quantidade":1},{"codigo":"pacar 2.038","quantidade":"2"}]');
-  v_num := (r ->> 'pedido_numero')::int;
+  v_num := (r ->> 'orcamento_numero')::int;
   insert into resultado (teste, ok) values ('agente pedido: monta com preço do cadastro e separa código desconhecido',
     (r ->> 'sucesso')::boolean and jsonb_array_length(r -> 'itens') = 2 and (r ->> 'total')::numeric = 10 * 102.70 + 2 * 7551.03
     and jsonb_array_length(r -> 'nao_encontrados') = 1 and r ->> 'total_formatado' = 'R$ 16.129,06');
@@ -1568,7 +1568,7 @@ begin
 
   r2 := public.agente_montar_pedido(v_conv, '[{"codigo":"14/19","quantidade":3}]', 'Entregar na portaria');
   insert into resultado (teste, ok) select 'agente pedido: nova lista atualiza o mesmo rascunho sem duplicar',
-    (r2 ->> 'pedido_numero')::int = v_num and jsonb_array_length(r2 -> 'itens') = 1 and (r2 ->> 'total')::numeric = 308.10
+    (r2 ->> 'orcamento_numero')::int = v_num and jsonb_array_length(r2 -> 'itens') = 1 and (r2 ->> 'total')::numeric = 308.10
     and (select count(*) from public.pedidos where org_id = v_org and contato_id = v_contato and origem = 'agente') = 1
     and (select observacao from public.pedidos where numero = v_num and org_id = v_org) = 'Entregar na portaria';
   insert into resultado (teste, ok) select 'agente pedido: não mexe no rascunho da equipe',
@@ -1590,7 +1590,7 @@ begin
   perform public.pedido_mudar_status((select id from public.pedidos where numero = v_num and org_id = v_org), 'confirmado');
   r := public.agente_montar_pedido(v_conv, '[{"codigo":"14/19","quantidade":1}]');
   insert into resultado (teste, ok) select 'agente pedido: pedido confirmado não muda (o agente abre outro rascunho)',
-    (r ->> 'pedido_numero')::int <> v_num
+    (r ->> 'orcamento_numero')::int <> v_num
     and (select count(*) from public.pedido_itens i join public.pedidos p on p.id = i.pedido_id where p.numero = v_num and p.org_id = v_org) = 1
     and (select quantidade from public.pedido_itens i join public.pedidos p on p.id = i.pedido_id where p.numero = v_num and p.org_id = v_org) = 3;
 
@@ -1657,6 +1657,38 @@ begin
   insert into resultado (teste, ok) values ('mídia: usuário logado não chama as funções de serviço', false);
 exception when insufficient_privilege then
   insert into resultado (teste, ok) values ('mídia: usuário logado não chama as funções de serviço', true);
+end $$;
+
+-- Descrição automática de imagem/PDF: gravada na mensagem, vai para o contexto do agente e diz se chama o agente.
+reset role;
+do $$
+declare
+  v_conv uuid := current_setting('teste.conversa')::uuid;
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_msg uuid; r jsonb; c jsonb;
+begin
+  update public.conversas set estado = 'bot', atribuida_a = null where id = v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, midia_mime, wa_id, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'imagem', 'vocês vendem esse grampo?', 'image/jpeg', 'wa-desc-1', 'recebida')
+  returning id into v_msg;
+  r := public.registrar_descricao(v_msg, 'Caixa de grampos 26/6 galvanizados, marca Bacchi, 5.000 unidades.');
+  insert into resultado (teste, ok) select 'descrição: gravada na mensagem e no resumo da conversa',
+    (select descricao from public.mensagens where id = v_msg) like 'Caixa de grampos 26/6%'
+    and (select ultima_mensagem_resumo from public.conversas where id = v_conv) like '🖼️ Caixa de grampos%'
+    and (r ->> 'mensagem_id')::uuid = v_msg;
+  c := public.agente_contexto(v_conv);
+  insert into resultado (teste, ok) select 'descrição: vai para o agente separada da legenda',
+    exists (select 1 from jsonb_array_elements(c -> 'mensagens') m
+             where m ->> 'descricao' like 'Caixa de grampos 26/6%' and m ->> 'texto' = 'vocês vendem esse grampo?');
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.registrar_descricao(gen_random_uuid(), 'x');
+  insert into resultado (teste, ok) values ('descrição: usuário logado não grava descrição', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('descrição: usuário logado não grava descrição', true);
 end $$;
 
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
