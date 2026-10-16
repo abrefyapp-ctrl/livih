@@ -4,6 +4,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { avisarAgente, emSegundoPlano, transcreverEAvisar } from "../_shared/atendimento.ts";
+import { guardarMidiaRecebida } from "../_shared/midia.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -166,6 +167,15 @@ Deno.serve(async (req) => {
     p_texto: texto,
     p_payload: enxugar(body),
   };
+  // Arquivo da mensagem (imagem, PDF, vídeo, áudio) para o bucket `midias`, depois de gravar a mensagem.
+  const guardarMidia = () => {
+    if (!p.media?.url) return;
+    emSegundoPlano(guardarMidiaRecebida(
+      supabase,
+      { canal_id: canalId, wa_id: String(p.id), tipo, mime: p.media.mimetype, nome: p.media.filename },
+      () => fetch(p.media.url, { headers: { "X-Api-Key": WAHA_API_KEY }, signal: AbortSignal.timeout(30000) }),
+    ));
+  };
 
   if (p.fromMe) {
     const { error } = await supabase.rpc("registrar_saida_celular", comum);
@@ -173,6 +183,7 @@ Deno.serve(async (req) => {
       console.error("registrar_saida_celular", error.message);
       return resposta(500, { erro: "gravar" });
     }
+    guardarMidia();
     return resposta(200, { ok: true });
   }
 
@@ -187,6 +198,7 @@ Deno.serve(async (req) => {
   }
 
   if (entrada?.duplicada) return resposta(200, { ok: true, duplicada: true });
+  guardarMidia();
 
   // Áudio: transcreve depois de responder ao WAHA e só então acorda o agente, que já recebe o texto.
   const segundos = Number(p._data?.Message?.audioMessage?.seconds ?? p._data?.message?.audioMessage?.seconds ?? 0);

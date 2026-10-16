@@ -8,6 +8,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { avisarAgente, emSegundoPlano, normalizarTelefone, transcreverEAvisar } from "../_shared/atendimento.ts";
+import { guardarMidiaRecebida } from "../_shared/midia.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -44,7 +45,7 @@ async function assinaturaValida(corpo: string, cabecalho: string | null): Promis
 }
 
 // Tipo e texto de uma mensagem (entrada ou eco do celular). null = não vira mensagem (reação, sistema…).
-function lerMensagem(m: Json): { tipo: Tipo; texto: string | null; midia?: { id: string; mime?: string } } | null {
+function lerMensagem(m: Json): { tipo: Tipo; texto: string | null; midia?: { id: string; mime?: string; nome?: string } } | null {
   switch (m.type) {
     case "text":
       return m.text?.body?.trim() ? { tipo: "texto", texto: m.text.body } : null;
@@ -55,7 +56,7 @@ function lerMensagem(m: Json): { tipo: Tipo; texto: string | null; midia?: { id:
     case "video":
       return { tipo: "video", texto: m.video?.caption ?? null, midia: { id: m.video?.id, mime: m.video?.mime_type } };
     case "document":
-      return { tipo: "documento", texto: m.document?.caption ?? m.document?.filename ?? null, midia: { id: m.document?.id, mime: m.document?.mime_type } };
+      return { tipo: "documento", texto: m.document?.caption ?? m.document?.filename ?? null, midia: { id: m.document?.id, mime: m.document?.mime_type, nome: m.document?.filename } };
     case "sticker":
       return { tipo: "figurinha", texto: null, midia: { id: m.sticker?.id, mime: m.sticker?.mime_type } };
     case "location":
@@ -87,6 +88,17 @@ async function baixarMidia(mediaId: string, token: string): Promise<Response> {
   return await fetch(corpo.url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20000) });
 }
 
+// Arquivo da mensagem (imagem, PDF, vídeo, áudio) para o bucket `midias`, depois de gravar a mensagem.
+async function guardarMidia(canalId: string, m: Json, lida: NonNullable<ReturnType<typeof lerMensagem>>) {
+  if (!lida.midia?.id) return;
+  const token = await tokenDoCanal(canalId);
+  await guardarMidiaRecebida(
+    supabase,
+    { canal_id: canalId, wa_id: String(m.id), tipo: lida.tipo, mime: lida.midia.mime, nome: lida.midia.nome },
+    () => baixarMidia(lida.midia!.id, token),
+  );
+}
+
 async function entrada(canalId: string, m: Json, nomes: Map<string, string>, valor: Json) {
   const lida = lerMensagem(m);
   const telefone = normalizarTelefone(m.from);
@@ -105,6 +117,7 @@ async function entrada(canalId: string, m: Json, nomes: Map<string, string>, val
   });
   if (error) throw new Error(`registrar_entrada: ${error.message}`);
   if (e?.duplicada) return;
+  emSegundoPlano(guardarMidia(canalId, m, lida));
 
   if (lida.tipo === "audio" && lida.midia?.id) {
     const token = await tokenDoCanal(canalId);
@@ -129,6 +142,7 @@ async function ecoDoCelular(canalId: string, m: Json, valor: Json) {
     p_payload: { metadata: valor.metadata, message: m },
   });
   if (error) throw new Error(`registrar_saida_celular: ${error.message}`);
+  emSegundoPlano(guardarMidia(canalId, m, lida));
 }
 
 Deno.serve(async (req) => {

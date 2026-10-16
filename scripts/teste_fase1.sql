@@ -1608,6 +1608,57 @@ exception when insufficient_privilege then
   insert into resultado (teste, ok) values ('agente pedido: usuário logado não chama as funções do agente', true);
 end $$;
 
+-- Mídia recebida: o arquivo é ligado à mensagem uma vez, só pela função de serviço.
+reset role;
+do $$
+declare
+  v_conv uuid := current_setting('teste.conversa')::uuid;
+  v_canal uuid := (select canal_id from public.conversas where id = current_setting('teste.conversa')::uuid);
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_msg uuid; d jsonb; r jsonb; v_path text;
+begin
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, midia_mime, wa_id, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'documento', 'requisicao_compra.pdf', 'application/pdf', 'wa-midia-1', 'recebida')
+  returning id into v_msg;
+  d := public.midia_destino(v_canal, 'wa-midia-1');
+  insert into resultado (teste, ok) values ('mídia: acha a mensagem pelo número e id do WhatsApp',
+    (d ->> 'mensagem_id')::uuid = v_msg and not (d ->> 'ja_tem')::boolean);
+
+  v_path := v_org || '/' || v_conv || '/recebido-' || v_msg || '-requisicao_compra.pdf';
+  insert into storage.objects (bucket_id, name, metadata) values ('midias', v_path, '{"mimetype":"application/pdf","size":3000}');
+  r := public.guardar_midia(v_msg, v_path, 'requisicao_compra.pdf', 'application/pdf');
+  insert into resultado (teste, ok) select 'mídia: arquivo recebido fica ligado à mensagem',
+    (r ->> 'guardado')::boolean and midia_path = v_path and midia_nome = 'requisicao_compra.pdf'
+    from public.mensagens where id = v_msg;
+
+  r := public.guardar_midia(v_msg, v_path, 'outro.pdf', 'application/pdf');
+  insert into resultado (teste, ok) values ('mídia: não troca o arquivo depois de guardado', not (r ->> 'guardado')::boolean);
+  begin
+    update public.mensagens set midia_path = v_org || '/' || v_conv || '/trocado.pdf' where id = v_msg;
+    insert into resultado (teste, ok) values ('mídia: fora da função o arquivo continua imutável', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('mídia: fora da função o arquivo continua imutável', sqlerrm like 'o conteúdo de uma mensagem%');
+  end;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, midia_mime, wa_id, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'imagem', 'image/jpeg', 'wa-midia-2', 'recebida')
+  returning id into v_msg;
+  begin
+    perform public.guardar_midia(v_msg, 'outra-org/x/y.pdf', 'y.pdf', 'application/pdf');
+    insert into resultado (teste, ok) values ('mídia: caminho fora da conversa é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('mídia: caminho fora da conversa é recusado', true);
+  end;
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.midia_destino(gen_random_uuid(), 'x');
+  insert into resultado (teste, ok) values ('mídia: usuário logado não chama as funções de serviço', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('mídia: usuário logado não chama as funções de serviço', true);
+end $$;
+
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
 reset role;
 insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');

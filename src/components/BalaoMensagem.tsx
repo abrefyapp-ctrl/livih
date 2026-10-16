@@ -23,7 +23,10 @@ const ENTREGA: Record<Mensagem['status_entrega'], { icone: NomeIcone; rotulo: st
   erro: { icone: 'erro', rotulo: 'Não enviada' },
 }
 
-/** Arquivo guardado no Livih (enviado pela equipe): imagem e vídeo aparecem; o resto vira link de baixar. */
+/**
+ * Arquivo guardado no Livih (enviado pela equipe ou recebido do cliente): imagem, figurinha, vídeo e áudio aparecem;
+ * o resto vira link de baixar.
+ */
 function Arquivo({ m, saida }: { m: Mensagem; saida: boolean }) {
   const [url, setUrl] = useState<{ path: string; url: string | null } | null>(null)
   useEffect(() => {
@@ -44,7 +47,9 @@ function Arquivo({ m, saida }: { m: Mensagem; saida: boolean }) {
         <img src={link} alt={nome} className="max-h-64 rounded-md object-contain" />
       </a>
     )
+  if (link && m.tipo === 'figurinha') return <img src={link} alt="Figurinha" className="max-h-32 object-contain" />
   if (link && m.tipo === 'video') return <video src={link} controls preload="metadata" className="max-h-64 rounded-md" />
+  if (link && m.tipo === 'audio') return <audio src={link} controls preload="metadata" className="h-10 w-64 max-w-full" />
 
   return (
     <a
@@ -64,11 +69,14 @@ function Arquivo({ m, saida }: { m: Mensagem; saida: boolean }) {
 }
 
 function Conteudo({ m }: { m: Mensagem }) {
-  if (m.midia_path) {
+  const saida = m.direcao === 'saida' && m.autor_tipo !== 'bot'
+  // Áudio: a transcrição continua sendo o principal; com o arquivo guardado, dá para ouvir o original.
+  if (m.midia_path && m.tipo !== 'audio') {
     return (
       <div className="space-y-1">
-        <Arquivo m={m} saida={m.direcao === 'saida' && m.autor_tipo !== 'bot'} />
-        {m.texto && (
+        <Arquivo m={m} saida={saida} />
+        {/* Documento recebido guarda o nome do arquivo também como texto: não repete. */}
+        {m.texto && m.texto !== m.midia_nome && (
           <p className="break-words whitespace-pre-wrap">
             <TextoWhatsapp texto={m.texto} />
           </p>
@@ -95,6 +103,7 @@ function Conteudo({ m }: { m: Mensagem }) {
         <p className="break-words whitespace-pre-wrap">
           {m.transcricao ?? <span className="italic opacity-80">Áudio sem transcrição.</span>}
         </p>
+        {m.midia_path && <Arquivo m={m} saida={saida} />}
       </div>
     )
   }
