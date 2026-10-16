@@ -5,15 +5,14 @@
 import { Document, Font, Image, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer'
 import { formatarCnpj } from '../services/empresa'
 import { quantidade } from '../services/erp'
-import { formatarTelefone } from '../services/formato'
+import { formatarTelefone, moeda as moedaTela } from '../services/formato'
 import type { DadosOrcamento } from '../services/orcamento'
 
 // Sem hifenização automática: em português ela quebra palavras em lugares errados ("grampea-mento").
 Font.registerHyphenationCallback((palavra) => [palavra])
 
-// No documento comercial, sempre com centavos (o moeda() da tela arredonda para reais inteiros).
-const reais = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })
-const moeda = (v: number) => reais.format(v)
+// No documento comercial, sempre com centavos.
+const moeda = (v: number) => moedaTela(v, true)
 
 const COR = { texto: '#1f2933', suave: '#616e7c', linha: '#d9dee3', fundo: '#f4f6f8', destaque: '#111827' }
 

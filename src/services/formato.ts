@@ -60,7 +60,16 @@ export function haQuanto(iso: string | null): string {
   return `há ${dias} ${dias === 1 ? 'dia' : 'dias'}`
 }
 
-export function moeda(valor: number | null): string {
+/**
+ * Reais. Por padrão sem centavos (valor estimado de oportunidade, totais de funil); com `centavos`, sempre com duas
+ * casas: preço, item, total de pedido e tudo o que é cobrado (R$ 12,50 não pode virar R$ 13).
+ */
+export function moeda(valor: number | null, centavos = false): string {
   if (valor == null) return ''
-  return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+  return valor.toLocaleString(
+    'pt-BR',
+    centavos
+      ? { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }
+      : { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 },
+  )
 }

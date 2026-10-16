@@ -48,6 +48,8 @@ const ROTULO_ACAO: Partial<Record<StatusPedido, string>> = {
 }
 
 const texto = (n: number | null | undefined) => (n == null ? '' : String(n).replace('.', ','))
+// Campos de dinheiro sempre com duas casas (12,50, não 12,5).
+const textoReais = (n: number | null | undefined) => (n == null ? '' : n.toFixed(2).replace('.', ','))
 
 export function PedidoDetalhe() {
   const { id } = useParams()
@@ -381,7 +383,7 @@ function Itens({
     setProdutoId(p.id!)
     setBusca(p.nome!)
     setDescricao(p.nome!)
-    setPreco(texto(Number(p.preco)))
+    setPreco(textoReais(Number(p.preco)))
   }
 
   async function adicionar(e: FormEvent) {
@@ -477,7 +479,7 @@ function Itens({
                         {p.codigo && <span className="text-texto-3"> · {p.codigo}</span>}
                       </span>
                       <span className="shrink-0 text-texto-3 tabular-nums">
-                        {moeda(Number(p.preco))}
+                        {moeda(Number(p.preco), true)}
                         {p.controla_estoque && ` · ${quantidade(Number(p.saldo))} ${p.unidade}`}
                       </span>
                     </button>
@@ -504,7 +506,7 @@ function Itens({
 
 function LinhaItem({ item, editavel, aoMudar, aoErro }: { item: ItemPedido; editavel: boolean; aoMudar: () => void; aoErro: (m: string | null) => void }) {
   const [qtd, setQtd] = useState(texto(Number(item.quantidade)))
-  const [preco, setPreco] = useState(texto(Number(item.preco_unitario)))
+  const [preco, setPreco] = useState(textoReais(Number(item.preco_unitario)))
 
   async function salvarCampo(campo: 'quantidade' | 'preco_unitario', valor: string) {
     const n = lerNumero(valor)
@@ -537,10 +539,10 @@ function LinhaItem({ item, editavel, aoMudar, aoErro }: { item: ItemPedido; edit
         {editavel ? (
           <input aria-label={`Preço de ${item.descricao}`} inputMode="decimal" value={preco} onChange={(e) => setPreco(e.target.value)} onBlur={() => void salvarCampo('preco_unitario', preco)} className={campo} />
         ) : (
-          moeda(Number(item.preco_unitario))
+          moeda(Number(item.preco_unitario), true)
         )}
       </td>
-      <td className="px-4 py-2 text-right font-medium tabular-nums">{moeda(Number(item.subtotal))}</td>
+      <td className="px-4 py-2 text-right font-medium tabular-nums">{moeda(Number(item.subtotal), true)}</td>
       {editavel && (
         <td className="px-2 py-2">
           <button
@@ -558,8 +560,8 @@ function LinhaItem({ item, editavel, aoMudar, aoErro }: { item: ItemPedido; edit
 }
 
 function Totais({ pedido, editavel, aoMudar, aoErro }: { pedido: Pedido; editavel: boolean; aoMudar: () => void; aoErro: (m: string | null) => void }) {
-  const [desconto, setDesconto] = useState(texto(Number(pedido.desconto)))
-  const [frete, setFrete] = useState(texto(Number(pedido.frete)))
+  const [desconto, setDesconto] = useState(textoReais(Number(pedido.desconto)))
+  const [frete, setFrete] = useState(textoReais(Number(pedido.frete)))
 
   async function salvar(campo: 'desconto' | 'frete', valor: string) {
     const n = lerNumero(valor) ?? 0
@@ -582,7 +584,7 @@ function Totais({ pedido, editavel, aoMudar, aoErro }: { pedido: Pedido; editave
     <section aria-label="Totais" className="ml-auto max-w-sm rounded-lg border border-borda bg-superficie px-4 py-2 text-pequeno tabular-nums">
       <div className={linha}>
         <span className="text-texto-2">Subtotal</span>
-        <span>{moeda(Number(pedido.subtotal))}</span>
+        <span>{moeda(Number(pedido.subtotal), true)}</span>
       </div>
       <div className={linha}>
         <label htmlFor="ped-desconto" className="text-texto-2">
@@ -591,7 +593,7 @@ function Totais({ pedido, editavel, aoMudar, aoErro }: { pedido: Pedido; editave
         {editavel ? (
           <input id="ped-desconto" inputMode="decimal" value={desconto} onChange={(e) => setDesconto(e.target.value)} onBlur={() => void salvar('desconto', desconto)} className={campo} />
         ) : (
-          <span>− {moeda(Number(pedido.desconto))}</span>
+          <span>− {moeda(Number(pedido.desconto), true)}</span>
         )}
       </div>
       <div className={linha}>
@@ -601,12 +603,12 @@ function Totais({ pedido, editavel, aoMudar, aoErro }: { pedido: Pedido; editave
         {editavel ? (
           <input id="ped-frete" inputMode="decimal" value={frete} onChange={(e) => setFrete(e.target.value)} onBlur={() => void salvar('frete', frete)} className={campo} />
         ) : (
-          <span>{moeda(Number(pedido.frete))}</span>
+          <span>{moeda(Number(pedido.frete), true)}</span>
         )}
       </div>
       <div className={`${linha} border-t border-borda pt-2 text-corpo font-semibold`}>
         <span>Total</span>
-        <span>{moeda(Number(pedido.total))}</span>
+        <span>{moeda(Number(pedido.total), true)}</span>
       </div>
     </section>
   )

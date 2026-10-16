@@ -265,7 +265,7 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-texto-2">{p.codigo ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{moeda(Number(p.preco))}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{moeda(Number(p.preco), true)}</td>
                     <td className={`px-4 py-2.5 text-right tabular-nums ${abaixo(p) ? 'font-semibold text-atencao' : ''}`}>
                       {p.controla_estoque ? `${quantidade(Number(p.saldo))} ${p.unidade}` : <span className="text-texto-3">não controla</span>}
                     </td>
@@ -325,7 +325,7 @@ function ModalProduto({
   const [nome, setNome] = useState(produto?.nome ?? '')
   const [codigo, setCodigo] = useState(produto?.codigo ?? '')
   const [unidade, setUnidade] = useState(produto?.unidade ?? 'un')
-  const [preco, setPreco] = useState(produto ? String(produto.preco).replace('.', ',') : '')
+  const [preco, setPreco] = useState(produto ? Number(produto.preco).toFixed(2).replace('.', ',') : '')
   const [minimo, setMinimo] = useState(produto?.estoque_minimo != null ? String(produto.estoque_minimo).replace('.', ',') : '')
   const [controla, setControla] = useState(produto?.controla_estoque ?? true)
   const [ativoProd, setAtivoProd] = useState(produto?.ativo ?? true)
@@ -647,7 +647,7 @@ function ModalImportacao({
                   <tr key={i}>
                     <td className="px-3 py-1.5">{l.nome}</td>
                     <td className="px-3 py-1.5 text-texto-2">{l.codigo ?? '—'}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{moeda(l.preco ?? 0)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{moeda(l.preco ?? 0, true)}</td>
                   </tr>
                 ))}
               </tbody>

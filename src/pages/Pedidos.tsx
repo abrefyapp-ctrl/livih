@@ -116,7 +116,7 @@ function ListaPedidos({ orgId }: { orgId: string }) {
                   <span className="w-14 font-semibold tabular-nums">#{p.numero}</span>
                   <span className="min-w-0 flex-1 truncate font-medium">{p.contato ? nomeDoContato(p.contato) : 'Sem cliente'}</span>
                   <EtiquetaPedido status={p.status} />
-                  <span className="w-28 text-right font-medium tabular-nums">{moeda(Number(p.total))}</span>
+                  <span className="w-28 text-right font-medium tabular-nums">{moeda(Number(p.total), true)}</span>
                   <span className="w-16 text-right text-legenda text-texto-3">{quandoCurto(p.criado_em)}</span>
                 </Link>
               </li>

@@ -125,7 +125,7 @@ export function ModalNovoOrcamento({ contato, aoFechar }: { contato: Contato; ao
                         <span className="font-medium text-primaria">Orçamento #{p.numero}</span>
                         <span className="text-texto-3"> · {quandoCurto(p.criado_em).toLowerCase()}</span>
                       </span>
-                      <span className="text-texto-2 tabular-nums">{moeda(Number(p.total))}</span>
+                      <span className="text-texto-2 tabular-nums">{moeda(Number(p.total), true)}</span>
                     </button>
                   </li>
                 ))}

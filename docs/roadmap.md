@@ -21,6 +21,26 @@ Planejamento do produto combinado em 12/10/2026. As pendências pequenas de tela
 
 Se a JoGrampo estiver esperando, os itens 2 e 3 trocam de lugar.
 
+### Próximos passos (combinado em 16/10)
+
+Depois do orçamento em PDF, do envio de arquivos e da busca de produtos pelo agente (14 e 15/10):
+
+1. **Centavos na tela do pedido**: a lista de itens e os totais arredondavam para reais inteiros (o PDF já saía certo).
+2. **O agente monta o rascunho do pedido pela conversa** (ERP): junta a busca de produtos, o orçamento e o PDF pelo
+   WhatsApp. O cliente pede, o agente cria o rascunho, a equipe confere e envia.
+3. **Saúde do agente** (peça 1 do Orientador, especificada em [saude-do-agente.md](saude-do-agente.md)): preventivo,
+   antes do próximo cliente.
+4. **Simulador de conversa** (peça 3): o cliente e nós testamos o agente sem mandar mensagem pelo celular.
+5. **Importador inteligente de catálogo** (peça 2): quando entrar um cliente com catálogo em PDF ou texto.
+6. **Assistente orientador** (peça 4): por último, usa as peças anteriores.
+
+Se um cliente novo for entrar nas próximas semanas, os itens 3 e 5 sobem para antes do 2: a implantação dele já sai
+com o custo sob controle e sem catálogo manual.
+
+Em paralelo, sem código: conferir o custo da JoGrampo depois da limpeza (uso_ia e tokens em cache no painel da
+OpenAI), testar envio de arquivo pela API oficial da Meta e confirmar com a JoGrampo o código "ROCAMA 7.005" (dois
+grampeadores com o mesmo código na tabela do fornecedor).
+
 ## Agenda (todos os planos)
 
 Primeira entrega (12/10):
