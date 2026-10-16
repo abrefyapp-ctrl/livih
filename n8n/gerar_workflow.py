@@ -257,24 +257,29 @@ if (d.logo_path) {
   if (s.statusCode < 400 && s.body?.signedURL) logo_url = `${URL}/storage/v1${s.body.signedURL}`;
 }
 
+// O n8n NÃO manipula o PDF: o httpRequest dele embrulhava o binário em JSON ({"type":"Buffer","data":[...]}) e o
+// cliente recebia um arquivo que não abre (16/10). Aqui só se cria uma URL de upload assinada (uso único) na pasta
+// da conversa; o livih-pdf gera o PDF e sobe direto por ela, sem precisar da chave do Supabase.
+const path = `${d.org_id}/${conversa}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-orcamento-${d.pedido.numero}.pdf`;
+const assinatura = await this.helpers.httpRequest({
+  method: 'POST', url: `${URL}/storage/v1/object/upload/sign/midias/${path}`, headers: auth,
+  body: {}, json: true, ignoreHttpStatusErrors: true, returnFullResponse: true,
+});
+if (assinatura.statusCode >= 400 || !assinatura.body?.url) {
+  return JSON.stringify({ erro: `não foi possível preparar o envio do PDF (HTTP ${assinatura.statusCode}); chame a equipe` });
+}
+
 const dados = { pedido: { ...d.pedido, contato: null }, itens: d.itens, emissora: d.emissora, cliente: d.cliente, vendedor: d.vendedor };
 const pdf = await this.helpers.httpRequest({
   method: 'POST', url: 'http://livih-pdf:3000/orcamento',
-  headers: { 'content-type': 'application/json', 'x-livih-token': $env.LIVIH_PDF_TOKEN },
-  body: JSON.stringify({ dados, logo_url }), encoding: 'arraybuffer',
+  headers: { 'x-livih-token': $env.LIVIH_PDF_TOKEN },
+  body: { dados, logo_url, upload_url: `${URL}/storage/v1${assinatura.body.url}` }, json: true,
   ignoreHttpStatusErrors: true, returnFullResponse: true, timeout: 60000,
 });
-if (pdf.statusCode >= 400) return JSON.stringify({ erro: `não foi possível gerar o PDF (HTTP ${pdf.statusCode}); chame a equipe` });
-const nome = decodeURIComponent(pdf.headers['x-nome-arquivo'] || `Orcamento-${d.pedido.numero}.pdf`);
-
-// Mesmo caminho do envio da equipe: midias/<org>/<conversa>/<id>-<nome>.
-const path = `${d.org_id}/${conversa}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${nome}`;
-const up = await this.helpers.httpRequest({
-  method: 'POST', url: `${URL}/storage/v1/object/midias/${path}`,
-  headers: { ...auth, 'content-type': 'application/pdf', 'x-upsert': 'false' },
-  body: Buffer.from(pdf.body), ignoreHttpStatusErrors: true, returnFullResponse: true,
-});
-if (up.statusCode >= 400) return JSON.stringify({ erro: `não foi possível guardar o PDF (HTTP ${up.statusCode}); chame a equipe` });
+if (pdf.statusCode >= 400 || !pdf.body?.ok) {
+  return JSON.stringify({ erro: `não foi possível gerar o PDF (${pdf.body?.erro || 'HTTP ' + pdf.statusCode}); chame a equipe` });
+}
+const nome = pdf.body.nome || `Orcamento-${d.pedido.numero}.pdf`;
 
 const tipo = d.pedido.status === 'rascunho' ? 'Orçamento' : 'Pedido';
 const empresa = d.emissora?.nome_fantasia || d.emissora?.razao_social;
