@@ -113,6 +113,8 @@ Você trabalha dentro do CRM da ${c.organizacao?.nome || 'empresa'}. As ferramen
 - **mover_etapa**: reflita o avanço no funil usando exatamente um destes nomes: ${(c.etapas || []).join(', ')}. Nunca marque Ganho ou Perdido; isso é da equipe.
 - **registrar_nota**: antes de passar para a equipe, deixe um resumo útil: dores, contexto, o que já foi explicado e o próximo passo sugerido.
 - **buscar_produtos**: quando o cliente perguntar de um produto (preço, embalagem, quantidade, especificação, compatibilidade, se tem), busque no cadastro pela referência, modelo ou nome que ele usou (ex.: "14/19", "grampeador IMECO", "prego anelado"). Informe só o que vier da busca, com o preço exatamente como veio. Se vierem vários parecidos, pergunte qual ele quer; se não vier nenhum, não invente: peça mais detalhes ou chame a equipe. Pode buscar mais de uma vez com termos diferentes.
+- **montar_pedido**: quando o cliente disser o que quer comprar E as quantidades, monte o pedido com o código exato que veio da busca (campo codigo) e a quantidade na unidade do produto (ex.: 10 caixinhas = quantidade 10). Mande SEMPRE a lista completa do pedido (se o cliente mudar algo, reenvie tudo). O preço vem do cadastro: confirme ao cliente os itens e o total exatamente como a ferramenta devolveu, e diga que o frete não está incluso e é calculado pela equipe. Se algum código voltar em nao_encontrados, busque de novo antes de remontar.
+- **enviar_orcamento**: envia ao cliente o PDF do pedido montado. Use quando o cliente pedir o orçamento, a proposta ou o PDF, ou confirmar os itens. Antes, monte (ou atualize) com montar_pedido. Depois de enviar, diga em uma frase que o orçamento foi enviado e que a equipe confirma frete e pagamento.
 - **chamar_humano**: chame quando acontecer um destes casos:
 ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar com uma pessoa'}
   Depois de chamar, diga ao cliente, em uma frase, que um especialista vai continuar a conversa por aqui. Não continue o atendimento depois disso.
@@ -207,6 +209,72 @@ return JSON.stringify(await rpc('{fn}', {corpo_js}));
     }
 
 
+def ferramenta_codigo(nome, descricao, codigo_js, schema):
+    """Ferramenta cujo código faz mais que uma chamada ao banco (ex.: enviar_orcamento)."""
+    return {
+        "parameters": {
+            "description": descricao,
+            "jsCode": RPC_FERRAMENTA + codigo_js,
+            "specifyInputSchema": True,
+            "schemaType": "manual",
+            "inputSchema": json.dumps(schema, ensure_ascii=False, indent=2),
+        },
+        "type": "@n8n/n8n-nodes-langchain.toolCode",
+        "typeVersion": 1.3,
+        "name": nome,
+        "id": str(uuid.uuid5(uuid.NAMESPACE_URL, "livih-agente/" + nome)),
+    }
+
+
+# PDF do orçamento: dados do banco -> serviço livih-pdf (rede interna do n8n) -> bucket midias -> mensagem do agente
+# na fila de envio. Docs: docs/agente-pedido.md. Variáveis: LIVIH_SUPABASE_URL, LIVIH_SUPABASE_KEY, LIVIH_PDF_TOKEN.
+ENVIAR_ORCAMENTO = r"""
+const conversa = $('Validar').first().json.conversa_id;
+const URL = $env.LIVIH_SUPABASE_URL;
+const auth = { apikey: $env.LIVIH_SUPABASE_KEY, Authorization: `Bearer ${$env.LIVIH_SUPABASE_KEY}` };
+
+const d = await rpc('agente_dados_orcamento', { p_conversa: conversa });
+if (!d || d.erro || !d.sucesso) return JSON.stringify(d || { erro: 'sem dados do orçamento' });
+
+// A logo é privada (bucket logos): URL assinada por 10 minutos, só para o serviço baixar.
+let logo_url = null;
+if (d.logo_path) {
+  const s = await this.helpers.httpRequest({
+    method: 'POST', url: `${URL}/storage/v1/object/sign/logos/${d.logo_path}`, headers: auth,
+    body: { expiresIn: 600 }, json: true, ignoreHttpStatusErrors: true, returnFullResponse: true,
+  });
+  if (s.statusCode < 400 && s.body?.signedURL) logo_url = `${URL}/storage/v1${s.body.signedURL}`;
+}
+
+const dados = { pedido: { ...d.pedido, contato: null }, itens: d.itens, emissora: d.emissora, cliente: d.cliente, vendedor: d.vendedor };
+const pdf = await this.helpers.httpRequest({
+  method: 'POST', url: 'http://livih-pdf:3000/orcamento',
+  headers: { 'content-type': 'application/json', 'x-livih-token': $env.LIVIH_PDF_TOKEN },
+  body: JSON.stringify({ dados, logo_url }), encoding: 'arraybuffer',
+  ignoreHttpStatusErrors: true, returnFullResponse: true, timeout: 60000,
+});
+if (pdf.statusCode >= 400) return JSON.stringify({ erro: `não foi possível gerar o PDF (HTTP ${pdf.statusCode}); chame a equipe` });
+const nome = decodeURIComponent(pdf.headers['x-nome-arquivo'] || `Orcamento-${d.pedido.numero}.pdf`);
+
+// Mesmo caminho do envio da equipe: midias/<org>/<conversa>/<id>-<nome>.
+const path = `${d.org_id}/${conversa}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${nome}`;
+const up = await this.helpers.httpRequest({
+  method: 'POST', url: `${URL}/storage/v1/object/midias/${path}`,
+  headers: { ...auth, 'content-type': 'application/pdf', 'x-upsert': 'false' },
+  body: Buffer.from(pdf.body), ignoreHttpStatusErrors: true, returnFullResponse: true,
+});
+if (up.statusCode >= 400) return JSON.stringify({ erro: `não foi possível guardar o PDF (HTTP ${up.statusCode}); chame a equipe` });
+
+const tipo = d.pedido.status === 'rascunho' ? 'Orçamento' : 'Pedido';
+const empresa = d.emissora?.nome_fantasia || d.emissora?.razao_social;
+const env = await rpc('agente_enviar_arquivo', {
+  p_conversa: conversa, p_path: path, p_nome: nome,
+  p_legenda: `${tipo} nº ${d.pedido.numero}${empresa ? ` – ${empresa}` : ''}`,
+});
+return JSON.stringify({ enviado: !!env?.enviado, numero: d.pedido.numero, total: d.pedido.total, aviso: env?.aviso || env?.erro || null });
+"""
+
+
 def obj(props, obrig=None):
     o = {"type": "object", "properties": {k: {"type": "string", "description": v} for k, v in props.items()}}
     if obrig:
@@ -255,6 +323,39 @@ FERRAMENTAS = [
         "{ p_conversa: conversa, p_busca: args.busca, p_limite: 8 }",
         obj({"busca": "O que o cliente procura: referência, modelo, nome ou tipo do produto, ex.: 14/19, grampeador IMECO"},
             ["busca"]),
+    ),
+    ferramenta(
+        "montar_pedido",
+        "Monta (ou atualiza) o pedido do cliente com a lista COMPLETA de itens. O preço vem do cadastro. Devolve "
+        "número, itens, total e códigos não encontrados.",
+        "agente_montar_pedido",
+        "{ p_conversa: conversa, p_itens: args.itens, p_observacao: args.observacao || null }",
+        {
+            "type": "object",
+            "properties": {
+                "itens": {
+                    "type": "array",
+                    "description": "Todos os itens do pedido, cada um com o código exato da busca e a quantidade",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "codigo": {"type": "string", "description": "Código do produto, exatamente como veio de buscar_produtos"},
+                            "quantidade": {"type": "number", "description": "Quantidade na unidade do produto (ex.: caixinhas)"},
+                        },
+                        "required": ["codigo", "quantidade"],
+                    },
+                },
+                "observacao": {"type": "string", "description": "Observação do cliente sobre o pedido (opcional)"},
+            },
+            "required": ["itens"],
+        },
+    ),
+    ferramenta_codigo(
+        "enviar_orcamento",
+        "Gera o PDF do pedido montado e envia ao cliente no WhatsApp. Use depois de montar_pedido, quando o cliente "
+        "pedir o orçamento ou confirmar os itens.",
+        ENVIAR_ORCAMENTO,
+        {"type": "object", "properties": {"confirmar": {"type": "string", "description": "Escreva sim"}}},
     ),
     ferramenta(
         "chamar_humano",
