@@ -97,6 +97,9 @@ const blocoHorario = !textoHorario
     : `Horário de atendimento da equipe (Brasília): ${textoHorario}. Agora estamos FORA do horário: a equipe não está disponível. ${avisoJunto ? 'O aviso de fora do horário JÁ foi enviado junto com a saudação: não avise de novo.' : `Avise o cliente uma única vez na conversa (não repita se já avisou) que a equipe retorna no próximo horário de atendimento${foraHorario ? `, usando esta mensagem como base: "${foraHorario}"` : ''}.`} Continue ajudando normalmente: tire dúvidas, entenda a necessidade e anote os dados. Se precisar chamar a equipe, chame e diga que ela responde quando voltar.`;
 const blocoAbertura = [blocoSaudacao, blocoHorario].filter(Boolean).join('\n\n');
 
+// Ordem pensada para o cache de prompt da OpenAI (cobra ~90% menos pelo início repetido entre chamadas): primeiro
+// tudo o que é fixo por agente/empresa (instruções, CRM, regras, base), depois o que muda a cada conversa ou minuto
+// (saudação/horário, dados do contato, data e hora). Não pôr nada variável antes da base.
 const prompt_sistema = `${c.agente?.prompt || ''}
 
 ---
@@ -115,6 +118,10 @@ ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar co
   Depois de chamar, diga ao cliente, em uma frase, que um especialista vai continuar a conversa por aqui. Não continue o atendimento depois disso.
 
 Nunca fale de ferramentas, CRM ou sistema com o cliente. A sua resposta final é exatamente o texto que será enviado no WhatsApp.
+
+# BASE DE CONHECIMENTO
+
+${c.base_conhecimento || '(vazia)'}
 ${blocoAbertura ? `
 # SAUDAÇÃO E HORÁRIO
 
@@ -127,10 +134,6 @@ ${blocoAbertura}
 - E-mail: ${contato.email || 'não informado'}
 - Outros dados: ${Object.keys(contato.dados || {}).length ? JSON.stringify(contato.dados) : 'nenhum'}
 - Oportunidade aberta: ${op ? `"${op.titulo}" — etapa ${op.etapa}${op.resumo ? `. Resumo: ${op.resumo}` : ''}` : 'nenhuma ainda'}
-
-# BASE DE CONHECIMENTO
-
-${c.base_conhecimento || '(vazia)'}
 
 Data e hora agora: ${agora} (horário de Brasília).`;
 
