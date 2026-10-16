@@ -25,17 +25,30 @@ Se a JoGrampo estiver esperando, os itens 2 e 3 trocam de lugar.
 
 Depois do orçamento em PDF, do envio de arquivos e da busca de produtos pelo agente (14 e 15/10):
 
-1. **Centavos na tela do pedido**: a lista de itens e os totais arredondavam para reais inteiros (o PDF já saía certo).
-2. **O agente monta o rascunho do pedido pela conversa** (ERP): junta a busca de produtos, o orçamento e o PDF pelo
-   WhatsApp. O cliente pede, o agente cria o rascunho, a equipe confere e envia.
-3. **Saúde do agente** (peça 1 do Orientador, especificada em [saude-do-agente.md](saude-do-agente.md)): preventivo,
+1. ✅ **Centavos na tela do pedido** (16/10): a lista de itens e os totais arredondavam para reais inteiros (o PDF já
+   saía certo).
+2. ✅ **O agente monta e envia o orçamento** (16/10, [agente-pedido.md](agente-pedido.md)): o cliente pede, o agente
+   cria o rascunho com preço do cadastro e, quando o cliente pede, envia o PDF ele mesmo (serviço `livih-pdf` na VPS,
+   mesmo layout da tela). A equipe vê o aviso na conversa e o rascunho em Pedidos.
+3. **Guardar a mídia recebida** (incluído em 16/10): hoje o Livih não guarda os arquivos que o cliente manda (imagem,
+   PDF, vídeo, áudio): só registra que chegou um documento, com o nome. A equipe não abre o arquivo no Livih (só no
+   celular) e o histórico de auditoria fica incompleto, o que pesa contra a promessa do produto. Baixar a mídia na
+   entrada (WAHA e API oficial) para o bucket `midias`, no mesmo caminho do que a equipe envia, e mostrar na conversa
+   (imagem, vídeo, link para baixar), como já acontece com o envio. É a base do item 6.
+4. **Saúde do agente** (peça 1 do Orientador, especificada em [saude-do-agente.md](saude-do-agente.md)): preventivo,
    antes do próximo cliente.
-4. **Simulador de conversa** (peça 3): o cliente e nós testamos o agente sem mandar mensagem pelo celular.
-5. **Importador inteligente de catálogo** (peça 2): quando entrar um cliente com catálogo em PDF ou texto.
-6. **Assistente orientador** (peça 4): por último, usa as peças anteriores.
+5. **Simulador de conversa** (peça 3): o cliente e nós testamos o agente sem mandar mensagem pelo celular.
+6. **O agente lê PDF e imagem, e o importador inteligente de catálogo** (incluído em 16/10; peça 2): os dois extraem
+   produtos e quantidades de um arquivo.
+   - No atendimento: texto do PDF e a imagem vão para o modelo, e uma requisição de compra vira orçamento montado.
+     Caso real: JoGrampo, 15/10, cliente mandou `requisicao_compra.pdf` para orçar e o agente, sem ler, entrou em
+     laço. Corrigido só o comportamento: ele agora diz que não abre o arquivo e pede os itens por escrito.
+   - Na configuração: catálogo em PDF ou texto vira a prévia de importação de produtos.
+   - Cuidar do custo: imagem e PDF longo pesam em tokens; limitar páginas e tamanho, e medir em `uso_ia`.
+7. **Assistente orientador** (peça 4): por último, usa as peças anteriores.
 
-Se um cliente novo for entrar nas próximas semanas, os itens 3 e 5 sobem para antes do 2: a implantação dele já sai
-com o custo sob controle e sem catálogo manual.
+Se um cliente novo for entrar nas próximas semanas, os itens 4 e 6 sobem: a implantação dele já sai com o custo sob
+controle e sem catálogo manual.
 
 Em paralelo, sem código: conferir o custo da JoGrampo depois da limpeza (uso_ia e tokens em cache no painel da
 OpenAI), testar envio de arquivo pela API oficial da Meta e confirmar com a JoGrampo o código "ROCAMA 7.005" (dois
