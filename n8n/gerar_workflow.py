@@ -42,12 +42,20 @@ const contato = c.contato || {};
 const op = c.oportunidade;
 const regras = c.agente?.regras_humano?.casos || [];
 
+// Arquivo/imagem: o `texto` é só o nome do arquivo ou a legenda. Sem esta marcação o agente lia
+// "cliente: requisicao_compra.pdf" como se tivesse o conteúdo e inventava "os itens do anexo" (JoGrampo, 15/10).
+const MIDIA = { imagem: 'uma imagem', video: 'um vídeo', documento: 'um documento', figurinha: 'uma figurinha',
+  localizacao: 'uma localização', contato: 'um contato', outro: 'uma mensagem sem texto' };
 const linha = (m) => {
-  const t = m.texto
-    ? m.texto
-    : m.tipo === 'audio'
-      ? '[áudio que não deu para transcrever — peça para escrever ou mandar um áudio mais curto]'
-      : `[${m.tipo} — você só lê texto e áudio; peça para descrever por escrito se for importante]`;
+  let t;
+  if (m.tipo === 'texto') t = m.texto || '';
+  else if (m.tipo === 'audio') {
+    t = m.texto || '[áudio que não deu para transcrever — peça para escrever ou mandar um áudio mais curto]';
+  } else if (m.de === 'cliente') {
+    t = `[o cliente enviou ${MIDIA[m.tipo] || 'um arquivo'}${m.texto ? ` (${m.texto})` : ''} — você NÃO consegue abrir arquivos, documentos nem imagens]`;
+  } else {
+    t = `[${MIDIA[m.tipo] || 'arquivo'} enviado${m.texto ? `: ${m.texto}` : ''}]`;
+  }
   return `[${m.em}] ${m.de}: ${t}`;
 };
 
@@ -118,6 +126,9 @@ Você trabalha dentro do CRM da ${c.organizacao?.nome || 'empresa'}. As ferramen
 - **chamar_humano**: chame quando acontecer um destes casos:
 ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar com uma pessoa'}
   Depois de chamar, diga ao cliente, em uma frase, que um especialista vai continuar a conversa por aqui. Não continue o atendimento depois disso.
+
+- **Arquivos e imagens**: você NÃO consegue abrir documentos, PDFs, planilhas nem ver imagens. Quando o cliente mandar um, diga com clareza, uma única vez, que por aqui você não consegue abrir o arquivo, e peça para escrever na conversa o que precisa (produtos e quantidades). Se for um pedido de orçamento em arquivo (lista, requisição de compra) e o cliente preferir não digitar, chame a equipe com chamar_humano. Nunca fale do conteúdo do arquivo como se tivesse visto, nem peça "a linha do PDF".
+- **Nome do cliente**: use o nome que está em "O que já sabemos deste contato". Um nome que o cliente escreve num cumprimento ("boa tarde, Flávio") é de quem ele espera que atenda, não o dele.
 
 Nunca fale de ferramentas, CRM ou sistema com o cliente. A sua resposta final é exatamente o texto que será enviado no WhatsApp.
 
