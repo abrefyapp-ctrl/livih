@@ -44,11 +44,23 @@ export async function guardarMidiaRecebida(
     console.error("download da mídia", r.status, ref.wa_id);
     return null;
   }
-  const bytes = new Uint8Array(await r.arrayBuffer());
-  if (bytes.byteLength > LIMITE) {
-    console.error("mídia acima de 50 MB, não guardada", ref.wa_id, bytes.byteLength);
+  // Acima do limite não guarda, mas deixa o motivo na mensagem: sem isso o balão ficava mudo e o clique não fazia
+  // nada (catálogo de 62 MB, 16/10). Confere o tamanho antes de baixar tudo, quando o servidor informa.
+  const grandeDemais = async (tamanho: number) => {
+    console.error("mídia acima de 50 MB, não guardada", ref.wa_id, tamanho);
+    await r.body?.cancel().catch(() => undefined);
+    const mb = (tamanho / 1024 / 1024).toFixed(0);
+    const { error: erroAviso } = await supabase.rpc("registrar_descricao", {
+      p_mensagem: destino.mensagem_id,
+      p_descricao: `Arquivo de ${mb} MB: grande demais para guardar no Livih (limite de 50 MB). Abra pelo WhatsApp do celular.`,
+    });
+    if (erroAviso) console.error("aviso de arquivo grande", erroAviso.message);
     return null;
-  }
+  };
+  const informado = Number(r.headers.get("content-length") ?? 0);
+  if (informado > LIMITE) return await grandeDemais(informado);
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  if (bytes.byteLength > LIMITE) return await grandeDemais(bytes.byteLength);
   const mime = (ref.mime || r.headers.get("content-type") || "application/octet-stream").split(";")[0].trim();
   const { visivel, chave } = nomes(ref.tipo, mime, ref.nome);
   const path = `${destino.org_id}/${destino.conversa_id}/recebido-${destino.mensagem_id}-${chave}`;
