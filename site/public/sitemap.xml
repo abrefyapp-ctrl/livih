@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://livih.com.br/</loc>
-    <lastmod>2026-10-08</lastmod>
-  </url>
-  <url>
-    <loc>https://livih.com.br/privacidade/</loc>
-    <lastmod>2026-10-08</lastmod>
-  </url>
-  <url>
-    <loc>https://livih.com.br/termos/</loc>
-    <lastmod>2026-10-08</lastmod>
-  </url>
+  <url><loc>https://livih.com.br/</loc><lastmod>2026-10-16</lastmod><priority>1.0</priority></url>
+  <url><loc>https://livih.com.br/atendimento-whatsapp-equipe/</loc><lastmod>2026-10-16</lastmod><priority>0.8</priority></url>
+  <url><loc>https://livih.com.br/whatsapp-equipe-de-vendas/</loc><lastmod>2026-10-16</lastmod><priority>0.8</priority></url>
+  <url><loc>https://livih.com.br/crm-whatsapp/</loc><lastmod>2026-10-16</lastmod><priority>0.8</priority></url>
+  <url><loc>https://livih.com.br/agente-ia-whatsapp/</loc><lastmod>2026-10-16</lastmod><priority>0.8</priority></url>
+  <url><loc>https://livih.com.br/historico-auditoria-whatsapp/</loc><lastmod>2026-10-16</lastmod><priority>0.8</priority></url>
+  <url><loc>https://livih.com.br/orcamento-pedidos-whatsapp/</loc><lastmod>2026-10-16</lastmod><priority>0.8</priority></url>
+  <url><loc>https://livih.com.br/privacidade/</loc><lastmod>2026-10-16</lastmod><priority>0.3</priority></url>
+  <url><loc>https://livih.com.br/termos/</loc><lastmod>2026-10-16</lastmod><priority>0.3</priority></url>
 </urlset>

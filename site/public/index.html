@@ -57,138 +57,7 @@
   }
   </script>
 
-  <style>
-    :root {
-      --petroleo: #092124;
-      --primaria: #0f766e;
-      --primaria-hover: #115e59;
-      --destaque: #10b981;
-      --suave: #ecfdf5;
-      --fundo: #f8fafc;
-      --texto: #0f172a;
-      --texto-2: #334155;
-      --texto-3: #64748b;
-      --borda: #e2e8f0;
-      --largura: 72rem;
-    }
-    *, *::before, *::after { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      color: var(--texto);
-      background: #fff;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
-    img { max-width: 100%; height: auto; display: block; }
-    a { color: var(--primaria); }
-    :focus-visible { outline: 3px solid var(--destaque); outline-offset: 2px; }
-    .container { width: 100%; max-width: var(--largura); margin: 0 auto; padding: 0 1rem; }
-    @media (min-width: 48rem) { .container { padding: 0 2rem; } }
-
-    .pular { position: absolute; left: -999px; }
-    .pular:focus { left: 1rem; top: 1rem; background: #fff; padding: .5rem 1rem; z-index: 10; }
-
-    header.topo { border-bottom: 1px solid var(--borda); background: #fff; position: sticky; top: 0; z-index: 5; }
-    .topo .container { display: flex; align-items: center; justify-content: space-between; gap: 1rem; height: 4rem; }
-    .topo nav { display: flex; align-items: center; gap: 1.5rem; }
-    .topo nav a.secao { color: var(--texto-2); text-decoration: none; font-weight: 500; font-size: .95rem; display: none; }
-    .topo nav a.secao:hover { color: var(--texto); }
-    @media (min-width: 48rem) { .topo nav a.secao { display: inline; } }
-
-    .botao {
-      display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
-      min-height: 2.75rem; padding: 0 1.25rem; border-radius: .5rem; border: 1px solid transparent;
-      font-weight: 600; font-size: 1rem; text-decoration: none; white-space: nowrap;
-      transition: background-color .15s;
-    }
-    .botao.primario { background: var(--primaria); color: #fff; }
-    .botao.primario:hover { background: var(--primaria-hover); }
-    .botao.secundario { background: #fff; color: var(--texto); border-color: var(--borda); }
-    .botao.secundario:hover { background: var(--fundo); }
-    .botao.claro { background: #fff; color: var(--petroleo); }
-    .botao.claro:hover { background: var(--suave); }
-    .botao.pequeno { min-height: 2.5rem; padding: 0 1rem; font-size: .95rem; }
-
-    .heroi { background: var(--petroleo); color: #fff; padding: 4rem 0 4.5rem; }
-    .heroi .container { display: grid; gap: 2.5rem; align-items: center; }
-    @media (min-width: 60rem) { .heroi .container { grid-template-columns: 1.2fr .8fr; } }
-    .heroi .selo { display: inline-block; color: var(--destaque); font-weight: 600; font-size: .9rem; letter-spacing: .02em; margin: 0 0 1rem; }
-    .heroi h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.12; margin: 0 0 1.25rem; letter-spacing: -.02em; }
-    .heroi p.sub { font-size: clamp(1.05rem, 2vw, 1.25rem); color: #cbd5e1; margin: 0 0 2rem; max-width: 40rem; }
-    .heroi .acoes { display: flex; flex-wrap: wrap; gap: .75rem; }
-    .heroi .acoes .botao.secundario { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
-    .heroi .acoes .botao.secundario:hover { background: rgba(255,255,255,.08); }
-    .heroi .simbolo { justify-self: center; width: 11rem; opacity: .95; }
-    @media (max-width: 59.99rem) { .heroi .simbolo { display: none; } }
-
-    section.bloco { padding: 4rem 0; }
-    section.bloco.cinza { background: var(--fundo); }
-    .bloco h2 { font-size: clamp(1.6rem, 3.5vw, 2.25rem); line-height: 1.2; letter-spacing: -.01em; margin: 0 0 .75rem; }
-    .bloco p.intro { color: var(--texto-2); font-size: 1.1rem; max-width: 46rem; margin: 0 0 2.5rem; }
-
-    .grade { display: grid; gap: 1rem; }
-    @media (min-width: 40rem) { .grade { grid-template-columns: repeat(2, 1fr); } }
-    @media (min-width: 64rem) { .grade.tres { grid-template-columns: repeat(3, 1fr); } }
-    .cartao { background: #fff; border: 1px solid var(--borda); border-radius: .75rem; padding: 1.5rem; }
-    .cartao h3 { font-size: 1.1rem; margin: 0 0 .5rem; line-height: 1.35; }
-    .cartao p { margin: 0; color: var(--texto-2); }
-    .cartao .marca { display: block; width: 2rem; height: .3rem; border-radius: 1rem; background: var(--destaque); margin-bottom: 1rem; }
-
-    ol.passos { list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; counter-reset: passo; }
-    @media (min-width: 64rem) { ol.passos { grid-template-columns: repeat(3, 1fr); } }
-    ol.passos li { counter-increment: passo; background: #fff; border: 1px solid var(--borda); border-radius: .75rem; padding: 1.5rem; }
-    ol.passos li::before {
-      content: counter(passo); display: inline-grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%;
-      background: var(--suave); color: var(--primaria); font-weight: 700; margin-bottom: .75rem;
-    }
-    ol.passos h3 { margin: 0 0 .5rem; font-size: 1.1rem; }
-    ol.passos p { margin: 0; color: var(--texto-2); }
-
-    .lista-publico { display: grid; gap: .75rem; padding: 0; margin: 0; list-style: none; max-width: 46rem; }
-    .lista-publico li { padding-left: 1.75rem; position: relative; color: var(--texto-2); }
-    .lista-publico li::before { content: ""; position: absolute; left: 0; top: .55em; width: .75rem; height: .75rem; border-radius: 3px; background: var(--destaque); }
-
-    .perguntas { max-width: 50rem; }
-    .perguntas details { border-bottom: 1px solid var(--borda); padding: 1.1rem 0; }
-    .perguntas summary { cursor: pointer; font-weight: 600; font-size: 1.05rem; list-style: none; display: flex; justify-content: space-between; gap: 1rem; }
-    .perguntas summary::-webkit-details-marker { display: none; }
-    .perguntas summary::after { content: "+"; color: var(--primaria); font-weight: 700; }
-    .perguntas details[open] summary::after { content: "–"; }
-    .perguntas details p { margin: .75rem 0 0; color: var(--texto-2); }
-
-    .chamada { background: var(--petroleo); color: #fff; padding: 4rem 0; text-align: center; }
-    .chamada h2 { font-size: clamp(1.6rem, 3.5vw, 2.25rem); margin: 0 0 .75rem; }
-    .chamada p { color: #cbd5e1; margin: 0 auto 2rem; max-width: 36rem; font-size: 1.1rem; }
-
-    .formulario { max-width: 44rem; margin: 0 auto; text-align: left; }
-    .formulario .campos { display: grid; gap: 1rem; }
-    @media (min-width: 40rem) { .formulario .campos { grid-template-columns: 1fr 1fr; } .formulario .largo { grid-column: 1 / -1; } }
-    .formulario label { display: flex; flex-direction: column; gap: .35rem; font-weight: 600; font-size: .95rem; color: #e2e8f0; }
-    .formulario .opcional { font-weight: 400; color: #94a3b8; }
-    .formulario input, .formulario textarea {
-      font: inherit; font-weight: 400; color: var(--texto); background: #fff; border: 1px solid #cbd5e1; border-radius: .5rem;
-      min-height: 2.75rem; padding: .6rem .75rem; width: 100%;
-    }
-    .formulario textarea { resize: vertical; }
-    .formulario .isca { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-    .formulario .captcha { margin: 1.25rem 0 .5rem; }
-    .formulario .consentimento { font-size: .9rem; color: #94a3b8; margin: .75rem 0 1.25rem; text-align: left; max-width: none; }
-    .formulario .consentimento a, .chamada .alternativa a { color: #6ee7b7; }
-    .formulario button { cursor: pointer; }
-    .formulario button[disabled] { opacity: .6; cursor: wait; }
-    .formulario .status { margin: 1rem 0 0; font-weight: 600; text-align: left; max-width: none; min-height: 1.5em; }
-    .formulario .status.ok { color: #6ee7b7; }
-    .formulario .status.erro { color: #fca5a5; }
-    .chamada { position: relative; }
-    .chamada .alternativa { margin: 2rem auto 0; font-size: .95rem; }
-    .links-rodape { display: flex; flex-wrap: wrap; gap: 1.25rem; }
-
-    footer.rodape { padding: 2rem 0; color: var(--texto-3); font-size: .9rem; border-top: 1px solid var(--borda); }
-    footer.rodape .container { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center; }
-    footer.rodape a { color: var(--texto-2); }
-  </style>
+  <link rel="stylesheet" href="/site.css">
 </head>
 <body>
   <a class="pular" href="#conteudo">Pular para o conteúdo</a>
@@ -199,6 +68,7 @@
         <img src="/marca/livih.png" alt="Livih" width="95" height="40">
       </a>
       <nav aria-label="Principal">
+        <a class="secao" href="#solucoes">Soluções</a>
         <a class="secao" href="#como-funciona">Como funciona</a>
         <a class="secao" href="#recursos">Recursos</a>
         <a class="secao" href="#perguntas">Perguntas</a>
@@ -296,10 +166,55 @@
       </div>
     </section>
 
-    <section class="bloco cinza" aria-labelledby="titulo-historico">
+    <section class="bloco cinza solucoes" id="solucoes" aria-labelledby="titulo-solucoes">
+      <div class="container">
+        <h2 id="titulo-solucoes">Soluções</h2>
+        <p class="intro">Cada parte do Livih resolve um problema da sua operação no WhatsApp. Escolha por onde começar.</p>
+        <div class="grade tres">
+          <a class="cartao" href="/atendimento-whatsapp-equipe/">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>Atendimento em equipe</h3>
+            <p>Uma caixa de entrada para todas as conversas da sua equipe no WhatsApp, com filas, um responsável por atendimento e aviso quando alguém precisa responder.</p>
+            <span class="ir">Veja como funciona</span>
+          </a>
+          <a class="cartao" href="/whatsapp-equipe-de-vendas/">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>Equipe de vendas</h3>
+            <p>Cada vendedor no próprio número de WhatsApp, com a carteira dele, e a gestão acompanhando todas as conversas. O histórico com o cliente fica na empresa.</p>
+            <span class="ir">Veja como funciona</span>
+          </a>
+          <a class="cartao" href="/crm-whatsapp/">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>CRM para WhatsApp</h3>
+            <p>Contatos, oportunidades, notas e agenda ligados às conversas do WhatsApp. O funil se atualiza a partir do atendimento, sem planilha paralela.</p>
+            <span class="ir">Veja como funciona</span>
+          </a>
+          <a class="cartao" href="/agente-ia-whatsapp/">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>Agente de IA</h3>
+            <p>Agente de inteligência artificial que responde clientes no WhatsApp com as informações da sua empresa, entende áudio, foto e PDF e chama a equipe na hora certa.</p>
+            <span class="ir">Veja como funciona</span>
+          </a>
+          <a class="cartao" href="/historico-auditoria-whatsapp/">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>Histórico e auditoria</h3>
+            <p>As conversas comerciais da sua equipe num histórico que nenhum usuário edita nem apaga, com quem respondeu e quando. Mesmo quando alguém sai da equipe.</p>
+            <span class="ir">Veja como funciona</span>
+          </a>
+          <a class="cartao" href="/orcamento-pedidos-whatsapp/">
+            <span class="marca" aria-hidden="true"></span>
+            <h3>Orçamentos e pedidos</h3>
+            <p>Catálogo de produtos, orçamento em PDF com a logo da sua empresa e pedidos ligados às conversas do WhatsApp. O agente de IA pode montar e enviar o orçamento.</p>
+            <span class="ir">Veja como funciona</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="bloco" aria-labelledby="titulo-historico">
       <div class="container">
         <h2 id="titulo-historico">Histórico e trilha de auditoria</h2>
-        <p class="intro">As mensagens registradas no Livih não podem ser editadas nem apagadas pelos usuários, e as ações da equipe, como assumir, transferir ou encerrar um atendimento, ficam registradas com o responsável e o horário. A gestão mantém o histórico das conversas comerciais mesmo quando alguém sai da equipe, respeitando os procedimentos previstos na LGPD.</p>
+        <p class="intro">As mensagens registradas no Livih não podem ser editadas nem apagadas pelos usuários, e as ações da equipe, como assumir, transferir ou encerrar um atendimento, ficam registradas com o responsável e o horário. A gestão mantém o histórico das conversas comerciais mesmo quando alguém sai da equipe, respeitando os procedimentos previstos na LGPD. <a href="/historico-auditoria-whatsapp/">Veja como funciona o histórico</a>.</p>
       </div>
     </section>
 
@@ -361,6 +276,14 @@
         <a href="/privacidade/">Política de Privacidade</a>
         <a href="/termos/">Termos de Uso</a>
         <a href="https://app.livih.com.br/">Entrar na plataforma</a>
+      </nav>
+      <nav aria-label="Soluções" class="solucoes-rodape">
+        <a href="/atendimento-whatsapp-equipe/">Atendimento em equipe</a>
+        <a href="/whatsapp-equipe-de-vendas/">Equipe de vendas</a>
+        <a href="/crm-whatsapp/">CRM para WhatsApp</a>
+        <a href="/agente-ia-whatsapp/">Agente de IA</a>
+        <a href="/historico-auditoria-whatsapp/">Histórico e auditoria</a>
+        <a href="/orcamento-pedidos-whatsapp/">Orçamentos e pedidos</a>
       </nav>
     </div>
   </footer>
