@@ -73,3 +73,26 @@ export function moeda(valor: number | null, centavos = false): string {
       : { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 },
   )
 }
+
+/** 11222333000181 → 11.222.333/0001-81 */
+export function formatarCnpj(cnpj: string | null | undefined): string {
+  const d = (cnpj ?? '').replace(/\D/g, '')
+  if (d.length !== 14) return cnpj ?? ''
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
+}
+
+/** 1,5 / 10 / 2,125 (até 3 casas); vazio → —. */
+export const quantidade = (n: number | null | undefined) =>
+  n == null ? '—' : Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 3 })
+
+/** "Orcamento-12-Maria-Silva.pdf" (sem acento nem espaço: abre bem em qualquer celular). */
+export function nomeArquivoOrcamento(d: { pedido: { status: string; numero: number }; cliente: { nome: string } | null }): string {
+  const tipo = d.pedido.status === 'rascunho' ? 'Orcamento' : 'Pedido'
+  const cliente = (d.cliente?.nome ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^\w]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40)
+  return `${tipo}-${d.pedido.numero}${cliente ? `-${cliente}` : ''}.pdf`
+}

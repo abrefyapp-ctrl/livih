@@ -3,9 +3,8 @@
 // Fonte Helvetica embutida no leitor de PDF: cobre os acentos do português sem baixar fonte. Por isso o sinal de
 // menos é "-" e não "−" (fora da tabela da Helvetica).
 import { Document, Font, Image, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer'
-import { formatarCnpj } from '../services/empresa'
-import { quantidade } from '../services/erp'
-import { formatarTelefone, moeda as moedaTela } from '../services/formato'
+// Só formato.ts e tipos: o mesmo componente roda no navegador e no serviço livih-pdf (servidor).
+import { formatarCnpj, formatarTelefone, moeda as moedaTela, quantidade } from '../services/formato'
 import type { DadosOrcamento } from '../services/orcamento'
 
 // Sem hifenização automática: em português ela quebra palavras em lugares errados ("grampea-mento").

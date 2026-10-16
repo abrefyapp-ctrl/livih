@@ -1,0 +1,11 @@
+{
+  "name": "livih-pdf",
+  "private": true,
+  "type": "module",
+  "description": "Gera o PDF do orçamento no servidor (mesmo componente do app). Ver docs/agente-pedido.md.",
+  "scripts": { "start": "node servidor.mjs" },
+  "dependencies": {
+    "@react-pdf/renderer": "4.9.0",
+    "react": "19.3.0"
+  }
+}

@@ -2,7 +2,7 @@ import { enviarArquivo } from './atendimento'
 import { listarEquipeCompleta } from './configuracoes'
 import { listarEmissoras, urlLogo, type Emissora } from './empresa'
 import { buscarPedido, type ItemPedido, type Pedido } from './erp'
-import { nomeDoContato } from './formato'
+import { nomeArquivoOrcamento, nomeDoContato } from './formato'
 import { supabase } from './supabaseClient'
 
 /** Tudo o que o PDF precisa, já resolvido (o componente do PDF não consulta nada). */
@@ -76,17 +76,8 @@ export async function montarOrcamento(orgId: string, pedidoId: string): Promise<
   }
 }
 
-/** "Orcamento-12-Maria-Silva.pdf" (sem acento nem espaço: abre bem em qualquer celular). */
-export function nomeArquivoOrcamento(d: DadosOrcamento): string {
-  const tipo = d.pedido.status === 'rascunho' ? 'Orcamento' : 'Pedido'
-  const cliente = (d.cliente?.nome ?? '')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^\w]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 40)
-  return `${tipo}-${d.pedido.numero}${cliente ? `-${cliente}` : ''}.pdf`
-}
+// Em formato.ts (sem Supabase): o serviço livih-pdf usa o mesmo nome.
+export { nomeArquivoOrcamento }
 
 /** Gera o PDF. A biblioteca (pesada) só carrega aqui, no primeiro clique. */
 export async function gerarPdfOrcamento(d: DadosOrcamento): Promise<Blob> {

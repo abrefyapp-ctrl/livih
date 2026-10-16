@@ -4,12 +4,8 @@ import type { Database } from './tiposBanco'
 export type Emissora = Database['public']['Tables']['emissoras']['Row']
 export type DadosEmissora = Omit<Emissora, 'id' | 'org_id' | 'logo_path' | 'padrao' | 'criado_em' | 'atualizado_em'>
 
-/** 11222333000181 → 11.222.333/0001-81 */
-export function formatarCnpj(cnpj: string | null | undefined): string {
-  const d = (cnpj ?? '').replace(/\D/g, '')
-  if (d.length !== 14) return cnpj ?? ''
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
-}
+// Em formato.ts (sem Supabase) para o PDF do orçamento rodar também no servidor (serviço livih-pdf).
+export { formatarCnpj } from './formato'
 
 /** Mesma conta do banco (cnpj_valido): a tela avisa antes de tentar salvar. */
 export function cnpjValido(v: string): boolean {

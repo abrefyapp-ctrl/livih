@@ -8,3 +8,7 @@ dist
 supabase/.temp
 *.log
 *.local
+
+# Pacote do serviço de PDF (gerado por npm run pdf:build)
+pdf-servico/dist/
+pdf-servico/node_modules/

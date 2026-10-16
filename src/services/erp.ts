@@ -199,5 +199,5 @@ export function lerNumero(v: string): number | null | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
-export const quantidade = (n: number | null | undefined) =>
-  n == null ? '—' : Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 3 })
+// Em formato.ts (sem Supabase) para o PDF do orçamento rodar também no servidor (serviço livih-pdf).
+export { quantidade } from './formato'
