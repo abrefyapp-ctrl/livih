@@ -13,17 +13,20 @@ function tamanhoLegivel(bytes: number) {
  * Caixa de resposta. Enter envia; Shift+Enter quebra a linha.
  * `acao` fica ao lado da caixa (ex.: enviar modelo); com `bloqueio`, a caixa dá lugar ao aviso.
  * Com `aoEnviarArquivo`, aparece o clipe (ou cola-se um arquivo/print): o texto vira a legenda.
+ * Com `aoAbrirBiblioteca`, um botão ao lado abre os documentos cadastrados da empresa.
  */
 export function Compositor({
   dica,
   aoEnviar,
   aoEnviarArquivo,
+  aoAbrirBiblioteca,
   acao,
   bloqueio,
 }: {
   dica?: string
   aoEnviar: (texto: string) => Promise<void>
   aoEnviarArquivo?: (arquivo: File, legenda: string) => Promise<void>
+  aoAbrirBiblioteca?: () => void
   acao?: ReactNode
   bloqueio?: ReactNode
 }) {
@@ -113,10 +116,15 @@ export function Compositor({
                 e.target.value = ''
               }}
             />
-            <Botao variante="secundario" icone="clipe" disabled={enviando} onClick={() => seletor.current?.click()}>
+            <Botao variante="secundario" icone="clipe" disabled={enviando} onClick={() => seletor.current?.click()} title="Anexar arquivo do computador">
               <span className="sr-only">Anexar arquivo</span>
             </Botao>
           </>
+        )}
+        {aoAbrirBiblioteca && (
+          <Botao variante="secundario" icone="livro" disabled={enviando} onClick={aoAbrirBiblioteca} title="Enviar documento da biblioteca">
+            <span className="sr-only">Enviar documento da biblioteca</span>
+          </Botao>
         )}
         <label htmlFor="resposta" className="sr-only">
           {arquivo ? 'Legenda' : 'Mensagem'}

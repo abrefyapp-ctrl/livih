@@ -126,13 +126,14 @@ Você trabalha dentro do CRM da ${c.organizacao?.nome || 'empresa'}. As ferramen
 - **buscar_produtos**: quando o cliente perguntar de um produto (preço, embalagem, quantidade, especificação, compatibilidade, se tem), busque no cadastro pela referência, modelo ou nome que ele usou (ex.: "14/19", "grampeador IMECO", "prego anelado"). Informe só o que vier da busca, com o preço exatamente como veio. Se vierem vários parecidos, pergunte qual ele quer; se não vier nenhum, não invente: peça mais detalhes ou chame a equipe. Pode buscar mais de uma vez com termos diferentes.
 - **montar_pedido**: quando o cliente disser o que quer comprar E as quantidades, monte o pedido com o código exato que veio da busca (campo codigo) e a quantidade na unidade do produto (ex.: 10 caixinhas = quantidade 10). Mande SEMPRE a lista completa do pedido (se o cliente mudar algo, reenvie tudo). O preço vem do cadastro: confirme ao cliente os itens e o total exatamente como a ferramenta devolveu, e diga que o frete não está incluso e é calculado pela equipe. Se algum código voltar em nao_encontrados, busque de novo antes de remontar. Para o cliente, o que você monta é um ORÇAMENTO: chame sempre de "orçamento nº X", usando o campo orcamento_numero (o mesmo número do PDF), nunca de "pedido", porque ainda não foi confirmado pela equipe.
 - **enviar_orcamento**: envia ao cliente o PDF do pedido montado. Use quando o cliente pedir o orçamento, a proposta ou o PDF, ou confirmar os itens. Antes, monte (ou atualize) com montar_pedido. Depois de enviar, diga em uma frase que o orçamento foi enviado e que a equipe confirma frete e pagamento.
+- **buscar_documentos** e **enviar_documento**: quando o cliente pedir um arquivo (vista explodida, desenho de peças, manual, catálogo, ficha técnica, foto do produto), busque na biblioteca com o produto e o tipo que ele disse. Se vier exatamente o que ele pediu, envie com enviar_documento; se vierem vários parecidos, pergunte qual; se não vier nenhum, diga que a equipe envia e chame chamar_humano. Envie só o que ele pediu (no máximo 3 por resposta). Se a ferramenta disser que o documento já foi enviado, diga que está na mensagem daquele horário; reenvie (reenviar=sim) só se o cliente disser que não recebeu.
 - **chamar_humano**: chame quando acontecer um destes casos:
 ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar com uma pessoa'}
   Depois de chamar, diga ao cliente, em uma frase, que um especialista vai continuar a conversa por aqui. Não continue o atendimento depois disso.
 
 - **Arquivos e imagens**: você não vê o arquivo em si. Quando a foto ou o PDF do cliente vier com "descrição automática", use a descrição para entender o que ele quer: busque os produtos citados (buscar_produtos) e, se for uma lista de itens com quantidades, monte o orçamento (montar_pedido). Se a descrição estiver incompleta, ilegível ou não bastar para identificar o produto, pergunte o que faltar, sem inventar. Quando NÃO houver descrição (arquivo que não deu para ler, planilha, vídeo), diga com clareza, uma única vez, que por aqui você não consegue abrir o arquivo e peça para escrever na conversa o que precisa; se for pedido de orçamento em arquivo e o cliente preferir não digitar, chame a equipe com chamar_humano. Nunca fale de detalhes do arquivo que não estejam na descrição.
-- **O que você consegue enviar**: o ÚNICO arquivo que você envia é o PDF do orçamento (enviar_orcamento). Nunca prometa enviar catálogo, vista explodida, desenho de peças, foto, manual, ficha técnica, tabela, link, boleto, nota fiscal ou qualquer outro arquivo, e nunca diga "vou enviar agora" sobre algo que nenhuma ferramenta faz. Se o cliente pedir um desses, diga que a equipe envia e chame chamar_humano com o motivo (ex.: "Cliente pediu a vista explodida do grampeador 80W"). Prometer e não enviar deixa o cliente esperando.
-- **Nunca diga que enviou sem ter enviado**: só diga "enviei", "reenviei", "segue" ou "está acima na conversa" sobre um arquivo se você chamou enviar_orcamento NESTA resposta e ela deu certo. Se não chamou, nada foi enviado. Se o cliente disser que não recebeu algo, não insista que está na conversa: reenvie o orçamento (se for ele) ou chame a equipe.
+- **O que você consegue enviar**: só o PDF do orçamento (enviar_orcamento) e os documentos da biblioteca (buscar_documentos + enviar_documento). Nunca prometa um arquivo antes de achá-lo na biblioteca, e nunca prometa link, boleto, nota fiscal ou qualquer outro arquivo: diga que a equipe envia e chame chamar_humano com o motivo (ex.: "Cliente pediu a vista explodida do grampeador 14/45, que não está na biblioteca"). Prometer e não enviar deixa o cliente esperando.
+- **Nunca diga que enviou sem ter enviado**: só diga "enviei", "reenviei", "segue" ou "está acima na conversa" sobre um arquivo se enviar_orcamento ou enviar_documento devolveu enviado: true NESTA resposta (ou se a ferramenta avisou que o documento já tinha sido enviado). Se não, nada foi enviado. Se o cliente disser que não recebeu, não insista: reenvie ou chame a equipe.
 - **Nome do cliente**: use o nome que está em "O que já sabemos deste contato". Um nome que o cliente escreve num cumprimento ("boa tarde, Flávio") é de quem ele espera que atenda, não o dele.
 
 Nunca fale de ferramentas, CRM ou sistema com o cliente. A sua resposta final é exatamente o texto que será enviado no WhatsApp.
@@ -296,6 +297,34 @@ return JSON.stringify({ enviado: !!env?.enviado, orcamento_numero: d.pedido.nume
 """
 
 
+# Documento da biblioteca (migration 20261016150000, docs/biblioteca-documentos.md): o banco confere e devolve
+# origem/destino; o arquivo é COPIADO de `documentos` para a pasta da conversa em `midias` (o histórico guarda a
+# cópia) e entra na fila pela mesma agente_enviar_arquivo do orçamento.
+ENVIAR_DOCUMENTO = r"""
+const conversa = $('Validar').first().json.conversa_id;
+const URL = $env.LIVIH_SUPABASE_URL;
+const auth = { apikey: $env.LIVIH_SUPABASE_KEY, Authorization: `Bearer ${$env.LIVIH_SUPABASE_KEY}` };
+const a = $input.item.json || {};
+const id = String(a.documento_id || '').trim();
+const reenviar = /^s/i.test(String(a.reenviar || ''));
+if (!id) return JSON.stringify({ enviado: false, erro: 'informe documento_id: o id que veio de buscar_documentos' });
+
+const p = await rpc('agente_preparar_documento', { p_conversa: conversa, p_documento: id, p_reenviar: reenviar });
+if (!p || p.erro || !p.pronto) return JSON.stringify(p || { enviado: false, erro: 'documento indisponível; chame a equipe' });
+
+const copia = await this.helpers.httpRequest({
+  method: 'POST', url: `${URL}/storage/v1/object/copy`, headers: auth,
+  body: { bucketId: 'documentos', sourceKey: p.origem, destinationBucket: 'midias', destinationKey: p.destino },
+  json: true, ignoreHttpStatusErrors: true, returnFullResponse: true,
+});
+if (copia.statusCode >= 400) {
+  return JSON.stringify({ enviado: false, erro: `não foi possível preparar o arquivo (HTTP ${copia.statusCode}); chame a equipe` });
+}
+const e = await rpc('agente_enviar_documento', { p_conversa: conversa, p_documento: id, p_path: p.destino });
+return JSON.stringify({ enviado: !!e?.enviado, titulo: e?.titulo || p.titulo, aviso: e?.aviso || e?.erro || null });
+"""
+
+
 def obj(props, obrig=None):
     o = {"type": "object", "properties": {k: {"type": "string", "description": v} for k, v in props.items()}}
     if obrig:
@@ -377,6 +406,22 @@ FERRAMENTAS = [
         "pedir o orçamento ou confirmar os itens.",
         ENVIAR_ORCAMENTO,
         {"type": "object", "properties": {"confirmar": {"type": "string", "description": "Escreva sim"}}},
+    ),
+    ferramenta(
+        "buscar_documentos",
+        "Busca na biblioteca da empresa os arquivos que podem ser enviados ao cliente (vista explodida, manual, "
+        "catálogo, ficha técnica...). Devolve id, título, tipo e produtos ligados.",
+        "agente_buscar_documentos",
+        "{ p_conversa: conversa, p_busca: args.busca }",
+        obj({"busca": "O documento e o produto que o cliente pediu, ex.: vista explodida 80W, catálogo de grampos"},
+            ["busca"]),
+    ),
+    ferramenta_codigo(
+        "enviar_documento",
+        "Envia ao cliente no WhatsApp um documento da biblioteca, pelo id devolvido por buscar_documentos.",
+        ENVIAR_DOCUMENTO,
+        obj({"documento_id": "O id exato que veio de buscar_documentos",
+             "reenviar": "sim só quando o cliente disser que não recebeu o documento já enviado"}, ["documento_id"]),
     ),
     ferramenta(
         "chamar_humano",

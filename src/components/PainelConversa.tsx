@@ -25,6 +25,7 @@ import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { EstadoVazio } from './EstadoVazio'
 import { EtiquetaEstado } from './EtiquetaEstado'
 import { Icone } from './Icone'
+import { ModalBiblioteca } from './ModalBiblioteca'
 import { ModalEnviarModelo } from './ModalEnviarModelo'
 
 type Acao = 'assumir' | 'devolver' | 'encerrar'
@@ -52,6 +53,7 @@ export function PainelConversa({
 }) {
   const { sessao, equipe, orgAtiva, modulos } = useSessao()
   const [novoOrcamento, setNovoOrcamento] = useState(false)
+  const [biblioteca, setBiblioteca] = useState(false)
   const eu = sessao?.user.id
   const [conversa, setConversa] = useState<ConversaLista | null | undefined>(undefined)
   const [confirmar, setConfirmar] = useState<Acao | null>(null)
@@ -265,12 +267,14 @@ export function PainelConversa({
         dica={dica}
         aoEnviar={(t) => enviarMensagem(conversaId, t)}
         aoEnviarArquivo={orgAtiva ? (f, legenda) => enviarArquivo(orgAtiva.id, conversaId, f, legenda) : undefined}
+        aoAbrirBiblioteca={orgAtiva ? () => setBiblioteca(true) : undefined}
         acao={botaoModelo}
         bloqueio={
           janelaFechada &&
           `Faz mais de 24 horas que ${nome} escreveu. Pela API oficial do WhatsApp, só dá para retomar com um modelo aprovado.`
         }
       />
+      {orgAtiva && <ModalBiblioteca aberto={biblioteca} conversaId={conversaId} aoFechar={() => setBiblioteca(false)} />}
       {novoOrcamento && conversa.contato && (
         <ModalNovoOrcamento contato={conversa.contato} aoFechar={() => setNovoOrcamento(false)} />
       )}

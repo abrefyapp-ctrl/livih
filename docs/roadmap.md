@@ -38,7 +38,8 @@ Depois do orçamento em PDF, do envio de arquivos e da busca de produtos pelo ag
 4. **Saúde do agente** (peça 1 do Orientador, especificada em [saude-do-agente.md](saude-do-agente.md)): preventivo,
    antes do próximo cliente. Implementada em 16/10, aguardando teste na tela (R$ só para a plataforma).
 5. **Biblioteca de documentos e catálogo de fornecedor** (incluído em 16/10, seção abaixo): o agente envia
-   vista explodida, manual e catálogo que estejam cadastrados. Começar pela parte 1 (biblioteca e `enviar_documento`).
+   vista explodida, manual e catálogo que estejam cadastrados. Parte 1 (biblioteca, envio pela equipe e pelo agente)
+   implementada em 16/10: [biblioteca-documentos.md](biblioteca-documentos.md).
 6. **Simulador de conversa** (peça 3): o cliente e nós testamos o agente sem mandar mensagem pelo celular.
 7. **O agente lê PDF e imagem, e o importador inteligente de catálogo** (incluído em 16/10; peça 2): os dois extraem
    produtos e quantidades de um arquivo.

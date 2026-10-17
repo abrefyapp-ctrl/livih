@@ -544,6 +544,111 @@ export type Database = {
           },
         ]
       }
+      documentos: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          criado_por: string | null
+          descricao: string | null
+          fonte_url: string | null
+          id: string
+          mime: string
+          nome_arquivo: string
+          org_id: string
+          origem: string
+          palavras_chave: string | null
+          path: string
+          tamanho: number
+          tipo: string | null
+          titulo: string
+          ativo: boolean
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string | null
+          fonte_url?: string | null
+          id?: string
+          mime: string
+          nome_arquivo: string
+          org_id: string
+          origem?: string
+          palavras_chave?: string | null
+          path: string
+          tamanho: number
+          tipo?: string | null
+          titulo: string
+          ativo?: boolean
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string | null
+          fonte_url?: string | null
+          id?: string
+          mime?: string
+          nome_arquivo?: string
+          org_id?: string
+          origem?: string
+          palavras_chave?: string | null
+          path?: string
+          tamanho?: number
+          tipo?: string | null
+          titulo?: string
+          ativo?: boolean
+        }
+        Relationships: []
+      }
+      documentos_envios: {
+        Row: {
+          autor_tipo: string
+          conversa_id: string
+          criado_em: string
+          documento_id: string | null
+          id: number
+          mensagem_id: string
+          org_id: string
+        }
+        Insert: {
+          autor_tipo: string
+          conversa_id: string
+          criado_em?: string
+          documento_id?: string | null
+          id?: number
+          mensagem_id: string
+          org_id: string
+        }
+        Update: {
+          autor_tipo?: string
+          conversa_id?: string
+          criado_em?: string
+          documento_id?: string | null
+          id?: number
+          mensagem_id?: string
+          org_id?: string
+        }
+        Relationships: []
+      }
+      documentos_produtos: {
+        Row: {
+          documento_id: string
+          org_id: string
+          produto_id: string
+        }
+        Insert: {
+          documento_id: string
+          org_id: string
+          produto_id: string
+        }
+        Update: {
+          documento_id?: string
+          org_id?: string
+          produto_id?: string
+        }
+        Relationships: []
+      }
       emissoras: {
         Row: {
           atualizado_em: string
@@ -1913,6 +2018,10 @@ export type Database = {
       enviar_mensagem: {
         Args: { p_conversa: string; p_texto: string }
         Returns: string
+      }
+      registrar_envio_documento: {
+        Args: { p_documento: string; p_mensagem: string }
+        Returns: undefined
       }
       enviar_arquivo: {
         Args: {

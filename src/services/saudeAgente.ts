@@ -5,9 +5,10 @@
 export const CARACTERES_POR_TOKEN = 4.5
 /**
  * Texto fixo do sistema (bloco do CRM, regras de arquivos, horário, dados do contato) mais a definição das
- * ferramentas. Medido em 16/10 na JoGrampo: o lido de fato menos instruções, regras, base e histórico.
+ * ferramentas. Medido em 16/10 na JoGrampo: o lido de fato menos instruções, regras, base e histórico (10 mil),
+ * mais ~1,5 mil das ferramentas de documentos (buscar_documentos, enviar_documento) e da regra delas.
  */
-export const PARTE_FIXA = 10_000
+export const PARTE_FIXA = 11_500
 export const HISTORICO_PADRAO = 3_000
 export const CHAMADAS_PADRAO = 1.6
 /** Mesmo câmbio do painel de uso da plataforma. */

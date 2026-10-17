@@ -1691,6 +1691,134 @@ exception when insufficient_privilege then
   insert into resultado (teste, ok) values ('descrição: usuário logado não grava descrição', true);
 end $$;
 
+-- Biblioteca de documentos: dono/admin cadastram, toda a equipe vê, o agente busca e envia (chave de serviço).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_doc uuid; v_doc2 uuid;
+begin
+  insert into public.documentos (org_id, titulo, tipo, descricao, palavras_chave, path, nome_arquivo, mime, tamanho)
+  values (v_org, 'Vista explodida — grampeador 80/W-LS', 'Vista explodida', 'Peças numeradas com código', '80W, 80 W, PACAR 80',
+          v_org || '/doc-80w/vista-80w.pdf', 'Vista explodida 80W-LS.pdf', 'application/pdf', 120000)
+  returning id into v_doc;
+  insert into public.documentos_produtos (documento_id, produto_id, org_id)
+  values (v_doc, (select id from public.produtos where org_id = v_org and codigo = '14/19'), v_org);
+  insert into public.documentos (org_id, titulo, tipo, path, nome_arquivo, mime, tamanho, ativo)
+  values (v_org, 'Catálogo geral 2025', 'Catálogo', v_org || '/doc-cat/catalogo.pdf', 'Catalogo.pdf', 'application/pdf', 900000, false)
+  returning id into v_doc2;
+  perform set_config('teste.doc', v_doc::text, false);
+  perform set_config('teste.doc_inativo', v_doc2::text, false);
+  insert into resultado (teste, ok) values ('documentos: dono cadastra e liga a produto', true);
+exception when others then
+  insert into resultado (teste, ok) values ('documentos: dono cadastra e liga a produto: ' || sqlerrm, false);
+end $$;
+do $$
+begin
+  insert into public.documentos (org_id, titulo, path, nome_arquivo, mime, tamanho)
+  values (current_setting('teste.f7')::uuid, 'Fora da pasta', current_setting('teste.cli') || '/x/y.pdf', 'y.pdf', 'application/pdf', 10);
+  insert into resultado (teste, ok) values ('documentos: arquivo fora da pasta da empresa é recusado', false);
+exception when others then
+  insert into resultado (teste, ok) values ('documentos: arquivo fora da pasta da empresa é recusado', true);
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'documentos: atendente vê a biblioteca', count(*) = 2 from public.documentos where org_id = current_setting('teste.f7')::uuid;
+do $$
+begin
+  insert into public.documentos (org_id, titulo, path, nome_arquivo, mime, tamanho)
+  values (current_setting('teste.f7')::uuid, 'Do atendente', current_setting('teste.f7') || '/x/y.pdf', 'y.pdf', 'application/pdf', 10);
+  insert into resultado (teste, ok) values ('documentos: atendente não cadastra', false);
+exception when others then
+  insert into resultado (teste, ok) values ('documentos: atendente não cadastra', true);
+end $$;
+with u as (update public.documentos set titulo = 'mudado' where id = current_setting('teste.doc')::uuid returning 1)
+insert into resultado (teste, ok) select 'documentos: atendente não edita', count(*) = 0 from u;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'documentos: outra empresa não vê', count(*) = 0 from public.documentos where org_id = current_setting('teste.f7')::uuid;
+insert into resultado (teste, ok)
+select 'documentos: outra empresa não vê os produtos ligados', count(*) = 0 from public.documentos_produtos;
+
+reset role;
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_conv uuid := current_setting('teste.conversa')::uuid;
+  v_doc uuid := current_setting('teste.doc')::uuid;
+  b jsonb; p jsonb; e jsonb; p2 jsonb;
+begin
+  update public.conversas set estado = 'bot', atribuida_a = null where id = v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, wa_id, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'texto', 'me manda a vista explodida do 80W', 'wa-doc-1', 'recebida');
+
+  b := public.agente_buscar_documentos(v_conv, 'vista explodida do 80w');
+  insert into resultado (teste, ok) values ('documentos agente: busca pela palavra-chave e devolve produto ligado',
+    (b ->> 'encontrados')::int = 1 and (b -> 'documentos' -> 0 ->> 'id')::uuid = v_doc and b -> 'documentos' -> 0 -> 'produtos' is not null);
+  b := public.agente_buscar_documentos(v_conv, '14/19');
+  insert into resultado (teste, ok) values ('documentos agente: busca pelo código do produto ligado',
+    (b -> 'documentos' -> 0 ->> 'id')::uuid = v_doc);
+  b := public.agente_buscar_documentos(v_conv, 'catalogo geral');
+  insert into resultado (teste, ok) values ('documentos agente: inativo não aparece na busca',
+    (b ->> 'encontrados')::int = 0 and b ->> 'aviso' like '%chame chamar_humano%');
+
+  p := public.agente_preparar_documento(v_conv, current_setting('teste.doc_inativo')::uuid);
+  insert into resultado (teste, ok) values ('documentos agente: inativo não é enviado', p ->> 'pronto' is null);
+
+  p := public.agente_preparar_documento(v_conv, v_doc);
+  insert into resultado (teste, ok) values ('documentos agente: prepara cópia na pasta da conversa',
+    (p ->> 'pronto')::boolean and p ->> 'origem' = v_org || '/doc-80w/vista-80w.pdf'
+    and p ->> 'destino' like v_org || '/' || v_conv || '/%-vista_explodida_80w-ls.pdf');
+  insert into storage.objects (bucket_id, name, metadata) values ('midias', p ->> 'destino', '{"mimetype":"application/pdf","size":120000}');
+  e := public.agente_enviar_documento(v_conv, v_doc, p ->> 'destino');
+  insert into resultado (teste, ok) select 'documentos agente: envia como mensagem do agente, com título, e registra',
+    (e ->> 'enviado')::boolean and m.autor_tipo = 'bot' and m.texto = 'Vista explodida — grampeador 80/W-LS'
+    and m.midia_nome = 'Vista explodida 80W-LS.pdf'
+    and exists (select 1 from public.documentos_envios d where d.mensagem_id = m.id and d.documento_id = v_doc and d.autor_tipo = 'bot')
+    from public.mensagens m where m.id = (e ->> 'mensagem_id')::uuid;
+
+  p2 := public.agente_preparar_documento(v_conv, v_doc);
+  insert into resultado (teste, ok) values ('documentos agente: não reenvia em 24 h sem o cliente pedir',
+    p2 ->> 'pronto' is null and p2 ->> 'ja_enviado_em' is not null);
+  p2 := public.agente_preparar_documento(v_conv, v_doc, true);
+  insert into resultado (teste, ok) values ('documentos agente: reenvia quando o cliente diz que não recebeu', (p2 ->> 'pronto')::boolean);
+
+  with m as (
+    insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, status_entrega)
+    select v_org, v_conv, 'saida', 'bot', 'texto', 'doc ' || g, 'pendente' from generate_series(1, 2) g
+    returning id)
+  insert into public.documentos_envios (org_id, documento_id, conversa_id, mensagem_id, autor_tipo)
+  select v_org, null, v_conv, id, 'bot' from m;
+  p2 := public.agente_preparar_documento(v_conv, v_doc, true);
+  insert into resultado (teste, ok) values ('documentos agente: no máximo 3 por resposta', coalesce(p2 ->> 'aviso' like 'Limite de 3%', false));
+
+  update public.conversas set estado = 'humano' where id = v_conv;
+  p2 := public.agente_preparar_documento(v_conv, v_doc, true);
+  insert into resultado (teste, ok) values ('documentos agente: conversa com a equipe bloqueia', p2 ->> 'aviso' like 'A conversa está com a equipe%');
+  update public.conversas set estado = 'bot' where id = v_conv;
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.agente_buscar_documentos(current_setting('teste.conversa')::uuid, 'x');
+  insert into resultado (teste, ok) values ('documentos agente: usuário logado não chama as funções do agente', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('documentos agente: usuário logado não chama as funções do agente', true);
+end $$;
+do $$
+begin
+  insert into public.documentos_envios (org_id, conversa_id, mensagem_id, autor_tipo)
+  select org_id, conversa_id, id, 'equipe' from public.mensagens where conversa_id = current_setting('teste.conversa')::uuid limit 1;
+  insert into resultado (teste, ok) values ('documentos: envio só é registrado pelas funções', false);
+exception when others then
+  insert into resultado (teste, ok) values ('documentos: envio só é registrado pelas funções', true);
+end $$;
+
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
 reset role;
 insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');

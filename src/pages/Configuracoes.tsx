@@ -4,6 +4,7 @@ import { PrimeirosPassos } from '../components/PrimeirosPassos'
 import { Icone, type NomeIcone } from '../components/Icone'
 import { SecaoAgente } from '../components/SecaoAgente'
 import { SecaoBase } from '../components/SecaoBase'
+import { SecaoDocumentos } from '../components/SecaoDocumentos'
 import { SecaoEmpresa } from '../components/SecaoEmpresa'
 import { SecaoEquipe } from '../components/SecaoEquipe'
 import { SecaoModelos } from '../components/SecaoModelos'
@@ -19,6 +20,7 @@ const SECOES: { id: string; rotulo: string; icone: NomeIcone; soPlataforma?: boo
   { id: 'modelos', rotulo: 'Modelos', icone: 'arquivo', soPlataforma: true },
   { id: 'agente', rotulo: 'Agente', icone: 'agente' },
   { id: 'base', rotulo: 'Base de conhecimento', icone: 'livro' },
+  { id: 'documentos', rotulo: 'Documentos', icone: 'arquivo' },
   { id: 'uso', rotulo: 'Uso da IA', icone: 'painel' },
   { id: 'notificacoes', rotulo: 'Notificações', icone: 'sino' },
 ]
@@ -62,6 +64,7 @@ export function Configuracoes() {
           {secao === 'modelos' && <SecaoModelos />}
           {secao === 'agente' && <SecaoAgente />}
           {secao === 'base' && <SecaoBase />}
+          {secao === 'documentos' && <SecaoDocumentos />}
           {secao === 'uso' && <SecaoUsoIa />}
           {secao === 'notificacoes' && <SecaoNotificacoes />}
         </div>

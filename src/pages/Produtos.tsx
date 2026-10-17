@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import {
   importarProdutos,
   lancarEstoque,
@@ -12,6 +13,7 @@ import {
   type Produto,
 } from '../services/erp'
 import { moeda } from '../services/formato'
+import { documentosDoProduto, urlDocumento, type DocumentoRow } from '../services/documentos'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
@@ -453,8 +455,64 @@ function ModalProduto({
         </form>
 
         {produto?.controla_estoque && <Estoque produto={produto} gerencia={gerencia} aoMudar={aoMudarEstoque} />}
+        {produto?.id && <DocumentosDoProduto produtoId={produto.id} gerencia={gerencia} />}
       </div>
     </Modal>
+  )
+}
+
+/** Documentos da biblioteca ligados ao produto (o agente acha pelo nome e código dele). */
+function DocumentosDoProduto({ produtoId, gerencia }: { produtoId: string; gerencia: boolean }) {
+  const [docs, setDocs] = useState<{ produtoId: string; lista: DocumentoRow[] } | null>(null)
+  useEffect(() => {
+    let ativo = true
+    documentosDoProduto(produtoId)
+      .then((lista) => ativo && setDocs({ produtoId, lista }))
+      .catch(() => ativo && setDocs({ produtoId, lista: [] }))
+    return () => {
+      ativo = false
+    }
+  }, [produtoId])
+  const lista = docs?.produtoId === produtoId ? docs.lista : null
+  if (!lista) return null
+
+  async function abrir(path: string) {
+    const aba = window.open('', '_blank')
+    try {
+      const url = await urlDocumento(path)
+      if (aba) aba.location.href = url
+    } catch {
+      aba?.close()
+    }
+  }
+
+  return (
+    <div className="space-y-2 border-t border-borda pt-4">
+      <h3 className="text-pequeno font-semibold">Documentos</h3>
+      {lista.length ? (
+        <ul className="divide-y divide-borda rounded-md border border-borda">
+          {lista.map((d) => (
+            <li key={d.id} className="flex items-center gap-2 px-3 py-2 text-pequeno">
+              <Icone nome="arquivo" className="size-4 shrink-0 text-texto-3" />
+              <span className="min-w-0 flex-1 truncate">
+                {d.titulo}
+                {!d.ativo && <span className="text-texto-3"> · inativo</span>}
+              </span>
+              <Botao tamanho="sm" variante="fantasma" onClick={() => void abrir(d.path)}>
+                Abrir
+              </Botao>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-legenda text-texto-3">Nenhum documento ligado a este produto.</p>
+      )}
+      {gerencia && (
+        <Link to="/configuracoes/documentos" className="text-legenda font-medium text-primaria underline">
+          Gerenciar documentos
+        </Link>
+      )}
+    </div>
   )
 }
 
