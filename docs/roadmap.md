@@ -35,11 +35,12 @@ Depois do orçamento em PDF, do envio de arquivos e da busca de produtos pelo ag
    celular) e o histórico de auditoria fica incompleto, o que pesa contra a promessa do produto. Baixar a mídia na
    entrada (WAHA e API oficial) para o bucket `midias`, no mesmo caminho do que a equipe envia, e mostrar na conversa
    (imagem, vídeo, link para baixar), como já acontece com o envio. É a base do item 7.
-4. **Saúde do agente** (peça 1 do Orientador, especificada em [saude-do-agente.md](saude-do-agente.md)): preventivo,
-   antes do próximo cliente. Implementada em 16/10, aguardando teste na tela (R$ só para a plataforma).
+4. ✅ **Saúde do agente** (peça 1 do Orientador, especificada em [saude-do-agente.md](saude-do-agente.md)): preventivo,
+   antes do próximo cliente. Feita em 16/10 e usada na JoGrampo (separadores limpos). R$ só para a plataforma.
 5. **Biblioteca de documentos e catálogo de fornecedor** (incluído em 16/10, seção abaixo): o agente envia
    vista explodida, manual e catálogo que estejam cadastrados. Parte 1 (biblioteca, envio pela equipe e pelo agente)
-   implementada em 16/10: [biblioteca-documentos.md](biblioteca-documentos.md).
+   ✅ feita em 16/10 e testada (o agente já enviou documento): [biblioteca-documentos.md](biblioteca-documentos.md).
+   Falta a parte 2: catálogo do fornecedor compartilhado e importador da PACAR.
 6. **Simulador de conversa** (peça 3): o cliente e nós testamos o agente sem mandar mensagem pelo celular.
 7. **O agente lê PDF e imagem, e o importador inteligente de catálogo** (incluído em 16/10; peça 2): os dois extraem
    produtos e quantidades de um arquivo.
