@@ -1,8 +1,9 @@
-"""Gera n8n/livih-agente.json (workflow do agente do Livih).
+"""Gera n8n/livih-agente.json (workflow do agente do Livih) e n8n/livih-simulador.json (simulador de conversa).
 
 O JSON é gerado daqui para que o código dos nós fique legível e versionado.
 Uso (na raiz do repo): python n8n/gerar_workflow.py
 """
+import copy
 import json
 import uuid
 
@@ -453,6 +454,7 @@ nodes = [
        credentials={"openAiApi": {"id": "7sGjuIVHzRDjq3T0", "name": "OpenAI account"}}),
     no("Responder", "n8n-nodes-base.code", 2, {"jsCode": RESPONDER}, [1300, 0]),
 ]
+FERRAMENTAS_BASE = copy.deepcopy(FERRAMENTAS)
 for i, t in enumerate(FERRAMENTAS):
     t["position"] = [880 + i * 150, 260]
 nodes += FERRAMENTAS
@@ -481,3 +483,137 @@ workflow = {
 with open("n8n/livih-agente.json", "w", encoding="utf-8") as f:
     json.dump(workflow, f, ensure_ascii=False, indent=2)
 print("n8n/livih-agente.json:", len(nodes), "nós")
+
+
+# ============================================================================
+# Simulador de conversa (docs/simulador-agente.md; migration 20261019120000)
+# ============================================================================
+# Mesmo prompt (o Contexto é o do agente, com 3 trocas) e as mesmas ferramentas (nome, descrição e esquema), mas
+# sem estado e sem gravar: a tela manda a conversa de teste inteira a cada pergunta; leituras são reais e o que
+# gravaria só é simulado. Webhook síncrono (responde com o último nó), sem a espera de 6 s.
+
+def trocar(texto, antigo, novo):
+    assert texto.count(antigo) == 1, f"o Contexto do agente mudou; ajuste o simulador: {antigo[:60]!r}"
+    return texto.replace(antigo, novo)
+
+
+VALIDAR_SIM = """// Só o Livih (Edge Function agente-simular) chama este webhook.
+const req = $input.first().json;
+if ((req.headers?.['x-livih-token'] || '') !== $env.LIVIH_AGENTE_TOKEN) throw new Error('não autorizado');
+const { org_id, mensagens, prompt, casos } = req.body || {};
+if (!org_id || !Array.isArray(mensagens) || !mensagens.length) throw new Error('pedido inválido');
+return [{ json: { org_id, mensagens, prompt: prompt ?? null, casos: casos ?? null } }];
+"""
+
+CONTEXTO_SIM = trocar(CONTEXTO, """// Depois da espera: se o cliente mandou outra mensagem (ou um atendente assumiu), esta execução
+// desiste; a execução da mensagem mais nova responde tudo junto.
+const { conversa_id, mensagem_id } = $input.first().json;
+if ((await rpc('agente_deve_responder', { p_conversa: conversa_id, p_mensagem: mensagem_id })) !== true) return [];
+
+const c = await rpc('agente_contexto', { p_conversa: conversa_id });""",
+"""// Simulador: a conversa de teste vem inteira da tela (nada no banco); instruções e regras podem ser as não salvas.
+const { org_id, mensagens, prompt, casos } = $input.first().json;
+const c = await rpc('agente_contexto_simulado', { p_org: org_id, p_mensagens: mensagens, p_prompt: prompt, p_casos: casos });""")
+CONTEXTO_SIM = trocar(CONTEXTO_SIM, """if (saudacaoAgora) {
+  const r = await rpc('agente_responder', { p_conversa: conversa_id, p_texto: textoAbertura, p_mensagem: mensagem_id });
+  if (r?.enviado === false) return [];
+}
+""", "// Simulador: a saudação não é enviada; volta para a tela junto com a resposta.\n")
+CONTEXTO_SIM = trocar(CONTEXTO_SIM, "return [{ json: { conversa_id, mensagem_id, prompt_sistema, entrada } }];",
+                      "return [{ json: { org_id, prompt_sistema, entrada, saudacao: saudacaoAgora ? textoAbertura : null } }];")
+
+RESPONDER_SIM = r"""// Volta para a tela: saudação automática (se saiu), a resposta e o que o agente fez (ferramentas).
+const out = $input.first().json;
+const texto = String(out.output || '').trim();
+// O n8n embrulha o retorno da ferramenta em [{"response": "<json>"}]: devolve só o que a ferramenta respondeu.
+const desembrulhar = (o) => {
+  try {
+    const v = typeof o === 'string' ? JSON.parse(o) : o;
+    if (Array.isArray(v) && v.length === 1 && typeof v[0]?.response === 'string') return v[0].response;
+  } catch {}
+  return typeof o === 'string' ? o : JSON.stringify(o ?? '');
+};
+const passos = (out.intermediateSteps || []).map((p) => ({
+  ferramenta: p.action?.tool || null,
+  entrada: p.action?.toolInput ?? null,
+  saida: desembrulhar(p.observation).slice(0, 4000),
+}));
+return [{ json: {
+  saudacao: $('Contexto').first().json.saudacao,
+  resposta: !texto || /^\W*SEM_RESPOSTA\W*$/i.test(texto) ? null : texto,
+  passos,
+  execucao: $execution.id,
+} }];
+"""
+
+SIMULADO = "JSON.stringify({ sucesso: true, simulado: true })"
+CORPO_SIM = {
+    "atualizar_contato": SIMULADO,
+    "registrar_oportunidade": SIMULADO,
+    "mover_etapa": SIMULADO,
+    "registrar_nota": SIMULADO,
+    "buscar_produtos": "JSON.stringify(await rpc('buscar_produtos_org', { p_org: org, p_busca: args.busca, p_limite: 8 }))",
+    "buscar_documentos": "JSON.stringify(await rpc('buscar_documentos_org', { p_org: org, p_busca: args.busca }))",
+    "montar_pedido": "JSON.stringify(await rpc('simulador_montar_pedido', { p_org: org, p_itens: args.itens, p_observacao: args.observacao || null }))",
+    "enviar_orcamento": "JSON.stringify({ enviado: true, simulado: true })",
+    "enviar_documento": "JSON.stringify(await rpc('simulador_documento', { p_org: org, p_documento: String(args.documento_id || '').trim() }))",
+    "chamar_humano": "JSON.stringify({ sucesso: true, simulado: true })",
+}
+
+ferramentas_sim = []
+for t in FERRAMENTAS_BASE:
+    nome = t["name"]
+    assert nome in CORPO_SIM, f"ferramenta nova sem versão no simulador: {nome}"
+    campos = json.dumps(list(json.loads(t["parameters"]["inputSchema"]).get("properties", {}).keys()))
+    t = copy.deepcopy(t)
+    t["id"] = str(uuid.uuid5(uuid.NAMESPACE_URL, "livih-simulador/" + nome))
+    t["parameters"]["jsCode"] = RPC_FERRAMENTA + f"""
+// Simulador: a empresa vem do webhook; nada é gravado nem enviado.
+const org = $('Validar').first().json.org_id;
+const CAMPOS = {campos};
+const args = Object.fromEntries(Object.entries($input.item.json || {{}}).filter(([k]) => CAMPOS.includes(k)));
+return {CORPO_SIM[nome]};
+"""
+    ferramentas_sim.append(t)
+for i, t in enumerate(ferramentas_sim):
+    t["position"] = [880 + i * 150, 260]
+
+
+def no_sim(nome, tipo, versao, params, pos, **extra):
+    n = no(nome, tipo, versao, params, pos, **extra)
+    n["id"] = str(uuid.uuid5(uuid.NAMESPACE_URL, "livih-simulador/" + nome))
+    return n
+
+
+nodes_sim = [
+    no_sim("Webhook", "n8n-nodes-base.webhook", 2.1,
+           {"httpMethod": "POST", "path": "livih-agente-simulador", "responseMode": "lastNode",
+            "responseData": "firstEntryJson", "options": {}},
+           [0, 0], webhookId="5f0d6c1e-1a2b-4a9e-9a61-0000000000b1"),
+    no_sim("Validar", "n8n-nodes-base.code", 2, {"jsCode": VALIDAR_SIM}, [220, 0]),
+    no_sim("Contexto", "n8n-nodes-base.code", 2, {"jsCode": CONTEXTO_SIM}, [440, 0]),
+    no_sim("AI Agent", "@n8n/n8n-nodes-langchain.agent", 3.1,
+           {"promptType": "define", "text": "={{ $json.entrada }}",
+            "options": {"systemMessage": "={{ $json.prompt_sistema }}", "maxIterations": 8,
+                        "returnIntermediateSteps": True}}, [700, 0]),
+    no_sim("OpenAI Chat Model", "@n8n/n8n-nodes-langchain.lmChatOpenAi", 1.3,
+           {"model": {"__rl": True, "mode": "list", "value": "gpt-5-mini"}, "builtInTools": {}, "options": {}}, [560, 260],
+           credentials={"openAiApi": {"id": "7sGjuIVHzRDjq3T0", "name": "OpenAI account"}}),
+    no_sim("Responder", "n8n-nodes-base.code", 2, {"jsCode": RESPONDER_SIM}, [1100, 0]),
+] + ferramentas_sim
+
+conexoes_sim = {
+    "Webhook": {"main": [[{"node": "Validar", "type": "main", "index": 0}]]},
+    "Validar": {"main": [[{"node": "Contexto", "type": "main", "index": 0}]]},
+    "Contexto": {"main": [[{"node": "AI Agent", "type": "main", "index": 0}]]},
+    "AI Agent": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]},
+    "OpenAI Chat Model": {"ai_languageModel": [[{"node": "AI Agent", "type": "ai_languageModel", "index": 0}]]},
+}
+for t in ferramentas_sim:
+    conexoes_sim[t["name"]] = {"ai_tool": [[{"node": "AI Agent", "type": "ai_tool", "index": 0}]]}
+
+with open("n8n/livih-simulador.json", "w", encoding="utf-8") as f:
+    json.dump({"id": "LvhSimuladorAg01", "name": "Livih — Simulador do agente", "active": False, "nodes": nodes_sim,
+               "connections": conexoes_sim, "settings": {"executionOrder": "v1"}, "pinData": {}},
+              f, ensure_ascii=False, indent=2)
+print("n8n/livih-simulador.json:", len(nodes_sim), "nós")

@@ -443,3 +443,7 @@ verify_jwt = false
 # whatsapp-modelos: modelos da API oficial; login validado dentro da função (mesmo padrão da whatsapp-conexao).
 [functions.whatsapp-modelos]
 verify_jwt = false
+
+# agente-simular: Configurações → Agente → Testar agente; login validado dentro da função (dono/admin ou plataforma).
+[functions.agente-simular]
+verify_jwt = false

@@ -1819,6 +1819,63 @@ exception when others then
   insert into resultado (teste, ok) values ('documentos: envio só é registrado pelas funções', true);
 end $$;
 
+-- Simulador de conversa: contexto montado com as mensagens da tela, orçamento e documento sem gravar nada.
+reset role;
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  c jsonb; r jsonb; d jsonb;
+  v_pedidos integer := (select count(*) from public.pedidos where org_id = current_setting('teste.f7')::uuid);
+  v_msgs integer := (select count(*) from public.mensagens where org_id = current_setting('teste.f7')::uuid);
+begin
+  c := public.agente_contexto_simulado(v_org, '[{"de":"cliente","texto":"oi, tem grampo 14/19?"}]');
+  insert into resultado (teste, ok) values ('simulador: contexto com as mensagens da tela e o prompt salvo',
+    c -> 'mensagens' -> 0 ->> 'de' = 'cliente' and c -> 'mensagens' -> 0 ->> 'texto' = 'oi, tem grampo 14/19?'
+    and (c ->> 'primeira_resposta')::boolean and c -> 'agente' ->> 'prompt' is not null
+    and c -> 'contato' ->> 'nome_whatsapp' = 'Cliente de teste');
+
+  c := public.agente_contexto_simulado(v_org, '[{"de":"cliente","texto":"oi"},{"de":"assistente","texto":"Olá!"},{"de":"cliente","texto":"preço?"}]',
+                                       'Instruções ainda não salvas', '["cliente pediu desconto"]');
+  insert into resultado (teste, ok) values ('simulador: testa instruções e regras ainda não salvas',
+    c -> 'agente' ->> 'prompt' = 'Instruções ainda não salvas'
+    and c -> 'agente' -> 'regras_humano' -> 'casos' = '["cliente pediu desconto"]'::jsonb
+    and not (c ->> 'primeira_resposta')::boolean and c -> 'mensagens' -> 1 ->> 'de' = 'assistente');
+
+  r := public.buscar_produtos_org(v_org, '14/19');
+  insert into resultado (teste, ok) values ('simulador: busca de produtos por empresa igual à do agente',
+    (r ->> 'encontrados')::int >= 1 and r -> 'produtos' -> 0 ->> 'codigo' = '14/19');
+
+  r := public.simulador_montar_pedido(v_org, '[{"codigo":"14/19","quantidade":10},{"codigo":"XYZ-999","quantidade":1}]');
+  insert into resultado (teste, ok) values ('simulador: orçamento com preço do cadastro, sem gravar pedido nem mensagem',
+    (r ->> 'sucesso')::boolean and (r ->> 'simulado')::boolean and r ->> 'orcamento_numero' = 'TESTE'
+    and (r ->> 'total')::numeric = 10 * 102.70 and jsonb_array_length(r -> 'nao_encontrados') = 1
+    and (select count(*) from public.pedidos where org_id = v_org) = v_pedidos
+    and (select count(*) from public.mensagens where org_id = v_org) = v_msgs);
+
+  d := public.simulador_documento(v_org, current_setting('teste.doc')::uuid);
+  insert into resultado (teste, ok) values ('simulador: documento ativo "enviado" sem enviar',
+    (d ->> 'enviado')::boolean and (d ->> 'simulado')::boolean
+    and not exists (select 1 from public.documentos_envios where documento_id = current_setting('teste.doc')::uuid
+                     and mensagem_id not in (select id from public.mensagens where org_id = v_org)));
+  d := public.simulador_documento(v_org, current_setting('teste.doc_inativo')::uuid);
+  insert into resultado (teste, ok) values ('simulador: documento inativo não sai', not (d ->> 'enviado')::boolean);
+  d := public.simulador_documento(current_setting('teste.cli')::uuid, current_setting('teste.doc')::uuid);
+  insert into resultado (teste, ok) values ('simulador: documento de outra empresa não sai', not (d ->> 'enviado')::boolean);
+
+  insert into public.simulacoes_agente (org_id) select v_org from generate_series(1, 199);
+  insert into resultado (teste, ok) values ('simulador: limite de 200 respostas de teste por dia',
+    public.simulador_registrar(v_org, null) and not public.simulador_registrar(v_org, null));
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.agente_contexto_simulado(current_setting('teste.f7')::uuid, '[]');
+  insert into resultado (teste, ok) values ('simulador: usuário logado não chama as funções do simulador', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('simulador: usuário logado não chama as funções do simulador', true);
+end $$;
+
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
 reset role;
 insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');

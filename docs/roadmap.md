@@ -42,6 +42,7 @@ Depois do orçamento em PDF, do envio de arquivos e da busca de produtos pelo ag
    ✅ feita em 16/10 e testada (o agente já enviou documento): [biblioteca-documentos.md](biblioteca-documentos.md).
    Falta a parte 2: catálogo do fornecedor compartilhado e importador da PACAR.
 6. **Simulador de conversa** (peça 3): o cliente e nós testamos o agente sem mandar mensagem pelo celular.
+   Implementado em 19/10: [simulador-agente.md](simulador-agente.md).
 7. **O agente lê PDF e imagem, e o importador inteligente de catálogo** (incluído em 16/10; peça 2): os dois extraem
    produtos e quantidades de um arquivo.
    - ✅ No atendimento (16/10): a imagem e as 5 primeiras páginas do PDF do cliente viram uma descrição em texto

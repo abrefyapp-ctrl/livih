@@ -10,6 +10,7 @@ import { EstadoVazio } from './EstadoVazio'
 import { erroDoHorario, horarioDoBanco, horarioParaBanco, type Horario } from '../services/horario'
 import { HorarioAtendimento } from './HorarioAtendimento'
 import { Icone } from './Icone'
+import { ModalSimulador } from './ModalSimulador'
 import { SecaoSaudeAgente } from './SecaoSaudeAgente'
 
 type Formulario = {
@@ -54,6 +55,7 @@ export function SecaoAgente() {
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [salvo, setSalvo] = useState(false)
+  const [testando, setTestando] = useState(false)
 
   useEffect(() => {
     let ativo = true
@@ -123,12 +125,26 @@ export function SecaoAgente() {
 
   return (
     <section aria-labelledby="titulo-agente" className="space-y-6 pb-20">
-      <div>
-        <h2 id="titulo-agente" className="text-h2 font-semibold">
-          Agente
-        </h2>
-        <p className="text-pequeno text-texto-3">Como o agente de IA atende o WhatsApp de {orgAtiva?.nome}.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="titulo-agente" className="text-h2 font-semibold">
+            Agente
+          </h2>
+          <p className="text-pequeno text-texto-3">Como o agente de IA atende o WhatsApp de {orgAtiva?.nome}.</p>
+        </div>
+        {podeEditar && (
+          <Botao variante="secundario" icone="conversas" onClick={() => setTestando(true)}>
+            Testar agente
+          </Botao>
+        )}
       </div>
+      {podeEditar && (
+        <ModalSimulador
+          aberto={testando}
+          aoFechar={() => setTestando(false)}
+          rascunho={alterado ? { prompt: form.prompt, casos: form.casos } : null}
+        />
+      )}
 
       {!podeEditar && <Aviso>Só dono e admin alteram o agente. Você está vendo as configurações atuais.</Aviso>}
 

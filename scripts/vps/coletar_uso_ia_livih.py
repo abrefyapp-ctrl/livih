@@ -6,6 +6,9 @@ chamada ao modelo (promptTokens/completionTokens) e a referência enviada pelo w
 mensagem_id). Este coletor lê as execuções novas no Postgres do n8n e grava uma linha por execução em uso_ia.
 Não mexe no workflow: importar workflow no n8n o desativa.
 
+Também lê o simulador de conversa (workflow LvhSimuladorAg01, desde 19/10): grava com tipo 'simulador', só com a
+empresa (não há conversa), para o teste não contar como resposta ao cliente. Estado separado (ultimo_id_simulador).
+
 - Roda pelo cron a cada 10 min (/etc/cron.d/coletar_uso_ia_livih). Log em /var/log/coletor_uso_ia.log.
 - Idempotente: origem_ref = 'n8n:<id da execução>' é única no banco; o estado só avança depois de gravar.
 - O n8n apaga dados de execuções antigas (padrão: 14 dias); o cron frequente evita perder alguma.
@@ -16,8 +19,11 @@ Uso: coletar_uso_ia_livih.py            -> coleta as execuções novas
 """
 import csv, datetime, io, json, os, subprocess, sys, urllib.request
 
-WORKFLOW = "LvhAgenteLivih01"
-ESTADO = "/var/lib/coletor_uso_ia/ultimo_id"
+# (workflow, tipo em uso_ia, arquivo de estado, exige conversa na referência)
+FONTES = [
+    ("LvhAgenteLivih01", "resposta", "/var/lib/coletor_uso_ia/ultimo_id", True),
+    ("LvhSimuladorAg01", "simulador", "/var/lib/coletor_uso_ia/ultimo_id_simulador", False),
+]
 ENV = "/docker/n8n/.env"
 LOTE = 200
 
@@ -35,11 +41,11 @@ def env():
     return d["LIVIH_SUPABASE_URL"].rstrip("/"), d["LIVIH_SUPABASE_KEY"]
 
 
-def execucoes(desde):
+def execucoes(desde, workflow):
     sql = (
         'copy (select e.id, e."startedAt", d.data from execution_entity e '
         'join execution_data d on d."executionId" = e.id '
-        f"where e.\"workflowId\" = '{WORKFLOW}' and e.id > {int(desde)} and e.\"stoppedAt\" is not null "
+        f"where e.\"workflowId\" = '{workflow}' and e.id > {int(desde)} and e.\"stoppedAt\" is not null "
         f"order by e.id limit {LOTE}) to stdout with (format csv)"
     )
     saida = subprocess.run(
@@ -77,7 +83,7 @@ def desachatar(texto):
     return resolver(0)
 
 
-def extrair(dados):
+def extrair(dados, exige_conversa=True):
     chamadas = entrada = saida = 0
     modelo = None
     ref = None
@@ -95,8 +101,9 @@ def extrair(dados):
             m = o.get("model")
             if isinstance(m, str) and m.startswith("gpt") and not modelo:
                 modelo = m
-            if ref is None and isinstance(o.get("org_id"), str) and isinstance(o.get("conversa_id"), str):
-                ref = {"org_id": o["org_id"], "conversa_id": o["conversa_id"], "mensagem_id": o.get("mensagem_id")}
+            if ref is None and isinstance(o.get("org_id"), str) and (
+                    isinstance(o.get("conversa_id"), str) or not exige_conversa):
+                ref = {"org_id": o["org_id"], "conversa_id": o.get("conversa_id"), "mensagem_id": o.get("mensagem_id")}
             pilha.extend(o.values())
         elif isinstance(o, list):
             pilha.extend(o)
@@ -118,25 +125,24 @@ def gravar(url, chave, linhas):
     urllib.request.urlopen(req, timeout=30).read()
 
 
-def main():
-    os.makedirs(os.path.dirname(ESTADO), exist_ok=True)
+def coletar(url, chave, workflow, tipo, estado, exige_conversa):
+    os.makedirs(os.path.dirname(estado), exist_ok=True)
     if "--desde" in sys.argv:
         desde = int(sys.argv[sys.argv.index("--desde") + 1])
     else:
         try:
-            desde = int(open(ESTADO).read().strip() or 0)
+            desde = int(open(estado).read().strip() or 0)
         except FileNotFoundError:
             desde = 0
-    url, chave = env()
     total = 0
     while True:
-        rows = execucoes(desde)
+        rows = execucoes(desde, workflow)
         if not rows:
             break
         linhas = []
         for eid, inicio, data in rows:
             try:
-                chamadas, entrada, saida, modelo, ref = extrair(desachatar(data))
+                chamadas, entrada, saida, modelo, ref = extrair(desachatar(data), exige_conversa)
             except Exception as e:  # execução com dados ilegíveis: registra e segue
                 log(f"execução {eid} ilegível: {e}")
                 continue
@@ -144,7 +150,7 @@ def main():
                 continue
             linhas.append({
                 "org_id": ref["org_id"], "conversa_id": ref["conversa_id"], "mensagem_id": ref["mensagem_id"],
-                "tipo": "resposta", "modelo": modelo or "desconhecido", "chamadas": chamadas,
+                "tipo": tipo, "modelo": modelo or "desconhecido", "chamadas": chamadas,
                 "tokens_entrada": entrada, "tokens_saida": saida,
                 "origem_ref": f"n8n:{eid}", "criado_em": inicio,
             })
@@ -152,11 +158,17 @@ def main():
             gravar(url, chave, linhas)
             total += len(linhas)
         desde = int(rows[-1][0])
-        open(ESTADO, "w").write(str(desde))
+        open(estado, "w").write(str(desde))
         if len(rows) < LOTE:
             break
     if total:
-        log(f"ok: {total} execução(ões) do agente gravadas; última {desde}")
+        log(f"ok: {total} execução(ões) de {workflow} gravadas como '{tipo}'; última {desde}")
+
+
+def main():
+    url, chave = env()
+    for workflow, tipo, estado, exige_conversa in FONTES:
+        coletar(url, chave, workflow, tipo, estado, exige_conversa)
 
 
 if __name__ == "__main__":
