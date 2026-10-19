@@ -2,7 +2,7 @@
 
 Um modelo só para as 6 páginas: mesmo cabeçalho, rodapé, metadados e dados estruturados. Para mudar um texto ou
 acrescentar uma página, edite PAGINAS e rode na raiz do repo: python site/gerar_solucoes.py
-Tom de voz F7 (você, prova concreta, frases curtas). Só o que o Livih faz de verdade: nada de "inviolável".
+Tom de voz F7 (você, prova concreta, frases curtas). Só o que a Livih faz de verdade: nada de "inviolável".
 """
 import html
 import json
@@ -30,16 +30,16 @@ PAGINAS = [
             "A mensagem que chega fora do horário some no meio das outras.",
             "O arquivo que o cliente mandou fica só no celular de quem recebeu.",
         ],
-        "recursos_titulo": "Como o Livih organiza o atendimento",
+        "recursos_titulo": "Como a Livih organiza o atendimento",
         "recursos": [
-            ("Caixa de entrada compartilhada", "As conversas de todos os números conectados numa tela só, no computador ou no celular. O Livih instala como aplicativo."),
+            ("Caixa de entrada compartilhada", "As conversas de todos os números conectados numa tela só, no computador ou no celular. A Livih instala como aplicativo."),
             ("Filas por situação", "Aguardando atendimento, em atendimento, com o agente e encerradas. Quem espera há mais tempo aparece primeiro."),
             ("Um responsável por conversa", "Quem responde assume o atendimento. Você transfere para outra pessoa ou devolve ao agente de IA quando quiser."),
             ("Aviso na hora certa", "Quando o agente passa a conversa para a equipe, o atendente recebe notificação no celular e um aviso no WhatsApp com o motivo."),
             ("Fotos, PDFs e áudios na conversa", "O que o cliente manda fica guardado, para qualquer pessoa da equipe abrir. Áudios chegam com transcrição."),
-            ("O celular também conta", "Se alguém responde pelo WhatsApp do celular, a mensagem aparece no Livih e o agente para de responder naquela conversa."),
+            ("O celular também conta", "Se alguém responde pelo WhatsApp do celular, a mensagem aparece na Livih e o agente para de responder naquela conversa."),
         ],
-        "exemplo": "Uma loja com 3 atendentes recebe 40 conversas por dia num número só. Às 18h40, um cliente pede um orçamento. O agente de IA entende o pedido e passa a conversa para a fila com o motivo \"pedido de orçamento\". No dia seguinte, às 8h, a primeira pessoa que abre o Livih vê a conversa no topo da fila, assume e responde. As outras veem que ela já tem dono.",
+        "exemplo": "Uma loja com 3 atendentes recebe 40 conversas por dia num número só. Às 18h40, um cliente pede um orçamento. O agente de IA entende o pedido e passa a conversa para a fila com o motivo \"pedido de orçamento\". No dia seguinte, às 8h, a primeira pessoa que abre a Livih vê a conversa no topo da fila, assume e responde. As outras veem que ela já tem dono.",
         "perguntas": [
             ("Quantas pessoas podem atender no mesmo número?", "Não há limite de usuários por empresa. Toda a equipe vê as conversas do número da empresa, e cada conversa tem um responsável de cada vez."),
             ("Funciona com o WhatsApp que eu já uso?", "Sim. O número continua o mesmo e segue funcionando no celular."),
@@ -62,20 +62,20 @@ PAGINAS = [
             "Quando um vendedor sai, a carteira e o histórico vão embora no celular dele.",
             "Dois vendedores disputam o mesmo cliente.",
         ],
-        "recursos_titulo": "Como o Livih organiza a equipe de vendas",
+        "recursos_titulo": "Como a Livih organiza a equipe de vendas",
         "recursos": [
-            ("Cada um no seu número", "Os números dos vendedores são conectados ao Livih e seguem funcionando no celular, como sempre."),
+            ("Cada um no seu número", "Os números dos vendedores são conectados à Livih e seguem funcionando no celular, como sempre."),
             ("Carteira por vendedor", "O vendedor vê os clientes dele. Donos e gestores veem a operação inteira."),
-            ("O cliente é da empresa", "Contatos, conversas, notas e orçamentos ficam no Livih. Se o vendedor sai, você passa os clientes para outra pessoa com todo o histórico."),
-            ("Prospecção pelo Livih", "O vendedor começa uma conversa com um cliente novo direto do sistema, e ela já entra na carteira dele."),
+            ("O cliente é da empresa", "Contatos, conversas, notas e orçamentos ficam na Livih. Se o vendedor sai, você passa os clientes para outra pessoa com todo o histórico."),
+            ("Prospecção pela Livih", "O vendedor começa uma conversa com um cliente novo direto do sistema, e ela já entra na carteira dele."),
             ("Oportunidades e agenda", "Cada negociação numa etapa do funil, e as reuniões, visitas e retornos na agenda da equipe."),
             ("Orçamento em PDF na conversa", "O vendedor monta o orçamento com os produtos cadastrados e envia o PDF com a logo da empresa num clique."),
         ],
-        "exemplo": "Uma distribuidora tem 5 vendedores, cada um com o próprio WhatsApp. Um deles sai da empresa numa sexta-feira. Na segunda, o gestor passa os clientes dele para outro vendedor no Livih. O novo responsável abre cada cliente e lê a conversa inteira, os orçamentos enviados e as notas. Nenhum cliente precisa repetir o que já tinha combinado.",
+        "exemplo": "Uma distribuidora tem 5 vendedores, cada um com o próprio WhatsApp. Um deles sai da empresa numa sexta-feira. Na segunda, o gestor passa os clientes dele para outro vendedor na Livih. O novo responsável abre cada cliente e lê a conversa inteira, os orçamentos enviados e as notas. Nenhum cliente precisa repetir o que já tinha combinado.",
         "perguntas": [
-            ("O vendedor precisa trocar de número?", "Não. O número dele é conectado ao Livih e continua funcionando no celular."),
+            ("O vendedor precisa trocar de número?", "Não. O número dele é conectado à Livih e continua funcionando no celular."),
             ("Um vendedor vê os clientes dos outros?", "Não. Cada vendedor vê a própria carteira e as conversas do número da empresa. Donos e administradores veem tudo."),
-            ("E se o vendedor responder pelo celular?", "A mensagem também fica registrada no Livih, na mesma conversa. Você acompanha do mesmo jeito."),
+            ("E se o vendedor responder pelo celular?", "A mensagem também fica registrada na Livih, na mesma conversa. Você acompanha do mesmo jeito."),
         ],
         "relacionadas": ["crm-whatsapp", "orcamento-pedidos-whatsapp", "historico-auditoria-whatsapp"],
     },
@@ -93,7 +93,7 @@ PAGINAS = [
             "A informação do cliente fica em anotações soltas de cada vendedor.",
             "Você não sabe quantas negociações estão em cada etapa, nem com quem.",
         ],
-        "recursos_titulo": "Como o Livih mantém o CRM em dia",
+        "recursos_titulo": "Como a Livih mantém o CRM em dia",
         "recursos": [
             ("Contato criado sozinho", "Quem escreve vira contato, com nome, telefone e todas as conversas. Também dá para cadastrar à mão."),
             ("O agente preenche o cadastro", "Empresa, e-mail, cargo, cidade: o que o cliente contar na conversa, o agente de IA grava no contato."),
@@ -137,7 +137,7 @@ PAGINAS = [
         "perguntas": [
             ("O agente pode inventar informação?", "Ele é instruído a responder só com as informações da sua empresa e do seu catálogo, e a chamar a equipe quando não sabe. Como todo agente de IA, pode errar. Por isso a equipe acompanha as conversas e ajusta as instruções quando precisa."),
             ("Dá para desligar o agente?", "Sim. Você liga e desliga o agente em cada número e também para clientes específicos."),
-            ("O agente faz disparo de mensagens?", "Não. Ele responde quem escreve para a sua empresa. Envio em massa não faz parte do Livih."),
+            ("O agente faz disparo de mensagens?", "Não. Ele responde quem escreve para a sua empresa. Envio em massa não faz parte da Livih."),
         ],
         "relacionadas": ["atendimento-whatsapp-equipe", "orcamento-pedidos-whatsapp", "crm-whatsapp"],
     },
@@ -155,20 +155,20 @@ PAGINAS = [
             "Numa reclamação, ninguém consegue mostrar o que foi dito.",
             "O vendedor sai da empresa e leva os clientes no celular.",
         ],
-        "recursos_titulo": "Como o Livih guarda o histórico",
+        "recursos_titulo": "Como a Livih guarda o histórico",
         "recursos": [
-            ("Mensagens que não mudam", "O que entra no Livih não pode ser editado nem apagado por nenhum usuário, nem por quem administra a conta. Apagar no celular não apaga o registro."),
+            ("Mensagens que não mudam", "O que entra na Livih não pode ser editado nem apagado por nenhum usuário, nem por quem administra a conta. Apagar no celular não apaga o registro."),
             ("Arquivos guardados", "Fotos, PDFs, vídeos e áudios ficam na conversa, até 50 MB por arquivo. Depois de guardado, o arquivo não é trocado."),
             ("O celular também entra", "As mensagens enviadas pelo WhatsApp do celular do atendente também são registradas, na mesma conversa."),
             ("Quem fez o quê", "Assumir, transferir, devolver ao agente e encerrar um atendimento ficam registrados com o responsável e o horário."),
             ("Os clientes ficam", "Se alguém sai da equipe, você passa os clientes dessa pessoa para outra, com a conversa inteira."),
             ("LGPD", "A exclusão de dados pessoais, quando a lei exige, segue um procedimento próprio e fica registrada."),
         ],
-        "exemplo": "Uma empresa de cobrança tem 8 atendentes negociando pelo WhatsApp. Um cliente reclama que a atendente prometeu um desconto que não foi dado. A gestora abre a conversa no Livih e lê exatamente o que foi enviado, por quem e quando, inclusive o que saiu pelo celular. A resposta à reclamação sai no mesmo dia, com base no registro.",
+        "exemplo": "Uma empresa de cobrança tem 8 atendentes negociando pelo WhatsApp. Um cliente reclama que a atendente prometeu um desconto que não foi dado. A gestora abre a conversa na Livih e lê exatamente o que foi enviado, por quem e quando, inclusive o que saiu pelo celular. A resposta à reclamação sai no mesmo dia, com base no registro.",
         "perguntas": [
             ("O administrador consegue apagar uma conversa?", "Não pelo sistema. A exclusão de dados pessoais, quando a LGPD exige, segue um procedimento próprio e fica registrada."),
-            ("As conversas antigas entram no Livih?", "O registro começa quando o número é conectado. As mensagens de antes ficam só no celular."),
-            ("Os arquivos que o cliente manda também ficam?", "Sim. Fotos, PDFs, vídeos e áudios de até 50 MB ficam guardados na conversa. Acima disso, o Livih registra que o arquivo chegou e avisa para abrir no celular."),
+            ("As conversas antigas entram na Livih?", "O registro começa quando o número é conectado. As mensagens de antes ficam só no celular."),
+            ("Os arquivos que o cliente manda também ficam?", "Sim. Fotos, PDFs, vídeos e áudios de até 50 MB ficam guardados na conversa. Acima disso, a Livih registra que o arquivo chegou e avisa para abrir no celular."),
         ],
         "relacionadas": ["atendimento-whatsapp-equipe", "whatsapp-equipe-de-vendas", "crm-whatsapp"],
     },
@@ -186,7 +186,7 @@ PAGINAS = [
             "Preço desatualizado, porque cada um usa a própria tabela.",
             "Pedido anotado no papel e estoque conferido no olho.",
         ],
-        "recursos_titulo": "Como o Livih resolve",
+        "recursos_titulo": "Como a Livih resolve",
         "recursos": [
             ("Catálogo de produtos", "Importe a sua planilha com código, preço, unidade, categoria, marca e NCM."),
             ("Orçamento ao lado da conversa", "Do atendimento você cria o orçamento já com o cliente e adiciona itens, desconto, frete, validade e condições de pagamento."),
@@ -196,11 +196,11 @@ PAGINAS = [
             ("Do orçamento ao pedido", "Confirmado, o pedido baixa o estoque e segue as etapas: separando, enviado e entregue."),
         ],
         "exemplo": "Uma empresa de grampos e ferramentas tem 277 produtos e anotava os pedidos no papel. Hoje o cliente escreve: \"quero 10 caixas do 14/19 e 2 do prego anelado 2,30x35\". O agente monta o orçamento com os preços do catálogo, R$ 1.981,40 sem frete, e envia o PDF com a logo da empresa. A equipe confere o frete e confirma o pedido.",
-        "aviso": "Orçamentos e pedidos é um pacote adicional do Livih. Fale com a gente para ativar na sua empresa.",
+        "aviso": "Orçamentos e pedidos é um pacote adicional da Livih. Fale com a gente para ativar na sua empresa.",
         "perguntas": [
-            ("Preciso cadastrar os produtos um a um?", "Não. Você importa uma planilha (CSV) com os produtos e ajusta o que precisar no Livih."),
+            ("Preciso cadastrar os produtos um a um?", "Não. Você importa uma planilha (CSV) com os produtos e ajusta o que precisar na Livih."),
             ("O agente pode dar desconto?", "Não. Ele usa o preço cadastrado. Desconto e frete ficam com a equipe."),
-            ("O Livih emite nota fiscal?", "Ainda não. Hoje o Livih cuida do orçamento, do pedido e do estoque."),
+            ("A Livih emite nota fiscal?", "Ainda não. Hoje a Livih cuida do orçamento, do pedido e do estoque."),
         ],
         "relacionadas": ["agente-ia-whatsapp", "whatsapp-equipe-de-vendas", "crm-whatsapp"],
     },
@@ -305,7 +305,7 @@ def pagina(p: dict) -> str:
           <h1 id="titulo">{e(p["h1"])}</h1>
           <p class="sub">{e(p["sub"])}</p>
           <div class="acoes">
-            <a class="botao claro" href="/#solicitar">Peça acesso ao Livih</a>
+            <a class="botao claro" href="/#solicitar">Peça acesso à Livih</a>
             <a class="botao secundario" href="{WHATSAPP}" rel="noopener">Fale com a gente no WhatsApp</a>
           </div>
         </div>
@@ -354,7 +354,7 @@ def pagina(p: dict) -> str:
         <h2 id="titulo-veja">Veja também</h2>
         <ul class="veja-tambem">
 {relacionadas}
-          <li><a href="/">Visão geral do Livih</a></li>
+          <li><a href="/">Visão geral da Livih</a></li>
         </ul>
       </div>
     </section>
@@ -362,9 +362,9 @@ def pagina(p: dict) -> str:
     <section class="chamada" aria-labelledby="titulo-chamada">
       <div class="container">
         <h2 id="titulo-chamada">Organize o WhatsApp da sua equipe</h2>
-        <p>Peça o acesso ao Livih. Nós entramos em contato para conhecer a sua operação e ajudar a conectar os números.</p>
+        <p>Peça o acesso à Livih. Nós entramos em contato para conhecer a sua operação e ajudar a conectar os números.</p>
         <div class="acoes" style="justify-content:center;display:flex;flex-wrap:wrap;gap:.75rem">
-          <a class="botao claro" href="/#solicitar">Peça acesso ao Livih</a>
+          <a class="botao claro" href="/#solicitar">Peça acesso à Livih</a>
         </div>
         <p class="alternativa">Prefere conversar agora? <a href="{WHATSAPP}" rel="noopener">Fale com a gente no WhatsApp</a>.</p>
       </div>
