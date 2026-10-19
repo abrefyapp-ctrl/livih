@@ -451,3 +451,7 @@ verify_jwt = false
 # importar-catalogo: Produtos → Importar com IA; login validado dentro da função (e chave de serviço para continuar).
 [functions.importar-catalogo]
 verify_jwt = false
+
+# agente-assistente: Configurações → Agente → Assistente; login validado dentro da função (dono/admin ou plataforma).
+[functions.agente-assistente]
+verify_jwt = false

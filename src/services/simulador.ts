@@ -11,7 +11,7 @@ export type RespostaTeste = { saudacao: string | null; resposta: string | null; 
 export async function simular(
   orgId: string,
   mensagens: MensagemTeste[],
-  rascunho: { prompt: string; casos: string[] } | null,
+  rascunho: { prompt: string; casos: string[]; base?: string } | null,
 ): Promise<RespostaTeste> {
   const { data, error } = await supabase.functions.invoke('agente-simular', {
     body: {
@@ -19,6 +19,7 @@ export async function simular(
       mensagens: mensagens.map((m) => ({ de: m.de, texto: m.texto })),
       prompt: rascunho?.prompt ?? null,
       casos: rascunho?.casos ?? null,
+      base: rascunho?.base ?? null,
     },
   })
   if (error) {

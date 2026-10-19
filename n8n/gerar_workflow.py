@@ -500,9 +500,9 @@ def trocar(texto, antigo, novo):
 VALIDAR_SIM = """// Só o Livih (Edge Function agente-simular) chama este webhook.
 const req = $input.first().json;
 if ((req.headers?.['x-livih-token'] || '') !== $env.LIVIH_AGENTE_TOKEN) throw new Error('não autorizado');
-const { org_id, mensagens, prompt, casos } = req.body || {};
+const { org_id, mensagens, prompt, casos, base } = req.body || {};
 if (!org_id || !Array.isArray(mensagens) || !mensagens.length) throw new Error('pedido inválido');
-return [{ json: { org_id, mensagens, prompt: prompt ?? null, casos: casos ?? null } }];
+return [{ json: { org_id, mensagens, prompt: prompt ?? null, casos: casos ?? null, base: base ?? null } }];
 """
 
 CONTEXTO_SIM = trocar(CONTEXTO, """// Depois da espera: se o cliente mandou outra mensagem (ou um atendente assumiu), esta execução
@@ -511,9 +511,10 @@ const { conversa_id, mensagem_id } = $input.first().json;
 if ((await rpc('agente_deve_responder', { p_conversa: conversa_id, p_mensagem: mensagem_id })) !== true) return [];
 
 const c = await rpc('agente_contexto', { p_conversa: conversa_id });""",
-"""// Simulador: a conversa de teste vem inteira da tela (nada no banco); instruções e regras podem ser as não salvas.
-const { org_id, mensagens, prompt, casos } = $input.first().json;
-const c = await rpc('agente_contexto_simulado', { p_org: org_id, p_mensagens: mensagens, p_prompt: prompt, p_casos: casos });""")
+"""// Simulador: a conversa de teste vem inteira da tela (nada no banco); instruções, regras e base podem ser as não
+// salvas ou as propostas pelo assistente.
+const { org_id, mensagens, prompt, casos, base } = $input.first().json;
+const c = await rpc('agente_contexto_simulado', { p_org: org_id, p_mensagens: mensagens, p_prompt: prompt, p_casos: casos, p_base: base });""")
 CONTEXTO_SIM = trocar(CONTEXTO_SIM, """if (saudacaoAgora) {
   const r = await rpc('agente_responder', { p_conversa: conversa_id, p_texto: textoAbertura, p_mensagem: mensagem_id });
   if (r?.enviado === false) return [];

@@ -4,7 +4,7 @@
 // ou a plataforma), aplica o limite diário e repassa ao workflow do simulador no n8n (mesmo endereço e token do
 // agente, outro caminho). Nada vai para o WhatsApp nem para o histórico.
 //
-//   { org_id, mensagens: [{ de: 'cliente'|'assistente', texto }], prompt?, casos? }
+//   { org_id, mensagens: [{ de: 'cliente'|'assistente', texto }], prompt?, casos?, base? }
 //   → { saudacao, resposta, passos: [{ ferramenta, entrada, saida }] }
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json(405, { erro: "use POST" });
 
-  let p: { org_id?: string; mensagens?: Mensagem[]; prompt?: string | null; casos?: string[] | null };
+  let p: { org_id?: string; mensagens?: Mensagem[]; prompt?: string | null; casos?: string[] | null; base?: string | null };
   try {
     p = await req.json();
   } catch {
@@ -62,6 +62,8 @@ Deno.serve(async (req) => {
   }
   const casos = Array.isArray(p.casos) ? p.casos.filter((c) => typeof c === "string").slice(0, 50) : null;
   const prompt = typeof p.prompt === "string" ? p.prompt.slice(0, 100_000) : null;
+  // Base proposta pelo assistente (texto já montado como o agente lê).
+  const base = typeof p.base === "string" ? p.base.slice(0, 200_000) : null;
 
   const { data: pode, error: erroLimite } = await admin.rpc("simulador_registrar", { p_org: p.org_id, p_user: quem.user.id });
   if (erroLimite) {
@@ -75,7 +77,7 @@ Deno.serve(async (req) => {
     const r = await fetch(SIMULADOR_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-livih-token": TOKEN },
-      body: JSON.stringify({ org_id: p.org_id, mensagens, prompt, casos }),
+      body: JSON.stringify({ org_id: p.org_id, mensagens, prompt, casos, base }),
       signal: AbortSignal.timeout(110_000),
     });
     const corpo = await r.json().catch(() => null);

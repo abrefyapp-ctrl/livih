@@ -1937,6 +1937,93 @@ exception when others then
   insert into resultado (teste, ok) values ('importação: só a função grava importações', true);
 end $$;
 
+-- Assistente orientador: aplicar a proposta por seção, desfazer e quem pode.
+reset role;
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_velho uuid; v_dup uuid; v_sessao uuid;
+begin
+  insert into public.base_conhecimento (org_id, titulo, conteudo, ativo) values (v_org, 'Horários e frete', 'texto antigo', true)
+  returning id into v_velho;
+  insert into public.base_conhecimento (org_id, titulo, conteudo, ativo) values (v_org, 'Frete (repetido)', 'texto repetido', true)
+  returning id into v_dup;
+  insert into public.assistente_sessoes (org_id, modo, status, proposta) values (v_org, 'revisar', 'proposta', jsonb_build_object(
+    'instrucoes', jsonb_build_object('texto', 'Instruções enxutas do assistente', 'por_que', 'menor'),
+    'regras', jsonb_build_object('lista', '["Cliente pede desconto acima de 5%", "Reclamação de entrega"]'::jsonb, 'por_que', 'curtas'),
+    'base', jsonb_build_array(
+      jsonb_build_object('acao', 'atualizar', 'id', v_velho, 'titulo', 'Frete e prazos', 'conteudo', 'texto novo', 'por_que', 'x'),
+      jsonb_build_object('acao', 'desativar', 'id', v_dup, 'titulo', 'Frete (repetido)', 'conteudo', null, 'por_que', 'repete'),
+      jsonb_build_object('acao', 'criar', 'id', null, 'titulo', 'Formas de pagamento', 'conteudo', 'Pix e boleto', 'por_que', 'faltava'))))
+  returning id into v_sessao;
+  perform set_config('teste.sessao', v_sessao::text, false);
+  perform set_config('teste.base_velho', v_velho::text, false);
+  perform set_config('teste.base_dup', v_dup::text, false);
+  perform set_config('teste.prompt_antes', (select prompt from public.agentes where org_id = v_org order by ativo desc, atualizado_em desc limit 1), false);
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'assistente: atendente não vê as sessões', count(*) = 0 from public.assistente_sessoes;
+do $$
+begin
+  perform public.assistente_aplicar(current_setting('teste.sessao')::uuid, '{"instrucoes": true}');
+  insert into resultado (teste, ok) values ('assistente: atendente não aplica proposta', false);
+exception when others then
+  insert into resultado (teste, ok) values ('assistente: atendente não aplica proposta', true);
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'assistente: outra empresa não vê as sessões', count(*) = 0 from public.assistente_sessoes;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  r jsonb;
+begin
+  r := public.assistente_aplicar(current_setting('teste.sessao')::uuid, '{"instrucoes": true, "regras": true, "base": [0, 1, 2]}');
+  insert into resultado (teste, ok) select 'assistente: dono aplica instruções, regras e base (criar, editar, desativar)',
+    (r ->> 'aplicadas')::int = 5
+    and (select bool_and(prompt = 'Instruções enxutas do assistente') from public.agentes where org_id = v_org)
+    and (select regras_humano -> 'casos' from public.agentes where org_id = v_org limit 1) = '["Cliente pede desconto acima de 5%", "Reclamação de entrega"]'::jsonb
+    and (select titulo = 'Frete e prazos' and conteudo = 'texto novo' from public.base_conhecimento where id = current_setting('teste.base_velho')::uuid)
+    and (select not ativo from public.base_conhecimento where id = current_setting('teste.base_dup')::uuid)
+    and exists (select 1 from public.base_conhecimento where org_id = v_org and titulo = 'Formas de pagamento');
+
+  perform public.assistente_desfazer(current_setting('teste.sessao')::uuid);
+  insert into resultado (teste, ok) select 'assistente: desfazer volta tudo e apaga o que foi criado',
+    (select bool_and(prompt = current_setting('teste.prompt_antes')) from public.agentes where org_id = v_org)
+    and (select titulo = 'Horários e frete' and conteudo = 'texto antigo' from public.base_conhecimento where id = current_setting('teste.base_velho')::uuid)
+    and (select ativo from public.base_conhecimento where id = current_setting('teste.base_dup')::uuid)
+    and not exists (select 1 from public.base_conhecimento where org_id = v_org and titulo = 'Formas de pagamento')
+    and (select status from public.assistente_sessoes where id = current_setting('teste.sessao')::uuid) = 'desfeita';
+end $$;
+do $$
+begin
+  perform public.assistente_desfazer(current_setting('teste.sessao')::uuid);
+  insert into resultado (teste, ok) values ('assistente: não desfaz duas vezes', false);
+exception when others then
+  insert into resultado (teste, ok) values ('assistente: não desfaz duas vezes', true);
+end $$;
+do $$
+begin
+  insert into public.assistente_sessoes (org_id, modo) values (current_setting('teste.f7')::uuid, 'montar');
+  insert into resultado (teste, ok) values ('assistente: só a função grava sessões', false);
+exception when others then
+  insert into resultado (teste, ok) values ('assistente: só a função grava sessões', true);
+end $$;
+
+reset role;
+do $$
+declare c jsonb;
+begin
+  c := public.agente_contexto_simulado(current_setting('teste.f7')::uuid, '[{"de":"cliente","texto":"oi"}]', null, null, '## Base proposta\n\nPix e boleto');
+  insert into resultado (teste, ok) values ('simulador: testa a base proposta pelo assistente',
+    c ->> 'base_conhecimento' = '## Base proposta\n\nPix e boleto');
+end $$;
+
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
 reset role;
 insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');

@@ -183,6 +183,51 @@ export type Database = {
           },
         ]
       }
+      assistente_sessoes: {
+        Row: {
+          aplicada_em: string | null
+          anterior: Json | null
+          atualizado_em: string
+          criado_em: string
+          criado_por: string | null
+          erro: string | null
+          id: string
+          mensagens: Json
+          modo: string
+          org_id: string
+          proposta: Json | null
+          status: string
+        }
+        Insert: {
+          aplicada_em?: string | null
+          anterior?: Json | null
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          erro?: string | null
+          id?: string
+          mensagens?: Json
+          modo: string
+          org_id: string
+          proposta?: Json | null
+          status?: string
+        }
+        Update: {
+          aplicada_em?: string | null
+          anterior?: Json | null
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          erro?: string | null
+          id?: string
+          mensagens?: Json
+          modo?: string
+          org_id?: string
+          proposta?: Json | null
+          status?: string
+        }
+        Relationships: []
+      }
       auditoria: {
         Row: {
           acao: string
@@ -2069,6 +2114,14 @@ export type Database = {
       enviar_mensagem: {
         Args: { p_conversa: string; p_texto: string }
         Returns: string
+      }
+      assistente_aplicar: {
+        Args: { p_secoes: Json; p_sessao: string }
+        Returns: Json
+      }
+      assistente_desfazer: {
+        Args: { p_sessao: string }
+        Returns: undefined
       }
       registrar_envio_documento: {
         Args: { p_documento: string; p_mensagem: string }

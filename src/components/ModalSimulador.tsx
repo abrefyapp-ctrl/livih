@@ -15,10 +15,13 @@ export function ModalSimulador({
   aberto,
   aoFechar,
   rascunho,
+  rotuloRascunho = 'Testar com as alterações ainda não salvas (instruções e regras)',
 }: {
   aberto: boolean
   aoFechar: () => void
-  rascunho: { prompt: string; casos: string[] } | null
+  rascunho: { prompt: string; casos: string[]; base?: string } | null
+  /** Texto do aviso do rascunho (padrão: alterações não salvas do formulário). */
+  rotuloRascunho?: string
 }) {
   const { orgAtiva } = useSessao()
   const [mensagens, setMensagens] = useState<MensagemTeste[]>([])
@@ -95,7 +98,7 @@ export function ModalSimulador({
               onChange={(e) => setUsarRascunho(e.target.checked)}
               className="size-4 accent-primaria"
             />
-            Testar com as alterações ainda não salvas (instruções e regras)
+            {rotuloRascunho}
           </label>
         )}
 

@@ -10,6 +10,7 @@ import { EstadoVazio } from './EstadoVazio'
 import { erroDoHorario, horarioDoBanco, horarioParaBanco, type Horario } from '../services/horario'
 import { HorarioAtendimento } from './HorarioAtendimento'
 import { Icone } from './Icone'
+import { ModalAssistente } from './ModalAssistente'
 import { ModalSimulador } from './ModalSimulador'
 import { SecaoSaudeAgente } from './SecaoSaudeAgente'
 
@@ -56,6 +57,9 @@ export function SecaoAgente() {
   const [salvando, setSalvando] = useState(false)
   const [salvo, setSalvo] = useState(false)
   const [testando, setTestando] = useState(false)
+  const [assistente, setAssistente] = useState(false)
+  // Sobe quando o assistente aplica ou desfaz: recarrega o agente e a Saúde.
+  const [versao, setVersao] = useState(0)
 
   useEffect(() => {
     let ativo = true
@@ -69,7 +73,7 @@ export function SecaoAgente() {
     return () => {
       ativo = false
     }
-  }, [orgId])
+  }, [orgId, versao])
 
   const atual = agente?.orgId === orgId ? agente : null
   if (erro && !atual) return <Aviso tom="erro">{erro}</Aviso>
@@ -133,11 +137,19 @@ export function SecaoAgente() {
           <p className="text-pequeno text-texto-3">Como o agente de IA atende o WhatsApp de {orgAtiva?.nome}.</p>
         </div>
         {podeEditar && (
-          <Botao variante="secundario" icone="conversas" onClick={() => setTestando(true)}>
-            Testar agente
-          </Botao>
+          <div className="flex flex-wrap gap-2">
+            <Botao variante="secundario" icone="agente" onClick={() => setAssistente(true)} disabled={alterado}>
+              Assistente
+            </Botao>
+            <Botao variante="secundario" icone="conversas" onClick={() => setTestando(true)}>
+              Testar agente
+            </Botao>
+          </div>
         )}
       </div>
+      {podeEditar && assistente && (
+        <ModalAssistente agente={atual.dado} aoFechar={() => setAssistente(false)} aoAplicado={() => setVersao((v) => v + 1)} />
+      )}
       {podeEditar && (
         <ModalSimulador
           aberto={testando}
@@ -150,6 +162,7 @@ export function SecaoAgente() {
 
       {podeEditar && (
         <SecaoSaudeAgente
+          key={versao}
           agente={atual.dado}
           formAlterado={alterado}
           aoAlterarAgente={(campos) => {

@@ -52,7 +52,8 @@ Depois do orçamento em PDF, do envio de arquivos e da busca de produtos pelo ag
    - ✅ Na configuração (19/10, [importador-catalogo.md](importador-catalogo.md)): PDF, Excel, foto ou texto vira a
      prévia de importação de produtos. Teste com a base da JoGrampo: 277 de 277 produtos e 277 de 277 preços certos.
    - Cuidar do custo: imagem e PDF longo pesam em tokens; limitar páginas e tamanho, e medir em `uso_ia`.
-8. **Assistente orientador** (peça 4): por último, usa as peças anteriores.
+8. **Assistente orientador** (peça 4): por último, usa as peças anteriores. Implementado em 20/10:
+   [assistente-orientador.md](assistente-orientador.md).
 
 Se um cliente novo for entrar nas próximas semanas, os itens 4 e 7 sobem: a implantação dele já sai com o custo sob
 controle e sem catálogo manual.
