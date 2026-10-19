@@ -1862,6 +1862,16 @@ begin
   d := public.simulador_documento(current_setting('teste.cli')::uuid, current_setting('teste.doc')::uuid);
   insert into resultado (teste, ok) values ('simulador: documento de outra empresa não sai', not (d ->> 'enviado')::boolean);
 
+  r := public.buscar_documentos_org(v_org, 'vista explodida do 14/45');
+  insert into resultado (teste, ok) values ('documentos: só o tipo em comum não vira "o mais próximo" (14/45 ≠ 80W)',
+    (r ->> 'encontrados')::int = 0 and r ->> 'aviso' like 'Nenhum documento encontrado%');
+  r := public.buscar_documentos_org(v_org, 'manual do 80w');
+  insert into resultado (teste, ok) values ('documentos: mesmo produto com outro tipo ainda aparece como próximo',
+    (r ->> 'encontrados')::int = 1 and r ->> 'aviso' like 'Nenhum documento tem todos os termos%');
+  r := public.buscar_documentos_org(v_org, 'vista explodida');
+  insert into resultado (teste, ok) values ('documentos: busca só pelo tipo acha os desse tipo',
+    (r ->> 'encontrados')::int = 1 and r ->> 'aviso' is null);
+
   insert into public.simulacoes_agente (org_id) select v_org from generate_series(1, 199);
   insert into resultado (teste, ok) values ('simulador: limite de 200 respostas de teste por dia',
     public.simulador_registrar(v_org, null) and not public.simulador_registrar(v_org, null));
