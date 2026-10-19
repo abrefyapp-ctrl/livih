@@ -915,6 +915,57 @@ export type Database = {
           },
         ]
       }
+      importacoes_catalogo: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          criado_por: string | null
+          erro: string | null
+          id: string
+          modo_preco: string
+          nome: string | null
+          org_id: string
+          origem: string
+          path: string | null
+          progresso: number
+          resultado: Json | null
+          status: string
+          total: number
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          erro?: string | null
+          id?: string
+          modo_preco: string
+          nome?: string | null
+          org_id: string
+          origem: string
+          path?: string | null
+          progresso?: number
+          resultado?: Json | null
+          status?: string
+          total?: number
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          erro?: string | null
+          id?: string
+          modo_preco?: string
+          nome?: string | null
+          org_id?: string
+          origem?: string
+          path?: string | null
+          progresso?: number
+          resultado?: Json | null
+          status?: string
+          total?: number
+        }
+        Relationships: []
+      }
       membros_org: {
         Row: {
           ativo: boolean

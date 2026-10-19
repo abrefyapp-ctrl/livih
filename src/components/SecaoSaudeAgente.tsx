@@ -281,6 +281,7 @@ export function SecaoSaudeAgente({
                             alerta={a}
                             bloqueado={formAlterado || salvando}
                             temProdutos={!!modulos?.has('erp')}
+                            base={lista}
                             aoPedir={(tipo) => setPendente({ alerta: a, tipo })}
                           />
                         </span>
@@ -321,11 +322,13 @@ function AcaoAlerta({
   alerta,
   bloqueado,
   temProdutos,
+  base,
   aoPedir,
 }: {
   alerta: Alerta
   bloqueado: boolean
   temProdutos: boolean
+  base: ConteudoBase[]
   aoPedir: (tipo: 'limpar' | 'desativar') => void
 }) {
   const alvo = alerta.alvo
@@ -345,8 +348,18 @@ function AcaoAlerta({
     return (
       <>
         {temProdutos && (
-          <Link to="/produtos" className="inline-flex h-8 items-center rounded-md px-3 text-pequeno font-medium text-primaria ring-1 ring-borda ring-inset hover:bg-fundo">
-            Ir para Produtos
+          // Abre o importador com IA já com o texto deste conteúdo (Produtos lê o state da navegação).
+          <Link
+            to="/produtos"
+            state={{
+              importarTexto: (() => {
+                const item = alvo?.tipo === 'base' ? base.find((b) => b.id === alvo.id) : undefined
+                return item ? { texto: item.conteudo, nome: item.titulo } : undefined
+              })(),
+            }}
+            className="inline-flex h-8 items-center rounded-md px-3 text-pequeno font-medium text-primaria ring-1 ring-borda ring-inset hover:bg-fundo"
+          >
+            Importar este catálogo
           </Link>
         )}
         <Botao tamanho="sm" variante="secundario" onClick={() => aoPedir('desativar')} disabled={bloqueado}>

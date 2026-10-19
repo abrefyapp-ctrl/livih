@@ -1886,6 +1886,57 @@ exception when insufficient_privilege then
   insert into resultado (teste, ok) values ('simulador: usuário logado não chama as funções do simulador', true);
 end $$;
 
+-- Importador de catálogo: produto sem preço (preço 0) e acesso às importações.
+reset role;
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_conv uuid := current_setting('teste.conversa')::uuid;
+  r jsonb;
+begin
+  insert into public.produtos (org_id, codigo, nome, unidade, preco, controla_estoque)
+  values (v_org, 'PAC-80W', 'Grampeador PACAR 80/W-LS', 'un', 0, false);
+
+  r := public.buscar_produtos_org(v_org, 'PAC-80W');
+  insert into resultado (teste, ok) values ('sem preço: a busca devolve preço vazio e "sob consulta", nunca R$ 0',
+    r -> 'produtos' -> 0 ->> 'codigo' = 'PAC-80W' and r -> 'produtos' -> 0 -> 'preco' = 'null'::jsonb
+    and r -> 'produtos' -> 0 ->> 'preco_texto' like 'sob consulta%');
+  r := public.buscar_produtos_org(v_org, '14/19');
+  insert into resultado (teste, ok) values ('sem preço: produto com preço continua com o valor',
+    (r -> 'produtos' -> 0 ->> 'preco')::numeric = 102.70 and r -> 'produtos' -> 0 ->> 'preco_texto' is null);
+
+  r := public.simulador_montar_pedido(v_org, '[{"codigo":"PAC-80W","quantidade":1},{"codigo":"14/19","quantidade":2}]');
+  insert into resultado (teste, ok) values ('sem preço: o orçamento de teste recusa o item sem preço',
+    (r ->> 'sucesso')::boolean and jsonb_array_length(r -> 'itens') = 1 and (r ->> 'total')::numeric = 205.40
+    and r -> 'nao_encontrados' -> 0 ->> 'motivo' like 'sem preço cadastrado%');
+
+  update public.conversas set estado = 'bot', atribuida_a = null where id = v_conv;
+  r := public.agente_montar_pedido(v_conv, '[{"codigo":"PAC-80W","quantidade":1}]');
+  insert into resultado (teste, ok) values ('sem preço: o agente não monta orçamento só com item sem preço',
+    not (r ->> 'sucesso')::boolean and r -> 'nao_encontrados' -> 0 ->> 'motivo' like 'sem preço cadastrado%');
+
+  insert into public.importacoes_catalogo (org_id, origem, nome, modo_preco, status, resultado)
+  values (v_org, 'pdf', 'tabela.pdf', 'venda', 'pronto', '{"linhas":[]}');
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'importação: atendente não vê as importações', count(*) = 0 from public.importacoes_catalogo;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'importação: outra empresa não vê as importações', count(*) = 0 from public.importacoes_catalogo;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'importação: dono acompanha a importação', count(*) = 1 from public.importacoes_catalogo where nome = 'tabela.pdf';
+do $$
+begin
+  insert into public.importacoes_catalogo (org_id, origem, modo_preco) values (current_setting('teste.f7')::uuid, 'texto', 'venda');
+  insert into resultado (teste, ok) values ('importação: só a função grava importações', false);
+exception when others then
+  insert into resultado (teste, ok) values ('importação: só a função grava importações', true);
+end $$;
+
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
 reset role;
 insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');

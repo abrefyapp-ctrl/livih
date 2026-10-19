@@ -49,7 +49,8 @@ Depois do orçamento em PDF, do envio de arquivos e da busca de produtos pelo ag
      (gpt-5-mini, `uso_ia` tipo "descricao") que o agente lê antes de responder.
      Caso real: JoGrampo, 15/10, cliente mandou `requisicao_compra.pdf` para orçar e o agente, sem ler, entrou em
      laço. Corrigido só o comportamento: ele agora diz que não abre o arquivo e pede os itens por escrito.
-   - Na configuração: catálogo em PDF ou texto vira a prévia de importação de produtos.
+   - ✅ Na configuração (19/10, [importador-catalogo.md](importador-catalogo.md)): PDF, Excel, foto ou texto vira a
+     prévia de importação de produtos. Teste com a base da JoGrampo: 277 de 277 produtos e 277 de 277 preços certos.
    - Cuidar do custo: imagem e PDF longo pesam em tokens; limitar páginas e tamanho, e medir em `uso_ia`.
 8. **Assistente orientador** (peça 4): por último, usa as peças anteriores.
 

@@ -172,7 +172,7 @@ export function alertas(agente: AgenteSaude | null, base: ItemBase[]): Alerta[] 
         codigo: 'A1',
         chave: `A1:${b.id}`,
         titulo: `“${b.titulo}” parece um catálogo`,
-        mensagem: `Tem ${Math.max(precos, linhasProduto)} preços ou produtos. Na base, o agente lê tudo em toda resposta; cadastrados em Produtos, ele consulta só quando o cliente pergunta. Importe a planilha em Produtos e depois desative este conteúdo.`,
+        mensagem: `Tem ${Math.max(precos, linhasProduto)} preços ou produtos. Na base, o agente lê tudo em toda resposta; cadastrados em Produtos, ele consulta só quando o cliente pergunta. Use “Importar este catálogo” (a IA monta a lista para você revisar) e depois desative este conteúdo.`,
         economia: b.conteudo.length,
         alvo: { tipo: 'base', id: b.id },
         acao: 'produtos',

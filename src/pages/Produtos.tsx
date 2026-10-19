@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   importarProdutos,
   lancarEstoque,
@@ -21,6 +21,7 @@ import { CampoTexto } from '../components/CampoTexto'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { Icone } from '../components/Icone'
 import { Modal } from '../components/Modal'
+import { ModalImportarCatalogo, type Revisao } from '../components/ModalImportarCatalogo'
 
 const CLASSE_CAMPO =
   'block h-10 w-full rounded-md border border-borda bg-superficie px-3 placeholder:text-texto-3 focus:border-primaria focus:outline-none'
@@ -148,7 +149,12 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
   const [inativos, setInativos] = useState(false)
   const [soAbaixo, setSoAbaixo] = useState(false)
   const [aberto, setAberto] = useState<Produto | 'novo' | null>(null)
-  const [importacao, setImportacao] = useState<{ linhas: DadosProduto[]; erros: string[] } | null>(null)
+  const [importacao, setImportacao] = useState<{ linhas: DadosProduto[]; erros: string[] } | Revisao | null>(null)
+  // Importar com IA; o texto vem do alerta "Parece catálogo" da Saúde do agente (navegação com state).
+  const local = useLocation()
+  const navegar = useNavigate()
+  const textoDaBase = (local.state as { importarTexto?: { texto: string; nome: string } } | null)?.importarTexto
+  const [comIA, setComIA] = useState<boolean>(!!textoDaBase)
   const arquivo = useRef<HTMLInputElement>(null)
 
   const chave = `${orgId}|${inativos}|${versao}`
@@ -192,6 +198,9 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
             <div className="flex flex-wrap gap-2">
               <Botao variante="secundario" icone="arquivo" onClick={() => arquivo.current?.click()}>
                 Importar planilha
+              </Botao>
+              <Botao variante="secundario" icone="agente" onClick={() => setComIA(true)}>
+                Importar com IA
               </Botao>
               <input ref={arquivo} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => void lerArquivo(e.target.files?.[0])} />
               <Botao icone="mais" onClick={() => setAberto('novo')}>
@@ -267,7 +276,9 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-texto-2">{p.codigo ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{moeda(Number(p.preco), true)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      {Number(p.preco) > 0 ? moeda(Number(p.preco), true) : <span className="text-texto-3">sem preço</span>}
+                    </td>
                     <td className={`px-4 py-2.5 text-right tabular-nums ${abaixo(p) ? 'font-semibold text-atencao' : ''}`}>
                       {p.controla_estoque ? `${quantidade(Number(p.saldo))} ${p.unidade}` : <span className="text-texto-3">não controla</span>}
                     </td>
@@ -291,6 +302,21 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
             recarregar()
           }}
           aoMudarEstoque={recarregar}
+        />
+      )}
+      {comIA && !importacao && (
+        <ModalImportarCatalogo
+          orgId={orgId}
+          textoInicial={textoDaBase}
+          aoFechar={() => {
+            setComIA(false)
+            if (textoDaBase) navegar('.', { replace: true, state: null })
+          }}
+          aoRevisar={(r) => {
+            setComIA(false)
+            if (textoDaBase) navegar('.', { replace: true, state: null })
+            setImportacao(r)
+          }}
         />
       )}
       {importacao && (
@@ -625,6 +651,24 @@ function Estoque({ produto, gerencia, aoMudar }: { produto: Produto; gerencia: b
   )
 }
 
+const semAcentoMin = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+
+/** Avisos de uma linha contra o cadastro atual (importação com IA). */
+function avisosDaLinha(l: DadosProduto, porCodigo: Map<string, Produto>, porNome: Map<string, Produto>): string[] {
+  const avisos: string[] = []
+  const atual = l.codigo ? porCodigo.get(l.codigo.toLowerCase()) : undefined
+  if (l.preco == null && !atual) avisos.push('sem preço')
+  if (atual && l.preco != null && Number(atual.preco) > 0) {
+    const variacao = Math.abs(l.preco - Number(atual.preco)) / Number(atual.preco)
+    if (variacao > 0.5) avisos.push(`preço muda de ${moeda(Number(atual.preco), true)} para ${moeda(l.preco, true)}`)
+  }
+  if (!atual) {
+    const parecido = porNome.get(semAcentoMin(l.nome))
+    if (parecido && (parecido.codigo ?? '') !== (l.codigo ?? '')) avisos.push(`mesmo nome de ${parecido.codigo ?? 'um produto sem código'}`)
+  }
+  return avisos
+}
+
 function ModalImportacao({
   orgId,
   importacao,
@@ -633,21 +677,51 @@ function ModalImportacao({
   aoConcluir,
 }: {
   orgId: string
-  importacao: { linhas: DadosProduto[]; erros: string[] }
+  importacao: { linhas: DadosProduto[]; erros: string[] } | Revisao
   existentes: Produto[]
   aoFechar: () => void
   aoConcluir: () => void
 }) {
+  const ia = 'ia' in importacao
+  const paginas = 'paginas' in importacao ? importacao.paginas : undefined
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
-  const codigos = new Set(existentes.filter((p) => p.codigo).map((p) => p.codigo!.toLowerCase()))
-  const atualiza = importacao.linhas.filter((l) => l.codigo && codigos.has(l.codigo.toLowerCase())).length
+  // O cadastro aceita um produto por código: o mesmo código mais de uma vez no arquivo (ex.: ROCAMA 7.005 em dois
+  // grampeadores) fica com aviso, e só o primeiro vem marcado.
+  const repetidos = useMemo(() => {
+    const vistos = new Set<string>()
+    const r = new Set<number>()
+    importacao.linhas.forEach((l, i) => {
+      const c = l.codigo?.toLowerCase()
+      if (!c) return
+      if (vistos.has(c)) r.add(i)
+      vistos.add(c)
+    })
+    return r
+  }, [importacao.linhas])
+  const [fora, setFora] = useState<Set<number>>(() => new Set(repetidos))
+  const porCodigo = useMemo(() => new Map(existentes.filter((p) => p.codigo).map((p) => [p.codigo!.toLowerCase(), p])), [existentes])
+  const porNome = useMemo(() => new Map(existentes.map((p) => [semAcentoMin(p.nome ?? ''), p])), [existentes])
+  const avisos = useMemo(
+    () =>
+      ia
+        ? importacao.linhas.map((l, i) => [
+            ...(repetidos.has(i) ? ['código repetido no arquivo: confira qual é o certo'] : []),
+            ...avisosDaLinha(l, porCodigo, porNome),
+          ])
+        : [],
+    [ia, importacao.linhas, porCodigo, porNome, repetidos],
+  )
+  const escolhidas = importacao.linhas.filter((_, i) => !fora.has(i))
+  const atualiza = escolhidas.filter((l) => l.codigo && porCodigo.has(l.codigo.toLowerCase())).length
+  const comAviso = avisos.filter((a) => a.length).length
+  const MAX_LINHAS = 1000
 
   async function importar() {
     setEnviando(true)
     setErro(null)
     try {
-      await importarProdutos(orgId, importacao.linhas, existentes)
+      await importarProdutos(orgId, escolhidas, existentes)
       aoConcluir()
     } catch (e) {
       setErro((e as Error).message)
@@ -656,19 +730,27 @@ function ModalImportacao({
     }
   }
 
+  const alternar = (i: number) =>
+    setFora((f) => {
+      const n = new Set(f)
+      if (n.has(i)) n.delete(i)
+      else n.add(i)
+      return n
+    })
+
   return (
     <Modal
       aberto
-      titulo="Importar planilha"
-      largura="max-w-xl"
+      titulo={ia ? 'Revisar produtos encontrados' : 'Importar planilha'}
+      largura={ia ? 'max-w-2xl' : 'max-w-xl'}
       aoFechar={aoFechar}
       rodape={
         <>
           <Botao variante="secundario" onClick={aoFechar} disabled={enviando}>
             Cancelar
           </Botao>
-          <Botao onClick={() => void importar()} carregando={enviando} disabled={!importacao.linhas.length}>
-            Importar {importacao.linhas.length} {importacao.linhas.length === 1 ? 'produto' : 'produtos'}
+          <Botao onClick={() => void importar()} carregando={enviando} disabled={!escolhidas.length}>
+            Importar {escolhidas.length} {escolhidas.length === 1 ? 'produto' : 'produtos'}
           </Botao>
         </>
       }
@@ -676,10 +758,12 @@ function ModalImportacao({
       <div className="space-y-4">
         {importacao.linhas.length > 0 && (
           <p className="text-pequeno text-texto-2">
-            {importacao.linhas.length - atualiza} novos e {atualiza} já cadastrados (atualizados pelo código). O estoque não muda: lance a
+            {escolhidas.length - atualiza} novos e {atualiza} já cadastrados (atualizados pelo código). O estoque não muda: lance a
             contagem inicial em cada produto, como entrada.
+            {ia && ' Confira os itens com aviso e desmarque o que estiver errado.'}
           </p>
         )}
+        {ia && !importacao.linhas.length && <Aviso tom="atencao">A IA não encontrou produtos neste arquivo.</Aviso>}
         {importacao.erros.length > 0 && (
           <Aviso tom="atencao">
             {importacao.erros.slice(0, 5).map((e) => (
@@ -690,32 +774,84 @@ function ModalImportacao({
             {importacao.erros.length > 5 && <span className="block">E mais {importacao.erros.length - 5}.</span>}
           </Aviso>
         )}
+        {ia && comAviso > 0 && (
+          <p className="text-legenda text-atencao">
+            {comAviso} {comAviso === 1 ? 'item com aviso' : 'itens com aviso'}.
+          </p>
+        )}
         {importacao.linhas.length > 0 && (
-          <div className="max-h-64 overflow-auto rounded-md border border-borda">
+          <div className="max-h-96 overflow-auto rounded-md border border-borda">
             <table className="w-full text-pequeno">
               <thead className="sticky top-0 bg-superficie text-left text-legenda text-texto-3 uppercase">
                 <tr>
+                  {ia && (
+                    <th className="w-8 px-3 py-1.5">
+                      <span className="sr-only">Importar</span>
+                    </th>
+                  )}
                   <th className="px-3 py-1.5 font-medium">Nome</th>
                   <th className="px-3 py-1.5 font-medium">Código</th>
                   <th className="px-3 py-1.5 text-right font-medium">Preço</th>
+                  {paginas && <th className="px-3 py-1.5 text-right font-medium">Pág.</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-borda">
-                {importacao.linhas.slice(0, 100).map((l, i) => (
-                  <tr key={i}>
-                    <td className="px-3 py-1.5">{l.nome}</td>
-                    <td className="px-3 py-1.5 text-texto-2">{l.codigo ?? '—'}</td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">{moeda(l.preco ?? 0, true)}</td>
-                  </tr>
-                ))}
+                {importacao.linhas.slice(0, ia ? MAX_LINHAS : 100).map((l, i) => {
+                  const existente = l.codigo ? porCodigo.get(l.codigo.toLowerCase()) : undefined
+                  return (
+                    <tr key={i} className={fora.has(i) ? 'opacity-50' : ''}>
+                      {ia && (
+                        <td className="px-3 py-1.5 align-top">
+                          <input
+                            type="checkbox"
+                            checked={!fora.has(i)}
+                            onChange={() => alternar(i)}
+                            aria-label={`Importar ${l.nome}`}
+                            className="size-4 accent-primaria"
+                          />
+                        </td>
+                      )}
+                      <td className="px-3 py-1.5">
+                        {l.nome}
+                        {(l.descricao || l.categoria) && (
+                          <span className="block text-legenda text-texto-3">{[l.categoria, l.descricao].filter(Boolean).join(' · ')}</span>
+                        )}
+                        {avisos[i]?.map((a) => (
+                          <span key={a} className="mt-0.5 mr-1 inline-block rounded-sm bg-atencao-suave px-1.5 text-legenda text-atencao">
+                            {a}
+                          </span>
+                        ))}
+                      </td>
+                      <td className="px-3 py-1.5 align-top text-texto-2">{l.codigo ?? '—'}</td>
+                      <td className="px-3 py-1.5 text-right align-top whitespace-nowrap tabular-nums">
+                        {l.preco != null ? (
+                          moeda(l.preco, true)
+                        ) : existente ? (
+                          <span className="text-texto-3">mantém</span>
+                        ) : (
+                          <span className="text-texto-3">sem preço</span>
+                        )}
+                      </td>
+                      {paginas && <td className="px-3 py-1.5 text-right align-top text-texto-3">{paginas[i] ?? '—'}</td>}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
-        <p className="text-legenda text-texto-3">
-          No Excel ou Planilhas Google: Arquivo → Salvar como (ou Fazer download) → CSV. Colunas reconhecidas: nome (ou produto), código,
-          unidade, preço, estoque mínimo, categoria (ou família), marca (ou fornecedor), NCM, detalhes e controla estoque (sim/não).
-        </p>
+        {ia && importacao.linhas.length > MAX_LINHAS && (
+          <p className="text-legenda text-texto-3">
+            Mostrando os primeiros {MAX_LINHAS}; todos os {importacao.linhas.length} serão importados.
+          </p>
+        )}
+        {!ia && (
+          <p className="text-legenda text-texto-3">
+            No Excel ou Planilhas Google: Arquivo → Salvar como (ou Fazer download) → CSV. Colunas reconhecidas: nome (ou produto),
+            código, unidade, preço, estoque mínimo, categoria (ou família), marca (ou fornecedor), NCM, detalhes e controla estoque
+            (sim/não). Planilha com outras colunas, PDF ou foto: use Importar com IA.
+          </p>
+        )}
         {erro && <Aviso tom="erro">{erro}</Aviso>}
       </div>
     </Modal>
