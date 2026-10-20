@@ -96,3 +96,12 @@ export function nomeArquivoOrcamento(d: { pedido: { status: string; numero: numb
     .slice(0, 40)
   return `${tipo}-${d.pedido.numero}${cliente ? `-${cliente}` : ''}.pdf`
 }
+
+/** "1.234,56" → 1234.56; vazio → null; inválido → undefined. */
+export function lerNumero(v: string): number | null | undefined {
+  const t = v.trim()
+  if (!t) return null
+  const limpo = t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t
+  const n = Number(limpo)
+  return Number.isFinite(n) ? n : undefined
+}

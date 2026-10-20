@@ -24,9 +24,10 @@ export type ItemBruto = {
   codigo: string | null; nome: string; unidade: string | null; preco: string | null; detalhes: string | null;
   categoria: string | null; marca: string | null; ncm: string | null; pagina: number | null;
 };
+// Só os campos que vieram preenchidos: ausente = mantém o que está no cadastro (produto novo usa o padrão).
 export type Linha = {
-  codigo: string | null; nome: string; unidade: string; preco?: number; descricao: string | null;
-  categoria: string | null; marca: string | null; ncm: string | null;
+  codigo?: string; nome: string; unidade?: string; preco?: number; descricao?: string;
+  categoria?: string; marca?: string; ncm?: string;
 };
 export type Uso = { chamadas: number; entrada: number; saida: number };
 
@@ -245,9 +246,10 @@ const UNIDADES: Record<string, string> = {
   kg: "kg", quilo: "kg", m: "m", mt: "m", metro: "m", metros: "m",
   rolo: "rolo", rl: "rolo", pct: "pct", pacote: "pct", par: "par", jg: "jogo", jogo: "jogo", cj: "cj", conjunto: "cj",
 };
-export function lerUnidade(t: string | null): string {
+/** Unidade padronizada; vazio → undefined (o produto existente mantém a dele, o novo fica "un"). */
+export function lerUnidade(t: string | null): string | undefined {
   const s = (t ?? "").trim().toLowerCase().replace(/\.$/, "");
-  return UNIDADES[s] ?? (s ? s.slice(0, 10) : "un");
+  return UNIDADES[s] ?? (s ? s.slice(0, 10) : undefined);
 }
 
 /** Junta os blocos: limpa, corta nos tamanhos do cadastro e une duplicados (o primeiro vence; vazios se completam). */
@@ -261,14 +263,19 @@ export function limpar(itens: ItemBruto[], modoPreco: "venda" | "sem_preco"): { 
     const codigo = (i.codigo ?? "").trim().slice(0, 60) || null;
     const preco = lerPreco(i.preco);
     const ncm = (i.ncm ?? "").replace(/\D/g, "");
-    const linha: Linha = {
-      codigo, nome, unidade: lerUnidade(i.unidade),
-      ...(modoPreco === "venda" && preco != null ? { preco } : {}),
-      descricao: (i.detalhes ?? "").trim().slice(0, 2000) || null,
-      categoria: (i.categoria ?? "").trim().slice(0, 100) || null,
-      marca: (i.marca ?? "").trim().slice(0, 100) || null,
-      ncm: ncm.length === 8 ? ncm : null,
-    };
+    // Só o que o catálogo trouxe: campo vazio não apaga o que já está no cadastro (20/10).
+    const linha: Linha = { nome };
+    const unidade = lerUnidade(i.unidade);
+    const descricao = (i.detalhes ?? "").trim().slice(0, 2000);
+    const categoria = (i.categoria ?? "").trim().slice(0, 100);
+    const marca = (i.marca ?? "").trim().slice(0, 100);
+    if (codigo) linha.codigo = codigo;
+    if (unidade) linha.unidade = unidade;
+    if (modoPreco === "venda" && preco != null) linha.preco = preco;
+    if (descricao) linha.descricao = descricao;
+    if (categoria) linha.categoria = categoria;
+    if (marca) linha.marca = marca;
+    if (ncm.length === 8) linha.ncm = ncm;
     // Mesmo produto = mesmo código E mesmo nome. Só o código não basta: "código da tabela" se repete entre
     // fornecedores (4.003 é alicate na MTX e grampeador na IMECO) e era descartado como duplicado (teste de 19/10).
     const chave = `${(codigo ?? "").toLowerCase()}|${nome.toLowerCase()}`;

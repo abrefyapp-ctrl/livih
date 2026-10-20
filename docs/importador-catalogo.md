@@ -80,6 +80,17 @@ Base da JoGrampo (156 mil caracteres, os dois catálogos desativados) contra o g
 - **Chave de serviço:** a função aceita a chave de serviço em qualquer formato (JWT ou `sb_secret_`). Ela é usada
   para continuar a leitura e para testes.
 
+## Atualização de produto existente (20/10)
+
+A importação, por planilha ou com IA, atualiza pelo código e **só mexe no que veio preenchido**. Coluna ausente ou
+célula vazia mantém o valor do cadastro.
+
+Antes, uma planilha sem preço zerava o preço dos produtos existentes, sem estoque mínimo apagava o mínimo, e sem
+unidade trocava tudo para "un". O importador com IA também apagava descrição, categoria, marca e NCM.
+
+O produto novo usa os padrões: unidade "un" e sem preço. Produto cadastrado que não está no arquivo não muda; a
+opção de desativá-lo ficou para depois.
+
 ## Fora desta etapa
 
 Fotos de produto, estoque e catálogo de fornecedor compartilhado (item 5, parte 2).

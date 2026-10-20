@@ -191,13 +191,6 @@ export async function mudarStatusPedido(id: string, status: StatusPedido) {
 // ---- números ----
 
 /** "1,5" / "1.234,50" / "12.5" → número; vazio → null; inválido → undefined. */
-export function lerNumero(v: string): number | null | undefined {
-  const t = v.trim()
-  if (!t) return null
-  const limpo = t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t
-  const n = Number(limpo)
-  return Number.isFinite(n) ? n : undefined
-}
 
 // Em formato.ts (sem Supabase) para o PDF do orçamento rodar também no servidor (serviço livih-pdf).
-export { quantidade } from './formato'
+export { lerNumero, quantidade } from './formato'

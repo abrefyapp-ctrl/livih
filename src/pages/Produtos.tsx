@@ -13,6 +13,7 @@ import {
   type Produto,
 } from '../services/erp'
 import { moeda } from '../services/formato'
+import { lerNcm, planilhaParaProdutos } from '../services/planilhaProdutos'
 import { documentosDoProduto, urlDocumento, type DocumentoRow } from '../services/documentos'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
@@ -27,107 +28,6 @@ const CLASSE_CAMPO =
   'block h-10 w-full rounded-md border border-borda bg-superficie px-3 placeholder:text-texto-3 focus:border-primaria focus:outline-none'
 
 const semAcento = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
-
-/** CSV do Excel brasileiro (separado por ; ou ,), com aspas. */
-function lerCsv(texto: string): string[][] {
-  const primeira = texto.split(/\r?\n/, 1)[0] ?? ''
-  const sep = (primeira.match(/;/g)?.length ?? 0) >= (primeira.match(/,/g)?.length ?? 0) ? ';' : ','
-  const linhas: string[][] = []
-  let linha: string[] = []
-  let campo = ''
-  let aspas = false
-  for (let i = 0; i < texto.length; i++) {
-    const c = texto[i]
-    if (aspas) {
-      if (c === '"' && texto[i + 1] === '"') {
-        campo += '"'
-        i++
-      } else if (c === '"') aspas = false
-      else campo += c
-    } else if (c === '"') aspas = true
-    else if (c === sep) {
-      linha.push(campo)
-      campo = ''
-    } else if (c === '\n' || c === '\r') {
-      if (c === '\r' && texto[i + 1] === '\n') i++
-      linha.push(campo)
-      if (linha.some((x) => x.trim())) linhas.push(linha)
-      linha = []
-      campo = ''
-    } else campo += c
-  }
-  linha.push(campo)
-  if (linha.some((x) => x.trim())) linhas.push(linha)
-  return linhas
-}
-
-type ColunaPlanilha = 'codigo' | 'nome' | 'unidade' | 'preco' | 'estoque_minimo' | 'categoria' | 'marca' | 'ncm' | 'descricao' | 'controla_estoque'
-const COLUNAS: Record<ColunaPlanilha, string[]> = {
-  codigo: ['codigo', 'cod', 'sku', 'referencia', 'ref'],
-  nome: ['nome', 'produto', 'descricao', 'item'],
-  unidade: ['unidade', 'un', 'und', 'medida'],
-  preco: ['preco', 'valor', 'preco de venda', 'preco venda'],
-  estoque_minimo: ['estoque minimo', 'estoque_minimo', 'minimo'],
-  categoria: ['categoria', 'familia', 'grupo', 'linha'],
-  marca: ['marca', 'fabricante', 'fornecedor'],
-  ncm: ['ncm'],
-  // "descricao" já é sinônimo de nome (planilhas antigas); o texto longo vem em "detalhes".
-  descricao: ['detalhes', 'especificacoes', 'observacoes'],
-  controla_estoque: ['controla estoque', 'controla_estoque', 'estoque controlado'],
-}
-
-/** sim/não, s/n, 1/0, x; vazio → null; outra coisa → undefined. */
-function lerSimNao(v: string): boolean | null | undefined {
-  const t = semAcento(v)
-  if (!t) return null
-  if (['sim', 's', '1', 'x', 'true'].includes(t)) return true
-  if (['nao', 'n', '0', 'false'].includes(t)) return false
-  return undefined
-}
-
-/** "8467.19.00" → "84671900"; vazio → null; inválido → undefined. */
-function lerNcm(v: string): string | null | undefined {
-  const d = v.replace(/\D/g, '')
-  if (!d) return null
-  return d.length === 8 ? d : undefined
-}
-
-function planilhaParaProdutos(texto: string): { linhas: DadosProduto[]; erros: string[] } {
-  const [cab, ...resto] = lerCsv(texto.replace(/^\uFEFF/, ''))
-  const erros: string[] = []
-  if (!cab) return { linhas: [], erros: ['A planilha está vazia.'] }
-  const idx = Object.fromEntries(
-    Object.entries(COLUNAS).map(([campo, nomes]) => [campo, cab.findIndex((h) => nomes.includes(semAcento(h)))]),
-  ) as Record<keyof typeof COLUNAS, number>
-  if (idx.nome < 0) return { linhas: [], erros: ['Falta a coluna "nome" (ou "produto") no cabeçalho.'] }
-  const linhas: DadosProduto[] = []
-  resto.forEach((l) => {
-    const nome = l[idx.nome]?.trim()
-    if (!nome) return
-    const preco = idx.preco >= 0 ? lerNumero((l[idx.preco] ?? '').replace(/r\$\s*/i, '')) : 0
-    const minimo = idx.estoque_minimo >= 0 ? lerNumero(l[idx.estoque_minimo] ?? '') : null
-    const ncm = idx.ncm >= 0 ? lerNcm(l[idx.ncm] ?? '') : null
-    const controla = idx.controla_estoque >= 0 ? lerSimNao(l[idx.controla_estoque] ?? '') : null
-    if (preco === undefined || minimo === undefined || ncm === undefined || controla === undefined) {
-      erros.push(`"${nome}": preço, estoque mínimo, NCM ou "controla estoque" inválido.`)
-      return
-    }
-    linhas.push({
-      nome: nome.slice(0, 200),
-      codigo: idx.codigo >= 0 ? l[idx.codigo]?.trim() || null : null,
-      unidade: (idx.unidade >= 0 ? l[idx.unidade]?.trim() : '') || 'un',
-      preco: preco ?? 0,
-      estoque_minimo: minimo,
-      // Coluna ausente não entra: atualizar por código não apaga o que já estava cadastrado.
-      ...(idx.categoria >= 0 && { categoria: l[idx.categoria]?.trim().slice(0, 100) || null }),
-      ...(idx.marca >= 0 && { marca: l[idx.marca]?.trim().slice(0, 100) || null }),
-      ...(idx.ncm >= 0 && { ncm }),
-      ...(idx.descricao >= 0 && { descricao: l[idx.descricao]?.trim().slice(0, 2000) || null }),
-      ...(controla !== null && { controla_estoque: controla }),
-    })
-  })
-  return { linhas, erros }
-}
 
 export function Produtos() {
   const { orgAtiva, modulos } = useSessao()
@@ -758,8 +658,9 @@ function ModalImportacao({
       <div className="space-y-4">
         {importacao.linhas.length > 0 && (
           <p className="text-pequeno text-texto-2">
-            {escolhidas.length - atualiza} novos e {atualiza} já cadastrados (atualizados pelo código). O estoque não muda: lance a
-            contagem inicial em cada produto, como entrada.
+            {escolhidas.length - atualiza} novos e {atualiza} já cadastrados (atualizados pelo código: só muda o que veio
+            preenchido; coluna ausente ou vazia mantém o que está no cadastro). O estoque não muda: lance a contagem inicial em
+            cada produto, como entrada.
             {ia && ' Confira os itens com aviso e desmarque o que estiver errado.'}
           </p>
         )}
