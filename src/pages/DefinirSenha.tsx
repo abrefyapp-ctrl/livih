@@ -7,6 +7,34 @@ import { Botao } from '../components/Botao'
 import { CampoTexto } from '../components/CampoTexto'
 import { TelaAcesso } from '../components/TelaAcesso'
 
+const MOTIVOS_FRACA: Record<string, string> = {
+  length: 'é curta demais',
+  characters: 'precisa misturar letras, números e símbolos',
+  pwned: 'apareceu em vazamentos de senhas na internet',
+}
+
+/**
+ * Antes tudo virava "peça um link novo", o que não resolve senha repetida ou fraca (20/10: alguém no "esqueci minha
+ * senha" foi recusado e não soube por quê). Cada motivo com o que fazer.
+ */
+function motivoDoErro(error: { code?: string; message: string } & { reasons?: string[] }): string {
+  switch (error.code) {
+    case 'same_password':
+      return 'Essa já é a sua senha atual. Escolha uma diferente, ou, se lembrou dela, é só entrar com ela.'
+    case 'weak_password': {
+      const motivos = (error.reasons ?? []).map((r) => MOTIVOS_FRACA[r]).filter(Boolean)
+      return `Senha fraca${motivos.length ? `: ${motivos.join(' e ')}` : ''}. Escolha outra.`
+    }
+    case 'session_not_found':
+    case 'session_expired':
+    case 'bad_jwt':
+    case 'reauthentication_needed':
+      return 'Este link expirou. Na tela de entrar, use “Esqueci minha senha” para receber outro.'
+    default:
+      return `Não foi possível salvar a senha (${error.message}). Peça um link novo e tente de novo.`
+  }
+}
+
 /** Destino do link de convite e de "esqueci minha senha": o Supabase já abriu a sessão pelo link. */
 export function DefinirSenha() {
   const { sessao } = useSessao()
@@ -26,7 +54,7 @@ export function DefinirSenha() {
     setErro(null)
     const { error } = await supabase.auth.updateUser({ password: senha })
     setEnviando(false)
-    if (error) setErro('Não foi possível salvar a senha. Peça um link novo e tente de novo.')
+    if (error) setErro(motivoDoErro(error))
     else navegar('/conversas', { replace: true })
   }
 
