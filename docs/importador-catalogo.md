@@ -54,7 +54,7 @@ Produto com preço 0 é tratado como **sem preço**:
   - itens duplicados entre blocos juntados pelo código.
 - **Avisos** (na tela, contra o cadastro atual): sem preço, código repetido, preço que muda mais de 50% e nome
   parecido com um produto existente.
-- **Consumo:** `uso_ia` tipo `importacao`. Limites: 100 páginas e 5 importações por dia por empresa.
+- **Consumo:** `uso_ia` tipo `importacao`. Limites: 100 páginas e 5 importações por dia por empresa (o limite diário está desligado desde 21/10; ver roadmap).
 
 ## Qualidade
 

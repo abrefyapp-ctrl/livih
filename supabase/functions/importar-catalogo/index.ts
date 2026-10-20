@@ -17,7 +17,9 @@ import {
 const URL_SUPABASE = Deno.env.get("SUPABASE_URL")!;
 const CHAVE_SERVICO = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(URL_SUPABASE, CHAVE_SERVICO, { auth: { persistSession: false } });
-const LIMITE_DIA = 5;
+// Limite diário DESLIGADO em 21/10 (pedido do usuário: a JoGrampo está subindo vários catálogos). Voltar a 5
+// depois (anotado no roadmap): é só trocar null por 5.
+const LIMITE_DIA: number | null = null;
 const TEMPO_POR_EXECUCAO = 90_000;
 const EM_PARALELO = 4;
 
@@ -189,7 +191,7 @@ Deno.serve(async (req) => {
     }
     const { count } = await admin.from("importacoes_catalogo").select("id", { count: "exact", head: true })
       .eq("org_id", p.org_id).gte("criado_em", new Date(Date.now() - 864e5).toISOString());
-    if ((count ?? 0) >= LIMITE_DIA) return json(429, { erro: `Limite de ${LIMITE_DIA} importações por dia atingido. Tente amanhã.` });
+    if (LIMITE_DIA != null && (count ?? 0) >= LIMITE_DIA) return json(429, { erro: `Limite de ${LIMITE_DIA} importações por dia atingido. Tente amanhã.` });
   }
   const { data: erp } = await admin.rpc("modulo_ativo", { p_org: p.org_id, p_modulo: "erp" });
   if (!erp) return json(403, { erro: "Esta empresa não usa o cadastro de produtos." });

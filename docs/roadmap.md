@@ -58,6 +58,10 @@ Depois do orçamento em PDF, do envio de arquivos e da busca de produtos pelo ag
 Se um cliente novo for entrar nas próximas semanas, os itens 4 e 7 sobem: a implantação dele já sai com o custo sob
 controle e sem catálogo manual.
 
+**Pendente — religar o limite do importador com IA:** o limite de 5 importações por dia por empresa foi desligado
+em 21/10 a pedido, enquanto a JoGrampo sobe os catálogos. Para voltar, trocar `LIMITE_DIA` de `null` para `5` em
+`supabase/functions/importar-catalogo/index.ts` e publicar a função. Cada importação custa em média R$ 0,80 de IA.
+
 Em paralelo, sem código: conferir o custo da JoGrampo depois da limpeza (uso_ia e tokens em cache no painel da
 OpenAI), testar envio de arquivo pela API oficial da Meta e confirmar com a JoGrampo o código "ROCAMA 7.005" (dois
 grampeadores com o mesmo código na tabela do fornecedor).
