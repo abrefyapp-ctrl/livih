@@ -55,12 +55,19 @@ const amigavel = (m: string, padrao: string) => {
 
 // ---- produtos ----
 
+// O banco devolve no máximo 1000 linhas por consulta: catálogo maior (JoGrampo tem 1205) vem em páginas.
+const PAGINA_PRODUTOS = 1000
+
 export async function listarProdutos(orgId: string, incluirInativos = false): Promise<Produto[]> {
-  let q = supabase.from('produtos_saldo').select('*').eq('org_id', orgId)
-  if (!incluirInativos) q = q.eq('ativo', true)
-  const { data, error } = await q.order('nome').limit(5000)
-  if (error) throw error
-  return data ?? []
+  const todos: Produto[] = []
+  for (let de = 0; ; de += PAGINA_PRODUTOS) {
+    let q = supabase.from('produtos_saldo').select('*').eq('org_id', orgId)
+    if (!incluirInativos) q = q.eq('ativo', true)
+    const { data, error } = await q.order('nome').order('id').range(de, de + PAGINA_PRODUTOS - 1)
+    if (error) throw error
+    todos.push(...(data ?? []))
+    if ((data ?? []).length < PAGINA_PRODUTOS) return todos
+  }
 }
 
 export async function salvarProduto(orgId: string, id: string | null, dados: DadosProduto) {
@@ -91,7 +98,9 @@ export async function excluirProduto(id: string): Promise<boolean> {
  * atualiza: se o código não está cadastrado, fica de fora (`ignorados`).
  */
 export async function importarProdutos(orgId: string, linhas: (Omit<DadosProduto, 'nome'> & { nome?: string })[], existentes: Produto[]) {
-  const porCodigo = new Map(existentes.filter((p) => p.codigo).map((p) => [p.codigo!.toLowerCase(), p.id!]))
+  // Confere no banco, com os inativos: o código de um produto inativo também está ocupado.
+  const cadastro = existentes.some((p) => !p.ativo) ? existentes : await listarProdutos(orgId, true)
+  const porCodigo = new Map(cadastro.filter((p) => p.codigo).map((p) => [p.codigo!.toLowerCase(), p.id!]))
   let criados = 0
   let atualizados = 0
   let ignorados = 0
