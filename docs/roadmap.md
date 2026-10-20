@@ -58,6 +58,9 @@ Depois do orçamento em PDF, do envio de arquivos e da busca de produtos pelo ag
 Se um cliente novo for entrar nas próximas semanas, os itens 4 e 7 sobem: a implantação dele já sai com o custo sob
 controle e sem catálogo manual.
 
+**Entrada por nota fiscal** (pedido de 20/10): XML, PDF ou foto da nota do fornecedor cadastra o produto que falta e
+soma no estoque, com vínculo por fornecedor e último custo. Feita em 20/10: [entrada-por-nota.md](entrada-por-nota.md).
+
 **Pendente — religar o limite do importador com IA:** o limite de 5 importações por dia por empresa foi desligado
 em 21/10 a pedido, enquanto a JoGrampo sobe os catálogos. Para voltar, trocar `LIMITE_DIA` de `null` para `5` em
 `supabase/functions/importar-catalogo/index.ts` e publicar a função. Cada importação custa em média R$ 0,80 de IA.

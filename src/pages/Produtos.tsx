@@ -26,6 +26,8 @@ import { Icone } from '../components/Icone'
 import { DialogoConfirmacao } from '../components/DialogoConfirmacao'
 import { Modal } from '../components/Modal'
 import { ModalImportarCatalogo, type Revisao } from '../components/ModalImportarCatalogo'
+import { ModalEntradaNota } from '../components/ModalEntradaNota'
+import { ultimoCusto } from '../services/notasEntrada'
 
 const CLASSE_CAMPO =
   'block h-10 w-full rounded-md border border-borda bg-superficie px-3 placeholder:text-texto-3 focus:border-primaria focus:outline-none'
@@ -51,6 +53,9 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
   const [busca, setBusca] = useState('')
   const [inativos, setInativos] = useState(false)
   const [soAbaixo, setSoAbaixo] = useState(false)
+  const [soSemPreco, setSoSemPreco] = useState(false)
+  const [entradaNota, setEntradaNota] = useState(false)
+  const [mensagem, setMensagem] = useState<string | null>(null)
   const [aberto, setAberto] = useState<Produto | 'novo' | null>(null)
   const [importacao, setImportacao] = useState<Planilha | Revisao | null>(null)
   // Importar com IA; o texto vem do alerta "Parece catálogo" da Saúde do agente (navegação com state).
@@ -76,10 +81,13 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
   const lista = useMemo(() => {
     const t = semAcento(busca)
     return (todos ?? []).filter(
-      (p) => (!t || semAcento(`${p.nome} ${p.codigo ?? ''} ${p.categoria ?? ''} ${p.marca ?? ''}`).includes(t)) && (!soAbaixo || abaixo(p)),
+      (p) => (!t || semAcento(`${p.nome} ${p.codigo ?? ''} ${p.categoria ?? ''} ${p.marca ?? ''}`).includes(t)) &&
+        (!soAbaixo || abaixo(p)) &&
+        (!soSemPreco || !(Number(p.preco) > 0)),
     )
-  }, [todos, busca, soAbaixo])
+  }, [todos, busca, soAbaixo, soSemPreco])
   const qtdAbaixo = (todos ?? []).filter(abaixo).length
+  const qtdSemPreco = (todos ?? []).filter((p) => !(Number(p.preco) > 0)).length
   const recarregar = () => setVersao((v) => v + 1)
 
   async function lerArquivo(f: File | undefined) {
@@ -99,6 +107,9 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
           </div>
           {gerencia && (
             <div className="flex flex-wrap gap-2">
+              <Botao variante="secundario" icone="nota" onClick={() => setEntradaNota(true)}>
+                Entrada por nota
+              </Botao>
               <Botao variante="secundario" icone="arquivo" onClick={() => arquivo.current?.click()}>
                 Importar planilha
               </Botao>
@@ -132,8 +143,15 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
             <input type="checkbox" checked={inativos} onChange={(e) => setInativos(e.target.checked)} className="size-4 accent-primaria" />
             Mostrar inativos
           </label>
+          {qtdSemPreco > 0 && (
+            <label className="flex cursor-pointer items-center gap-2 text-pequeno text-texto-2">
+              <input type="checkbox" checked={soSemPreco} onChange={(e) => setSoSemPreco(e.target.checked)} className="size-4 accent-primaria" />
+              Só sem preço <span className="rounded-full bg-fundo px-1.5 text-legenda font-semibold text-texto-2">{qtdSemPreco}</span>
+            </label>
+          )}
         </div>
         {erro && <Aviso tom="erro">{erro}</Aviso>}
+        {mensagem && <Aviso tom="info">{mensagem}</Aviso>}
       </div>
 
       <div className="flex-1 overflow-auto px-4 pb-6 lg:px-8">
@@ -219,6 +237,23 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
             setComIA(false)
             if (textoDaBase) navegar('.', { replace: true, state: null })
             setImportacao(r)
+          }}
+        />
+      )}
+      {entradaNota && (
+        <ModalEntradaNota
+          orgId={orgId}
+          produtos={todos ?? []}
+          aoFechar={() => setEntradaNota(false)}
+          aoConcluir={(r) => {
+            setEntradaNota(false)
+            setMensagem(
+              `Nota ${r.numero ?? 's/n'} lançada: ${r.itens} ${r.itens === 1 ? 'item entrou' : 'itens entraram'} no estoque.` +
+                (r.criados
+                  ? ` ${r.criados} ${r.criados === 1 ? 'produto novo foi cadastrado' : 'produtos novos foram cadastrados'} sem preço de venda: marque "Só sem preço" para preencher.`
+                  : ''),
+            )
+            recarregar()
           }}
         />
       )}
@@ -531,6 +566,19 @@ function Estoque({ produto, gerencia, aoMudar }: { produto: Produto; gerencia: b
     }
   }, [produto.id, versao])
 
+  // Último custo da nota de entrada: só dono/admin leem (a RLS devolve vazio para a equipe).
+  const [custo, setCusto] = useState<{ custo: number; atualizado_em: string } | null>(null)
+  useEffect(() => {
+    if (!gerencia) return
+    let ativo = true
+    ultimoCusto(produto.id!)
+      .then((c) => ativo && setCusto(c))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [produto.id, gerencia])
+
   const lista = movs?.versao === versao ? movs.lista : null
   const saldo = lista ? lista.reduce((s, m) => s + Number(m.quantidade), 0) : Number(produto.saldo)
 
@@ -566,6 +614,12 @@ function Estoque({ produto, gerencia, aoMudar }: { produto: Produto; gerencia: b
           {quantidade(saldo)} <span className="text-pequeno font-normal text-texto-3">{produto.unidade}</span>
         </p>
       </div>
+      {gerencia && custo && (
+        <p className="text-pequeno text-texto-2">
+          Último custo de compra: <span className="font-medium tabular-nums">{moeda(custo.custo, true)}</span> por {produto.unidade}{' '}
+          <span className="text-texto-3">(nota lançada em {new Date(custo.atualizado_em).toLocaleDateString('pt-BR')})</span>
+        </p>
+      )}
       {saldo < 0 && <Aviso tom="atencao">Saldo negativo: saiu mais do que entrou. Lance a entrada ou um ajuste com a contagem real.</Aviso>}
 
       {gerencia && (

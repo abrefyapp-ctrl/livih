@@ -455,3 +455,7 @@ verify_jwt = false
 # agente-assistente: Configurações → Agente → Assistente; login validado dentro da função (dono/admin ou plataforma).
 [functions.agente-assistente]
 verify_jwt = false
+
+# ler-nota: Produtos > Entrada por nota (PDF ou foto); login e papel validados dentro da funcao.
+[functions.ler-nota]
+verify_jwt = false

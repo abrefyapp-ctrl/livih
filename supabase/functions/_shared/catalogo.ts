@@ -75,7 +75,7 @@ export function blocosTexto(texto: string): Bloco[] {
 
 // ---------------------------------------------------------------- IA
 
-function base64(bytes: Uint8Array): string {
+export function base64(bytes: Uint8Array): string {
   let s = "";
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
@@ -117,7 +117,7 @@ Para CADA produto (ou cada variação com código ou preço próprio), devolva:
 Extraia TODOS os produtos do trecho, um por um, do primeiro ao último, mesmo que sejam muitos e parecidos (ex.: as medidas 14/19, 14/22, 14/25... são produtos separados). Não resuma, não agrupe e não pule nenhum.
 Regras: copie, não invente; o que estiver ilegível fica null. Ignore cabeçalhos, rodapés, contatos, condições comerciais e textos de propaganda. Não repita o mesmo produto.`;
 
-async function chamarIA(conteudo: unknown[], esquema: unknown, nome: string, maxSaida: number) {
+export async function chamarIA(conteudo: unknown[], esquema: unknown, nome: string, maxSaida: number) {
   if (!OPENAI_API_KEY) throw new Error("IA indisponível (configuração do servidor)");
   let ultimoErro = "";
   for (let tentativa = 0; tentativa < 2; tentativa++) {

@@ -2157,6 +2157,94 @@ exception when others then
   insert into resultado (teste, ok) values ('estoque planilha: atendente não altera estoque', true);
 end $$;
 
+-- Entrada por nota: cria produto novo sem preço, soma no estoque com o fator, guarda vínculo e custo, não repete a nota.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_existente uuid; v_novo uuid; r jsonb; r2 jsonb;
+  nota jsonb := '{"chave":"41201012345678000190550010000012341000012345","numero":"1234","serie":"1","emissao":"2026-10-20",
+                  "emitente_cnpj":"12.345.678/0001-90","emitente_nome":"Pacar Ind.","valor_total":"1500.00","origem":"xml"}';
+begin
+  insert into public.produtos (org_id, codigo, nome, preco, controla_estoque) values (v_org, 'NF-EX', 'Grampo da nota', 30, false)
+  returning id into v_existente;
+
+  r := public.nota_entrada_lancar(v_org, nota, jsonb_build_array(
+    jsonb_build_object('produto_id', v_existente, 'codigo_fornecedor', 'PC-10', 'descricao', 'GRAMPO 14/19 CX', 'unidade', 'CX',
+                       'quantidade', 3, 'fator', 10, 'valor_unitario', 120, 'valor_total', 360),
+    jsonb_build_object('novo', jsonb_build_object('nome', 'Pregador PI-70', 'codigo', 'NF-NOVO', 'unidade', 'UN', 'ncm', '84672999'),
+                       'codigo_fornecedor', '2.037', 'descricao', 'PREGADOR PI-70', 'unidade', 'UN',
+                       'quantidade', 2, 'valor_unitario', 570, 'valor_total', 1140)));
+  v_novo := (select id from public.produtos where org_id = v_org and codigo = 'NF-NOVO');
+
+  insert into resultado (teste, ok) values ('nota entrada: soma no estoque com o fator e cria o produto novo sem preço',
+    (r ->> 'itens')::int = 2 and (r ->> 'criados')::int = 1
+    and (select sum(quantidade) from public.estoque_movimentos where produto_id = v_existente) = 30
+    and (select sum(quantidade) from public.estoque_movimentos where produto_id = v_novo) = 2
+    and (select preco from public.produtos where id = v_novo) = 0
+    and (select unidade from public.produtos where id = v_novo) = 'un'
+    and (select controla_estoque from public.produtos where id = v_existente));
+  insert into resultado (teste, ok) select 'nota entrada: movimento aponta a nota, com motivo NF e quem lançou',
+    exists (select 1 from public.estoque_movimentos where produto_id = v_existente and tipo = 'entrada'
+             and motivo = 'NF 1234 · Pacar Ind.' and nota_entrada_id = (r ->> 'nota_id')::uuid and autor_id = auth.uid());
+  insert into resultado (teste, ok) select 'nota entrada: guarda vínculo do fornecedor (CNPJ só dígitos) e custo por unidade',
+    (select fator from public.produtos_fornecedores where org_id = v_org and fornecedor_cnpj = '12345678000190'
+      and lower(codigo_fornecedor) = 'pc-10' and produto_id = v_existente) = 10
+    and (select custo from public.produtos_custos where produto_id = v_existente) = 12
+    and (select custo from public.produtos_custos where produto_id = v_novo) = 570;
+
+  begin
+    perform public.nota_entrada_lancar(v_org, nota, jsonb_build_array(
+      jsonb_build_object('produto_id', v_existente, 'descricao', 'x', 'quantidade', 1)));
+    insert into resultado (teste, ok) values ('nota entrada: a mesma nota não entra duas vezes', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('nota entrada: a mesma nota não entra duas vezes', sqlerrm like 'esta nota já foi lançada em%');
+  end;
+
+  -- Sem chave (foto): repete pelo fornecedor + número + série.
+  r2 := public.nota_entrada_lancar(v_org, '{"numero":"77","serie":"1","emitente_cnpj":"12345678000190","origem":"imagem"}',
+    jsonb_build_array(jsonb_build_object('produto_id', v_existente, 'codigo_fornecedor', 'pc-10', 'descricao', 'x', 'quantidade', 1, 'fator', 10)));
+  begin
+    perform public.nota_entrada_lancar(v_org, '{"numero":"77","serie":"1","emitente_cnpj":"12345678000190","origem":"imagem"}',
+      jsonb_build_array(jsonb_build_object('produto_id', v_existente, 'descricao', 'x', 'quantidade', 1)));
+    insert into resultado (teste, ok) values ('nota entrada: sem chave, repete pelo fornecedor e número', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('nota entrada: sem chave, repete pelo fornecedor e número',
+      sqlerrm like 'esta nota já foi lançada em%' and (select sum(quantidade) from public.estoque_movimentos where produto_id = v_existente) = 40);
+  end;
+
+  begin
+    perform public.nota_entrada_lancar(v_org, '{"numero":"78","origem":"xml"}',
+      jsonb_build_array(jsonb_build_object('produto_id', v_existente, 'descricao', 'x', 'quantidade', 0)));
+    insert into resultado (teste, ok) values ('nota entrada: quantidade zero é recusada e nada fica gravado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('nota entrada: quantidade zero é recusada e nada fica gravado',
+      not exists (select 1 from public.notas_entrada where org_id = v_org and numero = '78'));
+  end;
+
+  insert into resultado (teste, ok) select 'nota entrada: dono vê nota, itens, vínculos e custo',
+    (select count(*) from public.notas_entrada where org_id = v_org) = 2
+    and (select count(*) from public.notas_entrada_itens where org_id = v_org) = 3
+    and (select count(*) from public.produtos_custos where org_id = v_org) = 2;
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  insert into resultado (teste, ok) select 'nota entrada: atendente não vê custo, vínculos nem notas',
+    not exists (select 1 from public.produtos_custos where org_id = v_org)
+    and not exists (select 1 from public.produtos_fornecedores where org_id = v_org)
+    and not exists (select 1 from public.notas_entrada where org_id = v_org);
+  begin
+    perform public.nota_entrada_lancar(v_org, '{"numero":"99","origem":"xml"}',
+      jsonb_build_array(jsonb_build_object('produto_id', (select id from public.produtos where org_id = v_org and codigo = 'NF-EX'), 'descricao', 'x', 'quantidade', 1)));
+    insert into resultado (teste, ok) values ('nota entrada: atendente não lança nota', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('nota entrada: atendente não lança nota', true);
+  end;
+end $$;
+
 -- Painel: indicadores num dia fixo do passado (05/01/2026), longe do que os outros testes gravam agora.
 reset role;
 do $$

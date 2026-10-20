@@ -787,6 +787,7 @@ export type Database = {
           criado_em: string
           id: number
           motivo: string | null
+          nota_entrada_id: string | null
           org_id: string
           pedido_id: string | null
           produto_id: string
@@ -798,6 +799,7 @@ export type Database = {
           criado_em?: string
           id?: never
           motivo?: string | null
+          nota_entrada_id?: string | null
           org_id: string
           pedido_id?: string | null
           produto_id: string
@@ -809,6 +811,7 @@ export type Database = {
           criado_em?: string
           id?: never
           motivo?: string | null
+          nota_entrada_id?: string | null
           org_id?: string
           pedido_id?: string | null
           produto_id?: string
@@ -1014,6 +1017,156 @@ export type Database = {
           resultado?: Json | null
           status?: string
           total?: number
+        }
+        Relationships: []
+      }
+      notas_entrada: {
+        Row: {
+          arquivo_path: string | null
+          autor_id: string | null
+          chave: string | null
+          criado_em: string
+          emissao: string | null
+          emitente_cnpj: string | null
+          emitente_nome: string | null
+          id: string
+          numero: string | null
+          org_id: string
+          origem: string
+          serie: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          arquivo_path?: string | null
+          autor_id?: string | null
+          chave?: string | null
+          criado_em?: string
+          emissao?: string | null
+          emitente_cnpj?: string | null
+          emitente_nome?: string | null
+          id?: string
+          numero?: string | null
+          org_id: string
+          origem: string
+          serie?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          arquivo_path?: string | null
+          autor_id?: string | null
+          chave?: string | null
+          criado_em?: string
+          emissao?: string | null
+          emitente_cnpj?: string | null
+          emitente_nome?: string | null
+          id?: string
+          numero?: string | null
+          org_id?: string
+          origem?: string
+          serie?: string | null
+          valor_total?: number | null
+        }
+        Relationships: []
+      }
+      notas_entrada_itens: {
+        Row: {
+          codigo_fornecedor: string | null
+          descricao: string
+          fator: number
+          id: number
+          ncm: string | null
+          nota_id: string
+          org_id: string
+          produto_id: string | null
+          quantidade: number
+          unidade: string | null
+          valor_total: number | null
+          valor_unitario: number | null
+        }
+        Insert: {
+          codigo_fornecedor?: string | null
+          descricao: string
+          fator?: number
+          id?: number
+          ncm?: string | null
+          nota_id: string
+          org_id: string
+          produto_id?: string | null
+          quantidade: number
+          unidade?: string | null
+          valor_total?: number | null
+          valor_unitario?: number | null
+        }
+        Update: {
+          codigo_fornecedor?: string | null
+          descricao?: string
+          fator?: number
+          id?: number
+          ncm?: string | null
+          nota_id?: string
+          org_id?: string
+          produto_id?: string | null
+          quantidade?: number
+          unidade?: string | null
+          valor_total?: number | null
+          valor_unitario?: number | null
+        }
+        Relationships: []
+      }
+      produtos_custos: {
+        Row: {
+          atualizado_em: string
+          custo: number
+          nota_id: string | null
+          org_id: string
+          produto_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          custo: number
+          nota_id?: string | null
+          org_id: string
+          produto_id: string
+        }
+        Update: {
+          atualizado_em?: string
+          custo?: number
+          nota_id?: string | null
+          org_id?: string
+          produto_id?: string
+        }
+        Relationships: []
+      }
+      produtos_fornecedores: {
+        Row: {
+          atualizado_em: string
+          codigo_fornecedor: string
+          descricao_fornecedor: string | null
+          fator: number
+          fornecedor_cnpj: string
+          org_id: string
+          produto_id: string
+          unidade_fornecedor: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          codigo_fornecedor: string
+          descricao_fornecedor?: string | null
+          fator?: number
+          fornecedor_cnpj: string
+          org_id: string
+          produto_id: string
+          unidade_fornecedor?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          codigo_fornecedor?: string
+          descricao_fornecedor?: string | null
+          fator?: number
+          fornecedor_cnpj?: string
+          org_id?: string
+          produto_id?: string
+          unidade_fornecedor?: string | null
         }
         Relationships: []
       }
@@ -2156,6 +2309,10 @@ export type Database = {
       assistente_desfazer: {
         Args: { p_sessao: string }
         Returns: undefined
+      }
+      nota_entrada_lancar: {
+        Args: { p_itens: Json; p_nota: Json; p_org: string }
+        Returns: Json
       }
       estoque_definir_saldos: {
         Args: { p_itens: Json; p_org: string }
