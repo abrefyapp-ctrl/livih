@@ -3,9 +3,11 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   importarProdutos,
   lancarEstoque,
+  excluirProduto,
   lerNumero,
   listarProdutos,
   movimentosDoProduto,
+  mudarAtivoProduto,
   quantidade,
   salvarProduto,
   type DadosProduto,
@@ -21,6 +23,7 @@ import { Botao } from '../components/Botao'
 import { CampoTexto } from '../components/CampoTexto'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { Icone } from '../components/Icone'
+import { DialogoConfirmacao } from '../components/DialogoConfirmacao'
 import { Modal } from '../components/Modal'
 import { ModalImportarCatalogo, type Revisao } from '../components/ModalImportarCatalogo'
 
@@ -256,13 +259,45 @@ function ModalProduto({
   const [preco, setPreco] = useState(produto ? Number(produto.preco).toFixed(2).replace('.', ',') : '')
   const [minimo, setMinimo] = useState(produto?.estoque_minimo != null ? String(produto.estoque_minimo).replace('.', ',') : '')
   const [controla, setControla] = useState(produto?.controla_estoque ?? true)
-  const [ativoProd, setAtivoProd] = useState(produto?.ativo ?? true)
   const [descricao, setDescricao] = useState(produto?.descricao ?? '')
   const [categoria, setCategoria] = useState(produto?.categoria ?? '')
   const [marca, setMarca] = useState(produto?.marca ?? '')
   const [ncm, setNcm] = useState(produto?.ncm ?? '')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false)
+  const [comHistorico, setComHistorico] = useState(false)
+
+  async function mudarAtivo(ativo: boolean) {
+    if (!produto?.id) return
+    setSalvando(true)
+    setErro(null)
+    try {
+      await mudarAtivoProduto(produto.id, ativo)
+      aoSalvar()
+    } catch (e) {
+      setErro((e as Error).message)
+      setSalvando(false)
+    }
+  }
+
+  async function excluir() {
+    if (!produto?.id) return
+    setSalvando(true)
+    setErro(null)
+    try {
+      if (await excluirProduto(produto.id)) {
+        aoSalvar()
+        return
+      }
+      setComHistorico(true)
+    } catch (e) {
+      setErro((e as Error).message)
+    } finally {
+      setSalvando(false)
+      setConfirmarExclusao(false)
+    }
+  }
 
   const precoNum = lerNumero(preco)
   const minimoNum = lerNumero(minimo)
@@ -288,7 +323,6 @@ function ModalProduto({
         preco: precoNum ?? 0,
         estoque_minimo: minimoNum,
         controla_estoque: controla,
-        ativo: ativoProd,
         descricao: descricao.trim() || null,
         categoria: categoria.trim() || null,
         marca: marca.trim() || null,
@@ -310,6 +344,16 @@ function ModalProduto({
       aoFechar={aoFechar}
       rodape={
         <>
+          {gerencia && produto && (
+            <span className="mr-auto flex gap-1">
+              <Botao variante="fantasma" tamanho="sm" onClick={() => void mudarAtivo(!produto.ativo)} disabled={salvando}>
+                {produto.ativo ? 'Inativar' : 'Reativar'}
+              </Botao>
+              <Botao variante="fantasma" tamanho="sm" icone="lixeira" onClick={() => setConfirmarExclusao(true)} disabled={salvando}>
+                Excluir
+              </Botao>
+            </span>
+          )}
           <Botao variante="secundario" onClick={aoFechar} disabled={salvando}>
             Fechar
           </Botao>
@@ -322,6 +366,24 @@ function ModalProduto({
       }
     >
       <div className="space-y-6">
+        {produto && !produto.ativo && (
+          <Aviso tom="atencao">Produto inativo: não aparece nas buscas, nos pedidos novos nem para o agente.</Aviso>
+        )}
+        {comHistorico && (
+          <Aviso
+            tom="atencao"
+            acao={
+              produto?.ativo ? (
+                <Botao tamanho="sm" variante="secundario" onClick={() => void mudarAtivo(false)} carregando={salvando}>
+                  Inativar
+                </Botao>
+              ) : undefined
+            }
+          >
+            Este produto já teve movimento de estoque, então não pode ser excluído: o histórico depende dele.{' '}
+            {produto?.ativo ? 'Inative-o: ele some das buscas e do agente, e o histórico fica.' : 'Ele já está inativo.'}
+          </Aviso>
+        )}
         <form id="form-produto" onSubmit={salvar} className="space-y-4">
           <fieldset disabled={!gerencia} className="space-y-4">
             <CampoTexto rotulo="Nome" required maxLength={200} value={nome} onChange={(e) => setNome(e.target.value)} />
@@ -370,18 +432,24 @@ function ModalProduto({
                 className="block w-full rounded-md border border-borda bg-superficie px-3 py-2 text-pequeno focus:border-primaria focus:outline-none"
               />
             </div>
-            {produto && (
-              <label className="flex items-center gap-2 text-pequeno text-texto-2">
-                <input type="checkbox" checked={ativoProd} onChange={(e) => setAtivoProd(e.target.checked)} className="size-4 accent-primaria" />
-                Ativo (inativos não aparecem para montar pedido)
-              </label>
-            )}
           </fieldset>
           {erro && <Aviso tom="erro">{erro}</Aviso>}
         </form>
 
         {produto?.controla_estoque && <Estoque produto={produto} gerencia={gerencia} aoMudar={aoMudarEstoque} />}
         {produto?.id && <DocumentosDoProduto produtoId={produto.id} gerencia={gerencia} />}
+        <DialogoConfirmacao
+          aberto={confirmarExclusao}
+          titulo="Excluir produto?"
+          rotuloConfirmar="Excluir"
+          perigo
+          carregando={salvando}
+          aoConfirmar={() => void excluir()}
+          aoCancelar={() => setConfirmarExclusao(false)}
+        >
+          “{produto?.nome}” sai do cadastro de vez. Pedidos antigos continuam com o nome e o preço do item. Se quiser só
+          tirar de circulação, use Inativar.
+        </DialogoConfirmacao>
       </div>
     </Modal>
   )

@@ -70,6 +70,22 @@ export async function salvarProduto(orgId: string, id: string | null, dados: Dad
   if (error) throw amigavel(error.message, 'Não foi possível salvar o produto.')
 }
 
+/** Inativar some das buscas, dos pedidos novos e do agente; o histórico fica. */
+export async function mudarAtivoProduto(id: string, ativo: boolean) {
+  const { error } = await supabase.from('produtos').update({ ativo }).eq('id', id)
+  if (error) throw amigavel(error.message, 'Não foi possível atualizar o produto.')
+}
+
+/**
+ * Exclui de vez. Produto com movimento de estoque não sai (política produtos_apagar: o histórico depende dele) e o
+ * banco não acusa erro, só não apaga: devolve false para a tela oferecer inativar. Pedidos antigos guardam o nome.
+ */
+export async function excluirProduto(id: string): Promise<boolean> {
+  const { data, error } = await supabase.from('produtos').delete().eq('id', id).select('id')
+  if (error) throw amigavel(error.message, 'Não foi possível excluir o produto.')
+  return (data ?? []).length > 0
+}
+
 /** Importação da planilha: atualiza pelo código quando ele já existe, cria o resto. */
 export async function importarProdutos(orgId: string, linhas: DadosProduto[], existentes: Produto[]) {
   const porCodigo = new Map(existentes.filter((p) => p.codigo).map((p) => [p.codigo!.toLowerCase(), p.id!]))

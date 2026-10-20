@@ -2085,6 +2085,35 @@ exception when insufficient_privilege then
   insert into resultado (teste, ok) values ('lembrete: usuário logado não dispara a rodada', true);
 end $$;
 
+-- Excluir produto: sem histórico de estoque sai de vez, e o item de pedido que o usava continua com o nome.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_prod uuid; v_ped uuid; v_item uuid; n integer;
+begin
+  insert into public.produtos (org_id, codigo, nome, preco, controla_estoque) values (v_org, 'EXC-1', 'Produto para excluir', 10, false)
+  returning id into v_prod;
+  insert into public.pedidos (org_id) values (v_org) returning id into v_ped;
+  insert into public.pedido_itens (org_id, pedido_id, produto_id, descricao, quantidade, preco_unitario)
+  values (v_org, v_ped, v_prod, 'Produto para excluir', 2, 10) returning id into v_item;
+  with d as (delete from public.produtos where id = v_prod returning 1) select count(*) into n from d;
+  insert into resultado (teste, ok) select 'produto: sem histórico de estoque, o dono exclui',
+    n = 1 and not exists (select 1 from public.produtos where id = v_prod);
+  insert into resultado (teste, ok) select 'produto: item de pedido antigo continua com o nome e o preço',
+    produto_id is null and descricao = 'Produto para excluir' and preco_unitario = 10
+    from public.pedido_itens where id = v_item;
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare n integer;
+begin
+  with d as (delete from public.produtos where org_id = current_setting('teste.f7')::uuid and codigo = '14/19' returning 1)
+  select count(*) into n from d;
+  insert into resultado (teste, ok) values ('produto: atendente não exclui', n = 0);
+end $$;
+
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
 reset role;
 insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');
