@@ -2157,6 +2157,91 @@ exception when others then
   insert into resultado (teste, ok) values ('estoque planilha: atendente não altera estoque', true);
 end $$;
 
+-- Painel: indicadores num dia fixo do passado (05/01/2026), longe do que os outros testes gravam agora.
+reset role;
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select canal_id from public.conversas where id = current_setting('teste.conversa')::uuid);
+  v_a1 uuid := '00000000-0000-0000-0000-0000000000a1';
+  v_ct uuid; v_conv uuid; t0 timestamptz := '2026-01-05 13:00:00-03';
+begin
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541933330000', 'Cliente do painel') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado, criado_em) values (v_org, v_canal, v_ct, 'humano', t0)
+  returning id into v_conv;
+  perform set_config('teste.painel_conv', v_conv::text, false);
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, autor_id, tipo, texto, status_entrega, automatica, criado_em) values
+    (v_org, v_conv, 'entrada', 'contato', null, 'texto', 'oi, tem grampo?', 'recebida', false, t0),                          -- pedido 1
+    (v_org, v_conv, 'saida', 'bot', null, 'texto', 'Temos sim!', 'enviada', false, t0 + interval '30 seconds'),              -- agente: 30 s
+    (v_org, v_conv, 'entrada', 'contato', null, 'texto', 'quero 10 caixas', 'recebida', false, t0 + interval '60 seconds'),  -- pedido 2
+    (v_org, v_conv, 'entrada', 'contato', null, 'texto', 'pode ser hoje?', 'recebida', false, t0 + interval '61 seconds'),   -- mesmo turno
+    (v_org, v_conv, 'saida', 'atendente', v_a1, 'texto', 'Pode sim', 'enviada', false, t0 + interval '600 seconds'),         -- equipe: 540 s
+    (v_org, v_conv, 'saida', 'atendente', null, 'texto', 'Mensagem automática', 'enviada', true, t0 + interval '700 seconds'),
+    (v_org, v_conv, 'entrada', 'contato', null, 'texto', 'e o frete?', 'recebida', false, t0 + interval '2 hours');          -- pedido 3, sem resposta
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, criado_em)
+  values (v_org, v_ct, (select id from public.etapas_funil where org_id = v_org and tipo = 'aberta' order by ordem limit 1),
+          'Grampos do painel', t0 + interval '5 minutes');
+  insert into public.auditoria (org_id, acao, entidade, entidade_id, ator_tipo, antes, depois, criado_em)
+  values (v_org, 'conversa_estado', 'conversas', v_conv::text, 'bot', '{"estado":"bot"}',
+          '{"estado":"aguardando_humano","motivo":"Cliente quer frete para hoje"}', t0 + interval '2 minutes');
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb := public.painel_resumo(current_setting('teste.f7')::uuid, '2026-01-05 00:00:00-03', '2026-01-06 00:00:00-03');
+  a jsonb := r -> 'atual';
+  v jsonb;
+begin
+  insert into resultado (teste, ok) values ('painel: pedidos são turnos do cliente (mensagens seguidas contam uma vez)',
+    (a -> 'resposta' ->> 'pedidos')::int = 3 and (a -> 'resposta' ->> 'sem_resposta')::int = 1);
+  insert into resultado (teste, ok) values ('painel: tempo até a primeira resposta do agente e da equipe (sem automática)',
+    (a -> 'resposta' -> 'agente' ->> 'n')::int = 1 and (a -> 'resposta' -> 'agente' ->> 'mediana_seg')::numeric = 30
+    and (a -> 'resposta' -> 'equipe' ->> 'n')::int = 1 and (a -> 'resposta' -> 'equipe' ->> 'mediana_seg')::numeric = 540
+    and (a -> 'resposta' -> 'geral' ->> 'pct_5min')::int = 33);
+  insert into resultado (teste, ok) values ('painel: leads novos, com oportunidade e respondidos',
+    (a -> 'leads' ->> 'novos')::int = 1 and (a -> 'leads' ->> 'com_oportunidade')::int = 1 and (a -> 'leads' ->> 'respondidos')::int = 1);
+  insert into resultado (teste, ok) values ('painel: funil e agente (conversas, respostas, passadas para a equipe, motivo)',
+    (a -> 'funil' ->> 'criadas')::int = 1 and (a -> 'agente' ->> 'conversas')::int = 1 and (a -> 'agente' ->> 'respostas')::int = 1
+    and (a -> 'agente' ->> 'passadas')::int = 1 and a -> 'agente' -> 'motivos' ->> 0 = 'Cliente quer frete para hoje');
+  select x into v from jsonb_array_elements(a -> 'vendedores') x where x ->> 'user_id' = '00000000-0000-0000-0000-0000000000a1';
+  insert into resultado (teste, ok) values ('painel: por vendedor (respostas e tempo de quem respondeu)',
+    (v ->> 'respostas')::int = 1 and (v ->> 'mediana_seg')::numeric = 540 and (v ->> 'conversas')::int = 1);
+  insert into resultado (teste, ok) values ('painel: período anterior vem junto para comparar',
+    (r -> 'anterior' -> 'resposta' ->> 'pedidos')::int = 0 and (r ->> 'gerencia')::boolean);
+  insert into resultado (teste, ok) select 'painel: pendências mostram o cliente sem resposta',
+    exists (select 1 from jsonb_array_elements(public.painel_pendencias(current_setting('teste.f7')::uuid) -> 'sem_resposta') x
+             where x ->> 'conversa_id' = current_setting('teste.painel_conv'));
+  insert into resultado (teste, ok) select 'painel: relatório do piloto para o dono',
+    (public.painel_relatorio(current_setting('teste.f7')::uuid)) ? 'primeira_semana';
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare r jsonb := public.painel_resumo(current_setting('teste.f7')::uuid, '2026-01-05 00:00:00-03', '2026-01-06 00:00:00-03',
+                                        null, '00000000-0000-0000-0000-0000000000a1');
+begin
+  insert into resultado (teste, ok) values ('painel: atendente vê só a carteira dele (não escolhe outro vendedor)',
+    r ->> 'vendedor' = '00000000-0000-0000-0000-0000000000b1' and (r -> 'atual' -> 'resposta' ->> 'pedidos')::int = 0
+    and r -> 'atual' -> 'vendedores' = 'null'::jsonb and not (r ->> 'gerencia')::boolean);
+end $$;
+do $$
+begin
+  perform public.painel_relatorio(current_setting('teste.f7')::uuid);
+  insert into resultado (teste, ok) values ('painel: atendente não gera o relatório do piloto', false);
+exception when others then
+  insert into resultado (teste, ok) values ('painel: atendente não gera o relatório do piloto', true);
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.painel_resumo(current_setting('teste.f7')::uuid, now() - interval '7 days', now());
+  insert into resultado (teste, ok) values ('painel: outra empresa não vê', false);
+exception when others then
+  insert into resultado (teste, ok) values ('painel: outra empresa não vê', true);
+end $$;
+
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
 reset role;
 insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');

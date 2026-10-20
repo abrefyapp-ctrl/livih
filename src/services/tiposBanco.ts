@@ -1417,6 +1417,30 @@ export type Database = {
         }
         Relationships: []
       }
+      painel_config: {
+        Row: {
+          antes_tempo_resposta_min: number | null
+          atualizado_em: string
+          minutos_por_resposta: number
+          org_id: string
+          piloto_inicio: string | null
+        }
+        Insert: {
+          antes_tempo_resposta_min?: number | null
+          atualizado_em?: string
+          minutos_por_resposta?: number
+          org_id: string
+          piloto_inicio?: string | null
+        }
+        Update: {
+          antes_tempo_resposta_min?: number | null
+          atualizado_em?: string
+          minutos_por_resposta?: number
+          org_id?: string
+          piloto_inicio?: string | null
+        }
+        Relationships: []
+      }
       pedido_itens: {
         Row: {
           descricao: string
@@ -2135,6 +2159,18 @@ export type Database = {
       }
       estoque_definir_saldos: {
         Args: { p_itens: Json; p_org: string }
+        Returns: Json
+      }
+      painel_pendencias: {
+        Args: { p_canal?: string; p_org: string; p_vendedor?: string }
+        Returns: Json
+      }
+      painel_relatorio: {
+        Args: { p_org: string }
+        Returns: Json
+      }
+      painel_resumo: {
+        Args: { p_ate: string; p_canal?: string; p_de: string; p_org: string; p_vendedor?: string }
         Returns: Json
       }
       registrar_envio_documento: {

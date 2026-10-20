@@ -33,6 +33,7 @@ export function Layout() {
 
   const itens: ItemMenu[] = [
     { para: '/conversas', rotulo: 'Conversas', icone: 'conversas', contador: aguardando },
+    { para: '/painel', rotulo: 'Painel', icone: 'grafico' },
     { para: '/contatos', rotulo: 'Contatos', icone: 'usuario' },
     { para: '/oportunidades', rotulo: 'Oportunidades', icone: 'funil' },
     ...(modulos?.has('agenda') ? [{ para: '/agenda', rotulo: 'Agenda', icone: 'calendario' as const }] : []),
