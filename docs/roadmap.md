@@ -195,14 +195,57 @@ Quatro peças, nesta ordem:
 Decidir antes da peça 4: o modelo do assistente (vale um mais forte que o gpt-5-mini: uso raro, texto que importa),
 quem usa (dono/admin e a plataforma no modo suporte) e se entra em todos os planos.
 
-## Planos (decidido em 12/10)
+## Planos (revisto em 20/10)
 
-- Cobrança **por empresa**, usuários ilimitados, 1 número de WhatsApp incluso.
-- Essencial R$ 147 (500 conversas com o agente/mês), Profissional R$ 297 (1.200), Personalizado sob consulta (3.000+).
-- Número adicional R$ 19,99/mês (preço de inauguração; validade a definir). A cota do agente é da empresa.
-- Anual: 2 meses grátis. Implantação isenta no anual. Piloto assistido de 14 dias.
-- Modelos da Meta (fora da janela de 24 h): pagos pela empresa cliente direto à Meta, fora do plano.
-- ERP: pacote adicional, preço a definir.
+Substitui a tabela de 12/10. Posicionamento: vender **controle comercial** e não "mais um WhatsApp com IA". O
+vendedor continua no WhatsApp dele, e a empresa passa a ver atendimentos, oportunidades e resultados.
 
-Em aberto: o que acontece ao estourar a cota; implantação no plano mensal; regime tributário (Anexo III ou V);
-o custo da transcrição de áudio, que fica fora da cota.
+- Cobrança **por empresa**, **usuários ilimitados** em todos os planos. A diferença entre os planos é o número de
+  WhatsApps conectados e as conversas com o agente por mês.
+
+| Plano | Preço por mês | Números de WhatsApp | Conversas com o agente por mês |
+|---|---|---|---|
+| Start | R$ 149 | até 3 | 500 |
+| Pro | R$ 299 | até 5 | 1.200 |
+| Business | R$ 599 | até 10 | 3.000 |
+
+- **Custo de IA estimado** (JoGrampo depois da limpeza, ~R$ 0,02 por resposta e ~4 respostas por conversa): ~R$ 45,
+  ~R$ 110 e ~R$ 270 por mês com a franquia cheia. Conferir com o consumo real dos primeiros clientes.
+- **Modelos da Meta** (fora da janela de 24 h, só na API oficial): pagos pela empresa cliente direto à Meta, fora
+  do plano.
+- **ERP** (pedidos e estoque): pacote adicional, preço a definir.
+
+**Ainda em aberto:**
+- o que acontece ao passar da franquia de conversas;
+- implantação fora do Programa Fundadores;
+- o regime tributário (Anexo III ou V);
+- o custo da transcrição de áudio, que fica fora da franquia.
+
+### Programa Fundadores (20/10)
+
+Para as **10 primeiras empresas**, no lugar de liberar de graça por tempo indeterminado:
+
+- **Preço fundador travado por 12 meses:** R$ 149 com o que é do Pro, ou R$ 249 com o que é do Business.
+- **Implantação assistida e treinamento inicial da equipe**, com tempo definido no termo.
+- **Piloto de 30 dias** com escopo e franquias definidos.
+- **Em troca:** feedback frequente e autorização para um estudo de caso, quando possível e com aprovação do
+  cliente.
+- **Sem fidelidade longa** e sem promessa de resultado.
+
+O piloto quer comprovar três resultados: menor tempo de resposta, melhor acompanhamento dos leads e mais
+visibilidade das negociações. A prova é o **Relatório do piloto** (a construir), que compara o começo com o fim
+do piloto:
+- tempo até a primeira resposta;
+- oportunidades sem retorno;
+- percentual de leads acompanhados;
+- avanço no funil;
+- horas estimadas economizadas.
+
+Com resultado bom: pedir autorização para o caso e duas indicações.
+
+**Segmento:** variado por enquanto, mas direcionado a empresas com vários vendedores atendendo pelo WhatsApp. A
+prioridade são distribuidores e revendas B2B, como a JoGrampo.
+
+**Prospecção:**
+- dois períodos por semana de visitas presenciais e prospecção digital nos outros dias;
+- os prospects ficam registrados no próprio Livih, na empresa F7 Tech.
