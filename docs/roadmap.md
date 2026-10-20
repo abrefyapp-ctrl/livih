@@ -235,7 +235,7 @@ Para as **10 primeiras empresas**, no lugar de liberar de graça por tempo indet
 - **Sem fidelidade longa** e sem promessa de resultado.
 
 O piloto quer comprovar três resultados: menor tempo de resposta, melhor acompanhamento dos leads e mais
-visibilidade das negociações. A prova é o **Relatório do piloto** (a construir), que compara o começo com o fim
+visibilidade das negociações. A prova é o **Relatório do piloto** (feito em 21/10 com o Painel: [painel-relatorio-piloto.md](painel-relatorio-piloto.md)), que compara o começo com o fim
 do piloto:
 - tempo até a primeira resposta;
 - oportunidades sem retorno;
