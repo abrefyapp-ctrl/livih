@@ -372,10 +372,14 @@ Deno.serve(async (req) => {
     const { data: quem } = await admin.auth.getUser(token);
     if (!quem.user) return json(401, { erro: "faça login de novo" });
     if (!p.org_id) return json(400, { erro: "org_id obrigatório" });
-    const { data: membro } = await admin.from("membros_org").select("papel")
-      .eq("org_id", p.org_id).eq("user_id", quem.user.id).eq("ativo", true).maybeSingle();
-    if (!membro) return json(403, { erro: "sem acesso a esta organização" });
-    const gerencia = membro.papel === "dono" || membro.papel === "admin";
+    // Equipe da plataforma (modo suporte) entra como dono, igual a eh_membro/tem_papel no banco.
+    const [{ data: membro }, { data: plataforma }] = await Promise.all([
+      admin.from("membros_org").select("papel")
+        .eq("org_id", p.org_id).eq("user_id", quem.user.id).eq("ativo", true).maybeSingle(),
+      admin.from("admins_plataforma").select("user_id").eq("user_id", quem.user.id).maybeSingle(),
+    ]);
+    if (!membro && !plataforma) return json(403, { erro: "sem acesso a esta organização" });
+    const gerencia = !!plataforma || membro?.papel === "dono" || membro?.papel === "admin";
 
     if (p.acao === "listar") return json(200, { canais: await listar(p.org_id, quem.user.id, gerencia) });
 

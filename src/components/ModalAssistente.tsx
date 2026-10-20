@@ -26,12 +26,27 @@ const casosDe = (a: Agente): string[] => {
 }
 const mil = (n: number) => `${(n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: n < 10_000 ? 1 : 0 })} mil`
 const ACAO = { criar: 'Novo', atualizar: 'Editar', desativar: 'Desativar' } as const
+const MENSAGEM_INICIAL: Record<ModoAssistente, string> = {
+  revisar: 'Revise as orientações do meu agente e proponha uma versão melhor.',
+  montar: 'Quero montar as orientações do meu agente do zero.',
+}
 
 /**
  * Configurações → Agente → Assistente: conversa que monta ou revisa as orientações e devolve uma proposta por seção.
  * Nada muda no agente sem "Aplicar"; logo depois dá para desfazer.
  */
-export function ModalAssistente({ agente, aoFechar, aoAplicado }: { agente: Agente; aoFechar: () => void; aoAplicado: () => void }) {
+export function ModalAssistente({
+  agente,
+  aoFechar,
+  aoAplicado,
+  modoInicial,
+}: {
+  agente: Agente
+  aoFechar: () => void
+  aoAplicado: () => void
+  /** Vindo dos Primeiros passos: começa já no modo, sem a tela de escolha (se não houver conversa aberta). */
+  modoInicial?: ModoAssistente
+}) {
   const { orgAtiva } = useSessao()
   const orgId = orgAtiva!.id
   const [base, setBase] = useState<ConteudoBase[] | null>(null)
@@ -45,6 +60,7 @@ export function ModalAssistente({ agente, aoFechar, aoAplicado }: { agente: Agen
   const [testando, setTestando] = useState(false)
   const [aplicando, setAplicando] = useState(false)
   const fim = useRef<HTMLDivElement>(null)
+  const iniciou = useRef(false)
 
   useEffect(() => {
     let ativo = true
@@ -108,6 +124,13 @@ export function ModalAssistente({ agente, aoFechar, aoAplicado }: { agente: Agen
       setEnviando(false)
     }
   }
+
+  useEffect(() => {
+    if (!carregou || sessao || !modoInicial || iniciou.current) return
+    iniciou.current = true
+    void enviar(MENSAGEM_INICIAL[modoInicial], modoInicial)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só na abertura
+  }, [carregou, sessao, modoInicial])
 
   async function aplicar() {
     if (!sessao) return
@@ -198,7 +221,7 @@ export function ModalAssistente({ agente, aoFechar, aoAplicado }: { agente: Agen
               <button
                 type="button"
                 disabled={enviando}
-                onClick={() => void enviar('Revise as orientações do meu agente e proponha uma versão melhor.', 'revisar')}
+                onClick={() => void enviar(MENSAGEM_INICIAL.revisar, 'revisar')}
                 className="rounded-lg border border-borda p-4 text-left hover:border-primaria hover:bg-primaria-suave disabled:opacity-60"
               >
                 <p className="font-semibold">Revisar o agente atual</p>
@@ -209,7 +232,7 @@ export function ModalAssistente({ agente, aoFechar, aoAplicado }: { agente: Agen
               <button
                 type="button"
                 disabled={enviando}
-                onClick={() => void enviar('Quero montar as orientações do meu agente do zero.', 'montar')}
+                onClick={() => void enviar(MENSAGEM_INICIAL.montar, 'montar')}
                 className="rounded-lg border border-borda p-4 text-left hover:border-primaria hover:bg-primaria-suave disabled:opacity-60"
               >
                 <p className="font-semibold">Montar do zero</p>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useSessao } from '../hooks/useSessao'
 import { buscarAgente, salvarAgente, type Agente } from '../services/configuracoes'
 import { formatarTelefone } from '../services/formato'
@@ -57,7 +57,10 @@ export function SecaoAgente() {
   const [salvando, setSalvando] = useState(false)
   const [salvo, setSalvo] = useState(false)
   const [testando, setTestando] = useState(false)
-  const [assistente, setAssistente] = useState(false)
+  // ?assistente=montar: vindo dos Primeiros passos, abre o assistente já entrevistando.
+  const [parametros, setParametros] = useSearchParams()
+  const vemDosPassos = parametros.get('assistente') === 'montar'
+  const [assistente, setAssistente] = useState(vemDosPassos)
   // Sobe quando o assistente aplica ou desfaz: recarrega o agente e a Saúde.
   const [versao, setVersao] = useState(0)
 
@@ -148,7 +151,15 @@ export function SecaoAgente() {
         )}
       </div>
       {podeEditar && assistente && (
-        <ModalAssistente agente={atual.dado} aoFechar={() => setAssistente(false)} aoAplicado={() => setVersao((v) => v + 1)} />
+        <ModalAssistente
+          agente={atual.dado}
+          modoInicial={vemDosPassos ? 'montar' : undefined}
+          aoFechar={() => {
+            setAssistente(false)
+            if (vemDosPassos) setParametros({}, { replace: true })
+          }}
+          aoAplicado={() => setVersao((v) => v + 1)}
+        />
       )}
       {podeEditar && (
         <ModalSimulador

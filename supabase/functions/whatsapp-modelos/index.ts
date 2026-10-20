@@ -138,10 +138,14 @@ Deno.serve(async (req) => {
     if (!quem.user) return json(401, { erro: "faça login de novo" });
     if (!p.org_id || !p.canal_id) return json(400, { erro: "org_id e canal_id obrigatórios" });
 
-    const { data: membro } = await admin.from("membros_org").select("papel")
-      .eq("org_id", p.org_id).eq("user_id", quem.user.id).eq("ativo", true).maybeSingle();
-    if (!membro) return json(403, { erro: "sem acesso a esta organização" });
-    const gerencia = membro.papel === "dono" || membro.papel === "admin";
+    // Equipe da plataforma (modo suporte) entra como dono, igual a eh_membro/tem_papel no banco.
+    const [{ data: membro }, { data: plataforma }] = await Promise.all([
+      admin.from("membros_org").select("papel")
+        .eq("org_id", p.org_id).eq("user_id", quem.user.id).eq("ativo", true).maybeSingle(),
+      admin.from("admins_plataforma").select("user_id").eq("user_id", quem.user.id).maybeSingle(),
+    ]);
+    if (!membro && !plataforma) return json(403, { erro: "sem acesso a esta organização" });
+    const gerencia = !!plataforma || membro?.papel === "dono" || membro?.papel === "admin";
     const { data: org } = await admin.from("organizacoes").select("status").eq("id", p.org_id).maybeSingle();
     if (org?.status !== "ativa") return json(403, { erro: "Esta empresa está suspensa. Fale com a equipe da Livih." });
 
