@@ -400,6 +400,8 @@ export type Database = {
           fim: string
           id: string
           inicio: string
+          lembrete_enviado_em: string | null
+          lembrete_minutos: number | null
           local: string | null
           observacao: string | null
           oportunidade_id: string | null
@@ -417,6 +419,8 @@ export type Database = {
           fim: string
           id?: string
           inicio: string
+          lembrete_enviado_em?: string | null
+          lembrete_minutos?: number | null
           local?: string | null
           observacao?: string | null
           oportunidade_id?: string | null
@@ -434,6 +438,8 @@ export type Database = {
           fim?: string
           id?: string
           inicio?: string
+          lembrete_enviado_em?: string | null
+          lembrete_minutos?: number | null
           local?: string | null
           observacao?: string | null
           oportunidade_id?: string | null
@@ -2114,6 +2120,10 @@ export type Database = {
       enviar_mensagem: {
         Args: { p_conversa: string; p_texto: string }
         Returns: string
+      }
+      agenda_avisos_equipe: {
+        Args: { p_org: string }
+        Returns: { celular: boolean; user_id: string; whatsapp: boolean }[]
       }
       assistente_aplicar: {
         Args: { p_secoes: Json; p_sessao: string }

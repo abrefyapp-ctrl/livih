@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom'
 import {
   apagarCompromisso,
   atualizarCompromisso,
+  avisosDaEquipe,
   criarCompromisso,
   dataInput,
   horaCurta,
   horaInput,
   juntar,
+  LEMBRETES,
   ROTULO_STATUS,
   type Compromisso,
   type StatusCompromisso,
@@ -66,6 +68,9 @@ export function ModalCompromisso({
   const [local, setLocal] = useState(compromisso?.local ?? '')
   const [observacao, setObservacao] = useState(compromisso?.observacao ?? '')
   const [status, setStatus] = useState<StatusCompromisso>(compromisso?.status ?? 'marcado')
+  // Antecedência do lembrete ('' = sem lembrete). Novo compromisso: 30 min.
+  const [lembrete, setLembrete] = useState(compromisso ? String(compromisso.lembrete_minutos ?? '') : '30')
+  const [avisos, setAvisos] = useState<Map<string, { celular: boolean; whatsapp: boolean }> | null>(null)
   const [busca, setBusca] = useState('')
   const [contatos, setContatos] = useState<ContatoLista[]>([])
   const [oportunidades, setOportunidades] = useState<{ contatoId: string; lista: Oportunidade[] } | null>(null)
@@ -124,6 +129,21 @@ export function ModalCompromisso({
     )
   }, [outros, compromisso?.id, responsavel, status, horarioValido, inicioData, fimData])
 
+  useEffect(() => {
+    let ativo = true
+    avisosDaEquipe(orgId)
+      .then((a) => ativo && setAvisos(a))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [orgId])
+  // Lembrete marcado para quem não recebe por nenhum meio: avisa na hora, com o caminho para ativar.
+  const meiosDoResponsavel = responsavel && lembrete ? avisos?.get(responsavel) : undefined
+  const semMeio = !!meiosDoResponsavel && !meiosDoResponsavel.celular && !meiosDoResponsavel.whatsapp
+  const responsavelSouEu = responsavel === sessao?.user.id
+  const nomeResponsavel = equipe.find((m) => m.user_id === responsavel)?.nome || 'Essa pessoa'
+
   const nomeContato =
     contatoFixo?.nome ?? (compromisso?.contato ? nomeDoContato(compromisso.contato) : null)
 
@@ -145,6 +165,7 @@ export function ModalCompromisso({
       local: local.trim() || null,
       observacao: observacao.trim() || null,
       status,
+      lembrete_minutos: lembrete ? Number(lembrete) : null,
     }
     try {
       if (existente) await atualizarCompromisso(compromisso!.id, dados)
@@ -243,6 +264,31 @@ export function ModalCompromisso({
               </div>
             )}
           </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="comp-lembrete" className="block text-pequeno font-medium text-texto-2">
+              Lembrete para o responsável
+            </label>
+            <select id="comp-lembrete" value={lembrete} onChange={(e) => setLembrete(e.target.value)} className={`${CLASSE_CAMPO} sm:max-w-xs`}>
+              {LEMBRETES.map(([v, r]) => (
+                <option key={r} value={v ?? ''}>
+                  {r}
+                </option>
+              ))}
+            </select>
+            {meiosDoResponsavel && !semMeio && (
+              <p className="text-legenda text-texto-3">
+                Vai por {[meiosDoResponsavel.celular && 'notificação no celular', meiosDoResponsavel.whatsapp && 'WhatsApp'].filter(Boolean).join(' e ')}.
+              </p>
+            )}
+          </div>
+          {semMeio && (
+            <Aviso tom="atencao">
+              {responsavelSouEu ? 'Você não vai receber' : `${nomeResponsavel} não vai receber`} este lembrete: falta ativar as
+              notificações no celular (Configurações → Notificações) ou cadastrar o WhatsApp em Seus dados (Configurações →
+              Equipe){responsavelSouEu ? '.' : '. Só a própria pessoa faz isso, no aparelho dela.'}
+            </Aviso>
+          )}
 
           {choque && (
             <Aviso tom="atencao">

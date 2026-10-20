@@ -6,7 +6,8 @@ export type StatusCompromisso = Database['public']['Enums']['status_compromisso'
 
 export type Compromisso = Pick<
   Tabela['Row'],
-  'id' | 'titulo' | 'inicio' | 'fim' | 'responsavel_id' | 'contato_id' | 'oportunidade_id' | 'local' | 'observacao' | 'status' | 'origem'
+  | 'id' | 'titulo' | 'inicio' | 'fim' | 'responsavel_id' | 'contato_id' | 'oportunidade_id' | 'local' | 'observacao' | 'status'
+  | 'origem' | 'lembrete_minutos'
 > & {
   contato: { id: string; nome: string | null; nome_whatsapp: string | null; telefone: string | null } | null
   oportunidade: { id: string; titulo: string } | null
@@ -14,8 +15,26 @@ export type Compromisso = Pick<
 
 export type DadosCompromisso = Pick<
   Tabela['Insert'],
-  'titulo' | 'inicio' | 'fim' | 'responsavel_id' | 'contato_id' | 'oportunidade_id' | 'local' | 'observacao' | 'status'
+  | 'titulo' | 'inicio' | 'fim' | 'responsavel_id' | 'contato_id' | 'oportunidade_id' | 'local' | 'observacao' | 'status'
+  | 'lembrete_minutos'
 >
+
+// Lembrete para o responsável (migration 20261020130000): celular e WhatsApp, X minutos antes. Nulo = sem lembrete.
+export const LEMBRETES: [number | null, string][] = [
+  [null, 'Sem lembrete'],
+  [10, '10 minutos antes'],
+  [30, '30 minutos antes'],
+  [60, '1 hora antes'],
+  [120, '2 horas antes'],
+  [1440, '1 dia antes'],
+]
+
+/** Por onde cada pessoa da equipe recebe lembrete (sem expor telefone nem aparelhos). */
+export async function avisosDaEquipe(orgId: string): Promise<Map<string, { celular: boolean; whatsapp: boolean }>> {
+  const { data, error } = await supabase.rpc('agenda_avisos_equipe', { p_org: orgId })
+  if (error) throw error
+  return new Map((data ?? []).map((a) => [a.user_id, { celular: a.celular, whatsapp: a.whatsapp }]))
+}
 
 export const ROTULO_STATUS: Record<StatusCompromisso, string> = {
   marcado: 'Marcado',
@@ -26,7 +45,7 @@ export const ROTULO_STATUS: Record<StatusCompromisso, string> = {
 }
 
 const CAMPOS =
-  'id, titulo, inicio, fim, responsavel_id, contato_id, oportunidade_id, local, observacao, status, origem, ' +
+  'id, titulo, inicio, fim, responsavel_id, contato_id, oportunidade_id, local, observacao, status, origem, lembrete_minutos, ' +
   'contato:contatos(id, nome, nome_whatsapp, telefone), oportunidade:oportunidades(id, titulo)'
 
 const erroAmigavel = (m: string) =>

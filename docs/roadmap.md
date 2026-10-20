@@ -70,6 +70,11 @@ Primeira entrega (12/10):
 - Situação: marcado, confirmado, realizado, não compareceu, cancelado.
 - Mesma regra de carteira do resto do Livih: o vendedor vê os compromissos dele e os dos clientes que ele vê.
 
+- ✅ **Lembrete para a equipe** (20/10): o responsável recebe notificação no celular e WhatsApp antes do
+  compromisso (padrão 30 min; sem lembrete, 10 min, 1 h, 2 h ou 1 dia). Precisa ter ativado as notificações ou
+  cadastrado o WhatsApp em Seus dados, e o cadastro do compromisso avisa quando não tem nenhum dos dois. Rotina
+  `agenda_lembretes()` por minuto (migration 20261020130000).
+
 Próximas etapas:
 - **O agente marca sozinho**: consulta horários livres reais e oferece 2 ou 3 opções ao cliente.
 - **Lembrete com confirmação**: um dia antes, modelo com os botões Confirmar e Remarcar (ex.: `confirmacao_horario`).

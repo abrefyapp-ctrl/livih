@@ -2024,6 +2024,67 @@ begin
     c ->> 'base_conhecimento' = '## Base proposta\n\nPix e boleto');
 end $$;
 
+-- Lembrete de compromisso para a equipe: celular e WhatsApp do responsável, uma vez, de novo se remarcar.
+reset role;
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_a1 uuid := '00000000-0000-0000-0000-0000000000a1';
+  v_a uuid; n integer; v_push integer; v_alertas integer;
+begin
+  update public.perfis set telefone = '5541999990001' where user_id = v_a1;
+  insert into public.push_inscricoes (user_id, endpoint, p256dh, auth) values (v_a1, 'https://push.teste/a1', 'x', 'y');
+  v_push := (select count(*) from public.push_fila where user_id = v_a1);
+  v_alertas := (select count(*) from public.alertas where org_id = v_org);
+
+  insert into public.compromissos (org_id, titulo, inicio, fim, responsavel_id, local)
+  values (v_org, 'Visita na Wyllis', now() + interval '20 minutes', now() + interval '80 minutes', v_a1, 'Rua X, 10')
+  returning id into v_a;
+  insert into public.compromissos (org_id, titulo, inicio, fim, responsavel_id)
+  values (v_org, 'Daqui a 2 horas', now() + interval '2 hours', now() + interval '3 hours', v_a1);
+  insert into public.compromissos (org_id, titulo, inicio, fim, responsavel_id, status)
+  values (v_org, 'Cancelado', now() + interval '10 minutes', now() + interval '1 hour', v_a1, 'cancelado');
+  insert into public.compromissos (org_id, titulo, inicio, fim, responsavel_id, lembrete_minutos)
+  values (v_org, 'Sem lembrete', now() + interval '10 minutes', now() + interval '1 hour', v_a1, null);
+  insert into public.compromissos (org_id, titulo, inicio, fim, responsavel_id)
+  values (v_org, 'Já passou', now() - interval '1 hour', now() - interval '30 minutes', v_a1);
+
+  n := public.agenda_lembretes();
+  insert into resultado (teste, ok) select 'lembrete: avisa só o compromisso na hora (não o futuro, cancelado, sem lembrete ou passado)',
+    n = 1 and (select lembrete_enviado_em is not null from public.compromissos where id = v_a);
+  insert into resultado (teste, ok) select 'lembrete: notificação no celular do responsável, abrindo a Agenda',
+    (select count(*) from public.push_fila where user_id = v_a1) = v_push + 1
+    and exists (select 1 from public.push_fila where user_id = v_a1 and url = '/agenda' and corpo like 'Visita na Wyllis%Rua X, 10');
+  insert into resultado (teste, ok) select 'lembrete: WhatsApp do responsável por um número da empresa',
+    (select count(*) from public.alertas where org_id = v_org) = v_alertas + 1
+    and exists (select 1 from public.alertas where org_id = v_org and telefone = '5541999990001'
+                 and texto like '%Lembrete de compromisso%Visita na Wyllis%Hoje às%Local: Rua X, 10%');
+
+  n := public.agenda_lembretes();
+  insert into resultado (teste, ok) values ('lembrete: não repete', n = 0);
+
+  update public.compromissos set inicio = inicio + interval '5 minutes', fim = fim + interval '5 minutes' where id = v_a;
+  n := public.agenda_lembretes();
+  insert into resultado (teste, ok) values ('lembrete: remarcar faz avisar de novo', n = 1);
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'lembrete: a equipe vê quem recebe por onde (sem telefone)',
+  exists (select 1 from public.agenda_avisos_equipe(current_setting('teste.f7')::uuid)
+           where user_id = '00000000-0000-0000-0000-0000000000a1' and celular and whatsapp);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'lembrete: outra empresa não vê a equipe', count(*) = 0 from public.agenda_avisos_equipe(current_setting('teste.f7')::uuid);
+do $$
+begin
+  perform public.agenda_lembretes();
+  insert into resultado (teste, ok) values ('lembrete: usuário logado não dispara a rodada', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('lembrete: usuário logado não dispara a rodada', true);
+end $$;
+
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
 reset role;
 insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');
