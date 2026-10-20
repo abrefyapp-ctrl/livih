@@ -1,4 +1,7 @@
-# Painel e Relatório do piloto
+# Painel e Relatório de resultados
+
+Renomeado em 21/10: "Relatório do piloto" virou **Relatório de resultados** (no PDF, "Resultados com a Livih"),
+para servir também depois do piloto (renovação, revisão periódica).
 
 Plano aprovado em 20/10. Prova do Programa Fundadores ([roadmap.md](roadmap.md#programa-fundadores-2010)): os três
 resultados do piloto são menor tempo de resposta, melhor acompanhamento dos leads e mais visibilidade das

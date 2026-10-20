@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- carregado sob demanda (import dinâmico), sem fast refresh */
-// PDF do Relatório do piloto (@react-pdf/renderer, mesmo jeito do orçamento): primeira semana contra a última.
+// PDF do Relatório de resultados (antes "do piloto"; @react-pdf/renderer, mesmo jeito do orçamento): primeira semana contra a última.
 // Helvetica embutida: sem "−" (fora da tabela), usa "-".
 import { Document, Font, Image, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer'
 import { duracao, horasEconomizadas, porcentagem, type Periodo, type Relatorio } from '../services/painel'
@@ -112,14 +112,14 @@ function Documento({ r, logo }: { r: Relatorio; logo: string | null }) {
   const u = r.ultima_semana
   const antes = r.config?.antes_tempo_resposta_min
   const lead = u
-    ? `Na última semana do piloto, o tempo até a primeira resposta foi ${duracao(u.resposta.geral.mediana_seg)}, contra ${duracao(r.primeira_semana.resposta.geral.mediana_seg)} na primeira.`
-    : `O piloto tem ${r.dias} dias: ainda não há uma última semana separada da primeira para comparar.`
+    ? `Na última semana, o tempo até a primeira resposta foi ${duracao(u.resposta.geral.mediana_seg)}, contra ${duracao(r.primeira_semana.resposta.geral.mediana_seg)} na primeira semana de uso.`
+    : `São ${r.dias} dias de uso: ainda não há uma última semana separada da primeira para comparar.`
   return (
-    <Document title={`Relatório do piloto - ${r.empresa}`} author="Livih">
+    <Document title={`Resultados com a Livih - ${r.empresa}`} author="Livih">
       <Page size="A4" style={s.pagina}>
         <View style={s.topo}>
           <View>
-            <Text style={s.titulo}>Relatório do piloto</Text>
+            <Text style={s.titulo}>Resultados com a Livih</Text>
             <Text style={s.sub}>
               {r.empresa} · {data(r.inicio)} a {data(r.fim)} ({r.dias} dias)
             </Text>
@@ -159,7 +159,7 @@ function Documento({ r, logo }: { r: Relatorio; logo: string | null }) {
         </View>
 
         <View style={s.caixa} wrap={false}>
-          <Text style={{ fontFamily: 'Helvetica-Bold' }}>Todo o piloto</Text>
+          <Text style={{ fontFamily: 'Helvetica-Bold' }}>Todo o período</Text>
           <View style={s.totais}>
             <View>
               <Text style={s.totalValor}>{r.total.resposta.pedidos}</Text>

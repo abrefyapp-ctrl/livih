@@ -97,7 +97,7 @@ export function Painel() {
           </div>
           {gerencia && (
             <Botao variante="secundario" icone="arquivo" onClick={() => setRelatorio(true)}>
-              Relatório do piloto
+              Relatório de resultados
             </Botao>
           )}
         </div>

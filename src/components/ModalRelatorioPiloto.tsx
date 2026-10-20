@@ -8,7 +8,7 @@ import { Modal } from './Modal'
 import { VisualizadorPdf } from './VisualizadorPdf'
 
 /**
- * Painel → Relatório do piloto: confere o início do piloto e o "antes" contado no diagnóstico, gera o PDF (primeira
+ * Painel → Relatório de resultados (antes "do piloto"; renomeado em 21/10): confere o início do uso e o "antes" contado no diagnóstico, gera o PDF (primeira
  * semana × última) e mostra na tela para baixar.
  */
 export function ModalRelatorioPiloto({ orgId, config, aoFechar }: { orgId: string; config: ConfigPainel | null; aoFechar: () => void }) {
@@ -31,7 +31,7 @@ export function ModalRelatorioPiloto({ orgId, config, aoFechar }: { orgId: strin
       const [relatorio, logo] = await Promise.all([buscarRelatorio(orgId), logoPadrao(orgId).catch(() => null)])
       const { gerarPdfRelatorio } = await import('./DocumentoRelatorio')
       const blob = await gerarPdfRelatorio(relatorio, logo)
-      const nome = `Relatorio-piloto-${relatorio.empresa.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w]+/g, '-')}.pdf`
+      const nome = `Resultados-Livih-${relatorio.empresa.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w]+/g, '-')}.pdf`
       setPdf({ blob, nome })
     } catch {
       setErro('Não foi possível gerar o relatório. Tente de novo.')
@@ -54,7 +54,7 @@ export function ModalRelatorioPiloto({ orgId, config, aoFechar }: { orgId: strin
     <>
       <Modal
         aberto={!pdf}
-        titulo="Relatório do piloto"
+        titulo="Relatório de resultados"
         aoFechar={aoFechar}
         rodape={
           <>
@@ -69,15 +69,15 @@ export function ModalRelatorioPiloto({ orgId, config, aoFechar }: { orgId: strin
       >
         <form id="form-relatorio" onSubmit={gerar} className="space-y-4">
           <p className="text-pequeno text-texto-2">
-            Compara a primeira semana do piloto com a última: tempo de resposta, leads acompanhados, avanço no funil e o
-            trabalho do agente. Para a reunião de fechamento e para o estudo de caso.
+            Compara a primeira semana de uso da Livih com a última: tempo de resposta, leads acompanhados, avanço no funil e
+            o trabalho do agente. Para a reunião de resultados, a renovação e o estudo de caso.
           </p>
           <CampoTexto
-            rotulo="Início do piloto"
+            rotulo="Comparar a partir de"
             type="date"
             value={inicio}
             onChange={(e) => setInicio(e.target.value)}
-            ajuda="Vazio: a data em que o primeiro número foi conectado."
+            ajuda="Início do uso (ou do piloto). Vazio: a data em que o primeiro número foi conectado."
           />
           <CampoTexto
             rotulo="Antes da Livih: tempo até a primeira resposta, em minutos (opcional)"
@@ -93,7 +93,7 @@ export function ModalRelatorioPiloto({ orgId, config, aoFechar }: { orgId: strin
       </Modal>
       <VisualizadorPdf
         aberto={!!pdf}
-        titulo="Relatório do piloto"
+        titulo="Relatório de resultados"
         arquivo={pdf?.blob ?? null}
         aoFechar={() => setPdf(null)}
         acoes={
