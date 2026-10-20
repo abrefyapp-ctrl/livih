@@ -226,6 +226,8 @@ vendedor continua no WhatsApp dele, e a empresa passa a ver atendimentos, oportu
 Para as **10 primeiras empresas**, no lugar de liberar de graça por tempo indeterminado:
 
 - **Preço fundador travado por 12 meses:** R$ 149 com o que é do Pro, ou R$ 249 com o que é do Business.
+- **ERP (pedidos e estoque) incluído sem custo** enquanto valer o preço fundador (decisão de 20/10: eles já pagam
+  para testar).
 - **Implantação assistida e treinamento inicial da equipe**, com tempo definido no termo.
 - **Piloto de 30 dias** com escopo e franquias definidos.
 - **Em troca:** feedback frequente e autorização para um estudo de caso, quando possível e com aprovação do
