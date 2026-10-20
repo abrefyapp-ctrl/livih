@@ -15,6 +15,9 @@ import { lerNumero } from './formato'
 export type LinhaPlanilha = Omit<DadosProduto, 'nome'> & { nome?: string }
 
 const semAcento = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+/** Cabeçalho comparável: sem o que vem entre parênteses e sem pontuação ("Preço (R$)" → "preco", "Vlr. Venda" → "vlr venda"). */
+const nomeColuna = (h: string) =>
+  semAcento(h).replace(/\([^)]*\)/g, ' ').replace(/r\$/g, ' ').replace(/[^a-z0-9_ ]/g, ' ').replace(/\s+/g, ' ').trim()
 
 /** CSV do Excel brasileiro (separado por ; ou ,), com aspas. */
 export function lerCsv(texto: string): string[][] {
@@ -56,7 +59,10 @@ const COLUNAS: Record<ColunaPlanilha, string[]> = {
   codigo: ['codigo', 'cod', 'sku', 'referencia', 'ref'],
   nome: ['nome', 'produto', 'descricao', 'item'],
   unidade: ['unidade', 'un', 'und', 'medida'],
-  preco: ['preco', 'valor', 'preco de venda', 'preco venda'],
+  preco: [
+    'preco', 'valor', 'preco de venda', 'preco venda', 'valor de venda', 'valor venda', 'vlr venda', 'preco unitario',
+    'valor unitario', 'vlr unitario', 'preco tabela', 'preco de tabela', 'preco final',
+  ],
   estoque_minimo: ['estoque minimo', 'estoque_minimo', 'minimo'],
   categoria: ['categoria', 'familia', 'grupo', 'linha'],
   marca: ['marca', 'fabricante', 'fornecedor'],
@@ -88,10 +94,19 @@ export function planilhaParaProdutos(texto: string): { linhas: LinhaPlanilha[]; 
   const erros: string[] = []
   if (!cab) return { linhas: [], erros: ['A planilha está vazia.'], estoques: [] }
   const idx = Object.fromEntries(
-    Object.entries(COLUNAS).map(([campo, nomes]) => [campo, cab.findIndex((h) => nomes.includes(semAcento(h)))]),
+    Object.entries(COLUNAS).map(([campo, nomes]) => [campo, cab.findIndex((h) => nomes.includes(nomeColuna(h)))]),
   ) as Record<ColunaPlanilha, number>
   if (idx.nome < 0 && idx.codigo < 0) {
     return { linhas: [], erros: ['Falta a coluna "nome" (ou "produto") ou "código" no cabeçalho.'], estoques: [] }
+  }
+  // Só código e nada que dê para atualizar (ex.: "Preço (R$)" antes de 20/10): avisa em vez de importar sem mudar nada.
+  if (idx.nome < 0 && Object.entries(idx).every(([c, i]) => c === 'codigo' || i < 0)) {
+    const outras = cab.filter((_, i) => i !== idx.codigo).map((h) => `"${h.trim()}"`).join(', ')
+    return {
+      linhas: [],
+      erros: [`Nenhuma coluna para atualizar foi reconhecida${outras ? ` (${outras})` : ''}. Use, por exemplo, "Preço", "Estoque" ou "Categoria".`],
+      estoques: [],
+    }
   }
   // Célula da coluna (vazia se a coluna não existe).
   const celula = (l: string[], c: ColunaPlanilha) => (idx[c] >= 0 ? (l[idx[c]] ?? '').trim() : '')
