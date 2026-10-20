@@ -81,9 +81,9 @@ export function SecaoWhatsapp() {
   const { orgAtiva, sessao, adminPlataforma } = useSessao()
   const orgId = orgAtiva!.id
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
-  // API oficial: só a equipe da plataforma conecta, até a Meta liberar a F7 como Provedor de Tecnologia e o
-  // fluxo estar validado com o número da própria F7.
-  const oficial = gerencia && adminPlataforma
+  // API oficial: até a Meta aprovar a F7 (Provedor de Tecnologia), só na própria F7. Empresa cliente não vê, nem
+  // aberta pela plataforma no modo suporte (decisão de 20/10: novas empresas conectam pelo QR code).
+  const oficial = gerencia && adminPlataforma && !orgAtiva?.suporte
   const eu = sessao?.user.id
   const [numeros, setNumeros] = useState<{ orgId: string; lista: NumeroWhatsapp[] } | null>(null)
   const [equipe, setEquipe] = useState<MembroEquipe[]>([])

@@ -16,7 +16,7 @@ const SECOES: { id: string; rotulo: string; icone: NomeIcone; soPlataforma?: boo
   { id: 'equipe', rotulo: 'Equipe', icone: 'equipe' },
   { id: 'empresa', rotulo: 'Empresa', icone: 'empresa' },
   { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone' },
-  // Modelos só existem na API oficial, que por enquanto só a equipe da plataforma conecta.
+  // Modelos só existem na API oficial: até a Meta aprovar a F7, só na própria F7 (não no modo suporte das clientes).
   { id: 'modelos', rotulo: 'Modelos', icone: 'arquivo', soPlataforma: true },
   { id: 'agente', rotulo: 'Agente', icone: 'agente' },
   { id: 'base', rotulo: 'Base de conhecimento', icone: 'livro' },
@@ -29,7 +29,7 @@ export function Configuracoes() {
   const { secao } = useParams()
   const { orgAtiva, adminPlataforma } = useSessao()
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
-  const secoes = SECOES.filter((s) => !s.soPlataforma || adminPlataforma)
+  const secoes = SECOES.filter((s) => !s.soPlataforma || (adminPlataforma && !orgAtiva?.suporte))
   if (!secoes.some((s) => s.id === secao)) return <Navigate to="/configuracoes/equipe" replace />
 
   return (
