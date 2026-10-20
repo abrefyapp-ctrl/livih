@@ -2133,6 +2133,10 @@ export type Database = {
         Args: { p_sessao: string }
         Returns: undefined
       }
+      estoque_definir_saldos: {
+        Args: { p_itens: Json; p_org: string }
+        Returns: Json
+      }
       registrar_envio_documento: {
         Args: { p_documento: string; p_mensagem: string }
         Returns: undefined

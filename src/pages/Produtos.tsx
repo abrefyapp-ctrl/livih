@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   importarProdutos,
   lancarEstoque,
+  definirSaldos,
   excluirProduto,
   lerNumero,
   listarProdutos,
@@ -10,12 +11,11 @@ import {
   mudarAtivoProduto,
   quantidade,
   salvarProduto,
-  type DadosProduto,
   type Movimento,
   type Produto,
 } from '../services/erp'
 import { moeda } from '../services/formato'
-import { lerNcm, planilhaParaProdutos } from '../services/planilhaProdutos'
+import { lerNcm, planilhaParaProdutos, type LinhaPlanilha } from '../services/planilhaProdutos'
 import { documentosDoProduto, urlDocumento, type DocumentoRow } from '../services/documentos'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
@@ -52,7 +52,7 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
   const [inativos, setInativos] = useState(false)
   const [soAbaixo, setSoAbaixo] = useState(false)
   const [aberto, setAberto] = useState<Produto | 'novo' | null>(null)
-  const [importacao, setImportacao] = useState<{ linhas: DadosProduto[]; erros: string[] } | Revisao | null>(null)
+  const [importacao, setImportacao] = useState<Planilha | Revisao | null>(null)
   // Importar com IA; o texto vem do alerta "Parece catálogo" da Saúde do agente (navegação com state).
   const local = useLocation()
   const navegar = useNavigate()
@@ -619,10 +619,13 @@ function Estoque({ produto, gerencia, aoMudar }: { produto: Produto; gerencia: b
   )
 }
 
+/** Planilha CSV lida: linhas (sem nome = só atualizar) e o estoque de cada uma, na mesma ordem. */
+type Planilha = { linhas: LinhaPlanilha[]; erros: string[]; estoques: (number | null)[] }
+
 const semAcentoMin = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
 
 /** Avisos de uma linha contra o cadastro atual (importação com IA). */
-function avisosDaLinha(l: DadosProduto, porCodigo: Map<string, Produto>, porNome: Map<string, Produto>): string[] {
+function avisosDaLinha(l: LinhaPlanilha, porCodigo: Map<string, Produto>, porNome: Map<string, Produto>): string[] {
   const avisos: string[] = []
   const atual = l.codigo ? porCodigo.get(l.codigo.toLowerCase()) : undefined
   if (l.preco == null && !atual) avisos.push('sem preço')
@@ -631,7 +634,7 @@ function avisosDaLinha(l: DadosProduto, porCodigo: Map<string, Produto>, porNome
     if (variacao > 0.5) avisos.push(`preço muda de ${moeda(Number(atual.preco), true)} para ${moeda(l.preco, true)}`)
   }
   if (!atual) {
-    const parecido = porNome.get(semAcentoMin(l.nome))
+    const parecido = porNome.get(semAcentoMin(l.nome ?? ''))
     if (parecido && (parecido.codigo ?? '') !== (l.codigo ?? '')) avisos.push(`mesmo nome de ${parecido.codigo ?? 'um produto sem código'}`)
   }
   return avisos
@@ -645,13 +648,15 @@ function ModalImportacao({
   aoConcluir,
 }: {
   orgId: string
-  importacao: { linhas: DadosProduto[]; erros: string[] } | Revisao
+  importacao: Planilha | Revisao
   existentes: Produto[]
   aoFechar: () => void
   aoConcluir: () => void
 }) {
   const ia = 'ia' in importacao
   const paginas = 'paginas' in importacao ? importacao.paginas : undefined
+  const estoques = 'estoques' in importacao ? importacao.estoques : undefined
+  const temEstoque = !!estoques?.some((e) => e != null)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   // O cadastro aceita um produto por código: o mesmo código mais de uma vez no arquivo (ex.: ROCAMA 7.005 em dois
@@ -667,8 +672,16 @@ function ModalImportacao({
     })
     return r
   }, [importacao.linhas])
-  const [fora, setFora] = useState<Set<number>>(() => new Set(repetidos))
   const porCodigo = useMemo(() => new Map(existentes.filter((p) => p.codigo).map((p) => [p.codigo!.toLowerCase(), p])), [existentes])
+  // Planilha só com código (sem nome) atualiza o que já existe; código que não está no cadastro fica de fora.
+  const semCadastro = useMemo(
+    () =>
+      new Set(
+        importacao.linhas.flatMap((l, i) => (!l.nome && !(l.codigo && porCodigo.has(l.codigo.toLowerCase())) ? [i] : [])),
+      ),
+    [importacao.linhas, porCodigo],
+  )
+  const [fora, setFora] = useState<Set<number>>(() => new Set(repetidos))
   const porNome = useMemo(() => new Map(existentes.map((p) => [semAcentoMin(p.nome ?? ''), p])), [existentes])
   const avisos = useMemo(
     () =>
@@ -680,7 +693,9 @@ function ModalImportacao({
         : [],
     [ia, importacao.linhas, porCodigo, porNome, repetidos],
   )
-  const escolhidas = importacao.linhas.filter((_, i) => !fora.has(i))
+  const indices = importacao.linhas.flatMap((_, i) => (!fora.has(i) && !semCadastro.has(i) ? [i] : []))
+  const escolhidas = indices.map((i) => importacao.linhas[i])
+  const comEstoque = estoques ? indices.filter((i) => estoques[i] != null) : []
   const atualiza = escolhidas.filter((l) => l.codigo && porCodigo.has(l.codigo.toLowerCase())).length
   const comAviso = avisos.filter((a) => a.length).length
   const MAX_LINHAS = 1000
@@ -690,6 +705,13 @@ function ModalImportacao({
     setErro(null)
     try {
       await importarProdutos(orgId, escolhidas, existentes)
+      // Depois dos produtos (os novos já existem): o saldo de cada um fica igual ao da planilha.
+      if (estoques && comEstoque.length) {
+        await definirSaldos(
+          orgId,
+          comEstoque.map((i) => ({ codigo: importacao.linhas[i].codigo ?? null, nome: importacao.linhas[i].nome ?? null, saldo: estoques[i]! })),
+        )
+      }
       aoConcluir()
     } catch (e) {
       setErro((e as Error).message)
@@ -727,12 +749,20 @@ function ModalImportacao({
         {importacao.linhas.length > 0 && (
           <p className="text-pequeno text-texto-2">
             {escolhidas.length - atualiza} novos e {atualiza} já cadastrados (atualizados pelo código: só muda o que veio
-            preenchido; coluna ausente ou vazia mantém o que está no cadastro). O estoque não muda: lance a contagem inicial em
-            cada produto, como entrada.
+            preenchido; coluna ausente ou vazia mantém o que está no cadastro).{' '}
+            {temEstoque
+              ? `${comEstoque.length} com estoque na planilha: o saldo deles fica igual ao número da planilha (ajuste registrado no histórico de cada produto).`
+              : 'O estoque não muda: para atualizar, inclua a coluna Estoque com o saldo de cada produto.'}
             {ia && ' Confira os itens com aviso e desmarque o que estiver errado.'}
           </p>
         )}
         {ia && !importacao.linhas.length && <Aviso tom="atencao">A IA não encontrou produtos neste arquivo.</Aviso>}
+        {semCadastro.size > 0 && (
+          <Aviso tom="atencao">
+            {semCadastro.size} {semCadastro.size === 1 ? 'linha tem' : 'linhas têm'} código que não está no cadastro e não têm nome para
+            criar o produto: {semCadastro.size === 1 ? 'ficou' : 'ficaram'} de fora.
+          </Aviso>
+        )}
         {importacao.erros.length > 0 && (
           <Aviso tom="atencao">
             {importacao.erros.slice(0, 5).map((e) => (
@@ -761,6 +791,7 @@ function ModalImportacao({
                   <th className="px-3 py-1.5 font-medium">Nome</th>
                   <th className="px-3 py-1.5 font-medium">Código</th>
                   <th className="px-3 py-1.5 text-right font-medium">Preço</th>
+                  {temEstoque && <th className="px-3 py-1.5 text-right font-medium">Estoque</th>}
                   {paginas && <th className="px-3 py-1.5 text-right font-medium">Pág.</th>}
                 </tr>
               </thead>
@@ -768,7 +799,7 @@ function ModalImportacao({
                 {importacao.linhas.slice(0, ia ? MAX_LINHAS : 100).map((l, i) => {
                   const existente = l.codigo ? porCodigo.get(l.codigo.toLowerCase()) : undefined
                   return (
-                    <tr key={i} className={fora.has(i) ? 'opacity-50' : ''}>
+                    <tr key={i} className={fora.has(i) || semCadastro.has(i) ? 'opacity-50' : ''}>
                       {ia && (
                         <td className="px-3 py-1.5 align-top">
                           <input
@@ -781,7 +812,7 @@ function ModalImportacao({
                         </td>
                       )}
                       <td className="px-3 py-1.5">
-                        {l.nome}
+                        {l.nome ?? existente?.nome ?? <span className="text-texto-3">(não cadastrado)</span>}
                         {(l.descricao || l.categoria) && (
                           <span className="block text-legenda text-texto-3">{[l.categoria, l.descricao].filter(Boolean).join(' · ')}</span>
                         )}
@@ -801,6 +832,20 @@ function ModalImportacao({
                           <span className="text-texto-3">sem preço</span>
                         )}
                       </td>
+                      {temEstoque && (
+                        <td className="px-3 py-1.5 text-right align-top whitespace-nowrap tabular-nums">
+                          {estoques?.[i] == null ? (
+                            <span className="text-texto-3">mantém</span>
+                          ) : existente?.controla_estoque && Number(existente.saldo) !== estoques[i] ? (
+                            <>
+                              <span className="text-texto-3">{quantidade(Number(existente.saldo))} → </span>
+                              {quantidade(estoques[i]!)}
+                            </>
+                          ) : (
+                            quantidade(estoques[i]!)
+                          )}
+                        </td>
+                      )}
                       {paginas && <td className="px-3 py-1.5 text-right align-top text-texto-3">{paginas[i] ?? '—'}</td>}
                     </tr>
                   )
@@ -817,7 +862,7 @@ function ModalImportacao({
         {!ia && (
           <p className="text-legenda text-texto-3">
             No Excel ou Planilhas Google: Arquivo → Salvar como (ou Fazer download) → CSV. Colunas reconhecidas: nome (ou produto),
-            código, unidade, preço, estoque mínimo, categoria (ou família), marca (ou fornecedor), NCM, detalhes e controla estoque
+            código, unidade, preço, estoque (saldo atual), estoque mínimo, categoria (ou família), marca (ou fornecedor), NCM, detalhes e controla estoque
             (sim/não). Planilha com outras colunas, PDF ou foto: use Importar com IA.
           </p>
         )}

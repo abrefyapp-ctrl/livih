@@ -2114,6 +2114,49 @@ begin
   insert into resultado (teste, ok) values ('produto: atendente não exclui', n = 0);
 end $$;
 
+-- Estoque pela planilha: o número é o saldo final (ajuste até ele), sem duplicar ao subir de novo.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_a uuid; v_b uuid; r jsonb;
+  saldo_a numeric; saldo_b numeric;
+begin
+  insert into public.produtos (org_id, codigo, nome, preco, controla_estoque) values (v_org, 'EST-A', 'Estoque A', 10, false)
+  returning id into v_a;
+  insert into public.produtos (org_id, codigo, nome, preco) values (v_org, 'EST-B', 'Estoque B', 10) returning id into v_b;
+  perform public.estoque_lancar(v_b, 5, 'entrada', null);
+
+  r := public.estoque_definir_saldos(v_org, '[{"codigo":"est-a","saldo":12},{"codigo":"EST-B","saldo":3},{"codigo":"NAO-EXISTE","saldo":1}]');
+  saldo_a := (select sum(quantidade) from public.estoque_movimentos where produto_id = v_a);
+  saldo_b := (select sum(quantidade) from public.estoque_movimentos where produto_id = v_b);
+  insert into resultado (teste, ok) values ('estoque planilha: saldo fica igual ao da planilha (sobe e desce)',
+    saldo_a = 12 and saldo_b = 3 and (r ->> 'alterados')::int = 2 and jsonb_array_length(r -> 'nao_encontrados') = 1);
+  insert into resultado (teste, ok) select 'estoque planilha: ajuste com motivo e quem subiu; passa a controlar estoque',
+    exists (select 1 from public.estoque_movimentos where produto_id = v_a and tipo = 'ajuste'
+             and motivo = 'Estoque pela planilha' and autor_id = auth.uid())
+    and (select controla_estoque from public.produtos where id = v_a);
+
+  r := public.estoque_definir_saldos(v_org, '[{"codigo":"EST-A","saldo":12},{"codigo":"EST-B","saldo":3}]');
+  insert into resultado (teste, ok) select 'estoque planilha: subir de novo não duplica',
+    (r ->> 'alterados')::int = 0 and (r ->> 'iguais')::int = 2
+    and (select sum(quantidade) from public.estoque_movimentos where produto_id = v_a) = 12;
+
+  r := public.estoque_definir_saldos(v_org, '[{"codigo":null,"nome":"estoque b","saldo":7},{"codigo":"EST-A","saldo":-1}]');
+  insert into resultado (teste, ok) select 'estoque planilha: sem código acha pelo nome; negativo é recusado',
+    (select sum(quantidade) from public.estoque_movimentos where produto_id = v_b) = 7
+    and r -> 'nao_encontrados' -> 0 ->> 'motivo' = 'quantidade inválida';
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.estoque_definir_saldos(current_setting('teste.f7')::uuid, '[{"codigo":"EST-A","saldo":99}]');
+  insert into resultado (teste, ok) values ('estoque planilha: atendente não altera estoque', false);
+exception when others then
+  insert into resultado (teste, ok) values ('estoque planilha: atendente não altera estoque', true);
+end $$;
+
 -- Modo suporte: a plataforma cria pedido numa empresa da qual não é membro (nasce sem responsável).
 reset role;
 insert into public.organizacoes (nome, slug) values ('Cliente Suporte', 'teste-suporte');

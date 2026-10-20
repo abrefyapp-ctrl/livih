@@ -86,26 +86,42 @@ export async function excluirProduto(id: string): Promise<boolean> {
   return (data ?? []).length > 0
 }
 
-/** Importação da planilha: atualiza pelo código quando ele já existe, cria o resto. */
-export async function importarProdutos(orgId: string, linhas: DadosProduto[], existentes: Produto[]) {
+/**
+ * Importação: atualiza pelo código quando ele já existe, cria o resto. Linha sem nome (planilha só com código) só
+ * atualiza: se o código não está cadastrado, fica de fora (`ignorados`).
+ */
+export async function importarProdutos(orgId: string, linhas: (Omit<DadosProduto, 'nome'> & { nome?: string })[], existentes: Produto[]) {
   const porCodigo = new Map(existentes.filter((p) => p.codigo).map((p) => [p.codigo!.toLowerCase(), p.id!]))
   let criados = 0
   let atualizados = 0
+  let ignorados = 0
   const novos: DadosProduto[] = []
   for (const l of linhas) {
     const id = l.codigo ? porCodigo.get(l.codigo.toLowerCase()) : undefined
     if (id) {
       const { error } = await supabase.from('produtos').update(l).eq('id', id)
-      if (error) throw amigavel(error.message, `Erro ao atualizar "${l.nome}".`)
+      if (error) throw amigavel(error.message, `Erro ao atualizar "${l.nome ?? l.codigo}".`)
       atualizados++
-    } else novos.push(l)
+    } else if (l.nome) novos.push({ ...l, nome: l.nome })
+    else ignorados++
   }
   for (let i = 0; i < novos.length; i += 200) {
     const { error } = await supabase.from('produtos').insert(novos.slice(i, i + 200).map((l) => ({ org_id: orgId, ...l })))
     if (error) throw amigavel(error.message, 'Erro ao criar os produtos da planilha.')
     criados += Math.min(200, novos.length - i)
   }
-  return { criados, atualizados }
+  return { criados, atualizados, ignorados }
+}
+
+/** Estoque pela planilha: deixa o saldo de cada produto igual ao número (ajuste no histórico). Migration 20261020140000. */
+export async function definirSaldos(orgId: string, itens: { codigo: string | null; nome: string | null; saldo: number }[]) {
+  let alterados = 0
+  for (let i = 0; i < itens.length; i += 2000) {
+    const { data, error } = await supabase.rpc('estoque_definir_saldos', { p_org: orgId, p_itens: itens.slice(i, i + 2000) })
+    if (error) throw amigavel(error.message, 'Os produtos foram importados, mas não deu para lançar o estoque. Tente de novo.')
+    alterados += Number((data as { alterados?: number } | null)?.alterados ?? 0)
+  }
+  return alterados
 }
 
 export async function lancarEstoque(produtoId: string, quantidade: number, tipo: 'entrada' | 'ajuste', motivo: string) {
