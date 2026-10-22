@@ -9,10 +9,11 @@ import { SecaoEmpresa } from '../components/SecaoEmpresa'
 import { SecaoEquipe } from '../components/SecaoEquipe'
 import { SecaoModelos } from '../components/SecaoModelos'
 import { SecaoNotificacoes } from '../components/SecaoNotificacoes'
+import { SecaoOrdensServico } from '../components/SecaoOrdensServico'
 import { SecaoUsoIa } from '../components/SecaoUsoIa'
 import { SecaoWhatsapp } from '../components/SecaoWhatsapp'
 
-const SECOES: { id: string; rotulo: string; icone: NomeIcone; soPlataforma?: boolean }[] = [
+const SECOES: { id: string; rotulo: string; icone: NomeIcone; soPlataforma?: boolean; modulo?: string }[] = [
   { id: 'equipe', rotulo: 'Equipe', icone: 'equipe' },
   { id: 'empresa', rotulo: 'Empresa', icone: 'empresa' },
   { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone' },
@@ -23,13 +24,18 @@ const SECOES: { id: string; rotulo: string; icone: NomeIcone; soPlataforma?: boo
   { id: 'documentos', rotulo: 'Documentos', icone: 'arquivo' },
   { id: 'uso', rotulo: 'Uso da IA', icone: 'painel' },
   { id: 'notificacoes', rotulo: 'Notificações', icone: 'sino' },
+  { id: 'os', rotulo: 'Ordens de serviço', icone: 'ferramenta', modulo: 'os' },
 ]
 
 export function Configuracoes() {
   const { secao } = useParams()
-  const { orgAtiva, adminPlataforma } = useSessao()
+  const { orgAtiva, adminPlataforma, modulos } = useSessao()
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
-  const secoes = SECOES.filter((s) => !s.soPlataforma || (adminPlataforma && !orgAtiva?.suporte))
+  const secoes = SECOES.filter(
+    (s) => (!s.soPlataforma || (adminPlataforma && !orgAtiva?.suporte)) && (!s.modulo || modulos?.has(s.modulo)),
+  )
+  // Seção de módulo: espera os módulos carregarem antes de mandar embora.
+  if (!modulos && SECOES.some((s) => s.id === secao && s.modulo)) return null
   if (!secoes.some((s) => s.id === secao)) return <Navigate to="/configuracoes/equipe" replace />
 
   return (
@@ -67,6 +73,7 @@ export function Configuracoes() {
           {secao === 'documentos' && <SecaoDocumentos />}
           {secao === 'uso' && <SecaoUsoIa />}
           {secao === 'notificacoes' && <SecaoNotificacoes />}
+          {secao === 'os' && <SecaoOrdensServico />}
         </div>
       </div>
     </div>

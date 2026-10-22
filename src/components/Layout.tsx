@@ -43,6 +43,7 @@ export function Layout() {
           { para: '/produtos', rotulo: 'Produtos', icone: 'caixa' as const },
         ]
       : []),
+    ...(modulos?.has('os') ? [{ para: '/os', rotulo: 'Ordens de serviço', icone: 'ferramenta' as const }] : []),
     { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
     ...(adminPlataforma ? [{ para: '/empresas', rotulo: 'Empresas', icone: 'empresa' as const }] : []),
   ]

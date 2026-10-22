@@ -2120,6 +2120,291 @@ export type Database = {
           },
         ]
       }
+      os_config: {
+        Row: {
+          alerta_fator: number
+          atualizado_em: string
+          org_id: string
+          prazo_pagamento_dias: number
+        }
+        Insert: {
+          alerta_fator?: number
+          atualizado_em?: string
+          org_id: string
+          prazo_pagamento_dias?: number
+        }
+        Update: {
+          alerta_fator?: number
+          atualizado_em?: string
+          org_id?: string
+          prazo_pagamento_dias?: number
+        }
+        Relationships: []
+      }
+      os_etapas: {
+        Row: {
+          ativo: boolean
+          id: string
+          marco: string | null
+          nome: string
+          ordem: number
+          org_id: string
+          prazo_padrao_dias: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          id?: string
+          marco?: string | null
+          nome: string
+          ordem: number
+          org_id: string
+          prazo_padrao_dias?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          id?: string
+          marco?: string | null
+          nome?: string
+          ordem?: number
+          org_id?: string
+          prazo_padrao_dias?: number | null
+        }
+        Relationships: []
+      }
+      os_servicos: {
+        Row: {
+          ativo: boolean
+          codigo: string | null
+          criado_em: string
+          id: string
+          nome: string
+          org_id: string
+          preco: number
+        }
+        Insert: {
+          ativo?: boolean
+          codigo?: string | null
+          criado_em?: string
+          id?: string
+          nome: string
+          org_id: string
+          preco?: number
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string | null
+          criado_em?: string
+          id?: string
+          nome?: string
+          org_id?: string
+          preco?: number
+        }
+        Relationships: []
+      }
+      os_tipos_item: {
+        Row: {
+          ativo: boolean
+          campos: Json
+          id: string
+          nome: string
+          org_id: string
+          rotulo_identificacao: string
+          servico_padrao_id: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          campos?: Json
+          id?: string
+          nome: string
+          org_id: string
+          rotulo_identificacao?: string
+          servico_padrao_id?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          campos?: Json
+          id?: string
+          nome?: string
+          org_id?: string
+          rotulo_identificacao?: string
+          servico_padrao_id?: string | null
+        }
+        Relationships: []
+      }
+      os_prazos_cliente: {
+        Row: {
+          contato_id: string
+          org_id: string
+          prazo_pagamento_dias: number
+        }
+        Insert: {
+          contato_id: string
+          org_id: string
+          prazo_pagamento_dias: number
+        }
+        Update: {
+          contato_id?: string
+          org_id?: string
+          prazo_pagamento_dias?: number
+        }
+        Relationships: []
+      }
+      ordens_servico: {
+        Row: {
+          atualizado_em: string
+          cliente_nome: string | null
+          contato_id: string | null
+          criado_em: string
+          criado_por: string | null
+          id: string
+          nf_cliente: string | null
+          numero: number
+          numero_cliente: string | null
+          observacao: string | null
+          org_id: string
+          recebida_em: string
+          responsavel_id: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          cliente_nome?: string | null
+          contato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nf_cliente?: string | null
+          numero?: number
+          numero_cliente?: string | null
+          observacao?: string | null
+          org_id: string
+          recebida_em?: string
+          responsavel_id?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          cliente_nome?: string | null
+          contato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nf_cliente?: string | null
+          numero?: number
+          numero_cliente?: string | null
+          observacao?: string | null
+          org_id?: string
+          recebida_em?: string
+          responsavel_id?: string | null
+        }
+        Relationships: []
+      }
+      os_itens: {
+        Row: {
+          atualizado_em: string
+          campos: Json
+          cobranca: string
+          criado_em: string
+          desfecho: string | null
+          desfecho_em: string | null
+          etapa_desde: string
+          etapa_id: string
+          faturado_em: string | null
+          id: string
+          identificacao: string | null
+          modelo: string | null
+          observacao: string | null
+          ordem: number
+          org_id: string
+          os_id: string
+          pago_em: string | null
+          servico_id: string | null
+          tipo_id: string | null
+          valor: number
+          vencimento_em: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          campos?: Json
+          cobranca?: string
+          criado_em?: string
+          desfecho?: string | null
+          desfecho_em?: string | null
+          etapa_desde?: string
+          etapa_id?: string
+          faturado_em?: string | null
+          id?: string
+          identificacao?: string | null
+          modelo?: string | null
+          observacao?: string | null
+          ordem?: number
+          org_id: string
+          os_id: string
+          pago_em?: string | null
+          servico_id?: string | null
+          tipo_id?: string | null
+          valor?: number
+          vencimento_em?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          campos?: Json
+          cobranca?: string
+          criado_em?: string
+          desfecho?: string | null
+          desfecho_em?: string | null
+          etapa_desde?: string
+          etapa_id?: string
+          faturado_em?: string | null
+          id?: string
+          identificacao?: string | null
+          modelo?: string | null
+          observacao?: string | null
+          ordem?: number
+          org_id?: string
+          os_id?: string
+          pago_em?: string | null
+          servico_id?: string | null
+          tipo_id?: string | null
+          valor?: number
+          vencimento_em?: string | null
+        }
+        Relationships: []
+      }
+      os_item_historico: {
+        Row: {
+          autor_id: string | null
+          criado_em: string
+          data: string
+          etapa_de: string | null
+          etapa_para: string
+          id: number
+          importado: boolean
+          item_id: string
+          org_id: string
+        }
+        Insert: {
+          autor_id?: string | null
+          criado_em?: string
+          data: string
+          etapa_de?: string | null
+          etapa_para: string
+          id?: number
+          importado?: boolean
+          item_id: string
+          org_id: string
+        }
+        Update: {
+          autor_id?: string | null
+          criado_em?: string
+          data?: string
+          etapa_de?: string | null
+          etapa_para?: string
+          id?: number
+          importado?: boolean
+          item_id?: string
+          org_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       produtos_saldo: {
@@ -2635,6 +2920,59 @@ export type Database = {
       verificar_segredo_interno: {
         Args: { p_segredo: string }
         Returns: boolean
+      }
+      os_preparar: {
+        Args: { p_org: string }
+        Returns: undefined
+      }
+      os_salvar_etapas: {
+        Args: { p_etapas: Json; p_mover?: Json; p_org: string }
+        Returns: undefined
+      }
+      os_mover_itens: {
+        Args: { p_data?: string; p_etapa: string; p_itens: string[] }
+        Returns: undefined
+      }
+      os_definir_desfecho: {
+        Args: { p_data?: string; p_desfecho: string; p_itens: string[] }
+        Returns: undefined
+      }
+      os_faturar: {
+        Args: { p_data: string; p_itens: string[]; p_vencimento?: string }
+        Returns: undefined
+      }
+      os_registrar_pagamento: {
+        Args: { p_data: string; p_itens: string[] }
+        Returns: undefined
+      }
+      os_importar: {
+        Args: { p_linhas: Json; p_org: string }
+        Returns: Json
+      }
+      os_painel: {
+        Args: { p_ate: string; p_de: string; p_org: string }
+        Returns: Json
+      }
+      os_membro: {
+        Args: { p_org: string }
+        Returns: boolean
+      }
+      os_gerente: {
+        Args: { p_org: string }
+        Returns: boolean
+      }
+      os_previsao_itens: {
+        Args: { p_org: string }
+        Returns: {
+          dias_na_etapa: number
+          em_orcamento: boolean
+          fatura_em: string
+          finaliza_em: string
+          item_id: string
+          normal_etapa: number
+          parado: boolean
+          recebe_em: string
+        }[]
       }
     }
     Enums: {

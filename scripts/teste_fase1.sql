@@ -2440,5 +2440,230 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 insert into resultado (teste, ok)
 select 'fotos: outra empresa não vê o índice', count(*) = 0 from public.fotos_indice where org_id = current_setting('teste.f7')::uuid;
 
+-- ============================================================================
+-- Ordens de serviço (módulo 'os'; a1 é dono da F7 de teste e admin da plataforma, b1 atendente, c1 de outra empresa)
+-- ============================================================================
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+begin
+  begin
+    perform public.os_preparar(v_org);
+    insert into resultado (teste, ok) values ('os: desligado não prepara nada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: desligado não prepara nada', sqlerrm like 'ordens de serviço não está ligado%');
+  end;
+  perform public.plataforma_definir_modulo(v_org, 'os', true);
+  perform public.os_preparar(v_org);
+  perform public.os_preparar(v_org);
+  insert into resultado (teste, ok) select 'os: ligar e preparar cria 6 etapas e a configuração (uma vez só)',
+    (select count(*) from public.os_etapas where org_id = v_org) = 6
+    and (select prazo_pagamento_dias from public.os_config where org_id = v_org) = 30
+    and (select marco from public.os_etapas where org_id = v_org and ordem = 5) = 'finalizado';
+end $$;
+
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+  v_os uuid; v_a uuid; v_b uuid; v_g uuid;
+  v_e1 uuid := (select id from public.os_etapas where org_id = (select id from public.organizacoes where slug = 'teste-f7') and ordem = 1);
+  v_e2 uuid := (select id from public.os_etapas where org_id = (select id from public.organizacoes where slug = 'teste-f7') and ordem = 2);
+begin
+  insert into public.ordens_servico (org_id, cliente_nome, nf_cliente, recebida_em)
+  values (v_org, '  Indústria Teste  ', '182979', current_date - 10) returning id into v_os;
+  insert into public.os_itens (org_id, os_id, modelo, identificacao, valor) values
+    (v_org, v_os, 'SPINDLE SJ ZT', 'L14XE004', 150) returning id into v_a;
+  insert into public.os_itens (org_id, os_id, modelo, identificacao, valor) values
+    (v_org, v_os, 'HA33NC-TS', '1X023', 150) returning id into v_b;
+  insert into public.os_itens (org_id, os_id, modelo, valor, cobranca) values
+    (v_org, v_os, 'Garantia', 0, 'garantia') returning id into v_g;
+  insert into resultado (teste, ok) select 'os: OS nova ganha número e o nome do cliente sem espaços',
+    (select numero = 1 and cliente_nome = 'Indústria Teste' from public.ordens_servico where id = v_os);
+  insert into resultado (teste, ok) select 'os: item entra na primeira etapa, desde o recebimento, com histórico',
+    (select etapa_id = v_e1 and etapa_desde = current_date - 10 from public.os_itens where id = v_a)
+    and (select count(*) from public.os_item_historico where item_id = v_a and etapa_de is null and data = current_date - 10) = 1;
+
+  begin
+    update public.os_itens set etapa_id = v_e2 where id = v_a;
+    insert into resultado (teste, ok) values ('os: etapa só muda pela função', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: etapa só muda pela função', sqlerrm like 'use as funções de ordens de serviço%');
+  end;
+
+  perform public.os_mover_itens(array[v_a, v_b], v_e2, current_date - 7);
+  insert into resultado (teste, ok) select 'os: mover grava a data do fato no item e no histórico',
+    (select count(*) from public.os_itens where id in (v_a, v_b) and etapa_id = v_e2 and etapa_desde = current_date - 7) = 2
+    and (select count(*) from public.os_item_historico where item_id = v_a) = 2;
+  begin
+    perform public.os_mover_itens(array[v_a], v_e1, current_date - 8);
+    insert into resultado (teste, ok) values ('os: data antes da etapa atual é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: data antes da etapa atual é recusada', sqlerrm like 'a data não pode ser antes%');
+  end;
+  begin
+    perform public.os_mover_itens(array[v_a], v_e1, current_date + 1);
+    insert into resultado (teste, ok) values ('os: data no futuro é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: data no futuro é recusada', sqlerrm like 'a data não pode ser no futuro%');
+  end;
+
+  perform public.os_faturar(array[v_a], current_date - 1, null);
+  insert into resultado (teste, ok) select 'os: faturar calcula o vencimento pelo prazo padrão',
+    (select faturado_em = current_date - 1 and vencimento_em = current_date + 29 from public.os_itens where id = v_a);
+  begin
+    perform public.os_faturar(array[v_g], current_date, null);
+    insert into resultado (teste, ok) values ('os: garantia não é faturada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: garantia não é faturada', sqlerrm like 'item em garantia%');
+  end;
+  begin
+    perform public.os_registrar_pagamento(array[v_b], current_date);
+    insert into resultado (teste, ok) values ('os: só item faturado recebe pagamento', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: só item faturado recebe pagamento', sqlerrm like 'só item faturado%');
+  end;
+  perform public.os_registrar_pagamento(array[v_a], current_date);
+  insert into resultado (teste, ok) select 'os: pagamento registrado', (select pago_em = current_date from public.os_itens where id = v_a);
+  perform public.os_faturar(array[v_a], null, null);
+  insert into resultado (teste, ok) select 'os: desfazer o faturamento limpa vencimento e pagamento',
+    (select faturado_em is null and vencimento_em is null and pago_em is null from public.os_itens where id = v_a);
+
+  perform public.os_definir_desfecho(array[v_g], 'cancelado', null);
+  begin
+    perform public.os_mover_itens(array[v_g], v_e2, null);
+    insert into resultado (teste, ok) values ('os: item encerrado não anda', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: item encerrado não anda', sqlerrm like 'item encerrado%');
+  end;
+
+  perform set_config('teste.os', v_os::text, true);
+  perform set_config('teste.os_a', v_a::text, true);
+  perform set_config('teste.os_b', v_b::text, true);
+end $$;
+
+-- Previsão: item recebido hoje, sem histórico suficiente, usa os prazos padrão (2 + 5 + 5 + 15 até o Finalizado).
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+  v_os uuid; v_n uuid;
+  p record;
+begin
+  insert into public.ordens_servico (org_id, cliente_nome) values (v_org, 'Cliente Previsão') returning id into v_os;
+  insert into public.os_itens (org_id, os_id, valor) values (v_org, v_os, 200) returning id into v_n;
+  select * into p from public.os_previsao_itens(v_org) where item_id = v_n;
+  insert into resultado (teste, ok) select 'os: previsão pelos prazos padrão (termina, fatura e recebe)',
+    p.finaliza_em = current_date + 27 and p.fatura_em = current_date + 27 and p.recebe_em = current_date + 57
+    and p.em_orcamento and not p.parado;
+  insert into resultado (teste, ok) select 'os: painel separa o caixa previsto do que ainda está em orçamento',
+    (select (public.os_painel(v_org, current_date - 30, current_date) -> 'em_orcamento' ->> 'itens')::int >= 1);
+end $$;
+
+-- Etapas: remover uma com itens exige destino; a removida sai do quadro e continua no histórico.
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+  v_lista jsonb;
+  v_e2 uuid := (select id from public.os_etapas where org_id = (select id from public.organizacoes where slug = 'teste-f7') and ordem = 2);
+  v_e3 uuid := (select id from public.os_etapas where org_id = (select id from public.organizacoes where slug = 'teste-f7') and ordem = 3);
+begin
+  select jsonb_agg(jsonb_build_object('id', id, 'nome', nome, 'marco', marco, 'prazo_padrao_dias', prazo_padrao_dias) order by ordem)
+    into v_lista from public.os_etapas where org_id = v_org and ativo and id <> v_e2;
+  begin
+    perform public.os_salvar_etapas(v_org, v_lista, '{}');
+    insert into resultado (teste, ok) values ('os: remover etapa com itens pede destino', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: remover etapa com itens pede destino', sqlerrm like 'escolha para onde vão os itens%');
+  end;
+  perform public.os_salvar_etapas(v_org, v_lista, jsonb_build_object(v_e2::text, v_e3::text));
+  insert into resultado (teste, ok) select 'os: itens vão para o destino e a etapa removida sai do quadro',
+    (select etapa_id = v_e3 from public.os_itens where id = current_setting('teste.os_b')::uuid)
+    and not (select ativo from public.os_etapas where id = v_e2)
+    and (select count(*) from public.os_etapas where org_id = v_org and ativo) = 5
+    and exists (select 1 from public.os_item_historico where item_id = current_setting('teste.os_b')::uuid and etapa_para = v_e2);
+  begin
+    perform public.os_salvar_etapas(v_org, v_lista || jsonb_build_array(jsonb_build_object('nome', 'Outra', 'marco', 'finalizado')), '{}');
+    insert into resultado (teste, ok) values ('os: um marco por empresa', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: um marco por empresa', sqlerrm like 'cada marco só pode%');
+  end;
+end $$;
+
+-- Importação: linhas da mesma NF e recebimento viram uma OS; os passos entram em ordem de data.
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+  v_fim uuid := (select id from public.os_etapas where org_id = (select id from public.organizacoes where slug = 'teste-f7') and ativo and marco = 'finalizado');
+  v_rep uuid := (select id from public.os_etapas where org_id = (select id from public.organizacoes where slug = 'teste-f7') and ativo and nome = 'Em reparo');
+  r jsonb;
+begin
+  r := public.os_importar(v_org, jsonb_build_array(
+    jsonb_build_object('cliente', 'Sadia', 'nf_cliente', '183238', 'recebida_em', '2026-03-26', 'tipo', 'Bomba', 'modelo', 'BRINKS',
+                       'valor', '150', 'desfecho', 'nao_aprovado'),
+    jsonb_build_object('cliente', 'Sadia', 'nf_cliente', '183238', 'recebida_em', '2026-03-26', 'tipo', 'Motor', 'modelo', 'HA33NCB',
+                       'valor', '150', 'etapas', jsonb_build_array(jsonb_build_object('etapa_id', v_fim, 'data', '2026-05-25'),
+                                                                   jsonb_build_object('etapa_id', v_rep, 'data', '2026-04-10')),
+                       'faturado_em', '2026-07-30')));
+  insert into resultado (teste, ok) select 'os: importação agrupa a OS e cria os tipos',
+    (r ->> 'ordens')::int = 1 and (r ->> 'itens')::int = 2
+    and (select count(*) from public.os_tipos_item where org_id = v_org and nome in ('Bomba', 'Motor')) = 2;
+  insert into resultado (teste, ok) select 'os: importação grava os passos em ordem, marcados como importados',
+    exists (select 1 from public.os_itens i where i.org_id = v_org and i.modelo = 'HA33NCB'
+             and i.etapa_id = v_fim and i.etapa_desde = '2026-05-25' and i.vencimento_em = '2026-08-29'
+             and (select count(*) from public.os_item_historico h where h.item_id = i.id and h.importado) = 3)
+    and exists (select 1 from public.os_itens where org_id = v_org and modelo = 'BRINKS' and desfecho = 'nao_aprovado');
+end $$;
+
+-- Atendente: move, não fatura, não apaga, não vê o painel.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := (select id from public.organizacoes where slug = 'teste-f7');
+begin
+  perform public.os_mover_itens(array[current_setting('teste.os_a')::uuid],
+    (select id from public.os_etapas where org_id = v_org and ativo and marco = 'finalizado'), null);
+  insert into resultado (teste, ok) select 'os: atendente move item',
+    (select e.marco = 'finalizado' from public.os_itens i join public.os_etapas e on e.id = i.etapa_id where i.id = current_setting('teste.os_a')::uuid);
+  begin
+    perform public.os_faturar(array[current_setting('teste.os_a')::uuid], current_date, null);
+    insert into resultado (teste, ok) values ('os: atendente não fatura', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: atendente não fatura', sqlerrm = 'item não encontrado');
+  end;
+  delete from public.ordens_servico where id = current_setting('teste.os')::uuid;
+  insert into resultado (teste, ok) select 'os: atendente não apaga OS', exists (select 1 from public.ordens_servico where id = current_setting('teste.os')::uuid);
+  begin
+    perform public.os_painel(v_org, current_date - 30, current_date);
+    insert into resultado (teste, ok) values ('os: atendente não vê o painel', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: atendente não vê o painel', sqlerrm like 'só dono e admin%');
+  end;
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$
+begin
+  insert into resultado (teste, ok) select 'os: outra empresa não vê ordens, itens nem histórico',
+    not exists (select 1 from public.ordens_servico where org_id = (select id from public.organizacoes where slug = 'teste-f7'))
+    and not exists (select 1 from public.os_itens where org_id = (select id from public.organizacoes where slug = 'teste-f7'))
+    and not exists (select 1 from public.os_item_historico where org_id = (select id from public.organizacoes where slug = 'teste-f7'));
+  begin
+    perform public.os_mover_itens(array[current_setting('teste.os_a')::uuid], gen_random_uuid(), null);
+    insert into resultado (teste, ok) values ('os: outra empresa não move item daqui', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('os: outra empresa não move item daqui', sqlerrm = 'item não encontrado');
+  end;
+end $$;
+
+reset role;
+do $$
+begin
+  update public.os_item_historico set data = current_date where item_id = current_setting('teste.os_a')::uuid;
+  insert into resultado (teste, ok) values ('os: histórico das etapas é imutável até para o banco', false);
+exception when others then
+  insert into resultado (teste, ok) values ('os: histórico das etapas é imutável até para o banco', sqlerrm like 'o histórico das etapas%');
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;
