@@ -31,6 +31,14 @@ para antes do embedding. Se a identificação falhar, segue só a descrição, c
 - `foto_catalogo`: uma vez por foto cadastrada (descrição + embedding). Frações de centavo por foto.
 - `identificacao`: por foto de cliente, numa empresa com fotos (embedding + uma comparação com até 5 fotos).
 
+## Na ficha do produto (Produtos → produto → Documentos e fotos)
+
+Dono e admin têm dois botões, e o que sobe por ali já fica ligado ao produto:
+- **Adicionar foto:** uma ou várias fotos de uma vez. Viram "Foto do produto" (a mesma redução e o mesmo título
+  do envio em massa) e entram na fila de preparação.
+- **Adicionar documento:** o mesmo formulário de Configurações → Documentos (`ModalDocumento`), já com o produto
+  escolhido.
+
 ## Envio em massa (Configurações → Documentos → Fotos em massa)
 
 Só para dono e admin, com o módulo de pedidos ligado. O produto é achado pelo **código**:

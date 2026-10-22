@@ -16,7 +16,8 @@ import {
 } from '../services/erp'
 import { moeda } from '../services/formato'
 import { lerNcm, planilhaParaProdutos, type LinhaPlanilha } from '../services/planilhaProdutos'
-import { documentosDoProduto, urlDocumento, type DocumentoRow } from '../services/documentos'
+import { documentosDoProduto, TIPO_FOTO, TIPOS_SUGERIDOS, urlDocumento, type DocumentoRow, type ProdutoLigado } from '../services/documentos'
+import { enviarFotoProduto } from '../services/fotosProdutos'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
@@ -27,6 +28,7 @@ import { DialogoConfirmacao } from '../components/DialogoConfirmacao'
 import { Modal } from '../components/Modal'
 import { ModalImportarCatalogo, type Revisao } from '../components/ModalImportarCatalogo'
 import { ModalEntradaNota } from '../components/ModalEntradaNota'
+import { ModalDocumento } from '../components/ModalDocumento'
 import { ultimoCusto } from '../services/notasEntrada'
 
 const CLASSE_CAMPO =
@@ -472,7 +474,9 @@ function ModalProduto({
         </form>
 
         {produto?.controla_estoque && <Estoque produto={produto} gerencia={gerencia} aoMudar={aoMudarEstoque} />}
-        {produto?.id && <DocumentosDoProduto produtoId={produto.id} gerencia={gerencia} />}
+        {produto?.id && (
+          <DocumentosDoProduto orgId={orgId} produto={{ id: produto.id, nome: produto.nome ?? '', codigo: produto.codigo }} gerencia={gerencia} />
+        )}
         <DialogoConfirmacao
           aberto={confirmarExclusao}
           titulo="Excluir produto?"
@@ -490,9 +494,20 @@ function ModalProduto({
   )
 }
 
-/** Documentos da biblioteca ligados ao produto (o agente acha pelo nome e código dele). */
-function DocumentosDoProduto({ produtoId, gerencia }: { produtoId: string; gerencia: boolean }) {
+/**
+ * Documentos da biblioteca ligados ao produto (o agente acha pelo nome e código dele). Dono/admin adicionam fotos e
+ * documentos daqui já ligados ao produto; as fotos também servem para o agente reconhecer o produto pela foto do
+ * cliente (docs/identificar-produto-foto.md).
+ */
+function DocumentosDoProduto({ orgId, produto, gerencia }: { orgId: string; produto: ProdutoLigado; gerencia: boolean }) {
+  const produtoId = produto.id
   const [docs, setDocs] = useState<{ produtoId: string; lista: DocumentoRow[] } | null>(null)
+  const [versao, setVersao] = useState(0)
+  const [novoDocumento, setNovoDocumento] = useState(false)
+  const [enviando, setEnviando] = useState<{ feitas: number; total: number } | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  const seletorFotos = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     let ativo = true
     documentosDoProduto(produtoId)
@@ -501,9 +516,27 @@ function DocumentosDoProduto({ produtoId, gerencia }: { produtoId: string; geren
     return () => {
       ativo = false
     }
-  }, [produtoId])
+  }, [produtoId, versao])
   const lista = docs?.produtoId === produtoId ? docs.lista : null
   if (!lista) return null
+  const fotos = lista.filter((d) => d.tipo === TIPO_FOTO).length
+
+  async function adicionarFotos(arquivos: File[]) {
+    if (!arquivos.length) return
+    setErro(null)
+    const falhas: string[] = []
+    for (let i = 0; i < arquivos.length; i++) {
+      setEnviando({ feitas: i, total: arquivos.length })
+      try {
+        await enviarFotoProduto(orgId, arquivos[i], produto)
+      } catch (e) {
+        falhas.push((e as Error).message.startsWith('"') ? (e as Error).message : arquivos[i].name)
+      }
+    }
+    setEnviando(null)
+    if (falhas.length) setErro(`Não subiram: ${falhas.join('; ')}`)
+    setVersao((v) => v + 1)
+  }
 
   async function abrir(path: string) {
     const aba = window.open('', '_blank')
@@ -517,7 +550,44 @@ function DocumentosDoProduto({ produtoId, gerencia }: { produtoId: string; geren
 
   return (
     <div className="space-y-2 border-t border-borda pt-4">
-      <h3 className="text-pequeno font-semibold">Documentos</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-pequeno font-semibold">Documentos e fotos</h3>
+        {gerencia && (
+          <div className="flex flex-wrap gap-1">
+            <input
+              ref={seletorFotos}
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const arquivos = [...(e.target.files ?? [])]
+                e.target.value = ''
+                void adicionarFotos(arquivos)
+              }}
+            />
+            <Botao tamanho="sm" variante="secundario" icone="mais" onClick={() => seletorFotos.current?.click()} carregando={!!enviando}>
+              Adicionar foto
+            </Botao>
+            <Botao tamanho="sm" variante="secundario" icone="clipe" onClick={() => setNovoDocumento(true)} disabled={!!enviando}>
+              Adicionar documento
+            </Botao>
+          </div>
+        )}
+      </div>
+      {enviando && (
+        <p className="text-legenda text-texto-3" role="status">
+          Enviando foto {enviando.feitas + 1} de {enviando.total}…
+        </p>
+      )}
+      {erro && <Aviso tom="erro">{erro}</Aviso>}
+      {gerencia && (
+        <p className="text-legenda text-texto-3">
+          {fotos
+            ? `${fotos} ${fotos === 1 ? 'foto' : 'fotos'} deste produto: o agente compara com a foto que o cliente manda para reconhecer o produto.`
+            : 'Adicione fotos deste produto (2 ou 3, de ângulos diferentes) para o agente reconhecer quando o cliente mandar uma foto.'}
+        </p>
+      )}
       {lista.length ? (
         <ul className="divide-y divide-borda rounded-md border border-borda">
           {lista.map((d) => (
@@ -540,6 +610,17 @@ function DocumentosDoProduto({ produtoId, gerencia }: { produtoId: string; geren
         <Link to="/configuracoes/documentos" className="text-legenda font-medium text-primaria underline">
           Gerenciar documentos
         </Link>
+      )}
+      {novoDocumento && (
+        <ModalDocumento
+          orgId={orgId}
+          atual={null}
+          produtos={[produto]}
+          tipos={TIPOS_SUGERIDOS}
+          ligaProdutos
+          aoFechar={() => setNovoDocumento(false)}
+          aoSalvar={() => (setNovoDocumento(false), setVersao((v) => v + 1))}
+        />
       )}
     </div>
   )

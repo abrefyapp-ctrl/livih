@@ -121,13 +121,19 @@ export async function reduzirImagem(f: File): Promise<File> {
 
 export async function enviarFoto(orgId: string, linha: LinhaFoto) {
   if (!linha.produto) throw new Error('Foto sem produto.')
-  const arquivo = await reduzirImagem(linha.arquivo)
+  await enviarFotoProduto(orgId, linha.arquivo, linha.produto)
+}
+
+/** Uma foto ligada a um produto (envio em massa e "Adicionar foto" na ficha do produto). */
+export async function enviarFotoProduto(orgId: string, original: File, produto: ProdutoLigado) {
+  if (!ACEITOS.includes(original.type)) throw new Error(`"${original.name}": use JPG, PNG ou WebP.`)
+  const arquivo = await reduzirImagem(original)
   await salvarDocumento(
     orgId,
     null,
-    { titulo: `Foto — ${linha.produto.nome}`.slice(0, 200), tipo: TIPO_FOTO, descricao: null, palavras_chave: null, fonte_url: null, ativo: true },
+    { titulo: `Foto — ${produto.nome}`.slice(0, 200), tipo: TIPO_FOTO, descricao: null, palavras_chave: null, fonte_url: null, ativo: true },
     arquivo,
-    [linha.produto.id],
+    [produto.id],
   )
 }
 
