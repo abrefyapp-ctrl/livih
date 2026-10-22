@@ -62,9 +62,11 @@ export function OrdemServicoDetalhe() {
   const [acao, setAcao] = useState<Acao | null>(null)
   const [aberto, setAberto] = useState<string | null>(null)
   const [pdf, setPdf] = useState<{ dados: DadosPdfOs | null; arquivo: Blob | null; erro: string | null } | null>(null)
-  const [envio, setEnvio] = useState<ConversaEnvio | null>(null)
+  // Conversa do cliente buscada ao abrir a OS (como no pedido): o clique em Enviar não espera o banco.
+  const [conversa, setConversa] = useState<{ contatoId: string; info: ConversaEnvio | null } | null>(null)
+  const [paraEnviar, setParaEnviar] = useState<{ dados: DadosPdfOs; arquivo: Blob; conversa: ConversaEnvio } | null>(null)
   const [enviando, setEnviando] = useState(false)
-  const [enviado, setEnviado] = useState(false)
+  const [enviado, setEnviado] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -82,6 +84,18 @@ export function OrdemServicoDetalhe() {
       ativo = false
     }
   }, [id, orgId, versao])
+
+  const contatoId = dados?.id === id ? (dados?.ordem.contato_id ?? null) : null
+  useEffect(() => {
+    if (!contatoId) return
+    let ativo = true
+    conversaDoCliente(contatoId)
+      .then((info) => ativo && setConversa({ contatoId, info }))
+      .catch(() => ativo && setConversa({ contatoId, info: null }))
+    return () => {
+      ativo = false
+    }
+  }, [contatoId])
 
   const atual = dados && dados.id === id ? dados : dados === null ? null : undefined
   const etapaPorId = useMemo(() => new Map(atual?.todas.map((e) => [e.id, e]) ?? []), [atual])
@@ -110,7 +124,7 @@ export function OrdemServicoDetalhe() {
     const vivos = atual.itens.filter((i) => !i.desfecho)
     const itens = escolhidos.length ? escolhidos : vivos.length ? vivos : atual.itens
     setErro(null)
-    setEnviado(false)
+    setEnviado(null)
     setPdf({ dados: null, arquivo: null, erro: null })
     try {
       const dados = await montarPdfOs(orgId, atual.ordem, itens, atual.cfg, atual.prazo)
@@ -130,35 +144,36 @@ export function OrdemServicoDetalhe() {
     setTimeout(() => URL.revokeObjectURL(url), 10_000)
   }
 
-  // Antes de confirmar, explica por que não dá (sem contato, sem conversa, janela da API oficial).
-  async function pedirEnvio() {
-    const contatoId = atual?.ordem.contato_id
+  // Fecha a prévia antes de tudo: erro mostrado na página ficava escondido atrás dela e o botão parecia travado.
+  // Depois explica por que não dá (sem contato, sem conversa, janela da API oficial) ou pede a confirmação.
+  function pedirEnvio() {
+    if (!pdf?.dados || !pdf.arquivo) return
+    const pronto = { dados: pdf.dados, arquivo: pdf.arquivo }
+    setPdf(null)
     if (!contatoId) return setErro('O cliente desta OS não é um contato do Livih: baixe o PDF e mande por outro canal.')
-    try {
-      const conversa = await conversaDoCliente(contatoId)
-      if (!conversa) return setErro('O cliente ainda não tem conversa no Livih. Comece uma em Conversas → Nova conversa, ou baixe o PDF.')
-      if (conversa.janelaFechada)
-        return setErro(
-          `Faz mais de 24 horas que o cliente escreveu no número ${conversa.numero} (API oficial): só dá para retomar com um modelo aprovado. Depois que o cliente responder, o PDF pode ir.`,
-        )
-      setEnvio(conversa)
-    } catch {
-      setErro('Não foi possível achar a conversa do cliente.')
-    }
+    const info = conversa?.contatoId === contatoId ? conversa.info : undefined
+    if (info === undefined) return setErro('Procurando a conversa do cliente. Tente de novo em instantes.')
+    if (!info) return setErro('O cliente ainda não tem conversa no Livih. Comece uma em Conversas → Nova conversa, ou baixe o PDF.')
+    if (info.janelaFechada)
+      return setErro(
+        `Faz mais de 24 horas que o cliente escreveu no número ${info.numero} (API oficial): só dá para retomar com um modelo aprovado. Depois que o cliente responder, o PDF pode ir.`,
+      )
+    setErro(null)
+    setParaEnviar({ ...pronto, conversa: info })
   }
 
+  // Manda o mesmo PDF da prévia (não gera de novo).
   async function enviarWhatsapp() {
-    if (!envio || !pdf?.dados || !pdf.arquivo) return
+    if (!paraEnviar) return
     setEnviando(true)
     try {
-      await enviarPdfOsWhatsapp(orgId, envio.id, pdf.dados, pdf.arquivo)
-      setEnviado(true)
-      setPdf(null)
+      await enviarPdfOsWhatsapp(orgId, paraEnviar.conversa.id, paraEnviar.dados, paraEnviar.arquivo)
+      setEnviado(paraEnviar.conversa.id)
     } catch {
       setErro('O PDF não foi enviado. Confira a conexão e tente de novo.')
     } finally {
       setEnviando(false)
-      setEnvio(null)
+      setParaEnviar(null)
     }
   }
 
@@ -177,7 +192,11 @@ export function OrdemServicoDetalhe() {
           <Icone nome="voltar" className="size-4" /> Ordens de serviço
         </Link>
         {erro && <Aviso tom="erro">{erro}</Aviso>}
-        {enviado && <Aviso>PDF enviado na conversa do cliente.</Aviso>}
+        {enviado && (
+          <Aviso acao={<Link to={`/conversas/${enviado}`} className="font-medium underline">Abrir a conversa</Link>}>
+            PDF na fila de envio da conversa do cliente.
+          </Aviso>
+        )}
         {!atual || !o ? (
           !erro && <p className="text-pequeno text-texto-3">Carregando…</p>
         ) : (
@@ -393,22 +412,22 @@ export function OrdemServicoDetalhe() {
             <Botao variante="secundario" icone="baixar" disabled={!pdf?.arquivo} onClick={baixarPdf}>
               Baixar
             </Botao>
-            <Botao icone="enviar" disabled={!pdf?.arquivo} onClick={() => void pedirEnvio()}>
+            <Botao icone="enviar" disabled={!pdf?.arquivo} onClick={pedirEnvio}>
               Enviar pelo WhatsApp
             </Botao>
           </>
         }
       />
       <DialogoConfirmacao
-        aberto={!!envio}
+        aberto={!!paraEnviar}
         titulo="Enviar o PDF pelo WhatsApp?"
         rotuloConfirmar="Enviar PDF"
         carregando={enviando}
         aoConfirmar={() => void enviarWhatsapp()}
-        aoCancelar={() => setEnvio(null)}
+        aoCancelar={() => setParaEnviar(null)}
       >
-        {pdf?.dados?.tipo} da OS nº {o?.numero} vai para {o?.cliente_nome ?? 'o cliente'} pelo número {envio?.numero}. Fica no histórico
-        da conversa e você assume o atendimento.
+        {paraEnviar?.dados.tipo} da OS nº {o?.numero} vai para {o?.cliente_nome ?? 'o cliente'} pelo número {paraEnviar?.conversa.numero}.
+        Fica no histórico da conversa e você assume o atendimento.
       </DialogoConfirmacao>
 
       {atual && acao?.tipo === 'mover' && <ModalMover itens={acao.itens} etapas={atual.cfg.etapas} aoFechar={() => setAcao(null)} aoSalvar={recarregar} />}
