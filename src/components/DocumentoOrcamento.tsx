@@ -15,7 +15,8 @@ const moeda = (v: number) => moedaTela(v, true)
 
 const COR = { texto: '#1f2933', suave: '#616e7c', linha: '#d9dee3', fundo: '#f4f6f8', destaque: '#111827' }
 
-const s = StyleSheet.create({
+// Exportados para o PDF da ordem de serviço (DocumentoOs), que usa o mesmo cabeçalho, rodapé e tabela.
+export const s = StyleSheet.create({
   // Cabeçalho compacto (logo pequena + nome) é fixo em toda página, com o espaço reservado no paddingTop. Na 1ª,
   // o cabeçalho completo sobe para dentro desse espaço (marginTop negativo) e, com fundo branco, cobre o compacto.
   // Não dá para montar o compacto só da 2ª em diante (render): imagem dentro de render não é carregada.
@@ -84,41 +85,77 @@ const s = StyleSheet.create({
   pagina_rodape: { position: 'absolute', top: 804, left: 40, fontSize: 7.5, color: COR.suave },
 })
 
-const data = (iso: string | null | undefined) =>
+export const data = (iso: string | null | undefined) =>
   iso ? new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : ''
-const juntar = (partes: (string | null | undefined | false)[], sep = ' · ') => partes.filter(Boolean).join(sep)
+export const juntar = (partes: (string | null | undefined | false)[], sep = ' · ') => partes.filter(Boolean).join(sep)
+
+type Emitente = Pick<DadosOrcamento, 'emissora' | 'logo'>
+
+/** Cabeçalho compacto (toda página) e o completo da 1ª página, com os dados da empresa que emite. */
+export function Cabecalho({ d, titulo }: { d: Emitente; titulo: string }) {
+  const e = d.emissora
+  const endereco = e && juntar([juntar([e.logradouro, e.numero], ', '), e.complemento, e.bairro], ' - ')
+  const cidade = e && juntar([juntar([e.cidade, e.uf], '/'), e.cep && `CEP ${e.cep.slice(0, 5)}-${e.cep.slice(5)}`], ' - ')
+  return (
+    <>
+      <View style={s.compacto} fixed>
+        {d.logo && <Image src={d.logo} style={s.logoCompacto} />}
+        <Text style={s.nomeCompacto}>{e?.nome_fantasia || e?.razao_social || ''}</Text>
+        <Text style={s.suave}>{titulo}</Text>
+      </View>
+
+      <View style={s.topo}>
+        {d.logo ? <Image src={d.logo} style={s.logo} /> : <View />}
+        {e && (
+          <View style={s.empresa}>
+            <Text style={s.empresaNome}>{e.nome_fantasia || e.razao_social}</Text>
+            {e.nome_fantasia && <Text>{e.razao_social}</Text>}
+            <Text>{juntar([`CNPJ ${formatarCnpj(e.cnpj)}`, e.inscricao_estadual && `IE ${e.inscricao_estadual}`])}</Text>
+            {!!endereco && <Text style={s.suave}>{endereco}</Text>}
+            {!!cidade && <Text style={s.suave}>{cidade}</Text>}
+            <Text style={s.suave}>{juntar([formatarTelefone(e.telefone), e.email, e.site])}</Text>
+          </View>
+        )}
+      </View>
+    </>
+  )
+}
+
+/** Rodapé livre da empresa e a identificação + número de página em toda folha. */
+export function Rodape({ d, titulo }: { d: Emitente; titulo: string }) {
+  const e = d.emissora
+  return (
+    <>
+      {e?.rodape && (
+        <View style={s.rodape} wrap={false}>
+          <Text>{e.rodape}</Text>
+        </View>
+      )}
+
+      {/* Rodapé em toda página: identifica a folha solta. */}
+      <Text style={[s.pagina_rodape, { width: 360 }]} fixed>
+        {juntar([e?.nome_fantasia || e?.razao_social, titulo])}
+      </Text>
+      <Text
+        style={[s.pagina_rodape, { left: 435, width: 120, textAlign: 'right' }]}
+        fixed
+        render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+      />
+    </>
+  )
+}
 
 function Documento({ d }: { d: DadosOrcamento }) {
   const { pedido, emissora: e, cliente, vendedor } = d
   const orcamento = pedido.status === 'rascunho'
   const titulo = `${orcamento ? 'Orçamento' : 'Pedido'} nº ${pedido.numero}`
-  const endereco = e && juntar([juntar([e.logradouro, e.numero], ', '), e.complemento, e.bairro], ' - ')
-  const cidade = e && juntar([juntar([e.cidade, e.uf], '/'), e.cep && `CEP ${e.cep.slice(0, 5)}-${e.cep.slice(5)}`], ' - ')
   const desconto = Number(pedido.desconto)
   const frete = Number(pedido.frete)
 
   return (
     <Document title={titulo} author={e?.nome_fantasia || e?.razao_social || undefined} creator="Livih" producer="Livih">
       <Page size="A4" style={s.pagina}>
-        <View style={s.compacto} fixed>
-          {d.logo && <Image src={d.logo} style={s.logoCompacto} />}
-          <Text style={s.nomeCompacto}>{e?.nome_fantasia || e?.razao_social || ''}</Text>
-          <Text style={s.suave}>{titulo}</Text>
-        </View>
-
-        <View style={s.topo}>
-          {d.logo ? <Image src={d.logo} style={s.logo} /> : <View />}
-          {e && (
-            <View style={s.empresa}>
-              <Text style={s.empresaNome}>{e.nome_fantasia || e.razao_social}</Text>
-              {e.nome_fantasia && <Text>{e.razao_social}</Text>}
-              <Text>{juntar([`CNPJ ${formatarCnpj(e.cnpj)}`, e.inscricao_estadual && `IE ${e.inscricao_estadual}`])}</Text>
-              {!!endereco && <Text style={s.suave}>{endereco}</Text>}
-              {!!cidade && <Text style={s.suave}>{cidade}</Text>}
-              <Text style={s.suave}>{juntar([formatarTelefone(e.telefone), e.email, e.site])}</Text>
-            </View>
-          )}
-        </View>
+        <Cabecalho d={d} titulo={titulo} />
 
         <View style={s.faixa}>
           <Text style={s.titulo}>{titulo}</Text>
@@ -211,23 +248,7 @@ function Documento({ d }: { d: DadosOrcamento }) {
           )}
         </View>
 
-        {e?.rodape && (
-          <View style={s.rodape} wrap={false}>
-            <Text>{e.rodape}</Text>
-          </View>
-        )}
-
-
-
-        {/* Rodapé em toda página: identifica a folha solta. */}
-        <Text style={[s.pagina_rodape, { width: 360 }]} fixed>
-          {juntar([e?.nome_fantasia || e?.razao_social, titulo])}
-        </Text>
-        <Text
-          style={[s.pagina_rodape, { left: 435, width: 120, textAlign: 'right' }]}
-          fixed
-          render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
-        />
+        <Rodape d={d} titulo={titulo} />
       </Page>
     </Document>
   )

@@ -16,7 +16,7 @@ export type DadosOrcamento = {
   vendedor: { nome: string; telefone: string | null; email: string | null } | null
 }
 
-async function comoDataUrl(url: string): Promise<string | null> {
+export async function comoDataUrl(url: string): Promise<string | null> {
   try {
     const blob = await (await fetch(url)).blob()
     return await new Promise((ok, falha) => {

@@ -19,7 +19,10 @@ import {
   type Ordem,
   type PassoOs,
 } from '../services/os'
+import { conversaDoCliente, type ConversaEnvio } from '../services/orcamento'
+import { enviarPdfOsWhatsapp, gerarPdfOs, montarPdfOs, nomeArquivoOs, type DadosPdfOs } from '../services/orcamentoOs'
 import { supabase } from '../services/supabaseClient'
+import { VisualizadorPdf } from '../components/VisualizadorPdf'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
@@ -58,6 +61,10 @@ export function OrdemServicoDetalhe() {
   const [selecao, setSelecao] = useState<Set<string>>(new Set())
   const [acao, setAcao] = useState<Acao | null>(null)
   const [aberto, setAberto] = useState<string | null>(null)
+  const [pdf, setPdf] = useState<{ dados: DadosPdfOs | null; arquivo: Blob | null; erro: string | null } | null>(null)
+  const [envio, setEnvio] = useState<ConversaEnvio | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [enviado, setEnviado] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -96,6 +103,65 @@ export function OrdemServicoDetalhe() {
     )
   }
 
+  // PDF dos selecionados; sem seleção, dos itens que seguem no processo (encerrado não vai, a não ser que seja tudo).
+  async function abrirPdf() {
+    if (!atual) return
+    const escolhidos = atual.itens.filter((i) => selecao.has(i.id))
+    const vivos = atual.itens.filter((i) => !i.desfecho)
+    const itens = escolhidos.length ? escolhidos : vivos.length ? vivos : atual.itens
+    setErro(null)
+    setEnviado(false)
+    setPdf({ dados: null, arquivo: null, erro: null })
+    try {
+      const dados = await montarPdfOs(orgId, atual.ordem, itens, atual.cfg, atual.prazo)
+      setPdf({ dados, arquivo: await gerarPdfOs(dados), erro: null })
+    } catch {
+      setPdf({ dados: null, arquivo: null, erro: 'Não foi possível gerar o PDF. Feche e tente de novo.' })
+    }
+  }
+
+  function baixarPdf() {
+    if (!pdf?.dados || !pdf.arquivo) return
+    const url = URL.createObjectURL(pdf.arquivo)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = nomeArquivoOs(pdf.dados)
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  }
+
+  // Antes de confirmar, explica por que não dá (sem contato, sem conversa, janela da API oficial).
+  async function pedirEnvio() {
+    const contatoId = atual?.ordem.contato_id
+    if (!contatoId) return setErro('O cliente desta OS não é um contato do Livih: baixe o PDF e mande por outro canal.')
+    try {
+      const conversa = await conversaDoCliente(contatoId)
+      if (!conversa) return setErro('O cliente ainda não tem conversa no Livih. Comece uma em Conversas → Nova conversa, ou baixe o PDF.')
+      if (conversa.janelaFechada)
+        return setErro(
+          `Faz mais de 24 horas que o cliente escreveu no número ${conversa.numero} (API oficial): só dá para retomar com um modelo aprovado. Depois que o cliente responder, o PDF pode ir.`,
+        )
+      setEnvio(conversa)
+    } catch {
+      setErro('Não foi possível achar a conversa do cliente.')
+    }
+  }
+
+  async function enviarWhatsapp() {
+    if (!envio || !pdf?.dados || !pdf.arquivo) return
+    setEnviando(true)
+    try {
+      await enviarPdfOsWhatsapp(orgId, envio.id, pdf.dados, pdf.arquivo)
+      setEnviado(true)
+      setPdf(null)
+    } catch {
+      setErro('O PDF não foi enviado. Confira a conexão e tente de novo.')
+    } finally {
+      setEnviando(false)
+      setEnvio(null)
+    }
+  }
+
   const selecionados = atual?.itens.filter((i) => selecao.has(i.id)) ?? []
   const alvo = selecionados.length ? selecionados : (atual?.itens ?? [])
   const abertos = alvo.filter((i) => !i.desfecho)
@@ -111,6 +177,7 @@ export function OrdemServicoDetalhe() {
           <Icone nome="voltar" className="size-4" /> Ordens de serviço
         </Link>
         {erro && <Aviso tom="erro">{erro}</Aviso>}
+        {enviado && <Aviso>PDF enviado na conversa do cliente.</Aviso>}
         {!atual || !o ? (
           !erro && <p className="text-pequeno text-texto-3">Carregando…</p>
         ) : (
@@ -129,6 +196,9 @@ export function OrdemServicoDetalhe() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Botao variante="secundario" icone="arquivo" onClick={() => void abrirPdf()} disabled={!atual.itens.length}>
+                  PDF{selecao.size ? ` (${selecao.size})` : ''}
+                </Botao>
                 <Botao variante="secundario" icone="nota" onClick={() => setAcao({ tipo: 'ordem' })}>
                   Editar
                 </Botao>
@@ -311,6 +381,35 @@ export function OrdemServicoDetalhe() {
           </>
         )}
       </div>
+
+      <VisualizadorPdf
+        aberto={!!pdf}
+        titulo={pdf?.dados ? `${pdf.dados.tipo} · OS nº ${pdf.dados.ordem.numero}` : 'PDF da OS'}
+        arquivo={pdf?.arquivo ?? null}
+        erro={pdf?.erro}
+        aoFechar={() => setPdf(null)}
+        acoes={
+          <>
+            <Botao variante="secundario" icone="baixar" disabled={!pdf?.arquivo} onClick={baixarPdf}>
+              Baixar
+            </Botao>
+            <Botao icone="enviar" disabled={!pdf?.arquivo} onClick={() => void pedirEnvio()}>
+              Enviar pelo WhatsApp
+            </Botao>
+          </>
+        }
+      />
+      <DialogoConfirmacao
+        aberto={!!envio}
+        titulo="Enviar o PDF pelo WhatsApp?"
+        rotuloConfirmar="Enviar PDF"
+        carregando={enviando}
+        aoConfirmar={() => void enviarWhatsapp()}
+        aoCancelar={() => setEnvio(null)}
+      >
+        {pdf?.dados?.tipo} da OS nº {o?.numero} vai para {o?.cliente_nome ?? 'o cliente'} pelo número {envio?.numero}. Fica no histórico
+        da conversa e você assume o atendimento.
+      </DialogoConfirmacao>
 
       {atual && acao?.tipo === 'mover' && <ModalMover itens={acao.itens} etapas={atual.cfg.etapas} aoFechar={() => setAcao(null)} aoSalvar={recarregar} />}
       {atual && acao?.tipo === 'desfecho' && <ModalDesfecho itens={acao.itens} aoFechar={() => setAcao(null)} aoSalvar={recarregar} />}

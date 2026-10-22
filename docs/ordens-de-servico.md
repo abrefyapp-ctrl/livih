@@ -25,7 +25,11 @@ Mudanças em relação ao plano:
   admin. Esconder valor do técnico fica para quando o piloto pedir (ver "Em aberto").
 - **Desfecho sem "concluído"**: o caminho normal termina na etapa de marco Entregue; desfecho é só nao_aprovado,
   sem_conserto ou cancelado.
-- **Ainda não feito:** PDF do orçamento da OS e a fase 2 (agente).
+- **PDF da OS** (22/10): botão PDF na ficha, com prévia, download e envio pelo WhatsApp, no layout do orçamento do
+  pedido (cabeçalho e rodapé compartilhados, `src/components/DocumentoOs.tsx`). Gerado no navegador, com a empresa
+  emissora padrão. Sai como "Orçamento" enquanto todos os itens estão até a etapa de aprovação; depois, "Ordem de
+  serviço". Vão os itens selecionados ou, sem seleção, os que não foram encerrados.
+- **Ainda não feito:** a fase 2 (agente).
 
 O que o dono do piloto pediu, nas palavras dele:
 - ver quantos itens estão em cada etapa (recebido, desmontagem, preparação, finalizado, faturado);

@@ -63,8 +63,8 @@ soma no estoque, com vínculo por fornecedor e último custo. Feita em 20/10: [e
 
 **Ordens de serviço** (proposto em 22/10, módulo adicional `os`): equipamento recebido para conserto, etapas
 configuráveis, faturamento e previsão de caixa. Piloto: empresa de manutenção de motores. Plano em
-[ordens-de-servico.md](ordens-de-servico.md). Primeira versão construída em 22/10 (falta publicar, o PDF da OS e a
-fase 2 com o agente).
+[ordens-de-servico.md](ordens-de-servico.md). Primeira versão construída em 22/10 (PDF da OS em 22/10; falta a fase 2 com o
+agente).
 
 **Pendente — religar o limite do importador com IA:** o limite de 5 importações por dia por empresa foi desligado
 em 21/10 a pedido, enquanto a JoGrampo sobe os catálogos. Para voltar, trocar `LIMITE_DIA` de `null` para `5` em
