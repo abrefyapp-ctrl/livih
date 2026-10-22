@@ -459,3 +459,7 @@ verify_jwt = false
 # ler-nota: Produtos > Entrada por nota (PDF ou foto); login e papel validados dentro da funcao.
 [functions.ler-nota]
 verify_jwt = false
+
+# indexar-fotos: fotos de produto da biblioteca para a identificação pela foto; chamada só pelo banco (x-livih-segredo).
+[functions.indexar-fotos]
+verify_jwt = false

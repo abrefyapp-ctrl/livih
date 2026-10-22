@@ -2348,5 +2348,97 @@ exception when others then
   insert into resultado (teste, ok) values ('suporte: plataforma cria pedido sem ser da equipe (sem responsável)', false);
 end $$;
 
+-- Identificar o produto pela foto (migration 20261022120000): fila de indexação, candidatos e isolamento.
+-- Vetores de teste: e1 aponta para um lado, e2 para outro; a "foto do cliente" fica perto de e1.
+reset role;
+select set_config('teste.e1', '[1,0.01,' || repeat('0.01,', 1533) || '0.01]', false);
+select set_config('teste.e2', '[0.01,1,' || repeat('0.01,', 1533) || '0.01]', false);
+select set_config('teste.perto_e1', '[0.9,0.1,' || repeat('0.01,', 1533) || '0.01]', false);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_azul uuid; v_preto uuid; v_inativo uuid;
+  v_f1 uuid; v_f2 uuid; v_f3 uuid; v_pdf uuid;
+  c jsonb;
+begin
+  insert into public.produtos (org_id, codigo, nome) values (v_org, 'GR-123', 'Grampeador azul') returning id into v_azul;
+  insert into public.produtos (org_id, codigo, nome) values (v_org, 'GR-456', 'Grampeador preto') returning id into v_preto;
+  insert into public.produtos (org_id, codigo, nome, ativo) values (v_org, 'GR-789', 'Grampeador antigo', false) returning id into v_inativo;
+  insert into public.documentos (org_id, titulo, tipo, path, nome_arquivo, mime, tamanho)
+  values (v_org, 'Foto — Grampeador azul', 'Foto do produto', v_org || '/f1/gr-123.jpg', 'GR-123.jpg', 'image/jpeg', 1000) returning id into v_f1;
+  insert into public.documentos (org_id, titulo, tipo, path, nome_arquivo, mime, tamanho)
+  values (v_org, 'Foto — Grampeador preto', 'Foto do produto', v_org || '/f2/gr-456.jpg', 'GR-456.jpg', 'image/jpeg', 1000) returning id into v_f2;
+  insert into public.documentos (org_id, titulo, tipo, path, nome_arquivo, mime, tamanho)
+  values (v_org, 'Foto — Grampeador antigo', 'Foto do produto', v_org || '/f3/gr-789.jpg', 'GR-789.jpg', 'image/jpeg', 1000) returning id into v_f3;
+  insert into public.documentos (org_id, titulo, tipo, path, nome_arquivo, mime, tamanho)
+  values (v_org, 'Manual do grampeador', 'Manual', v_org || '/m1/manual.pdf', 'manual.pdf', 'application/pdf', 1000) returning id into v_pdf;
+  insert into public.documentos_produtos (documento_id, produto_id, org_id) values
+    (v_f1, v_azul, v_org), (v_f2, v_preto, v_org), (v_f3, v_inativo, v_org), (v_pdf, v_azul, v_org);
+  perform set_config('teste.foto1', v_f1::text, false);
+
+  insert into resultado (teste, ok) select 'fotos: imagem entra na fila sozinha, PDF não',
+    (select count(*) from public.fotos_indice where documento_id in (v_f1, v_f2, v_f3) and status = 'pendente') = 3
+    and not exists (select 1 from public.fotos_indice where documento_id = v_pdf);
+
+  -- Reivindica até esvaziar (o banco pode ter outras fotos pendentes do backfill).
+  loop
+    exit when not exists (select 1 from public.fotos_reivindicar(50));
+  end loop;
+  insert into resultado (teste, ok) select 'fotos: a fila entrega cada foto uma vez, como processando',
+    (select count(*) from public.fotos_indice where documento_id in (v_f1, v_f2, v_f3) and status = 'processando' and tentativas = 1) = 3
+    and not exists (select 1 from public.fotos_reivindicar(50));
+
+  perform public.fotos_registrar(v_f1, v_org || '/f1/gr-123.jpg', 'grampeador azul de mesa', current_setting('teste.e1'), null);
+  perform public.fotos_registrar(v_f2, v_org || '/f2/gr-456.jpg', 'grampeador preto de mesa', current_setting('teste.e2'), null);
+  perform public.fotos_registrar(v_f3, v_org || '/f3/gr-789.jpg', 'grampeador antigo', current_setting('teste.e1'), null);
+  perform public.fotos_registrar(v_f2, v_org || '/f2/OUTRO.jpg', null, null, 'não deve gravar');
+  insert into resultado (teste, ok) select 'fotos: resultado grava; resultado de arquivo trocado é ignorado',
+    (select count(*) from public.fotos_indice where documento_id in (v_f1, v_f2, v_f3) and status = 'pronto' and embedding is not null) = 3;
+
+  c := public.fotos_candidatas(v_org, current_setting('teste.perto_e1'), 'grampeador azul de mesa', 5);
+  insert into resultado (teste, ok) select 'fotos: o mais parecido vem primeiro; produto inativo e PDF não entram',
+    (c -> 0 ->> 'produto_id')::uuid = v_azul and (c -> 0 ->> 'documento_id')::uuid = v_f1
+    and not exists (select 1 from jsonb_array_elements(c) e where (e ->> 'produto_id')::uuid = v_inativo or (e ->> 'documento_id')::uuid = v_pdf);
+
+  c := public.fotos_candidatas(v_org, current_setting('teste.perto_e1'), 'Etiqueta: GR-456, grampeador', 1);
+  insert into resultado (teste, ok) select 'fotos: código legível na foto entra mesmo longe na semelhança',
+    exists (select 1 from jsonb_array_elements(c) e where (e ->> 'produto_id')::uuid = v_preto and (e ->> 'codigo_na_foto')::boolean)
+    and (c -> 0 ->> 'produto_id')::uuid = v_preto;
+
+  insert into resultado (teste, ok) select 'fotos: outra empresa não recebe candidatos daqui',
+    public.fotos_candidatas(current_setting('teste.cli')::uuid, current_setting('teste.perto_e1'), 'GR-123', 5) = '[]'::jsonb;
+
+  update public.documentos set path = v_org || '/f1/gr-123-nova.jpg' where id = v_f1;
+  insert into resultado (teste, ok) select 'fotos: trocar o arquivo volta a foto para a fila',
+    exists (select 1 from public.fotos_indice where documento_id = v_f1 and status = 'pendente' and embedding is null
+             and path = v_org || '/f1/gr-123-nova.jpg' and tentativas = 0);
+  update public.documentos set titulo = 'Foto — Grampeador preto (frente)' where id = v_f2;
+  insert into resultado (teste, ok) select 'fotos: editar o título não reindexa',
+    exists (select 1 from public.fotos_indice where documento_id = v_f2 and status = 'pronto');
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'fotos: a equipe vê o andamento', count(*) = 3 from public.fotos_indice
+ where org_id = current_setting('teste.f7')::uuid and documento_id in (select id from public.documentos where tipo = 'Foto do produto');
+do $$
+begin
+  update public.fotos_indice set status = 'pronto' where documento_id = current_setting('teste.foto1')::uuid;
+  insert into resultado (teste, ok) values ('fotos: usuário logado não mexe no índice', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('fotos: usuário logado não mexe no índice', true);
+end $$;
+do $$
+begin
+  perform public.fotos_candidatas(current_setting('teste.f7')::uuid, current_setting('teste.e1'), 'x', 5);
+  insert into resultado (teste, ok) values ('fotos: usuário logado não chama a busca de candidatos', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('fotos: usuário logado não chama a busca de candidatos', true);
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'fotos: outra empresa não vê o índice', count(*) = 0 from public.fotos_indice where org_id = current_setting('teste.f7')::uuid;
+
 reset role;
 select n, teste, ok from resultado order by n;

@@ -682,6 +682,42 @@ export type Database = {
         }
         Relationships: []
       }
+      fotos_indice: {
+        Row: {
+          atualizado_em: string
+          descricao: string | null
+          documento_id: string
+          embedding: string | null
+          erro: string | null
+          org_id: string
+          path: string
+          status: string
+          tentativas: number
+        }
+        Insert: {
+          atualizado_em?: string
+          descricao?: string | null
+          documento_id: string
+          embedding?: string | null
+          erro?: string | null
+          org_id: string
+          path: string
+          status?: string
+          tentativas?: number
+        }
+        Update: {
+          atualizado_em?: string
+          descricao?: string | null
+          documento_id?: string
+          embedding?: string | null
+          erro?: string | null
+          org_id?: string
+          path?: string
+          status?: string
+          tentativas?: number
+        }
+        Relationships: []
+      }
       documentos_produtos: {
         Row: {
           documento_id: string

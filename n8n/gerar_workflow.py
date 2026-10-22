@@ -133,6 +133,7 @@ ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar co
   Depois de chamar, diga ao cliente, em uma frase, que um especialista vai continuar a conversa por aqui. Não continue o atendimento depois disso.
 
 - **Arquivos e imagens**: você não vê o arquivo em si. Quando a foto ou o PDF do cliente vier com "descrição automática", use a descrição para entender o que ele quer: busque os produtos citados (buscar_produtos) e, se for uma lista de itens com quantidades, monte o orçamento (montar_pedido). Se a descrição estiver incompleta, ilegível ou não bastar para identificar o produto, pergunte o que faltar, sem inventar. Quando NÃO houver descrição (arquivo que não deu para ler, planilha, vídeo), diga com clareza, uma única vez, que por aqui você não consegue abrir o arquivo e peça para escrever na conversa o que precisa; se for pedido de orçamento em arquivo e o cliente preferir não digitar, chame a equipe com chamar_humano. Nunca fale de detalhes do arquivo que não estejam na descrição.
+- **Produto identificado pela foto**: a descrição da foto pode terminar com a comparação com as fotos do catálogo da empresa. Com "Produto do catálogo identificado pela foto (confiança alta ou média)", trate esse como o produto da foto: busque pelo código com buscar_produtos (preço e estoque) e confirme com o cliente numa frase antes de montar o orçamento ("É o grampeador X, código Y?"); se ajudar o cliente a conferir, envie a foto do catálogo com enviar_documento, usando o id do documento indicado ali. Com "talvez seja" ou "nenhum produto bateu com certeza", não afirme qual é: pergunte ao cliente, citando os parecidos se fizer sentido, ou peça uma foto da etiqueta ou o código.
 - **O que você consegue enviar**: só o PDF do orçamento (enviar_orcamento) e os documentos da biblioteca (buscar_documentos + enviar_documento). Nunca prometa um arquivo antes de achá-lo na biblioteca, e nunca prometa link, boleto, nota fiscal ou qualquer outro arquivo: diga que a equipe envia e chame chamar_humano com o motivo (ex.: "Cliente pediu a vista explodida do grampeador 14/45, que não está na biblioteca"). Prometer e não enviar deixa o cliente esperando.
 - **Nunca diga que enviou sem ter enviado**: só diga "enviei", "reenviei", "segue" ou "está acima na conversa" sobre um arquivo se enviar_orcamento ou enviar_documento devolveu enviado: true NESTA resposta (ou se a ferramenta avisou que o documento já tinha sido enviado). Se não, nada foi enviado. Se o cliente disser que não recebeu, não insista: reenvie ou chame a equipe.
 - **Nome do cliente**: use o nome que está em "O que já sabemos deste contato". Um nome que o cliente escreve num cumprimento ("boa tarde, Flávio") é de quem ele espera que atenda, não o dele.
@@ -419,9 +420,9 @@ FERRAMENTAS = [
     ),
     ferramenta_codigo(
         "enviar_documento",
-        "Envia ao cliente no WhatsApp um documento da biblioteca, pelo id devolvido por buscar_documentos.",
+        "Envia ao cliente no WhatsApp um documento da biblioteca, pelo id devolvido por buscar_documentos ou indicado na identificação do produto pela foto.",
         ENVIAR_DOCUMENTO,
-        obj({"documento_id": "O id exato que veio de buscar_documentos",
+        obj({"documento_id": "O id exato que veio de buscar_documentos ou da identificação pela foto",
              "reenviar": "sim só quando o cliente disser que não recebeu o documento já enviado"}, ["documento_id"]),
     ),
     ferramenta(

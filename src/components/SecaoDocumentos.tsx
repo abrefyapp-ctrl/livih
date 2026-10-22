@@ -14,6 +14,7 @@ import {
   type ProdutoLigado,
 } from '../services/documentos'
 import { listarProdutos } from '../services/erp'
+import { andamentoFotos, type AndamentoFotos } from '../services/fotosProdutos'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
@@ -21,6 +22,7 @@ import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { EstadoVazio } from './EstadoVazio'
 import { Icone } from './Icone'
 import { Modal } from './Modal'
+import { ModalFotosEmMassa } from './ModalFotosEmMassa'
 
 type Edicao = {
   atual: Documento | null
@@ -76,6 +78,9 @@ export function SecaoDocumentos() {
   const [remover, setRemover] = useState<Documento | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [erroEdicao, setErroEdicao] = useState<string | null>(null)
+  const [emMassa, setEmMassa] = useState(false)
+  const [fotos, setFotos] = useState<AndamentoFotos | null>(null)
+  const comProdutos = !!modulos?.has('erp')
 
   useEffect(() => {
     let ativo = true
@@ -86,6 +91,26 @@ export function SecaoDocumentos() {
       ativo = false
     }
   }, [orgId, versao])
+
+  // Andamento da preparação das fotos para o reconhecimento: atualiza sozinho enquanto há foto na fila.
+  useEffect(() => {
+    if (!comProdutos) return
+    let ativo = true
+    let espera: ReturnType<typeof setTimeout> | undefined
+    const buscar = () =>
+      andamentoFotos(orgId)
+        .then((a) => {
+          if (!ativo) return
+          setFotos(a)
+          if (a.naFila) espera = setTimeout(buscar, 20000)
+        })
+        .catch(() => ativo && setFotos(null))
+    void buscar()
+    return () => {
+      ativo = false
+      clearTimeout(espera)
+    }
+  }, [orgId, versao, comProdutos])
 
   const lista = docs?.orgId === orgId ? docs.lista : null
   const tipos = useMemo(
@@ -152,9 +177,16 @@ export function SecaoDocumentos() {
           </p>
         </div>
         {podeEditar && (
-          <Botao icone="mais" onClick={() => setEdicao(nova())}>
-            Novo documento
-          </Botao>
+          <div className="flex flex-wrap gap-2">
+            {comProdutos && (
+              <Botao variante="secundario" icone="clipe" onClick={() => setEmMassa(true)}>
+                Fotos em massa
+              </Botao>
+            )}
+            <Botao icone="mais" onClick={() => setEdicao(nova())}>
+              Novo documento
+            </Botao>
+          </div>
         )}
       </div>
 
@@ -258,6 +290,19 @@ export function SecaoDocumentos() {
             {ativos} {ativos === 1 ? 'documento ativo' : 'documentos ativos'}. Os documentos não pesam no custo do agente: ele
             só busca quando o cliente pede um arquivo.
           </p>
+          {fotos && fotos.prontas + fotos.naFila + fotos.comErro > 0 && (
+            <p className="text-legenda text-texto-3">
+              Reconhecimento pela foto do cliente: {fotos.prontas} {fotos.prontas === 1 ? 'foto pronta' : 'fotos prontas'}
+              {fotos.naFila > 0 && ` · ${fotos.naFila} sendo preparadas pela IA`}
+              {fotos.comErro > 0 && (
+                <span className="text-erro">
+                  {' '}
+                  · {fotos.comErro} com erro (foto grande demais ou arquivo ilegível: troque o arquivo no documento)
+                </span>
+              )}
+              .
+            </p>
+          )}
         </>
       )}
 
@@ -356,6 +401,16 @@ export function SecaoDocumentos() {
           </form>
         )}
       </Modal>
+
+      {comProdutos && podeEditar && (
+        <ModalFotosEmMassa
+          aberto={emMassa}
+          orgId={orgId}
+          existentes={lista ?? []}
+          aoFechar={() => setEmMassa(false)}
+          aoConcluir={() => setVersao((v) => v + 1)}
+        />
+      )}
 
       <DialogoConfirmacao
         aberto={!!remover}

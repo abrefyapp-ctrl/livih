@@ -2,10 +2,13 @@
 // 1. Guarda o arquivo no bucket `midias` (cliente, ou equipe pelo celular). Migration 20261016130000.
 // 2. Imagem e PDF do cliente: a IA descreve em texto e só então o agente é chamado, já lendo a descrição (mesmo
 //    modelo da transcrição de áudio). Migration 20261016140000.
+// 3. Imagem: se a empresa tem fotos de produto na biblioteca, acha qual produto é e junta à descrição
+//    (_shared/fotos.ts, migration 20261022120000).
 
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { PDFDocument } from "npm:pdf-lib@1.17.1";
 import { avisarAgente, type Entrada } from "./atendimento.ts";
+import { base64, identificarProduto } from "./fotos.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const LIMITE = 50 * 1024 * 1024; // mesmo limite do bucket
@@ -79,12 +82,6 @@ export async function guardarMidiaRecebida(
 /** Imagem e PDF do cliente são descritos pela IA; o resto não. */
 export function descreve(tipo: string, mime?: string | null) {
   return tipo === "imagem" || (tipo === "documento" && /pdf/i.test(mime ?? ""));
-}
-
-function base64(bytes: Uint8Array): string {
-  let s = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(s);
 }
 
 async function primeirasPaginas(bytes: Uint8Array): Promise<Uint8Array> {
@@ -163,7 +160,13 @@ export async function guardarDescreverEAvisar(
   try {
     const g = await guardarMidiaRecebida(supabase, ref, baixar);
     if (g) {
-      const texto = await descrever(supabase, g, legenda, entrada);
+      let texto = await descrever(supabase, g, legenda, entrada);
+      if (texto && ref.tipo === "imagem") {
+        // Se falhar, segue só com a descrição: o agente pergunta o produto como antes.
+        const produto = await identificarProduto(supabase, entrada, g, texto)
+          .catch((e) => (console.error("identificar produto", String(e).slice(0, 300)), null));
+        if (produto) texto = `${texto}\n\n${produto}`;
+      }
       if (texto) {
         const { data, error } = await supabase.rpc("registrar_descricao", { p_mensagem: entrada.mensagem_id, p_descricao: texto });
         if (error) console.error("registrar_descricao", error.message);

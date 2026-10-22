@@ -11,8 +11,10 @@ export type CamposDocumento = Pick<DocumentoRow, 'titulo' | 'tipo' | 'descricao'
 
 export const LIMITE_DOCUMENTO = 50 * 1024 * 1024
 export const TIPOS_ACEITOS = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'video/mp4']
+/** Tipo das fotos de produto (envio em massa): o agente reconhece o produto pela foto do cliente comparando com elas. */
+export const TIPO_FOTO = 'Foto do produto'
 /** Sugestões para o campo Tipo; os já usados pela empresa entram junto. */
-export const TIPOS_SUGERIDOS = ['Vista explodida', 'Manual', 'Catálogo', 'Ficha técnica', 'Tabela de preços', 'Certificado de garantia']
+export const TIPOS_SUGERIDOS = ['Vista explodida', 'Manual', 'Catálogo', 'Ficha técnica', 'Tabela de preços', 'Certificado de garantia', TIPO_FOTO]
 
 /** A chave do storage não aceita qualquer caractere; o nome original fica no cadastro. */
 const chave = (nome: string) =>
