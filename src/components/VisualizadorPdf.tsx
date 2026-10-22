@@ -40,6 +40,8 @@ export function VisualizadorPdf({
 
   useEffect(() => {
     const alvo = paginas.current
+    // Fechado ou gerando outro PDF: tira as páginas do anterior, que apareciam embaixo de "Gerando o PDF…".
+    if (alvo && (!aberto || !arquivo)) alvo.replaceChildren()
     if (!aberto || !arquivo || !alvo) return
     let ativo = true
     ;(async () => {
@@ -87,7 +89,7 @@ export function VisualizadorPdf({
         aoFechar()
       }}
       aria-labelledby={idTitulo}
-      className="m-auto flex h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-4xl flex-col rounded-lg bg-superficie p-0 text-texto shadow-xl backdrop:bg-navy-900/50 sm:h-[calc(100dvh-3rem)]"
+      className="m-auto hidden h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-4xl flex-col rounded-lg bg-superficie p-0 text-texto shadow-xl backdrop:bg-navy-900/50 sm:h-[calc(100dvh-3rem)] open:flex"
     >
       <div className="flex items-center gap-3 border-b border-borda px-4 py-3">
         <h2 id={idTitulo} className="min-w-0 flex-1 truncate text-h2 font-semibold">

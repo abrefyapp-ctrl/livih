@@ -85,6 +85,15 @@ export function OrdemServicoDetalhe() {
     }
   }, [id, orgId, versao])
 
+  // O gerador de PDF (~1,2 MB) e o leitor só baixavam no clique: pré-carrega em segundo plano.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void import('../components/DocumentoOs').catch(() => undefined)
+      void import('pdfjs-dist').catch(() => undefined)
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [])
+
   const contatoId = dados?.id === id ? (dados?.ordem.contato_id ?? null) : null
   useEffect(() => {
     if (!contatoId) return
