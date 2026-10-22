@@ -70,11 +70,16 @@ export async function listarProdutos(orgId: string, incluirInativos = false): Pr
   }
 }
 
-export async function salvarProduto(orgId: string, id: string | null, dados: DadosProduto) {
-  const { error } = id
-    ? await supabase.from('produtos').update(dados).eq('id', id)
-    : await supabase.from('produtos').insert({ org_id: orgId, ...dados })
+/** Devolve o id (o do produto novo serve para lançar o estoque inicial e ligar fotos e documentos). */
+export async function salvarProduto(orgId: string, id: string | null, dados: DadosProduto): Promise<string> {
+  if (id) {
+    const { error } = await supabase.from('produtos').update(dados).eq('id', id)
+    if (error) throw amigavel(error.message, 'Não foi possível salvar o produto.')
+    return id
+  }
+  const { data, error } = await supabase.from('produtos').insert({ org_id: orgId, ...dados }).select('id').single()
   if (error) throw amigavel(error.message, 'Não foi possível salvar o produto.')
+  return data.id
 }
 
 /** Inativar some das buscas, dos pedidos novos e do agente; o histórico fica. */

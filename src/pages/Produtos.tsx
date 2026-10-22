@@ -16,7 +16,18 @@ import {
 } from '../services/erp'
 import { moeda } from '../services/formato'
 import { lerNcm, planilhaParaProdutos, type LinhaPlanilha } from '../services/planilhaProdutos'
-import { documentosDoProduto, TIPO_FOTO, TIPOS_SUGERIDOS, urlDocumento, type DocumentoRow, type ProdutoLigado } from '../services/documentos'
+import {
+  documentosDoProduto,
+  LIMITE_DOCUMENTO,
+  salvarDocumento,
+  tamanhoLegivel,
+  TIPO_FOTO,
+  TIPOS_ACEITOS,
+  TIPOS_SUGERIDOS,
+  urlDocumento,
+  type DocumentoRow,
+  type ProdutoLigado,
+} from '../services/documentos'
 import { enviarFotoProduto } from '../services/fotosProdutos'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
@@ -220,9 +231,10 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
           produto={aberto === 'novo' ? null : aberto}
           gerencia={gerencia}
           aoFechar={() => setAberto(null)}
-          aoSalvar={() => {
+          aoSalvar={(aviso) => {
             setAberto(null)
             recarregar()
+            if (aviso) setMensagem(aviso)
           }}
           aoMudarEstoque={recarregar}
         />
@@ -287,7 +299,8 @@ function ModalProduto({
   produto: Produto | null
   gerencia: boolean
   aoFechar: () => void
-  aoSalvar: () => void
+  /** `aviso`: produto novo salvo, mas parte do que veio junto (estoque, fotos, documentos) não subiu. */
+  aoSalvar: (aviso?: string) => void
   aoMudarEstoque: () => void
 }) {
   const [nome, setNome] = useState(produto?.nome ?? '')
@@ -304,6 +317,9 @@ function ModalProduto({
   const [erro, setErro] = useState<string | null>(null)
   const [confirmarExclusao, setConfirmarExclusao] = useState(false)
   const [comHistorico, setComHistorico] = useState(false)
+  // Produto novo: o que sobe junto, depois que o produto é criado.
+  const [estoqueInicial, setEstoqueInicial] = useState('')
+  const [anexos, setAnexos] = useState<Anexo[]>([])
 
   async function mudarAtivo(ativo: boolean) {
     if (!produto?.id) return
@@ -339,11 +355,20 @@ function ModalProduto({
   const precoNum = lerNumero(preco)
   const minimoNum = lerNumero(minimo)
   const ncmNum = lerNcm(ncm)
+  const estoqueNum = lerNumero(estoqueInicial)
 
   async function salvar(e: FormEvent) {
     e.preventDefault()
     if (precoNum === undefined || (precoNum ?? 0) < 0 || minimoNum === undefined) {
       setErro('Confira o preço e o estoque mínimo.')
+      return
+    }
+    if (!produto && controla && (estoqueNum === undefined || (estoqueNum ?? 0) < 0)) {
+      setErro('Confira o estoque inicial.')
+      return
+    }
+    if (anexos.some((a) => a.tipo === 'documento' && !a.titulo.trim())) {
+      setErro('Dê um título a cada documento.')
       return
     }
     if (ncmNum === undefined) {
@@ -353,7 +378,7 @@ function ModalProduto({
     setSalvando(true)
     setErro(null)
     try {
-      await salvarProduto(orgId, produto?.id ?? null, {
+      const id = await salvarProduto(orgId, produto?.id ?? null, {
         nome: nome.trim(),
         codigo: codigo.trim() || null,
         unidade: unidade.trim() || 'un',
@@ -365,7 +390,30 @@ function ModalProduto({
         marca: marca.trim() || null,
         ncm: ncmNum,
       })
-      aoSalvar()
+      if (produto) return aoSalvar()
+
+      // Produto criado: o resto sobe ligado a ele. Se algo falhar, o produto fica e a lista avisa o que faltou.
+      const falhas: string[] = []
+      if (controla && estoqueNum) {
+        await lancarEstoque(id, estoqueNum, 'entrada', 'Estoque inicial').catch(() => falhas.push('o estoque inicial'))
+      }
+      const ligado = { id, nome: nome.trim(), codigo: codigo.trim() || null }
+      for (const a of anexos) {
+        try {
+          if (a.tipo === 'foto') await enviarFotoProduto(orgId, a.arquivo, ligado)
+          else {
+            const campos = { titulo: a.titulo.trim(), tipo: a.tipoDocumento.trim() || null, descricao: null, palavras_chave: null, fonte_url: null, ativo: true }
+            await salvarDocumento(orgId, null, campos, a.arquivo, [id])
+          }
+        } catch {
+          falhas.push(`"${a.arquivo.name}"`)
+        }
+      }
+      aoSalvar(
+        falhas.length
+          ? `“${nome.trim()}” foi cadastrado, mas não subiu: ${falhas.join(', ')}. Abra o produto e adicione de novo.`
+          : undefined,
+      )
     } catch (e) {
       setErro((e as Error).message)
     } finally {
@@ -447,14 +495,25 @@ function ModalProduto({
               Controla estoque (desmarque para serviços)
             </label>
             {controla && (
-              <CampoTexto
-                rotulo="Estoque mínimo (opcional)"
-                inputMode="decimal"
-                value={minimo}
-                onChange={(e) => setMinimo(e.target.value)}
-                ajuda="Abaixo disso o produto aparece em destaque na lista."
-                className="sm:max-w-[12rem]"
-              />
+              <div className="grid gap-4 sm:grid-cols-3">
+                {!produto && (
+                  <CampoTexto
+                    rotulo="Estoque inicial (opcional)"
+                    inputMode="decimal"
+                    value={estoqueInicial}
+                    onChange={(e) => setEstoqueInicial(e.target.value)}
+                    placeholder="0"
+                    ajuda="Quanto tem hoje. Entra como entrada de estoque."
+                  />
+                )}
+                <CampoTexto
+                  rotulo="Estoque mínimo (opcional)"
+                  inputMode="decimal"
+                  value={minimo}
+                  onChange={(e) => setMinimo(e.target.value)}
+                  ajuda="Abaixo disso o produto aparece em destaque na lista."
+                />
+              </div>
             )}
             <div className="space-y-1.5">
               <label htmlFor="prod-desc" className="block text-pequeno font-medium text-texto-2">
@@ -473,6 +532,7 @@ function ModalProduto({
           {erro && <Aviso tom="erro">{erro}</Aviso>}
         </form>
 
+        {!produto && gerencia && <AnexosNovoProduto anexos={anexos} aoMudar={setAnexos} desabilitado={salvando} />}
         {produto?.controla_estoque && <Estoque produto={produto} gerencia={gerencia} aoMudar={aoMudarEstoque} />}
         {produto?.id && (
           <DocumentosDoProduto orgId={orgId} produto={{ id: produto.id, nome: produto.nome ?? '', codigo: produto.codigo }} gerencia={gerencia} />
@@ -491,6 +551,115 @@ function ModalProduto({
         </DialogoConfirmacao>
       </div>
     </Modal>
+  )
+}
+
+type Anexo =
+  | { tipo: 'foto'; arquivo: File }
+  | { tipo: 'documento'; arquivo: File; titulo: string; tipoDocumento: string }
+
+const IMAGENS = ['image/jpeg', 'image/png', 'image/webp']
+
+/** Produto novo: fotos e documentos escolhidos antes de salvar; sobem ligados ao produto quando ele é criado. */
+function AnexosNovoProduto({ anexos, aoMudar, desabilitado }: { anexos: Anexo[]; aoMudar: (a: Anexo[]) => void; desabilitado: boolean }) {
+  const seletorFotos = useRef<HTMLInputElement>(null)
+  const seletorDocs = useRef<HTMLInputElement>(null)
+  const [erro, setErro] = useState<string | null>(null)
+
+  function escolher(lista: FileList | null, tipo: Anexo['tipo']) {
+    const arquivos = [...(lista ?? [])]
+    const recusados = arquivos.filter((f) =>
+      tipo === 'foto' ? !IMAGENS.includes(f.type) : !TIPOS_ACEITOS.includes(f.type) || f.size > LIMITE_DOCUMENTO,
+    )
+    setErro(
+      recusados.length
+        ? `Ficaram de fora: ${recusados.map((f) => f.name).join(', ')}. ${tipo === 'foto' ? 'Fotos em JPG, PNG ou WebP.' : 'Documentos em PDF, imagem ou MP4, até 50 MB.'}`
+        : null,
+    )
+    const novos: Anexo[] = arquivos
+      .filter((f) => !recusados.includes(f))
+      .map((arquivo) =>
+        tipo === 'foto'
+          ? { tipo, arquivo }
+          : { tipo, arquivo, titulo: arquivo.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').slice(0, 200), tipoDocumento: '' },
+      )
+    aoMudar([...anexos, ...novos])
+  }
+
+  const trocar = (i: number, a: Anexo) => aoMudar(anexos.map((x, j) => (j === i ? a : x)))
+
+  return (
+    <div className="space-y-2 border-t border-borda pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-pequeno font-semibold">Documentos e fotos</h3>
+        <div className="flex flex-wrap gap-1">
+          <input ref={seletorFotos} type="file" multiple accept={IMAGENS.join(',')} className="hidden" onChange={(e) => (escolher(e.target.files, 'foto'), (e.target.value = ''))} />
+          <input ref={seletorDocs} type="file" multiple accept={TIPOS_ACEITOS.join(',')} className="hidden" onChange={(e) => (escolher(e.target.files, 'documento'), (e.target.value = ''))} />
+          <Botao tamanho="sm" variante="secundario" icone="mais" onClick={() => seletorFotos.current?.click()} disabled={desabilitado}>
+            Adicionar foto
+          </Botao>
+          <Botao tamanho="sm" variante="secundario" icone="clipe" onClick={() => seletorDocs.current?.click()} disabled={desabilitado}>
+            Adicionar documento
+          </Botao>
+        </div>
+      </div>
+      <p className="text-legenda text-texto-3">
+        Sobem quando você salvar, já ligados a este produto. Com 2 ou 3 fotos de ângulos diferentes, o agente reconhece o produto
+        quando o cliente manda uma foto.
+      </p>
+      {erro && <Aviso tom="erro">{erro}</Aviso>}
+      {anexos.length > 0 && (
+        <datalist id="tipos-anexo">
+          {TIPOS_SUGERIDOS.filter((t) => t !== TIPO_FOTO).map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+      )}
+      {anexos.length > 0 && (
+        <ul className="divide-y divide-borda rounded-md border border-borda">
+          {anexos.map((a, i) => (
+            <li key={i} className="flex flex-wrap items-center gap-2 px-3 py-2 text-pequeno">
+              <Icone nome={a.tipo === 'foto' ? 'olho' : 'arquivo'} className="size-4 shrink-0 text-texto-3" />
+              {a.tipo === 'foto' ? (
+                <span className="min-w-0 flex-1 truncate">
+                  {a.arquivo.name} <span className="text-texto-3">· foto</span>
+                </span>
+              ) : (
+                <span className="flex min-w-0 flex-1 flex-wrap gap-2">
+                  <input
+                    aria-label={`Título de ${a.arquivo.name}`}
+                    value={a.titulo}
+                    maxLength={200}
+                    onChange={(e) => trocar(i, { ...a, titulo: e.target.value })}
+                    placeholder="Título (como o cliente pede)"
+                    className="h-8 min-w-0 flex-[2] rounded-md border border-borda bg-superficie px-2 focus:border-primaria focus:outline-none"
+                  />
+                  <input
+                    aria-label={`Tipo de ${a.arquivo.name}`}
+                    list="tipos-anexo"
+                    value={a.tipoDocumento}
+                    maxLength={60}
+                    onChange={(e) => trocar(i, { ...a, tipoDocumento: e.target.value })}
+                    placeholder="Tipo (ex.: Manual)"
+                    className="h-8 min-w-0 flex-1 rounded-md border border-borda bg-superficie px-2 focus:border-primaria focus:outline-none"
+                  />
+                </span>
+              )}
+              <span className="text-legenda text-texto-3">{tamanhoLegivel(a.arquivo.size)}</span>
+              <button
+                type="button"
+                onClick={() => aoMudar(anexos.filter((_, j) => j !== i))}
+                disabled={desabilitado}
+                className="rounded-sm text-texto-3 hover:text-erro"
+              >
+                <Icone nome="fechar" className="size-4" />
+                <span className="sr-only">Tirar {a.arquivo.name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

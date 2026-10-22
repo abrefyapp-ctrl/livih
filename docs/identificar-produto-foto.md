@@ -39,6 +39,10 @@ Dono e admin têm dois botões, e o que sobe por ali já fica ligado ao produto:
 - **Adicionar documento:** o mesmo formulário de Configurações → Documentos (`ModalDocumento`), já com o produto
   escolhido.
 
+No **Novo produto** os mesmos botões aparecem antes de salvar, junto com o **Estoque inicial**: os arquivos ficam
+na lista (documento com título e tipo editáveis) e sobem ligados ao produto logo depois que ele é criado. Se algum
+falhar, o produto fica cadastrado e a lista de produtos avisa o que não subiu.
+
 ## Envio em massa (Configurações → Documentos → Fotos em massa)
 
 Só para dono e admin, com o módulo de pedidos ligado. O produto é achado pelo **código**:
