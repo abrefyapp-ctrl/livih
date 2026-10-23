@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from '../services/supabaseClient'
+import { escutarParaRecarregar } from '../services/aoVivo'
 import { moeda } from '../services/formato'
 import {
   carregarConfiguracao,
@@ -66,7 +66,6 @@ function Oficina({ orgId, gerencia }: { orgId: string; gerencia: boolean }) {
 
   useEffect(() => {
     let ativo = true
-    let espera: ReturnType<typeof setTimeout> | undefined
     const buscar = () =>
       Promise.all([carregarConfiguracao(orgId), carregarOficina(orgId)])
         .then(([cfg, oficina]) => {
@@ -77,17 +76,10 @@ function Oficina({ orgId, gerencia }: { orgId: string; gerencia: boolean }) {
         .catch((e) => ativo && setErro((e as Error).message || 'Não foi possível carregar as ordens de serviço.'))
     void buscar()
     // Ao vivo: outra pessoa move um item e o quadro acompanha.
-    const canal = supabase
-      .channel(`os-itens-${orgId}-${versao}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'os_itens', filter: `org_id=eq.${orgId}` }, () => {
-        clearTimeout(espera)
-        espera = setTimeout(() => void buscar(), 400)
-      })
-      .subscribe()
+    const parar = escutarParaRecarregar(`os-itens-${orgId}-${versao}`, 'os_itens', `org_id=eq.${orgId}`, () => void buscar())
     return () => {
       ativo = false
-      clearTimeout(espera)
-      void supabase.removeChannel(canal)
+      parar()
     }
   }, [orgId, versao])
 

@@ -185,8 +185,8 @@ export type Database = {
       }
       assistente_sessoes: {
         Row: {
-          aplicada_em: string | null
           anterior: Json | null
+          aplicada_em: string | null
           atualizado_em: string
           criado_em: string
           criado_por: string | null
@@ -199,8 +199,8 @@ export type Database = {
           status: string
         }
         Insert: {
-          aplicada_em?: string | null
           anterior?: Json | null
+          aplicada_em?: string | null
           atualizado_em?: string
           criado_em?: string
           criado_por?: string | null
@@ -213,8 +213,8 @@ export type Database = {
           status?: string
         }
         Update: {
-          aplicada_em?: string | null
           anterior?: Json | null
+          aplicada_em?: string | null
           atualizado_em?: string
           criado_em?: string
           criado_por?: string | null
@@ -226,7 +226,15 @@ export type Database = {
           proposta?: Json | null
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "assistente_sessoes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       auditoria: {
         Row: {
@@ -597,6 +605,7 @@ export type Database = {
       }
       documentos: {
         Row: {
+          ativo: boolean
           atualizado_em: string
           criado_em: string
           criado_por: string | null
@@ -612,9 +621,9 @@ export type Database = {
           tamanho: number
           tipo: string | null
           titulo: string
-          ativo: boolean
         }
         Insert: {
+          ativo?: boolean
           atualizado_em?: string
           criado_em?: string
           criado_por?: string | null
@@ -630,9 +639,9 @@ export type Database = {
           tamanho: number
           tipo?: string | null
           titulo: string
-          ativo?: boolean
         }
         Update: {
+          ativo?: boolean
           atualizado_em?: string
           criado_em?: string
           criado_por?: string | null
@@ -648,9 +657,16 @@ export type Database = {
           tamanho?: number
           tipo?: string | null
           titulo?: string
-          ativo?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "documentos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       documentos_envios: {
         Row: {
@@ -667,7 +683,7 @@ export type Database = {
           conversa_id: string
           criado_em?: string
           documento_id?: string | null
-          id?: number
+          id?: never
           mensagem_id: string
           org_id: string
         }
@@ -676,47 +692,40 @@ export type Database = {
           conversa_id?: string
           criado_em?: string
           documento_id?: string | null
-          id?: number
+          id?: never
           mensagem_id?: string
           org_id?: string
         }
-        Relationships: []
-      }
-      fotos_indice: {
-        Row: {
-          atualizado_em: string
-          descricao: string | null
-          documento_id: string
-          embedding: string | null
-          erro: string | null
-          org_id: string
-          path: string
-          status: string
-          tentativas: number
-        }
-        Insert: {
-          atualizado_em?: string
-          descricao?: string | null
-          documento_id: string
-          embedding?: string | null
-          erro?: string | null
-          org_id: string
-          path: string
-          status?: string
-          tentativas?: number
-        }
-        Update: {
-          atualizado_em?: string
-          descricao?: string | null
-          documento_id?: string
-          embedding?: string | null
-          erro?: string | null
-          org_id?: string
-          path?: string
-          status?: string
-          tentativas?: number
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "documentos_envios_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_envios_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "documentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_envios_mensagem_id_fkey"
+            columns: ["mensagem_id"]
+            isOneToOne: true
+            referencedRelation: "mensagens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_envios_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       documentos_produtos: {
         Row: {
@@ -734,7 +743,29 @@ export type Database = {
           org_id?: string
           produto_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "documentos_produtos_documento_id_org_id_fkey"
+            columns: ["documento_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "documentos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "documentos_produtos_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "documentos_produtos_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos_saldo"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
       }
       emissoras: {
         Row: {
@@ -815,7 +846,15 @@ export type Database = {
           uf?: string | null
           validade_dias?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "emissoras_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       estoque_movimentos: {
         Row: {
@@ -1005,6 +1044,57 @@ export type Database = {
           },
         ]
       }
+      fotos_indice: {
+        Row: {
+          atualizado_em: string
+          descricao: string | null
+          documento_id: string
+          embedding: string | null
+          erro: string | null
+          org_id: string
+          path: string
+          status: string
+          tentativas: number
+        }
+        Insert: {
+          atualizado_em?: string
+          descricao?: string | null
+          documento_id: string
+          embedding?: string | null
+          erro?: string | null
+          org_id: string
+          path: string
+          status?: string
+          tentativas?: number
+        }
+        Update: {
+          atualizado_em?: string
+          descricao?: string | null
+          documento_id?: string
+          embedding?: string | null
+          erro?: string | null
+          org_id?: string
+          path?: string
+          status?: string
+          tentativas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fotos_indice_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: true
+            referencedRelation: "documentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fotos_indice_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       importacoes_catalogo: {
         Row: {
           atualizado_em: string
@@ -1054,157 +1144,15 @@ export type Database = {
           status?: string
           total?: number
         }
-        Relationships: []
-      }
-      notas_entrada: {
-        Row: {
-          arquivo_path: string | null
-          autor_id: string | null
-          chave: string | null
-          criado_em: string
-          emissao: string | null
-          emitente_cnpj: string | null
-          emitente_nome: string | null
-          id: string
-          numero: string | null
-          org_id: string
-          origem: string
-          serie: string | null
-          valor_total: number | null
-        }
-        Insert: {
-          arquivo_path?: string | null
-          autor_id?: string | null
-          chave?: string | null
-          criado_em?: string
-          emissao?: string | null
-          emitente_cnpj?: string | null
-          emitente_nome?: string | null
-          id?: string
-          numero?: string | null
-          org_id: string
-          origem: string
-          serie?: string | null
-          valor_total?: number | null
-        }
-        Update: {
-          arquivo_path?: string | null
-          autor_id?: string | null
-          chave?: string | null
-          criado_em?: string
-          emissao?: string | null
-          emitente_cnpj?: string | null
-          emitente_nome?: string | null
-          id?: string
-          numero?: string | null
-          org_id?: string
-          origem?: string
-          serie?: string | null
-          valor_total?: number | null
-        }
-        Relationships: []
-      }
-      notas_entrada_itens: {
-        Row: {
-          codigo_fornecedor: string | null
-          descricao: string
-          fator: number
-          id: number
-          ncm: string | null
-          nota_id: string
-          org_id: string
-          produto_id: string | null
-          quantidade: number
-          unidade: string | null
-          valor_total: number | null
-          valor_unitario: number | null
-        }
-        Insert: {
-          codigo_fornecedor?: string | null
-          descricao: string
-          fator?: number
-          id?: number
-          ncm?: string | null
-          nota_id: string
-          org_id: string
-          produto_id?: string | null
-          quantidade: number
-          unidade?: string | null
-          valor_total?: number | null
-          valor_unitario?: number | null
-        }
-        Update: {
-          codigo_fornecedor?: string | null
-          descricao?: string
-          fator?: number
-          id?: number
-          ncm?: string | null
-          nota_id?: string
-          org_id?: string
-          produto_id?: string | null
-          quantidade?: number
-          unidade?: string | null
-          valor_total?: number | null
-          valor_unitario?: number | null
-        }
-        Relationships: []
-      }
-      produtos_custos: {
-        Row: {
-          atualizado_em: string
-          custo: number
-          nota_id: string | null
-          org_id: string
-          produto_id: string
-        }
-        Insert: {
-          atualizado_em?: string
-          custo: number
-          nota_id?: string | null
-          org_id: string
-          produto_id: string
-        }
-        Update: {
-          atualizado_em?: string
-          custo?: number
-          nota_id?: string | null
-          org_id?: string
-          produto_id?: string
-        }
-        Relationships: []
-      }
-      produtos_fornecedores: {
-        Row: {
-          atualizado_em: string
-          codigo_fornecedor: string
-          descricao_fornecedor: string | null
-          fator: number
-          fornecedor_cnpj: string
-          org_id: string
-          produto_id: string
-          unidade_fornecedor: string | null
-        }
-        Insert: {
-          atualizado_em?: string
-          codigo_fornecedor: string
-          descricao_fornecedor?: string | null
-          fator?: number
-          fornecedor_cnpj: string
-          org_id: string
-          produto_id: string
-          unidade_fornecedor?: string | null
-        }
-        Update: {
-          atualizado_em?: string
-          codigo_fornecedor?: string
-          descricao_fornecedor?: string | null
-          fator?: number
-          fornecedor_cnpj?: string
-          org_id?: string
-          produto_id?: string
-          unidade_fornecedor?: string | null
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "importacoes_catalogo_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       membros_org: {
         Row: {
@@ -1422,6 +1370,129 @@ export type Database = {
           },
         ]
       }
+      notas_entrada: {
+        Row: {
+          arquivo_path: string | null
+          autor_id: string | null
+          chave: string | null
+          criado_em: string
+          emissao: string | null
+          emitente_cnpj: string | null
+          emitente_nome: string | null
+          id: string
+          numero: string | null
+          org_id: string
+          origem: string
+          serie: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          arquivo_path?: string | null
+          autor_id?: string | null
+          chave?: string | null
+          criado_em?: string
+          emissao?: string | null
+          emitente_cnpj?: string | null
+          emitente_nome?: string | null
+          id?: string
+          numero?: string | null
+          org_id: string
+          origem: string
+          serie?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          arquivo_path?: string | null
+          autor_id?: string | null
+          chave?: string | null
+          criado_em?: string
+          emissao?: string | null
+          emitente_cnpj?: string | null
+          emitente_nome?: string | null
+          id?: string
+          numero?: string | null
+          org_id?: string
+          origem?: string
+          serie?: string | null
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notas_entrada_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notas_entrada_itens: {
+        Row: {
+          codigo_fornecedor: string | null
+          descricao: string
+          fator: number
+          id: number
+          ncm: string | null
+          nota_id: string
+          org_id: string
+          produto_id: string | null
+          quantidade: number
+          unidade: string | null
+          valor_total: number | null
+          valor_unitario: number | null
+        }
+        Insert: {
+          codigo_fornecedor?: string | null
+          descricao: string
+          fator?: number
+          id?: never
+          ncm?: string | null
+          nota_id: string
+          org_id: string
+          produto_id?: string | null
+          quantidade: number
+          unidade?: string | null
+          valor_total?: number | null
+          valor_unitario?: number | null
+        }
+        Update: {
+          codigo_fornecedor?: string | null
+          descricao?: string
+          fator?: number
+          id?: never
+          ncm?: string | null
+          nota_id?: string
+          org_id?: string
+          produto_id?: string | null
+          quantidade?: number
+          unidade?: string | null
+          valor_total?: number | null
+          valor_unitario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notas_entrada_itens_nota_id_org_id_fkey"
+            columns: ["nota_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "notas_entrada"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "notas_entrada_itens_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "notas_entrada_itens_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos_saldo"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       oportunidade_historico: {
         Row: {
           autor_id: string | null
@@ -1540,6 +1611,69 @@ export type Database = {
           },
         ]
       }
+      ordens_servico: {
+        Row: {
+          atualizado_em: string
+          cliente_nome: string | null
+          contato_id: string | null
+          criado_em: string
+          criado_por: string | null
+          id: string
+          nf_cliente: string | null
+          numero: number
+          numero_cliente: string | null
+          observacao: string | null
+          org_id: string
+          recebida_em: string
+          responsavel_id: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          cliente_nome?: string | null
+          contato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nf_cliente?: string | null
+          numero: number
+          numero_cliente?: string | null
+          observacao?: string | null
+          org_id: string
+          recebida_em?: string
+          responsavel_id?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          cliente_nome?: string | null
+          contato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nf_cliente?: string | null
+          numero?: number
+          numero_cliente?: string | null
+          observacao?: string | null
+          org_id?: string
+          recebida_em?: string
+          responsavel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_servico_contato_id_org_id_fkey"
+            columns: ["contato_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizacao_modulos: {
         Row: {
           ativo: boolean
@@ -1606,6 +1740,334 @@ export type Database = {
         }
         Relationships: []
       }
+      os_config: {
+        Row: {
+          alerta_fator: number
+          atualizado_em: string
+          org_id: string
+          prazo_pagamento_dias: number
+        }
+        Insert: {
+          alerta_fator?: number
+          atualizado_em?: string
+          org_id: string
+          prazo_pagamento_dias?: number
+        }
+        Update: {
+          alerta_fator?: number
+          atualizado_em?: string
+          org_id?: string
+          prazo_pagamento_dias?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_config_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      os_etapas: {
+        Row: {
+          ativo: boolean
+          id: string
+          marco: string | null
+          nome: string
+          ordem: number
+          org_id: string
+          prazo_padrao_dias: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          id?: string
+          marco?: string | null
+          nome: string
+          ordem: number
+          org_id: string
+          prazo_padrao_dias?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          id?: string
+          marco?: string | null
+          nome?: string
+          ordem?: number
+          org_id?: string
+          prazo_padrao_dias?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_etapas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      os_item_historico: {
+        Row: {
+          autor_id: string | null
+          criado_em: string
+          data: string
+          etapa_de: string | null
+          etapa_para: string
+          id: number
+          importado: boolean
+          item_id: string
+          org_id: string
+        }
+        Insert: {
+          autor_id?: string | null
+          criado_em?: string
+          data: string
+          etapa_de?: string | null
+          etapa_para: string
+          id?: never
+          importado?: boolean
+          item_id: string
+          org_id: string
+        }
+        Update: {
+          autor_id?: string | null
+          criado_em?: string
+          data?: string
+          etapa_de?: string | null
+          etapa_para?: string
+          id?: never
+          importado?: boolean
+          item_id?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_item_historico_etapa_para_org_id_fkey"
+            columns: ["etapa_para", "org_id"]
+            isOneToOne: false
+            referencedRelation: "os_etapas"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "os_item_historico_item_id_org_id_fkey"
+            columns: ["item_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "os_itens"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      os_itens: {
+        Row: {
+          atualizado_em: string
+          campos: Json
+          cobranca: string
+          criado_em: string
+          desfecho: string | null
+          desfecho_em: string | null
+          etapa_desde: string
+          etapa_id: string
+          faturado_em: string | null
+          id: string
+          identificacao: string | null
+          modelo: string | null
+          observacao: string | null
+          ordem: number
+          org_id: string
+          os_id: string
+          pago_em: string | null
+          servico_id: string | null
+          tipo_id: string | null
+          valor: number
+          vencimento_em: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          campos?: Json
+          cobranca?: string
+          criado_em?: string
+          desfecho?: string | null
+          desfecho_em?: string | null
+          etapa_desde: string
+          etapa_id: string
+          faturado_em?: string | null
+          id?: string
+          identificacao?: string | null
+          modelo?: string | null
+          observacao?: string | null
+          ordem?: number
+          org_id: string
+          os_id: string
+          pago_em?: string | null
+          servico_id?: string | null
+          tipo_id?: string | null
+          valor?: number
+          vencimento_em?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          campos?: Json
+          cobranca?: string
+          criado_em?: string
+          desfecho?: string | null
+          desfecho_em?: string | null
+          etapa_desde?: string
+          etapa_id?: string
+          faturado_em?: string | null
+          id?: string
+          identificacao?: string | null
+          modelo?: string | null
+          observacao?: string | null
+          ordem?: number
+          org_id?: string
+          os_id?: string
+          pago_em?: string | null
+          servico_id?: string | null
+          tipo_id?: string | null
+          valor?: number
+          vencimento_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_itens_etapa_id_org_id_fkey"
+            columns: ["etapa_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "os_etapas"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "os_itens_os_id_org_id_fkey"
+            columns: ["os_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "os_itens_servico_id_org_id_fkey"
+            columns: ["servico_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "os_servicos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "os_itens_tipo_id_org_id_fkey"
+            columns: ["tipo_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "os_tipos_item"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      os_prazos_cliente: {
+        Row: {
+          contato_id: string
+          org_id: string
+          prazo_pagamento_dias: number
+        }
+        Insert: {
+          contato_id: string
+          org_id: string
+          prazo_pagamento_dias: number
+        }
+        Update: {
+          contato_id?: string
+          org_id?: string
+          prazo_pagamento_dias?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_prazos_cliente_contato_id_org_id_fkey"
+            columns: ["contato_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      os_servicos: {
+        Row: {
+          ativo: boolean
+          codigo: string | null
+          criado_em: string
+          id: string
+          nome: string
+          org_id: string
+          preco: number
+        }
+        Insert: {
+          ativo?: boolean
+          codigo?: string | null
+          criado_em?: string
+          id?: string
+          nome: string
+          org_id: string
+          preco?: number
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string | null
+          criado_em?: string
+          id?: string
+          nome?: string
+          org_id?: string
+          preco?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_servicos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      os_tipos_item: {
+        Row: {
+          ativo: boolean
+          campos: Json
+          id: string
+          nome: string
+          org_id: string
+          rotulo_identificacao: string
+          servico_padrao_id: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          campos?: Json
+          id?: string
+          nome: string
+          org_id: string
+          rotulo_identificacao?: string
+          servico_padrao_id?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          campos?: Json
+          id?: string
+          nome?: string
+          org_id?: string
+          rotulo_identificacao?: string
+          servico_padrao_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_tipos_item_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_tipos_item_servico_padrao_id_org_id_fkey"
+            columns: ["servico_padrao_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "os_servicos"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       painel_config: {
         Row: {
           antes_tempo_resposta_min: number | null
@@ -1628,7 +2090,15 @@ export type Database = {
           org_id?: string
           piloto_inicio?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "painel_config_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pedido_itens: {
         Row: {
@@ -1690,16 +2160,14 @@ export type Database = {
       }
       pedidos: {
         Row: {
-          condicoes_pagamento: string | null
-          emissora_id: string | null
-          prazo_entrega: string | null
-          validade: string | null
           atualizado_em: string
+          condicoes_pagamento: string | null
           confirmado_em: string | null
           contato_id: string | null
           criado_em: string
           criado_por: string | null
           desconto: number
+          emissora_id: string | null
           estoque_baixado: boolean
           frete: number
           id: string
@@ -1708,22 +2176,22 @@ export type Database = {
           oportunidade_id: string | null
           org_id: string
           origem: string
+          prazo_entrega: string | null
           responsavel_id: string | null
           status: string
           subtotal: number
           total: number
+          validade: string | null
         }
         Insert: {
-          condicoes_pagamento?: string | null
-          emissora_id?: string | null
-          prazo_entrega?: string | null
-          validade?: string | null
           atualizado_em?: string
+          condicoes_pagamento?: string | null
           confirmado_em?: string | null
           contato_id?: string | null
           criado_em?: string
           criado_por?: string | null
           desconto?: number
+          emissora_id?: string | null
           estoque_baixado?: boolean
           frete?: number
           id?: string
@@ -1732,22 +2200,22 @@ export type Database = {
           oportunidade_id?: string | null
           org_id: string
           origem?: string
+          prazo_entrega?: string | null
           responsavel_id?: string | null
           status?: string
           subtotal?: number
           total?: number
+          validade?: string | null
         }
         Update: {
-          condicoes_pagamento?: string | null
-          emissora_id?: string | null
-          prazo_entrega?: string | null
-          validade?: string | null
           atualizado_em?: string
+          condicoes_pagamento?: string | null
           confirmado_em?: string | null
           contato_id?: string | null
           criado_em?: string
           criado_por?: string | null
           desconto?: number
+          emissora_id?: string | null
           estoque_baixado?: boolean
           frete?: number
           id?: string
@@ -1756,10 +2224,12 @@ export type Database = {
           oportunidade_id?: string | null
           org_id?: string
           origem?: string
+          prazo_entrega?: string | null
           responsavel_id?: string | null
           status?: string
           subtotal?: number
           total?: number
+          validade?: string | null
         }
         Relationships: [
           {
@@ -1767,6 +2237,13 @@ export type Database = {
             columns: ["contato_id", "org_id"]
             isOneToOne: false
             referencedRelation: "contatos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "pedidos_emissora_id_org_id_fkey"
+            columns: ["emissora_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "emissoras"
             referencedColumns: ["id", "org_id"]
           },
           {
@@ -1908,51 +2385,51 @@ export type Database = {
       }
       produtos: {
         Row: {
-          categoria: string | null
-          marca: string | null
-          ncm: string | null
           ativo: boolean
           atualizado_em: string
+          categoria: string | null
           codigo: string | null
           controla_estoque: boolean
           criado_em: string
           descricao: string | null
           estoque_minimo: number | null
           id: string
+          marca: string | null
+          ncm: string | null
           nome: string
           org_id: string
           preco: number
           unidade: string
         }
         Insert: {
-          categoria?: string | null
-          marca?: string | null
-          ncm?: string | null
           ativo?: boolean
           atualizado_em?: string
+          categoria?: string | null
           codigo?: string | null
           controla_estoque?: boolean
           criado_em?: string
           descricao?: string | null
           estoque_minimo?: number | null
           id?: string
+          marca?: string | null
+          ncm?: string | null
           nome: string
           org_id: string
           preco?: number
           unidade?: string
         }
         Update: {
-          categoria?: string | null
-          marca?: string | null
-          ncm?: string | null
           ativo?: boolean
           atualizado_em?: string
+          categoria?: string | null
           codigo?: string | null
           controla_estoque?: boolean
           criado_em?: string
           descricao?: string | null
           estoque_minimo?: number | null
           id?: string
+          marca?: string | null
+          ncm?: string | null
           nome?: string
           org_id?: string
           preco?: number
@@ -1965,6 +2442,100 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizacoes"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      produtos_custos: {
+        Row: {
+          atualizado_em: string
+          custo: number
+          nota_id: string | null
+          org_id: string
+          produto_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          custo: number
+          nota_id?: string | null
+          org_id: string
+          produto_id: string
+        }
+        Update: {
+          atualizado_em?: string
+          custo?: number
+          nota_id?: string | null
+          org_id?: string
+          produto_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_custos_nota_id_fkey"
+            columns: ["nota_id"]
+            isOneToOne: false
+            referencedRelation: "notas_entrada"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produtos_custos_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "produtos_custos_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos_saldo"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      produtos_fornecedores: {
+        Row: {
+          atualizado_em: string
+          codigo_fornecedor: string
+          descricao_fornecedor: string | null
+          fator: number
+          fornecedor_cnpj: string
+          org_id: string
+          produto_id: string
+          unidade_fornecedor: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          codigo_fornecedor: string
+          descricao_fornecedor?: string | null
+          fator?: number
+          fornecedor_cnpj: string
+          org_id: string
+          produto_id: string
+          unidade_fornecedor?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          codigo_fornecedor?: string
+          descricao_fornecedor?: string | null
+          fator?: number
+          fornecedor_cnpj?: string
+          org_id?: string
+          produto_id?: string
+          unidade_fornecedor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_fornecedores_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "produtos_fornecedores_produto_id_org_id_fkey"
+            columns: ["produto_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "produtos_saldo"
+            referencedColumns: ["id", "org_id"]
           },
         ]
       }
@@ -2060,6 +2631,35 @@ export type Database = {
         }
         Relationships: []
       }
+      simulacoes_agente: {
+        Row: {
+          criado_em: string
+          id: number
+          org_id: string
+          user_id: string | null
+        }
+        Insert: {
+          criado_em?: string
+          id?: never
+          org_id: string
+          user_id?: string | null
+        }
+        Update: {
+          criado_em?: string
+          id?: never
+          org_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulacoes_agente_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uso_ia: {
         Row: {
           chamadas: number
@@ -2120,306 +2720,21 @@ export type Database = {
           },
         ]
       }
-      os_config: {
-        Row: {
-          alerta_fator: number
-          atualizado_em: string
-          org_id: string
-          prazo_pagamento_dias: number
-        }
-        Insert: {
-          alerta_fator?: number
-          atualizado_em?: string
-          org_id: string
-          prazo_pagamento_dias?: number
-        }
-        Update: {
-          alerta_fator?: number
-          atualizado_em?: string
-          org_id?: string
-          prazo_pagamento_dias?: number
-        }
-        Relationships: []
-      }
-      os_etapas: {
-        Row: {
-          ativo: boolean
-          id: string
-          marco: string | null
-          nome: string
-          ordem: number
-          org_id: string
-          prazo_padrao_dias: number | null
-        }
-        Insert: {
-          ativo?: boolean
-          id?: string
-          marco?: string | null
-          nome: string
-          ordem: number
-          org_id: string
-          prazo_padrao_dias?: number | null
-        }
-        Update: {
-          ativo?: boolean
-          id?: string
-          marco?: string | null
-          nome?: string
-          ordem?: number
-          org_id?: string
-          prazo_padrao_dias?: number | null
-        }
-        Relationships: []
-      }
-      os_servicos: {
-        Row: {
-          ativo: boolean
-          codigo: string | null
-          criado_em: string
-          id: string
-          nome: string
-          org_id: string
-          preco: number
-        }
-        Insert: {
-          ativo?: boolean
-          codigo?: string | null
-          criado_em?: string
-          id?: string
-          nome: string
-          org_id: string
-          preco?: number
-        }
-        Update: {
-          ativo?: boolean
-          codigo?: string | null
-          criado_em?: string
-          id?: string
-          nome?: string
-          org_id?: string
-          preco?: number
-        }
-        Relationships: []
-      }
-      os_tipos_item: {
-        Row: {
-          ativo: boolean
-          campos: Json
-          id: string
-          nome: string
-          org_id: string
-          rotulo_identificacao: string
-          servico_padrao_id: string | null
-        }
-        Insert: {
-          ativo?: boolean
-          campos?: Json
-          id?: string
-          nome: string
-          org_id: string
-          rotulo_identificacao?: string
-          servico_padrao_id?: string | null
-        }
-        Update: {
-          ativo?: boolean
-          campos?: Json
-          id?: string
-          nome?: string
-          org_id?: string
-          rotulo_identificacao?: string
-          servico_padrao_id?: string | null
-        }
-        Relationships: []
-      }
-      os_prazos_cliente: {
-        Row: {
-          contato_id: string
-          org_id: string
-          prazo_pagamento_dias: number
-        }
-        Insert: {
-          contato_id: string
-          org_id: string
-          prazo_pagamento_dias: number
-        }
-        Update: {
-          contato_id?: string
-          org_id?: string
-          prazo_pagamento_dias?: number
-        }
-        Relationships: []
-      }
-      ordens_servico: {
-        Row: {
-          atualizado_em: string
-          cliente_nome: string | null
-          contato_id: string | null
-          criado_em: string
-          criado_por: string | null
-          id: string
-          nf_cliente: string | null
-          numero: number
-          numero_cliente: string | null
-          observacao: string | null
-          org_id: string
-          recebida_em: string
-          responsavel_id: string | null
-        }
-        Insert: {
-          atualizado_em?: string
-          cliente_nome?: string | null
-          contato_id?: string | null
-          criado_em?: string
-          criado_por?: string | null
-          id?: string
-          nf_cliente?: string | null
-          numero?: number
-          numero_cliente?: string | null
-          observacao?: string | null
-          org_id: string
-          recebida_em?: string
-          responsavel_id?: string | null
-        }
-        Update: {
-          atualizado_em?: string
-          cliente_nome?: string | null
-          contato_id?: string | null
-          criado_em?: string
-          criado_por?: string | null
-          id?: string
-          nf_cliente?: string | null
-          numero?: number
-          numero_cliente?: string | null
-          observacao?: string | null
-          org_id?: string
-          recebida_em?: string
-          responsavel_id?: string | null
-        }
-        Relationships: []
-      }
-      os_itens: {
-        Row: {
-          atualizado_em: string
-          campos: Json
-          cobranca: string
-          criado_em: string
-          desfecho: string | null
-          desfecho_em: string | null
-          etapa_desde: string
-          etapa_id: string
-          faturado_em: string | null
-          id: string
-          identificacao: string | null
-          modelo: string | null
-          observacao: string | null
-          ordem: number
-          org_id: string
-          os_id: string
-          pago_em: string | null
-          servico_id: string | null
-          tipo_id: string | null
-          valor: number
-          vencimento_em: string | null
-        }
-        Insert: {
-          atualizado_em?: string
-          campos?: Json
-          cobranca?: string
-          criado_em?: string
-          desfecho?: string | null
-          desfecho_em?: string | null
-          etapa_desde?: string
-          etapa_id?: string
-          faturado_em?: string | null
-          id?: string
-          identificacao?: string | null
-          modelo?: string | null
-          observacao?: string | null
-          ordem?: number
-          org_id: string
-          os_id: string
-          pago_em?: string | null
-          servico_id?: string | null
-          tipo_id?: string | null
-          valor?: number
-          vencimento_em?: string | null
-        }
-        Update: {
-          atualizado_em?: string
-          campos?: Json
-          cobranca?: string
-          criado_em?: string
-          desfecho?: string | null
-          desfecho_em?: string | null
-          etapa_desde?: string
-          etapa_id?: string
-          faturado_em?: string | null
-          id?: string
-          identificacao?: string | null
-          modelo?: string | null
-          observacao?: string | null
-          ordem?: number
-          org_id?: string
-          os_id?: string
-          pago_em?: string | null
-          servico_id?: string | null
-          tipo_id?: string | null
-          valor?: number
-          vencimento_em?: string | null
-        }
-        Relationships: []
-      }
-      os_item_historico: {
-        Row: {
-          autor_id: string | null
-          criado_em: string
-          data: string
-          etapa_de: string | null
-          etapa_para: string
-          id: number
-          importado: boolean
-          item_id: string
-          org_id: string
-        }
-        Insert: {
-          autor_id?: string | null
-          criado_em?: string
-          data: string
-          etapa_de?: string | null
-          etapa_para: string
-          id?: number
-          importado?: boolean
-          item_id: string
-          org_id: string
-        }
-        Update: {
-          autor_id?: string | null
-          criado_em?: string
-          data?: string
-          etapa_de?: string | null
-          etapa_para?: string
-          id?: number
-          importado?: boolean
-          item_id?: string
-          org_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       produtos_saldo: {
         Row: {
-          categoria: string | null
-          marca: string | null
-          ncm: string | null
           ativo: boolean | null
           atualizado_em: string | null
+          categoria: string | null
           codigo: string | null
           controla_estoque: boolean | null
           criado_em: string | null
           descricao: string | null
           estoque_minimo: number | null
           id: string | null
+          marca: string | null
+          ncm: string | null
           nome: string | null
           org_id: string | null
           preco: number | null
@@ -2429,12 +2744,15 @@ export type Database = {
         Insert: {
           ativo?: boolean | null
           atualizado_em?: string | null
+          categoria?: string | null
           codigo?: string | null
           controla_estoque?: boolean | null
           criado_em?: string | null
           descricao?: string | null
           estoque_minimo?: number | null
           id?: string | null
+          marca?: string | null
+          ncm?: string | null
           nome?: string | null
           org_id?: string | null
           preco?: number | null
@@ -2444,12 +2762,15 @@ export type Database = {
         Update: {
           ativo?: boolean | null
           atualizado_em?: string | null
+          categoria?: string | null
           codigo?: string | null
           controla_estoque?: boolean | null
           criado_em?: string | null
           descricao?: string | null
           estoque_minimo?: number | null
           id?: string | null
+          marca?: string | null
+          ncm?: string | null
           nome?: string | null
           org_id?: string | null
           preco?: number | null
@@ -2490,8 +2811,25 @@ export type Database = {
       }
     }
     Functions: {
+      agenda_avisos_equipe: {
+        Args: { p_org: string }
+        Returns: {
+          celular: boolean
+          user_id: string
+          whatsapp: boolean
+        }[]
+      }
+      agenda_lembretes: { Args: never; Returns: number }
       agente_atualizar_contato: {
         Args: { p_conversa: string; p_dados: Json }
+        Returns: Json
+      }
+      agente_buscar_documentos: {
+        Args: { p_busca: string; p_conversa: string }
+        Returns: Json
+      }
+      agente_buscar_produtos: {
+        Args: { p_busca: string; p_conversa: string; p_limite?: number }
         Returns: Json
       }
       agente_chamar_humano: {
@@ -2502,12 +2840,40 @@ export type Database = {
         Args: { p_conversa: string; p_limite?: number }
         Returns: Json
       }
+      agente_contexto_simulado: {
+        Args: {
+          p_base?: string
+          p_casos?: Json
+          p_mensagens: Json
+          p_org: string
+          p_prompt?: string
+        }
+        Returns: Json
+      }
+      agente_dados_orcamento: { Args: { p_conversa: string }; Returns: Json }
       agente_deve_responder: {
         Args: { p_conversa: string; p_mensagem: string }
         Returns: boolean
       }
+      agente_enviar_arquivo: {
+        Args: {
+          p_conversa: string
+          p_legenda?: string
+          p_nome: string
+          p_path: string
+        }
+        Returns: Json
+      }
+      agente_enviar_documento: {
+        Args: { p_conversa: string; p_documento: string; p_path: string }
+        Returns: Json
+      }
       agente_horario_valido: { Args: { p: Json }; Returns: boolean }
       agente_marcar: { Args: never; Returns: undefined }
+      agente_montar_pedido: {
+        Args: { p_conversa: string; p_itens: Json; p_observacao?: string }
+        Returns: Json
+      }
       agente_mover_etapa: {
         Args: { p_conversa: string; p_etapa: string }
         Returns: Json
@@ -2519,6 +2885,43 @@ export type Database = {
       agente_nota: {
         Args: { p_conversa: string; p_texto: string }
         Returns: Json
+      }
+      agente_preparar_documento: {
+        Args: { p_conversa: string; p_documento: string; p_reenviar?: boolean }
+        Returns: Json
+      }
+      agente_rascunho_atual: {
+        Args: { p_conversa: string }
+        Returns: {
+          atualizado_em: string
+          condicoes_pagamento: string | null
+          confirmado_em: string | null
+          contato_id: string | null
+          criado_em: string
+          criado_por: string | null
+          desconto: number
+          emissora_id: string | null
+          estoque_baixado: boolean
+          frete: number
+          id: string
+          numero: number
+          observacao: string | null
+          oportunidade_id: string | null
+          org_id: string
+          origem: string
+          prazo_entrega: string | null
+          responsavel_id: string | null
+          status: string
+          subtotal: number
+          total: number
+          validade: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "pedidos"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       agente_registrar_oportunidade: {
         Args: { p_conversa: string; p_resumo: string; p_titulo: string }
@@ -2543,6 +2946,11 @@ export type Database = {
           texto: string
         }[]
       }
+      assistente_aplicar: {
+        Args: { p_secoes: Json; p_sessao: string }
+        Returns: Json
+      }
+      assistente_desfazer: { Args: { p_sessao: string }; Returns: undefined }
       auditar: {
         Args: {
           p_acao: string
@@ -2557,6 +2965,18 @@ export type Database = {
       autor_atual: {
         Args: never
         Returns: Database["public"]["Enums"]["autor_tipo"]
+      }
+      aviso_sistema: {
+        Args: { p_conversa: string; p_texto: string }
+        Returns: undefined
+      }
+      buscar_documentos_org: {
+        Args: { p_busca: string; p_org: string }
+        Returns: Json
+      }
+      buscar_produtos_org: {
+        Args: { p_busca: string; p_limite?: number; p_org: string }
+        Returns: Json
       }
       canal_atualizar_status: {
         Args: { p_canal: string; p_numero?: string; p_status: string }
@@ -2583,6 +3003,7 @@ export type Database = {
         Args: { p_corpo?: Json; p_funcao: string }
         Returns: number
       }
+      cnpj_valido: { Args: { p: string }; Returns: boolean }
       contato_por_whatsapp: {
         Args: {
           p_lid: string
@@ -2615,46 +3036,6 @@ export type Database = {
         }
         Returns: string
       }
-      enviar_mensagem: {
-        Args: { p_conversa: string; p_texto: string }
-        Returns: string
-      }
-      agenda_avisos_equipe: {
-        Args: { p_org: string }
-        Returns: { celular: boolean; user_id: string; whatsapp: boolean }[]
-      }
-      assistente_aplicar: {
-        Args: { p_secoes: Json; p_sessao: string }
-        Returns: Json
-      }
-      assistente_desfazer: {
-        Args: { p_sessao: string }
-        Returns: undefined
-      }
-      nota_entrada_lancar: {
-        Args: { p_itens: Json; p_nota: Json; p_org: string }
-        Returns: Json
-      }
-      estoque_definir_saldos: {
-        Args: { p_itens: Json; p_org: string }
-        Returns: Json
-      }
-      painel_pendencias: {
-        Args: { p_canal?: string; p_org: string; p_vendedor?: string }
-        Returns: Json
-      }
-      painel_relatorio: {
-        Args: { p_org: string }
-        Returns: Json
-      }
-      painel_resumo: {
-        Args: { p_ate: string; p_canal?: string; p_de: string; p_org: string; p_vendedor?: string }
-        Returns: Json
-      }
-      registrar_envio_documento: {
-        Args: { p_documento: string; p_mensagem: string }
-        Returns: undefined
-      }
       enviar_arquivo: {
         Args: {
           p_conversa: string
@@ -2662,6 +3043,10 @@ export type Database = {
           p_nome: string
           p_path: string
         }
+        Returns: string
+      }
+      enviar_mensagem: {
+        Args: { p_conversa: string; p_texto: string }
         Returns: string
       }
       enviar_modelo: {
@@ -2687,6 +3072,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      estoque_definir_saldos: {
+        Args: { p_itens: Json; p_org: string }
+        Returns: Json
+      }
       estoque_lancar: {
         Args: {
           p_motivo?: string
@@ -2705,10 +3094,14 @@ export type Database = {
           fila_id: number
           instance_id: string
           mensagem_id: string
+          midia_mime: string
+          midia_nome: string
+          midia_path: string
           modelo: Json
           telefone: string
           tentativas: number
           texto: string
+          tipo: string
           whatsapp_lid: string
         }[]
       }
@@ -2721,6 +3114,35 @@ export type Database = {
         }
         Returns: undefined
       }
+      fotos_candidatas: {
+        Args: {
+          p_embedding: string
+          p_limite?: number
+          p_org: string
+          p_texto: string
+        }
+        Returns: Json
+      }
+      fotos_manutencao: { Args: never; Returns: undefined }
+      fotos_registrar: {
+        Args: {
+          p_descricao: string
+          p_documento: string
+          p_embedding: string
+          p_erro: string
+          p_path: string
+        }
+        Returns: undefined
+      }
+      fotos_reivindicar: {
+        Args: { p_limite: number }
+        Returns: {
+          documento_id: string
+          mime: string
+          org_id: string
+          path: string
+        }[]
+      }
       funil_salvar: {
         Args: {
           p_abertas: Json
@@ -2732,6 +3154,16 @@ export type Database = {
         Returns: undefined
       }
       gerar_segredo_webhook: { Args: { p_canal: string }; Returns: string }
+      guardar_midia: {
+        Args: {
+          p_mensagem: string
+          p_mime: string
+          p_nome: string
+          p_path: string
+        }
+        Returns: Json
+      }
+      hoje_brasil: { Args: never; Returns: string }
       iniciar_conversa: {
         Args: {
           p_canal: string
@@ -2750,10 +3182,19 @@ export type Database = {
         Returns: undefined
       }
       meta_token_do_canal: { Args: { p_canal: string }; Returns: string }
+      midia_destino: {
+        Args: { p_canal: string; p_wa_id: string }
+        Returns: Json
+      }
       modulo_ativo: {
         Args: { p_modulo: string; p_org: string }
         Returns: boolean
       }
+      nota_entrada_lancar: {
+        Args: { p_itens: Json; p_nota: Json; p_org: string }
+        Returns: Json
+      }
+      org_do_caminho: { Args: { p_nome: string }; Returns: string }
       org_modulos: {
         Args: { p_org: string }
         Returns: {
@@ -2774,6 +3215,104 @@ export type Database = {
           instrucoes: boolean
           whatsapp: boolean
         }[]
+      }
+      os_conferir_itens: {
+        Args: { p_gerente: boolean; p_itens: string[] }
+        Returns: string
+      }
+      os_definir_desfecho: {
+        Args: { p_data?: string; p_desfecho: string; p_itens: string[] }
+        Returns: undefined
+      }
+      os_duracoes: {
+        Args: { p_org: string }
+        Returns: {
+          dias: number
+          etapa_id: string
+          fim: string
+          inicio: string
+          item_id: string
+          tipo_id: string
+        }[]
+      }
+      os_faturar: {
+        Args: { p_data: string; p_itens: string[]; p_vencimento?: string }
+        Returns: undefined
+      }
+      os_gerente: { Args: { p_org: string }; Returns: boolean }
+      os_importar: { Args: { p_linhas: Json; p_org: string }; Returns: Json }
+      os_membro: { Args: { p_org: string }; Returns: boolean }
+      os_mover_itens: {
+        Args: { p_data?: string; p_etapa: string; p_itens: string[] }
+        Returns: undefined
+      }
+      os_painel: {
+        Args: { p_ate: string; p_de: string; p_org: string }
+        Returns: Json
+      }
+      os_prazo_cliente: {
+        Args: { p_contato: string; p_org: string }
+        Returns: number
+      }
+      os_preparar: { Args: { p_org: string }; Returns: undefined }
+      os_previsao_itens: {
+        Args: { p_org: string }
+        Returns: {
+          dias_na_etapa: number
+          em_orcamento: boolean
+          fatura_em: string
+          finaliza_em: string
+          item_id: string
+          normal_etapa: number
+          parado: boolean
+          recebe_em: string
+        }[]
+      }
+      os_registrar_pagamento: {
+        Args: { p_data: string; p_itens: string[] }
+        Returns: undefined
+      }
+      os_salvar_etapas: {
+        Args: { p_etapas: Json; p_mover?: Json; p_org: string }
+        Returns: undefined
+      }
+      os_tempo_normal: {
+        Args: { p_org: string }
+        Returns: {
+          base: string
+          dias: number
+          etapa_id: string
+          tipo_id: string
+        }[]
+      }
+      painel_filtro_vendedor: {
+        Args: { p_org: string; p_vendedor: string }
+        Returns: string
+      }
+      painel_pendencias: {
+        Args: { p_canal?: string; p_org: string; p_vendedor?: string }
+        Returns: Json
+      }
+      painel_periodo: {
+        Args: {
+          p_ate: string
+          p_canal: string
+          p_de: string
+          p_org: string
+          p_vendedor: string
+        }
+        Returns: Json
+      }
+      painel_relatorio: { Args: { p_org: string }; Returns: Json }
+      painel_resumo: {
+        Args: {
+          p_ate: string
+          p_canal?: string
+          p_de: string
+          p_org: string
+          p_vendedor?: string
+        }
+        Returns: Json
       }
       pedido_mudar_status: {
         Args: { p_pedido: string; p_status: string }
@@ -2806,6 +3345,7 @@ export type Database = {
           ultima_mensagem_em: string
         }[]
       }
+      pode_acessar_midia: { Args: { p_nome: string }; Returns: boolean }
       pode_ver_canal: { Args: { p_canal: string }; Returns: boolean }
       pode_ver_compromisso: {
         Args: { p_contato: string; p_org: string; p_responsavel: string }
@@ -2859,6 +3399,11 @@ export type Database = {
         Returns: Json
       }
       push_testar: { Args: never; Returns: undefined }
+      reais: { Args: { p: number }; Returns: string }
+      registrar_descricao: {
+        Args: { p_descricao: string; p_mensagem: string }
+        Returns: Json
+      }
       registrar_entrada: {
         Args: {
           p_canal: string
@@ -2873,6 +3418,10 @@ export type Database = {
           p_wa_id: string
         }
         Returns: Json
+      }
+      registrar_envio_documento: {
+        Args: { p_documento: string; p_mensagem: string }
+        Returns: undefined
       }
       registrar_saida_celular: {
         Args: {
@@ -2902,6 +3451,19 @@ export type Database = {
         Args: { p_mensagem: string; p_transcricao: string }
         Returns: Json
       }
+      sem_acento: { Args: { p: string }; Returns: string }
+      simulador_documento: {
+        Args: { p_documento: string; p_org: string }
+        Returns: Json
+      }
+      simulador_montar_pedido: {
+        Args: { p_itens: Json; p_observacao?: string; p_org: string }
+        Returns: Json
+      }
+      simulador_registrar: {
+        Args: { p_org: string; p_user: string }
+        Returns: boolean
+      }
       tem_papel: {
         Args: {
           p_org: string
@@ -2920,59 +3482,6 @@ export type Database = {
       verificar_segredo_interno: {
         Args: { p_segredo: string }
         Returns: boolean
-      }
-      os_preparar: {
-        Args: { p_org: string }
-        Returns: undefined
-      }
-      os_salvar_etapas: {
-        Args: { p_etapas: Json; p_mover?: Json; p_org: string }
-        Returns: undefined
-      }
-      os_mover_itens: {
-        Args: { p_data?: string; p_etapa: string; p_itens: string[] }
-        Returns: undefined
-      }
-      os_definir_desfecho: {
-        Args: { p_data?: string; p_desfecho: string; p_itens: string[] }
-        Returns: undefined
-      }
-      os_faturar: {
-        Args: { p_data: string; p_itens: string[]; p_vencimento?: string }
-        Returns: undefined
-      }
-      os_registrar_pagamento: {
-        Args: { p_data: string; p_itens: string[] }
-        Returns: undefined
-      }
-      os_importar: {
-        Args: { p_linhas: Json; p_org: string }
-        Returns: Json
-      }
-      os_painel: {
-        Args: { p_ate: string; p_de: string; p_org: string }
-        Returns: Json
-      }
-      os_membro: {
-        Args: { p_org: string }
-        Returns: boolean
-      }
-      os_gerente: {
-        Args: { p_org: string }
-        Returns: boolean
-      }
-      os_previsao_itens: {
-        Args: { p_org: string }
-        Returns: {
-          dias_na_etapa: number
-          em_orcamento: boolean
-          fatura_em: string
-          finaliza_em: string
-          item_id: string
-          normal_etapa: number
-          parado: boolean
-          recebe_em: string
-        }[]
       }
     }
     Enums: {

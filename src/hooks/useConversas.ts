@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '../services/supabaseClient'
+import { escutarParaRecarregar } from '../services/aoVivo'
 import {
   contarPorEstado,
   listarConversas,
@@ -24,7 +24,6 @@ export function useConversas(orgId: string | undefined, estado: EstadoConversa, 
   useEffect(() => {
     if (!orgId) return
     let ativo = true
-    let espera: ReturnType<typeof setTimeout> | undefined
     const buscar = () =>
       Promise.all([listarConversas(orgId, estado, canalId), contarPorEstado(orgId, canalId)])
         .then(([lista, cont]) => {
@@ -34,18 +33,10 @@ export function useConversas(orgId: string | undefined, estado: EstadoConversa, 
         })
         .catch(() => ativo && setDados({ chave, conversas: [], erro: 'Não foi possível carregar as conversas.' }))
     void buscar()
-    const canal = supabase
-      .channel(`conversas-${chave}-${versao}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversas', filter: `org_id=eq.${orgId}` }, () => {
-        // Rajadas (várias mensagens seguidas) viram uma recarga só.
-        clearTimeout(espera)
-        espera = setTimeout(() => void buscar(), 400)
-      })
-      .subscribe()
+    const parar = escutarParaRecarregar(`conversas-${chave}-${versao}`, 'conversas', `org_id=eq.${orgId}`, () => void buscar())
     return () => {
       ativo = false
-      clearTimeout(espera)
-      void supabase.removeChannel(canal)
+      parar()
     }
   }, [orgId, estado, canalId, chave, versao])
 
@@ -67,23 +58,15 @@ export function useContagemAguardando(orgId: string | undefined) {
   useEffect(() => {
     if (!orgId) return
     let ativo = true
-    let espera: ReturnType<typeof setTimeout> | undefined
     const contar = () =>
       contarPorEstado(orgId)
         .then((c) => ativo && setTotal(c.aguardando_humano))
         .catch(() => undefined)
     void contar()
-    const canal = supabase
-      .channel(`aguardando-${orgId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversas', filter: `org_id=eq.${orgId}` }, () => {
-        clearTimeout(espera)
-        espera = setTimeout(contar, 400)
-      })
-      .subscribe()
+    const parar = escutarParaRecarregar(`aguardando-${orgId}`, 'conversas', `org_id=eq.${orgId}`, () => void contar())
     return () => {
       ativo = false
-      clearTimeout(espera)
-      void supabase.removeChannel(canal)
+      parar()
     }
   }, [orgId])
 

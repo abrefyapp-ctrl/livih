@@ -51,6 +51,13 @@ export type Relatorio = {
 
 export const MINUTOS_PADRAO = 2
 
+/** Números de WhatsApp ativos da empresa, para o filtro do Painel. */
+export async function listarNumerosAtivos(orgId: string): Promise<{ id: string; nome: string }[]> {
+  const { data, error } = await supabase.from('canais').select('id, nome').eq('org_id', orgId).eq('ativo', true).order('nome')
+  if (error) throw error
+  return data ?? []
+}
+
 export async function buscarResumo(orgId: string, de: Date, ate: Date, canal: string | null, vendedor: string | null): Promise<Resumo> {
   const { data, error } = await supabase.rpc('painel_resumo', {
     p_org: orgId,

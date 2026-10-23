@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../services/supabaseClient'
+import { definirSenha } from '../services/autenticacao'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
@@ -52,7 +52,7 @@ export function DefinirSenha() {
     if (senha.length < 8 || senha !== confirmacao) return
     setEnviando(true)
     setErro(null)
-    const { error } = await supabase.auth.updateUser({ password: senha })
+    const error = await definirSenha(senha)
     setEnviando(false)
     if (error) setErro(motivoDoErro(error))
     else navegar('/conversas', { replace: true })

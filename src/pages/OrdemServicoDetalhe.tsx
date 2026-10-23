@@ -5,6 +5,7 @@ import {
   apagarItem,
   apagarOrdem,
   buscarOrdem,
+  buscarPrevisao,
   carregarConfiguracao,
   data,
   diasEntre,
@@ -21,7 +22,6 @@ import {
 } from '../services/os'
 import { conversaDoCliente, type ConversaEnvio } from '../services/orcamento'
 import { enviarPdfOsWhatsapp, gerarPdfOs, montarPdfOs, nomeArquivoOs, type DadosPdfOs } from '../services/orcamentoOs'
-import { supabase } from '../services/supabaseClient'
 import { VisualizadorPdf } from '../components/VisualizadorPdf'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
@@ -71,12 +71,12 @@ export function OrdemServicoDetalhe() {
   useEffect(() => {
     if (!id) return
     let ativo = true
-    Promise.all([buscarOrdem(id), carregarConfiguracao(orgId), todasAsEtapas(orgId), listarPrazosClientes(orgId), supabase.rpc('os_previsao_itens', { p_org: orgId })])
+    Promise.all([buscarOrdem(id), carregarConfiguracao(orgId), todasAsEtapas(orgId), listarPrazosClientes(orgId), buscarPrevisao(orgId)])
       .then(([achado, cfg, todas, prazos, previsao]) => {
         if (!ativo) return
         if (!achado) return setDados(null)
         const prazo = prazos.find((p) => p.contato_id === achado.ordem.contato_id)?.prazo_pagamento_dias ?? cfg.config.prazo_pagamento_dias
-        setDados({ id, ...achado, cfg, todas, prazo, previsao: new Map((previsao.data ?? []).map((p) => [p.item_id, p])) })
+        setDados({ id, ...achado, cfg, todas, prazo, previsao })
         setErro(null)
       })
       .catch(() => ativo && setErro('Não foi possível carregar a OS.'))
@@ -446,7 +446,7 @@ export function OrdemServicoDetalhe() {
       {atual && acao?.tipo === 'item' && (
         <ModalItem
           orgId={orgId}
-          osId={atual.ordem.id}
+          ordem={atual.ordem}
           cfg={atual.cfg}
           item={acao.item}
           proximaOrdem={Math.max(-1, ...atual.itens.map((i) => i.ordem)) + 1}

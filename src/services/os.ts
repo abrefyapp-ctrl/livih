@@ -192,6 +192,13 @@ async function emPaginas<T>(consulta: (de: number, ate: number) => PromiseLike<{
 
 export type Oficina = { ordens: Map<string, Ordem>; itens: ItemOs[]; previsao: Map<string, PrevisaoItem> }
 
+/** Previsão de cada item aberto ou a receber (término, faturamento, recebimento, parado). Sempre estimativa. */
+export async function buscarPrevisao(orgId: string): Promise<Map<string, PrevisaoItem>> {
+  const { data, error } = await supabase.rpc('os_previsao_itens', { p_org: orgId })
+  if (error) throw error
+  return new Map((data ?? []).map((p) => [p.item_id, p]))
+}
+
 /** Ordens, itens e a previsão de cada item: o quadro, a lista e a busca trabalham sobre isso. */
 export async function carregarOficina(orgId: string): Promise<Oficina> {
   const [ordens, itens, previsao] = await Promise.all([
@@ -199,14 +206,9 @@ export async function carregarOficina(orgId: string): Promise<Oficina> {
     emPaginas<Tabelas['os_itens']['Row']>((de, ate) =>
       supabase.from('os_itens').select('*').eq('org_id', orgId).order('os_id').order('ordem').order('id').range(de, ate),
     ),
-    supabase.rpc('os_previsao_itens', { p_org: orgId }),
+    buscarPrevisao(orgId),
   ])
-  if (previsao.error) throw previsao.error
-  return {
-    ordens: new Map(ordens.map((o) => [o.id, o])),
-    itens: itens.map(deItem),
-    previsao: new Map((previsao.data ?? []).map((p) => [p.item_id, p])),
-  }
+  return { ordens: new Map(ordens.map((o) => [o.id, o])), itens: itens.map(deItem), previsao }
 }
 
 export async function buscarOrdem(id: string): Promise<{ ordem: Ordem; itens: ItemOs[]; historico: PassoOs[] } | null> {
@@ -229,14 +231,29 @@ export type DadosItem = Pick<ItemOs, 'tipo_id' | 'servico_id' | 'modelo' | 'iden
 
 const linhaItem = (d: Partial<DadosItem>) => ({ ...d, campos: d.campos as Json | undefined })
 
-/** Cria a OS com os itens (cada item entra na primeira etapa, desde a data de recebimento). Devolve o id. */
-export async function criarOrdem(orgId: string, dados: DadosOrdem, itens: DadosItem[]): Promise<string> {
-  const { data, error } = await supabase.from('ordens_servico').insert({ org_id: orgId, ...dados }).select('id').single()
+// Item novo entra na primeira etapa, desde o recebimento da OS. O gatilho do banco confere a etapa; a tela manda os
+// dois porque as colunas são obrigatórias (e o tipo gerado do banco exige).
+const linhasItens = (orgId: string, os: Pick<Ordem, 'id' | 'recebida_em'>, etapaInicial: string, itens: DadosItem[], ordemInicial: number) =>
+  itens.map((i, n) => ({
+    org_id: orgId,
+    os_id: os.id,
+    ordem: ordemInicial + n,
+    etapa_id: etapaInicial,
+    etapa_desde: os.recebida_em,
+    ...linhaItem(i),
+  }))
+
+/** Cria a OS com os itens. Devolve o id. */
+export async function criarOrdem(orgId: string, dados: DadosOrdem, itens: DadosItem[], etapaInicial: string): Promise<string> {
+  // numero: o gatilho numera em sequência por empresa (o 0 só cumpre a coluna obrigatória, como no pedido).
+  const { data, error } = await supabase
+    .from('ordens_servico')
+    .insert({ org_id: orgId, numero: 0, ...dados })
+    .select('id, recebida_em')
+    .single()
   if (error) throw amigavel(error, 'Não foi possível criar a OS.')
   if (itens.length) {
-    const r = await supabase
-      .from('os_itens')
-      .insert(itens.map((i, n) => ({ org_id: orgId, os_id: data.id, ordem: n, ...linhaItem(i) })))
+    const r = await supabase.from('os_itens').insert(linhasItens(orgId, data, etapaInicial, itens, 0))
     if (r.error) throw amigavel(r.error, 'A OS foi criada, mas os itens não. Abra a OS e adicione de novo.')
   }
   return data.id
@@ -252,10 +269,14 @@ export async function apagarOrdem(id: string) {
   if (error || !count) throw new Error('Não foi possível apagar a OS (só dono e admin apagam).')
 }
 
-export async function adicionarItens(orgId: string, osId: string, itens: DadosItem[], ordemInicial: number) {
-  const { error } = await supabase
-    .from('os_itens')
-    .insert(itens.map((i, n) => ({ org_id: orgId, os_id: osId, ordem: ordemInicial + n, ...linhaItem(i) })))
+export async function adicionarItens(
+  orgId: string,
+  os: Pick<Ordem, 'id' | 'recebida_em'>,
+  etapaInicial: string,
+  itens: DadosItem[],
+  ordemInicial: number,
+) {
+  const { error } = await supabase.from('os_itens').insert(linhasItens(orgId, os, etapaInicial, itens, ordemInicial))
   if (error) throw amigavel(error, 'Não foi possível adicionar o item.')
 }
 

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { supabase } from '../services/supabaseClient'
+import { escutar } from '../services/aoVivo'
 import {
   assumirConversa,
   buscarConversa,
@@ -73,15 +73,16 @@ export function PainelConversa({
     buscarConversa(conversaId)
       .then((c) => ativo && setConversa(c))
       .catch(() => ativo && setConversa(null))
-    const canal = supabase
-      .channel(`conversa-${conversaId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversas', filter: `id=eq.${conversaId}` }, (e) =>
-        setConversa((atual) => (atual ? { ...atual, ...(e.new as Partial<ConversaLista>), contato: atual.contato } : atual)),
-      )
-      .subscribe()
+    const parar = escutar(
+      `conversa-${conversaId}`,
+      'conversas',
+      `id=eq.${conversaId}`,
+      (e) => setConversa((atual) => (atual ? { ...atual, ...(e.new as Partial<ConversaLista>), contato: atual.contato } : atual)),
+      'UPDATE',
+    )
     return () => {
       ativo = false
-      void supabase.removeChannel(canal)
+      parar()
     }
   }, [conversaId])
 

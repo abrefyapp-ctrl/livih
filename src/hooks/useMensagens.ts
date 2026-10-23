@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../services/supabaseClient'
+import { escutar } from '../services/aoVivo'
 import { listarMensagens, type Mensagem } from '../services/atendimento'
 
 type Estado = { conversaId: string; mensagens: Mensagem[]; erro: string | null }
@@ -27,22 +27,13 @@ export function useMensagens(conversaId: string) {
       .then((lista) => ativo && setEstado({ conversaId, mensagens: lista, erro: null }))
       .catch(() => ativo && setEstado({ conversaId, mensagens: [], erro: 'Não foi possível carregar as mensagens.' }))
 
-    const canal = supabase
-      .channel(`mensagens-${conversaId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'mensagens', filter: `conversa_id=eq.${conversaId}` },
-        (evento) => {
-          if (evento.eventType === 'DELETE') return
-          setEstado((e) =>
-            e && e.conversaId === conversaId ? { ...e, mensagens: aplicar(e.mensagens, evento.new as Mensagem) } : e,
-          )
-        },
-      )
-      .subscribe()
+    const parar = escutar(`mensagens-${conversaId}`, 'mensagens', `conversa_id=eq.${conversaId}`, (evento) => {
+      if (evento.eventType === 'DELETE') return
+      setEstado((e) => (e && e.conversaId === conversaId ? { ...e, mensagens: aplicar(e.mensagens, evento.new as Mensagem) } : e))
+    })
     return () => {
       ativo = false
-      void supabase.removeChannel(canal)
+      parar()
     }
   }, [conversaId])
 

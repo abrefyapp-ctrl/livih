@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
-import { supabase } from '../services/supabaseClient'
+import { escutarParaRecarregar } from '../services/aoVivo'
 import { atualizarOportunidade, listarEtapas, listarOportunidades, type Etapa, type Oportunidade } from '../services/crm'
 import { haQuanto, moeda, nomeDoContato } from '../services/formato'
 import { useSessao } from '../hooks/useSessao'
@@ -36,7 +36,6 @@ export function Oportunidades() {
 
   useEffect(() => {
     let ativo = true
-    let espera: ReturnType<typeof setTimeout> | undefined
     const buscar = () =>
       Promise.all([listarEtapas(orgId), listarOportunidades(orgId)])
         .then(([etapas, lista]) => {
@@ -48,17 +47,10 @@ export function Oportunidades() {
         .catch(() => ativo && setErro('Não foi possível carregar o funil.'))
     void buscar()
     // Ao vivo: o agente ou outro membro move um cartão e o quadro acompanha.
-    const canal = supabase
-      .channel(`oportunidades-${orgId}-${versao}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'oportunidades', filter: `org_id=eq.${orgId}` }, () => {
-        clearTimeout(espera)
-        espera = setTimeout(() => void buscar(), 400)
-      })
-      .subscribe()
+    const parar = escutarParaRecarregar(`oportunidades-${orgId}-${versao}`, 'oportunidades', `org_id=eq.${orgId}`, () => void buscar())
     return () => {
       ativo = false
-      clearTimeout(espera)
-      void supabase.removeChannel(canal)
+      parar()
     }
   }, [orgId, versao])
 

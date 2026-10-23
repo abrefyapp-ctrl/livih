@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase } from '../services/supabaseClient'
+import { acompanharSessao, encerrarSessao } from '../services/autenticacao'
 import { listarEquipe, listarOrganizacoes, type Organizacao, type Perfil } from '../services/atendimento'
 import { ehAdminPlataforma } from '../services/plataforma'
 import { listarModulos } from '../services/modulos'
@@ -45,11 +45,7 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
   const [modulos, setModulos] = useState<Modulos | null>(null)
   const [versaoModulos, setVersaoModulos] = useState(0)
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSessao(data.session))
-    const { data } = supabase.auth.onAuthStateChange((_evento, nova) => setSessao(nova))
-    return () => data.subscription.unsubscribe()
-  }, [])
+  useEffect(() => acompanharSessao(setSessao), [])
 
   const userId = sessao?.user.id
   useEffect(() => {
@@ -153,7 +149,7 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
     // Aparelho compartilhado: quem sai não continua recebendo as notificações da conta.
     await desativarNotificacoes().catch(() => undefined)
     sairDoSuporte()
-    await supabase.auth.signOut()
+    await encerrarSessao()
   }, [sairDoSuporte])
 
   const valor = useMemo(

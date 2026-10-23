@@ -11,6 +11,7 @@ import { moeda } from '../services/formato'
 import {
   buscarPendencias,
   buscarResumo,
+  listarNumerosAtivos,
   duracao,
   horasEconomizadas,
   MINUTOS_PADRAO,
@@ -19,7 +20,6 @@ import {
   type Pendencias,
   type Resumo,
 } from '../services/painel'
-import { supabase } from '../services/supabaseClient'
 
 const PERIODOS = [
   { dias: 7, rotulo: 'Últimos 7 dias' },
@@ -53,13 +53,9 @@ export function Painel() {
 
   useEffect(() => {
     let ativo = true
-    supabase
-      .from('canais')
-      .select('id, nome')
-      .eq('org_id', orgId)
-      .eq('ativo', true)
-      .order('nome')
-      .then(({ data }) => ativo && setNumeros(data ?? []))
+    listarNumerosAtivos(orgId)
+      .then((lista) => ativo && setNumeros(lista))
+      .catch(() => undefined)
     return () => {
       ativo = false
     }

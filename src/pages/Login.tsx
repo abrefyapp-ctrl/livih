@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { supabase } from '../services/supabaseClient'
+import { entrar as entrarComSenha, pedirNovaSenha } from '../services/autenticacao'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
@@ -26,7 +26,7 @@ export function Login() {
     e.preventDefault()
     setEnviando(true)
     setErro(null)
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha })
+    const error = await entrarComSenha(email, senha)
     setEnviando(false)
     if (error) {
       setErro(
@@ -41,9 +41,7 @@ export function Login() {
     e.preventDefault()
     setEnviando(true)
     setErro(null)
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/definir-senha`,
-    })
+    const error = await pedirNovaSenha(email)
     setEnviando(false)
     if (error) setErro('Não foi possível enviar o link agora. Tente de novo em instantes.')
     else setLinkEnviado(true)

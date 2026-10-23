@@ -456,9 +456,9 @@ function CamposItem({ r, cfg, novo, aoMudar }: { r: RascunhoItem; cfg: Configura
 }
 
 /** Novo item numa OS que já existe, ou edição de um item. */
-export function ModalItem({ orgId, osId, cfg, item, proximaOrdem, aoFechar, aoSalvar }: {
+export function ModalItem({ orgId, ordem, cfg, item, proximaOrdem, aoFechar, aoSalvar }: {
   orgId: string
-  osId: string
+  ordem: Pick<Ordem, 'id' | 'recebida_em'>
   cfg: ConfiguracaoOs
   item?: ItemOs
   proximaOrdem: number
@@ -480,7 +480,7 @@ export function ModalItem({ orgId, osId, cfg, item, proximaOrdem, aoFechar, aoSa
         id="form-item"
         onSubmit={(e) => {
           e.preventDefault()
-          void executar(() => (item ? atualizarItem(item.id, paraDados(r)) : adicionarItens(orgId, osId, expandir(r), proximaOrdem)))
+          void executar(() => (item ? atualizarItem(item.id, paraDados(r)) : adicionarItens(orgId, ordem, cfg.etapas[0].id, expandir(r), proximaOrdem)))
         }}
         className="space-y-3"
       >
@@ -552,7 +552,7 @@ export function ModalOrdem({ orgId, cfg, ordem, aoFechar, aoSalvar }: {
         await atualizarOrdem(ordem.id, dados)
         aoSalvar(ordem.id)
       } else {
-        aoSalvar(await criarOrdem(orgId, dados, itens.flatMap(expandir)))
+        aoSalvar(await criarOrdem(orgId, dados, itens.flatMap(expandir), cfg.etapas[0].id))
       }
     } catch (e) {
       setErro((e as Error).message)

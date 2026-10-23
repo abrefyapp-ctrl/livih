@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "verificar": "node scripts/verificar_site.mjs",
     "publicar": "git diff --quiet HEAD -- src public index.html && npm run build && git push && node scripts/verificar_site.mjs --esperar",
-    "pdf:build": "vite build --config pdf-servico/vite.config.ts"
+    "pdf:build": "vite build --config pdf-servico/vite.config.ts",
+    "tipos": "npx -y supabase gen types typescript --linked > src/services/tiposBanco.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",
