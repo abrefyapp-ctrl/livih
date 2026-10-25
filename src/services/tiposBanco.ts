@@ -3120,6 +3120,10 @@ export type Database = {
         Args: { p_corpo?: Json; p_funcao: string }
         Returns: number
       }
+      clientes_importar: {
+        Args: { p_linhas: Json; p_org: string }
+        Returns: Json
+      }
       cnpj_valido: { Args: { p: string }; Returns: boolean }
       contato_por_whatsapp: {
         Args: {

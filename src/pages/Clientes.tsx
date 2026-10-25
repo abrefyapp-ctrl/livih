@@ -9,6 +9,7 @@ import { Botao } from '../components/Botao'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { Icone } from '../components/Icone'
 import { ModalCliente } from '../components/ModalCliente'
+import { ModalImportarClientes } from '../components/ModalImportarClientes'
 
 const local = (c: ClienteLista) => [c.cidade, c.uf].filter(Boolean).join('/')
 const contatos = (c: ClienteLista) => c.contatos[0]?.count ?? 0
@@ -27,13 +28,16 @@ export function Clientes() {
   const [dados, setDados] = useState<{ chave: string; lista: ClienteLista[] } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [novo, setNovo] = useState(false)
+  const [importando, setImportando] = useState(false)
+  const [versao, setVersao] = useState(0)
+  const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
 
   useEffect(() => {
     const t = setTimeout(() => setBuscaAplicada(busca), 300)
     return () => clearTimeout(t)
   }, [busca])
 
-  const chave = `${orgId}|${buscaAplicada}|${comPedidos}`
+  const chave = `${orgId}|${buscaAplicada}|${comPedidos}|${versao}`
   useEffect(() => {
     let ativo = true
     listarClientes(orgId, buscaAplicada, comPedidos)
@@ -60,9 +64,16 @@ export function Clientes() {
             <h1 className="text-h1 font-semibold">Clientes</h1>
             <p className="text-pequeno text-texto-3">Quem compra: empresa (CNPJ) ou pessoa (CPF), com os contatos do WhatsApp ligados.</p>
           </div>
-          <Botao icone="mais" onClick={() => setNovo(true)}>
-            Novo cliente
-          </Botao>
+          <div className="flex flex-wrap gap-2">
+            {gerencia && (
+              <Botao variante="secundario" icone="arquivo" onClick={() => setImportando(true)}>
+                Importar planilha
+              </Botao>
+            )}
+            <Botao icone="mais" onClick={() => setNovo(true)}>
+              Novo cliente
+            </Botao>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -175,6 +186,16 @@ export function Clientes() {
         </div>
       </div>
 
+      {importando && (
+        <ModalImportarClientes
+          orgId={orgId}
+          aoFechar={() => setImportando(false)}
+          aoImportar={() => {
+            setImportando(false)
+            setVersao((v) => v + 1)
+          }}
+        />
+      )}
       {novo && (
         <ModalCliente
           aoFechar={() => setNovo(false)}

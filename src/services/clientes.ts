@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient'
-import type { Database } from './tiposBanco'
+import type { Database, Json } from './tiposBanco'
+import type { LinhaCliente } from './planilhaClientes'
 
 // Cadastro de clientes (migration 20261024120000, docs/clientes.md). Cliente é quem compra (CNPJ ou CPF); os
 // contatos do WhatsApp apontam o cliente (contatos.cliente_id). A RLS segue a carteira; quem tem "Vê todos os
@@ -215,6 +216,16 @@ export async function atividadeDosContatos(contatoIds: string[]): Promise<{ nego
   if (n.error) throw n.error
   if (v.error) throw v.error
   return { negocios: (n.data ?? []) as unknown as NegocioDoCliente[], conversas: v.data ?? [] }
+}
+
+// ---- importação (planilha) ----
+
+export type ResultadoImportacao = { criados: number; atualizados: number; contatos_criados: number; contatos_ligados: number; avisos: string[] }
+
+export async function importarClientes(orgId: string, linhas: LinhaCliente[]): Promise<ResultadoImportacao> {
+  const { data, error } = await supabase.rpc('clientes_importar', { p_org: orgId, p_linhas: linhas as unknown as Json })
+  if (error) throw new Error(error.message.includes('só dono e admin') ? 'Só dono e admin importam clientes.' : 'Não foi possível importar. Nada foi gravado.')
+  return data as unknown as ResultadoImportacao
 }
 
 // ---- equipe ----

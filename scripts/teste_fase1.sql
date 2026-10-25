@@ -2886,5 +2886,50 @@ begin
     and (select o.cliente_id is not null from public.ordens_servico o where o.org_id = v_org and o.nf_cliente = 'Z1');
 end $$;
 
+-- Importar planilha de clientes (migration 20261024150000); ainda como a1 (dono)
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  r jsonb; r2 jsonb;
+begin
+  r := public.clientes_importar(v_org, jsonb_build_array(
+    -- já existe (Beta, pelo CNPJ): só a cidade muda, o resto fica
+    jsonb_build_object('documento', '11.444.777/0001-61', 'cidade', 'Blumenau', 'razao_social', ''),
+    -- novo, com celular de contato novo
+    jsonb_build_object('nome', 'Delta Peças', 'documento', '04.252.011/0001-10', 'cep', '89010-000', 'uf', 'sc',
+                       'celular', '(47) 99999-0001', 'contato', 'Débora'),
+    -- novo, CNPJ inválido: entra sem documento
+    jsonb_build_object('nome', 'Épsilon', 'documento', '11.111.111/1111-11'),
+    -- sem nome nem documento: ignorada
+    jsonb_build_object('cidade', 'Lugar nenhum')));
+  insert into resultado (teste, ok) values ('clientes: importação cria, atualiza pelo CNPJ e avisa o que ficou de fora',
+    (r ->> 'criados')::int = 2 and (r ->> 'atualizados')::int = 1 and (r ->> 'contatos_criados')::int = 1
+    and jsonb_array_length(r -> 'avisos') = 2
+    and (select cidade = 'Blumenau' and razao_social = 'Beta Comércio Ltda' and uf = 'SC'
+           from public.clientes where org_id = v_org and documento = '11444777000161')
+    and exists (select 1 from public.clientes where org_id = v_org and nome = 'Épsilon' and documento is null));
+  insert into resultado (teste, ok) select 'clientes: importado é da empresa, com o contato do celular ligado',
+    c.responsavel_id is null and c.cep = '89010000' and c.uf = 'SC'
+    and exists (select 1 from public.contatos ct where ct.cliente_id = c.id and ct.telefone = '5547999990001'
+                 and ct.nome = 'Débora' and ct.responsavel_id is null)
+    from public.clientes c where c.org_id = v_org and documento = '04252011000110';
+
+  -- mesma planilha de novo: não duplica (pelo CNPJ e, sem documento, pelo nome)
+  r2 := public.clientes_importar(v_org, jsonb_build_array(
+    jsonb_build_object('nome', 'Delta Peças', 'documento', '04252011000110', 'celular', '47999990001'),
+    jsonb_build_object('nome', 'épsilon', 'cidade', 'Itajaí')));
+  insert into resultado (teste, ok) values ('clientes: importar de novo atualiza em vez de duplicar',
+    (r2 ->> 'criados')::int = 0 and (r2 ->> 'atualizados')::int = 2 and (r2 ->> 'contatos_criados')::int = 0
+    and (select count(*) from public.clientes where org_id = v_org and lower(nome) in ('delta peças', 'épsilon')) = 2
+    and (select cidade from public.clientes where org_id = v_org and lower(nome) = 'épsilon') = 'Itajaí');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.clientes_importar(current_setting('teste.f7')::uuid, '[{"nome":"x"}]');
+  insert into resultado (teste, ok) values ('clientes: atendente não importa', false);
+exception when others then
+  insert into resultado (teste, ok) values ('clientes: atendente não importa', sqlerrm like 'só dono e admin%');
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

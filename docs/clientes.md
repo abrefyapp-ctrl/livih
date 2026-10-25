@@ -150,6 +150,10 @@ admin mudam (pela função que já altera papel e status do membro, com auditori
    ou razão social) e cria o que falta. A planilha da OS ganhou a coluna CNPJ/CPF; a Nova OS escolhe o cliente (o
    contato vira "A/C"); o PDF da OS e o do orçamento usam o mesmo bloco de cliente (`ClientePdf`).
 4. **Importação** de planilha de clientes.
+   Feita em 24/10 (`20261024150000_clientes_importar.sql`, `clientes_importar`; tela em Clientes → Importar planilha,
+   dono e admin). CSV com colunas reconhecidas pelo nome; acha pelo CNPJ/CPF (sem documento, pelo nome, se houver um
+   só), atualiza só o que veio preenchido, cria sem vendedor responsável e liga o celular ao contato (ou cria o
+   contato). Documento, CEP, UF ou celular inválidos não derrubam a linha: voltam como aviso.
 5. **n8n:** texto do contexto do agente.
 
 Esforço estimado: 2 a 3 dias, mais meio dia para a OS.
