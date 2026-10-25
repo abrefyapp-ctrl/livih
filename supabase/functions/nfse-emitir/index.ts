@@ -174,6 +174,9 @@ Deno.serve(async (req) => {
     valor_servico: valor,
     tributacao_iss: 1,
     tipo_retencao_iss: p.iss_retido ? 2 : 1,
+    // Total aproximado de tributos (Lei da Transparência): obrigatório no XML; o emitente opta por não informar o
+    // valor estimado (Decreto 8.264/2014). Primeiro teste da F7 (25/10) recusado sem ele.
+    indicador_total_tributacao: 0,
     ...(p.informacoes?.trim() ? { informacoes_complementares: p.informacoes.trim().slice(0, 2000) } : {}),
     // Reforma tributária: finalidade regular, consumidor final (pessoa física) e destinatário = tomador.
     finalidade_emissao: 0,
