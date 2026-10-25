@@ -13,7 +13,8 @@ const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE
 });
 // A API de empresas fica no servidor de produção, com o token principal da conta da Livih.
 const FOCUS_EMPRESAS = "https://api.focusnfe.com.br/v2/empresas";
-const TOKEN_REVENDA = Deno.env.get("FOCUS_TOKEN_PRODUCAO") ?? "";
+// Sem espaço ou quebra de linha colados ao salvar o segredo (a Focus recusa o token com eles).
+const TOKEN_REVENDA = (Deno.env.get("FOCUS_TOKEN_PRODUCAO") ?? "").trim();
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
