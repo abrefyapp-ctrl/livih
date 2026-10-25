@@ -38,7 +38,7 @@ export type DadosFiscais = {
   email: string | null
 }
 
-const CAMPOS_FISCAIS = 'tipo, nome, razao_social, documento, inscricao_estadual, logradouro, numero, complemento, bairro, cidade, uf, cep, email'
+export const CAMPOS_FISCAIS = 'tipo, nome, razao_social, documento, inscricao_estadual, logradouro, numero, complemento, bairro, cidade, uf, cep, email'
 
 export async function comoDataUrl(url: string): Promise<string | null> {
   try {

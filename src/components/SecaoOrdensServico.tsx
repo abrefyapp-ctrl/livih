@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { listarContatos, type ContatoLista } from '../services/crm'
-import { lerNumero, moeda, nomeDoContato } from '../services/formato'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { lerNumero, moeda } from '../services/formato'
+import { ModalEscolherCliente } from './ClienteDoContato'
 import {
   carregarConfiguracao,
   carregarOficina,
@@ -239,23 +239,12 @@ function Etapas({ orgId, cfg, itensPorEtapa, aoSalvar }: { orgId: string; cfg: C
 function Prazos({ orgId, cfg, prazos, aoSalvar }: { orgId: string; cfg: ConfiguracaoOs; prazos: PrazoCliente[]; aoSalvar: () => void }) {
   const [padrao, setPadrao] = useState(String(cfg.config.prazo_pagamento_dias))
   const [fator, setFator] = useState(String(cfg.config.alerta_fator).replace('.', ','))
-  const [contatos, setContatos] = useState<ContatoLista[]>([])
-  const [novoContato, setNovoContato] = useState('')
+  const [novoCliente, setNovoCliente] = useState<{ id: string; nome: string } | null>(null)
+  const [escolher, setEscolher] = useState(false)
   const [novoPrazo, setNovoPrazo] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [salvo, setSalvo] = useState(false)
-
-  useEffect(() => {
-    let ativo = true
-    listarContatos(orgId, '')
-      .then((l) => ativo && setContatos(l))
-      .catch(() => undefined)
-    return () => {
-      ativo = false
-    }
-  }, [orgId])
-  const porId = useMemo(() => new Map(contatos.map((c) => [c.id, c])), [contatos])
 
   const nPadrao = Number(padrao)
   const nFator = lerNumero(fator)
@@ -297,41 +286,32 @@ function Prazos({ orgId, cfg, prazos, aoSalvar }: { orgId: string; cfg: Configur
         <p className="text-pequeno font-medium text-texto-2">Clientes com prazo diferente</p>
         {prazos.length > 0 && (
           <ul className="divide-y divide-borda rounded-md border border-borda text-pequeno">
-            {prazos.map((p) => {
-              const c = porId.get(p.contato_id)
-              return (
-                <li key={p.contato_id} className="flex items-center gap-2 px-3 py-2">
-                  <span className="min-w-0 flex-1 truncate">{c ? `${nomeDoContato(c)}${c.empresa ? ` · ${c.empresa}` : ''}` : 'Contato'}</span>
-                  <span className="tabular-nums">{p.prazo_pagamento_dias} dias</span>
-                  <button type="button" onClick={() => void executar(() => definirPrazoCliente(orgId, p.contato_id, null))} aria-label="Voltar ao prazo padrão"
-                    className="rounded-md p-1.5 text-texto-3 hover:bg-erro-suave hover:text-erro">
-                    <Icone nome="lixeira" className="size-4" />
-                  </button>
-                </li>
-              )
-            })}
+            {prazos.map((p) => (
+              <li key={p.cliente_id} className="flex items-center gap-2 px-3 py-2">
+                <span className="min-w-0 flex-1 truncate">{p.cliente?.nome ?? 'Cliente'}</span>
+                <span className="tabular-nums">{p.prazo_pagamento_dias} dias</span>
+                <button type="button" onClick={() => void executar(() => definirPrazoCliente(orgId, p.cliente_id, null))} aria-label="Voltar ao prazo padrão"
+                  className="rounded-md p-1.5 text-texto-3 hover:bg-erro-suave hover:text-erro">
+                  <Icone nome="lixeira" className="size-4" />
+                </button>
+              </li>
+            ))}
           </ul>
         )}
         <div className="flex flex-wrap items-end gap-2">
           <Campo rotulo="Cliente" id="prazo-cliente">
-            <select id="prazo-cliente" value={novoContato} onChange={(e) => setNovoContato(e.target.value)} className={`${CLASSE_CAMPO} w-72`}>
-              <option value="">Escolha…</option>
-              {contatos.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {nomeDoContato(c)}
-                  {c.empresa ? ` · ${c.empresa}` : ''}
-                </option>
-              ))}
-            </select>
+            <button id="prazo-cliente" type="button" onClick={() => setEscolher(true)} className={`${CLASSE_CAMPO} w-72 truncate text-left`}>
+              {novoCliente?.nome ?? <span className="text-texto-3">Escolha…</span>}
+            </button>
           </Campo>
           <CampoTexto rotulo="Dias" inputMode="numeric" value={novoPrazo} onChange={(e) => setNovoPrazo(e.target.value.replace(/\D/g, ''))} className="w-24" />
           <Botao
             variante="secundario"
-            disabled={!novoContato || !novoPrazo || Number(novoPrazo) > 365 || salvando}
+            disabled={!novoCliente || !novoPrazo || Number(novoPrazo) > 365 || salvando}
             onClick={() =>
               void executar(async () => {
-                await definirPrazoCliente(orgId, novoContato, Number(novoPrazo))
-                setNovoContato('')
+                await definirPrazoCliente(orgId, novoCliente!.id, Number(novoPrazo))
+                setNovoCliente(null)
                 setNovoPrazo('')
               })
             }
@@ -339,9 +319,19 @@ function Prazos({ orgId, cfg, prazos, aoSalvar }: { orgId: string; cfg: Configur
             Adicionar
           </Botao>
         </div>
-        <p className="text-legenda text-texto-3">Só para cliente cadastrado em Contatos. Cliente digitado na OS usa o prazo padrão.</p>
+        <p className="text-legenda text-texto-3">Pelo cadastro de Clientes. OS sem cliente usa o prazo padrão.</p>
       </div>
       {erro && <Aviso tom="erro">{erro}</Aviso>}
+      {escolher && (
+        <ModalEscolherCliente
+          orgId={orgId}
+          aoFechar={() => setEscolher(false)}
+          aoEscolher={(id, c) => {
+            setNovoCliente({ id, nome: c.nome })
+            setEscolher(false)
+          }}
+        />
+      )}
     </Bloco>
   )
 }

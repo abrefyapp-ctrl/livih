@@ -2,7 +2,7 @@ import { enviarArquivo } from './atendimento'
 import { listarEquipeCompleta } from './configuracoes'
 import { listarEmissoras, urlLogo, type Emissora } from './empresa'
 import { nomeDoContato } from './formato'
-import { comoDataUrl } from './orcamento'
+import { CAMPOS_FISCAIS, comoDataUrl, type DadosFiscais } from './orcamento'
 import type { Cobranca, ConfiguracaoOs, ItemOs, Ordem } from './os'
 import { supabase } from './supabaseClient'
 
@@ -25,6 +25,8 @@ export type DadosPdfOs = {
   emissora: Emissora | null
   logo: string | null
   cliente: { nome: string; empresa: string | null; telefone: string | null; email: string | null } | null
+  /** Cadastro do cliente da OS (razão social, documento, endereço), como no orçamento do pedido. */
+  fiscal: DadosFiscais | null
   responsavel: { nome: string; telefone: string | null; email: string | null } | null
   prazoPagamento: number
 }
@@ -36,11 +38,12 @@ export async function montarPdfOs(
   cfg: ConfiguracaoOs,
   prazoPagamento: number,
 ): Promise<DadosPdfOs> {
-  const [emissoras, equipe, contato, perfil] = await Promise.all([
+  const [emissoras, equipe, contato, perfil, cliente] = await Promise.all([
     listarEmissoras(orgId),
     listarEquipeCompleta(orgId).catch(() => []),
     ordem.contato_id ? supabase.from('contatos').select('nome, nome_whatsapp, telefone, empresa, email').eq('id', ordem.contato_id).maybeSingle() : null,
     ordem.responsavel_id ? supabase.from('perfis').select('nome, telefone').eq('user_id', ordem.responsavel_id).maybeSingle() : null,
+    ordem.cliente_id ? supabase.from('clientes').select(CAMPOS_FISCAIS).eq('id', ordem.cliente_id).maybeSingle() : null,
   ])
   const emissora = emissoras.find((e) => e.padrao) ?? emissoras[0] ?? null
   const logo = emissora?.logo_path ? await comoDataUrl(await urlLogo(emissora.logo_path)) : null
@@ -83,6 +86,7 @@ export async function montarPdfOs(
       : ordem.cliente_nome
         ? { nome: ordem.cliente_nome, empresa: null, telefone: null, email: null }
         : null,
+    fiscal: cliente?.data ?? null,
     responsavel: ordem.responsavel_id
       ? { nome: perfil?.data?.nome || membro?.nome || membro?.email || 'Equipe', telefone: perfil?.data?.telefone ?? null, email: membro?.email ?? null }
       : null,

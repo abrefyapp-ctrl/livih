@@ -2853,5 +2853,38 @@ begin
   end;
 end $$;
 
+-- OS pelo cliente (migration 20261024140000): prazo por cliente e importação ligando ao cliente
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_gama uuid; v_beta uuid; r jsonb;
+begin
+  select id into v_beta from public.clientes where org_id = v_org and documento = '11444777000161';
+  insert into public.clientes (org_id, tipo, nome) values (v_org, 'pj', 'Gama Usinagem') returning id into v_gama;
+  insert into public.os_prazos_cliente (org_id, cliente_id, prazo_pagamento_dias) values (v_org, v_gama, 45);
+
+  r := public.os_importar(v_org, jsonb_build_array(
+    jsonb_build_object('cliente_id', v_gama, 'nf_cliente', 'G1', 'recebida_em', '2026-06-01', 'modelo', 'G-1', 'valor', '100',
+                       'faturado_em', '2026-07-01'),
+    jsonb_build_object('cliente', 'Nome diferente', 'documento', '11.444.777/0001-61', 'nf_cliente', 'B1', 'recebida_em', '2026-06-02',
+                       'modelo', 'B-1'),
+    jsonb_build_object('cliente', 'beta comércio ltda', 'nf_cliente', 'B2', 'recebida_em', '2026-06-03', 'modelo', 'B-2'),
+    jsonb_build_object('cliente', 'Oficina do Zé', 'documento', '111.444.777-35', 'nf_cliente', 'Z1', 'recebida_em', '2026-06-04',
+                       'modelo', 'Z-1')));
+
+  insert into resultado (teste, ok) select 'clientes: OS faturada vence pelo prazo do cliente',
+    exists (select 1 from public.os_itens where org_id = v_org and modelo = 'G-1' and vencimento_em = '2026-08-15');
+  insert into resultado (teste, ok) select 'clientes: importação de OS acha o cliente pelo CNPJ e pela razão social',
+    (select o.cliente_id from public.ordens_servico o where o.org_id = v_org and o.nf_cliente = 'B1') = v_beta
+    and (select o.cliente_id from public.ordens_servico o where o.org_id = v_org and o.nf_cliente = 'B2') = v_beta
+    and (select o.cliente_nome from public.ordens_servico o where o.org_id = v_org and o.nf_cliente = 'B1') = 'Beta';
+  insert into resultado (teste, ok) select 'clientes: importação de OS cria o cliente que falta, com o CPF',
+    (r ->> 'clientes_criados')::int = 1
+    and exists (select 1 from public.clientes where org_id = v_org and nome = 'Oficina do Zé' and tipo = 'pf' and documento = '11144477735')
+    and (select o.cliente_id is not null from public.ordens_servico o where o.org_id = v_org and o.nf_cliente = 'Z1');
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

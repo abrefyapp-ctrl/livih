@@ -2067,26 +2067,26 @@ export type Database = {
       }
       os_prazos_cliente: {
         Row: {
-          contato_id: string
+          cliente_id: string
           org_id: string
           prazo_pagamento_dias: number
         }
         Insert: {
-          contato_id: string
+          cliente_id: string
           org_id: string
           prazo_pagamento_dias: number
         }
         Update: {
-          contato_id?: string
+          cliente_id?: string
           org_id?: string
           prazo_pagamento_dias?: number
         }
         Relationships: [
           {
-            foreignKeyName: "os_prazos_cliente_contato_id_org_id_fkey"
-            columns: ["contato_id", "org_id"]
+            foreignKeyName: "os_prazos_cliente_cliente_id_org_id_fkey"
+            columns: ["cliente_id", "org_id"]
             isOneToOne: false
-            referencedRelation: "contatos"
+            referencedRelation: "clientes"
             referencedColumns: ["id", "org_id"]
           },
         ]
@@ -3373,7 +3373,7 @@ export type Database = {
         Returns: Json
       }
       os_prazo_cliente: {
-        Args: { p_contato: string; p_org: string }
+        Args: { p_cliente: string; p_org: string }
         Returns: number
       }
       os_preparar: { Args: { p_org: string }; Returns: undefined }

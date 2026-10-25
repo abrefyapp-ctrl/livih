@@ -4,7 +4,7 @@
 import { Document, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer'
 import { formatarTelefone, moeda as moedaTela } from '../services/formato'
 import type { DadosPdfOs } from '../services/orcamentoOs'
-import { Cabecalho, data, juntar, Rodape, s } from './DocumentoOrcamento'
+import { Cabecalho, ClientePdf, data, juntar, Rodape, s } from './DocumentoOrcamento'
 
 const moeda = (v: number) => moedaTela(v, true)
 const COBRANCA = { cobrado: '', garantia: 'Garantia', cortesia: 'Cortesia' } as const
@@ -38,14 +38,9 @@ function Documento({ d }: { d: DadosPdfOs }) {
         </View>
 
         <View style={os.dados}>
-          {d.cliente && (
+          {(d.cliente || d.fiscal) && (
             <View style={{ width: '36%' }}>
-              <Text style={s.rotulo}>Cliente</Text>
-              <Text style={s.negrito}>{d.cliente.nome}</Text>
-              {d.cliente.empresa && d.cliente.empresa !== d.cliente.nome && <Text>{d.cliente.empresa}</Text>}
-              {(d.cliente.telefone || d.cliente.email) && (
-                <Text style={s.suave}>{juntar([formatarTelefone(d.cliente.telefone), d.cliente.email])}</Text>
-              )}
+              <ClientePdf cliente={d.cliente} fiscal={d.fiscal} />
             </View>
           )}
           <View style={os.dado}>

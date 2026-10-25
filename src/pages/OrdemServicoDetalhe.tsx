@@ -75,7 +75,7 @@ export function OrdemServicoDetalhe() {
       .then(([achado, cfg, todas, prazos, previsao]) => {
         if (!ativo) return
         if (!achado) return setDados(null)
-        const prazo = prazos.find((p) => p.contato_id === achado.ordem.contato_id)?.prazo_pagamento_dias ?? cfg.config.prazo_pagamento_dias
+        const prazo = prazos.find((p) => p.cliente_id === achado.ordem.cliente_id)?.prazo_pagamento_dias ?? cfg.config.prazo_pagamento_dias
         setDados({ id, ...achado, cfg, todas, prazo, previsao })
         setErro(null)
       })
@@ -214,12 +214,21 @@ export function OrdemServicoDetalhe() {
               <div>
                 <h1 className="text-h1 font-semibold">OS nº {o.numero}</h1>
                 <p className="text-corpo text-texto-2">
-                  {o.contato_id ? (
+                  {o.cliente_id ? (
+                    <Link to={`/clientes/${o.cliente_id}`} className="font-medium text-primaria hover:underline">
+                      {o.cliente_nome ?? 'Cliente'}
+                    </Link>
+                  ) : o.contato_id ? (
                     <Link to={`/contatos/${o.contato_id}`} className="font-medium text-primaria hover:underline">
                       {o.cliente_nome ?? 'Cliente'}
                     </Link>
                   ) : (
                     <span className="font-medium">{o.cliente_nome ?? 'Sem cliente'}</span>
+                  )}
+                  {o.cliente_id && o.contato_id && (
+                    <Link to={`/contatos/${o.contato_id}`} className="text-pequeno text-texto-3 hover:underline">
+                      {' '}· A/C contato
+                    </Link>
                   )}
                 </p>
               </div>

@@ -179,7 +179,20 @@ export async function pedidosDoCliente(clienteId: string): Promise<PedidoDoClien
   return data ?? []
 }
 
-export type NegocioDoCliente = { id: string; titulo: string; valor_estimado: number | null; fechada_em: string | null; contato_id: string; etapa: { nome: string; tipo: Database['public']['Enums']['tipo_etapa'] } | null }
+export type OrdemDoCliente = Pick<Tabelas['ordens_servico']['Row'], 'id' | 'numero' | 'recebida_em' | 'nf_cliente'>
+
+export async function ordensDoCliente(clienteId: string): Promise<OrdemDoCliente[]> {
+  const { data, error } = await supabase
+    .from('ordens_servico')
+    .select('id, numero, recebida_em, nf_cliente')
+    .eq('cliente_id', clienteId)
+    .order('recebida_em', { ascending: false })
+    .limit(50)
+  if (error) throw error
+  return data ?? []
+}
+
+export type NegocioDoCliente ={ id: string; titulo: string; valor_estimado: number | null; fechada_em: string | null; contato_id: string; etapa: { nome: string; tipo: Database['public']['Enums']['tipo_etapa'] } | null }
 export type ConversaDoCliente = { id: string; estado: Database['public']['Enums']['estado_conversa']; ultima_mensagem_em: string | null; ultima_mensagem_resumo: string | null; contato_id: string }
 
 /** Negócios e conversas dos contatos ligados. A RLS mostra só os da carteira ("ver todos" não abre). */

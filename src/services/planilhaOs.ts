@@ -16,10 +16,12 @@ const semAcento = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLo
 const nomeColuna = (h: string) => semAcento(h).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
 
 type Coluna =
-  | 'cliente' | 'nf_cliente' | 'numero_cliente' | 'recebida_em' | 'tipo' | 'modelo' | 'identificacao' | 'valor'
+  | 'cliente' | 'documento' | 'nf_cliente' | 'numero_cliente' | 'recebida_em' | 'tipo' | 'modelo' | 'identificacao' | 'valor'
   | 'cobranca' | 'desfecho' | 'faturado_em' | 'vencimento_em' | 'pago_em' | 'observacao'
 const COLUNAS: Record<Coluna, string[]> = {
   cliente: ['cliente', 'empresa'],
+  // Acha o cliente do cadastro pelo CNPJ/CPF (ou cria com ele); sem a coluna, vale o nome.
+  documento: ['cnpj', 'cpf', 'cnpj cpf', 'cpf cnpj', 'documento', 'cnpj do cliente'],
   nf_cliente: ['nf do cliente', 'nf', 'nota fiscal', 'nota'],
   numero_cliente: ['os do cliente', 'o s do cliente', 'numero do cliente', 'pedido do cliente'],
   recebida_em: ['recebido em', 'recebido', 'recebimento', 'data de recebimento', 'entrada', 'data de entrada'],
@@ -37,6 +39,7 @@ const COLUNAS: Record<Coluna, string[]> = {
 
 const ROTULOS: Record<Coluna, string> = {
   cliente: 'Cliente',
+  documento: 'CNPJ/CPF',
   nf_cliente: 'NF do cliente',
   numero_cliente: 'OS do cliente',
   recebida_em: 'Recebido em',
@@ -89,12 +92,12 @@ function lerDesfecho(v: string): Desfecho | null {
 export function modeloPlanilha(etapas: EtapaOs[]): string {
   const depois = etapas.slice(1)
   const cab = [
-    ...(['cliente', 'nf_cliente', 'numero_cliente', 'recebida_em', 'tipo', 'modelo', 'identificacao', 'valor', 'cobranca', 'desfecho'] as Coluna[]).map((c) => ROTULOS[c]),
+    ...(['cliente', 'documento', 'nf_cliente', 'numero_cliente', 'recebida_em', 'tipo', 'modelo', 'identificacao', 'valor', 'cobranca', 'desfecho'] as Coluna[]).map((c) => ROTULOS[c]),
     ...depois.map((e) => e.nome),
     ...(['faturado_em', 'vencimento_em', 'pago_em', 'observacao'] as Coluna[]).map((c) => ROTULOS[c]),
   ]
   const exemplo = [
-    'Indústria Exemplo', '182979', '124', '07/01/2026', 'Motor', 'SPINDLE SJ ZT', 'L14XE004', '150,00', '', '',
+    'Indústria Exemplo', '', '182979', '124', '07/01/2026', 'Motor', 'SPINDLE SJ ZT', 'L14XE004', '150,00', '', '',
     ...depois.map((_, n) => (n === 0 ? '10/01/2026' : '')),
     '', '', '', 'Troca de rolamento',
   ]
@@ -175,6 +178,7 @@ export function planilhaParaOs(texto: string, etapas: EtapaOs[]): LeituraOs {
     const texto = (c: Coluna, max: number) => celula(l, c).slice(0, max) || null
     linhas.push({
       cliente: texto('cliente', 200),
+      documento: celula(l, 'documento').replace(/\D/g, '') || null,
       nf_cliente: texto('nf_cliente', 40),
       numero_cliente: texto('numero_cliente', 40),
       recebida_em: recebida,

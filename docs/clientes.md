@@ -145,6 +145,10 @@ admin mudam (pela função que já altera papel e status do membro, com auditori
    o contato preenche os rascunhos dele, `fiscal` no `agente_dados_orcamento`). O PDF do agente só mostra o cadastro
    depois de reimportar o `livih-agente.json` e reconstruir o serviço livih-pdf na VPS (junto com a entrega 5).
 3. **OS:** cliente na OS, no PDF, nos prazos e na importação.
+   Feita em 24/10 (`20261024140000_clientes_os.sql`): `os_prazos_cliente` por cliente (estava vazia), `os_prazo_cliente`,
+   `os_faturar` e `os_previsao_itens` pelo cliente da OS, `os_importar` acha o cliente (id, CNPJ/CPF, contato, nome
+   ou razão social) e cria o que falta. A planilha da OS ganhou a coluna CNPJ/CPF; a Nova OS escolhe o cliente (o
+   contato vira "A/C"); o PDF da OS e o do orçamento usam o mesmo bloco de cliente (`ClientePdf`).
 4. **Importação** de planilha de clientes.
 5. **n8n:** texto do contexto do agente.
 

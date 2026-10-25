@@ -150,20 +150,24 @@ export async function desativarServico(id: string) {
   if (error) throw amigavel(error, 'Não foi possível remover o serviço.')
 }
 
-export type PrazoCliente = { contato_id: string; prazo_pagamento_dias: number }
+// Prazo por cliente (a empresa que paga; migration 20261024140000).
+export type PrazoCliente = { cliente_id: string; prazo_pagamento_dias: number; cliente: { nome: string } | null }
 
 export async function listarPrazosClientes(orgId: string): Promise<PrazoCliente[]> {
-  const { data, error } = await supabase.from('os_prazos_cliente').select('contato_id, prazo_pagamento_dias').eq('org_id', orgId)
+  const { data, error } = await supabase
+    .from('os_prazos_cliente')
+    .select('cliente_id, prazo_pagamento_dias, cliente:clientes(nome)')
+    .eq('org_id', orgId)
   if (error) throw error
-  return data ?? []
+  return (data ?? []) as PrazoCliente[]
 }
 
 /** dias nulo = volta ao prazo padrão da empresa. */
-export async function definirPrazoCliente(orgId: string, contatoId: string, dias: number | null) {
+export async function definirPrazoCliente(orgId: string, clienteId: string, dias: number | null) {
   const { error } =
     dias == null
-      ? await supabase.from('os_prazos_cliente').delete().eq('org_id', orgId).eq('contato_id', contatoId)
-      : await supabase.from('os_prazos_cliente').upsert({ org_id: orgId, contato_id: contatoId, prazo_pagamento_dias: dias })
+      ? await supabase.from('os_prazos_cliente').delete().eq('org_id', orgId).eq('cliente_id', clienteId)
+      : await supabase.from('os_prazos_cliente').upsert({ org_id: orgId, cliente_id: clienteId, prazo_pagamento_dias: dias })
   if (error) throw amigavel(error, 'Não foi possível salvar o prazo.')
 }
 
@@ -226,7 +230,7 @@ export async function buscarOrdem(id: string): Promise<{ ordem: Ordem; itens: It
   return { ordem: ordem.data, itens: (itens.data ?? []).map(deItem), historico: historico.data ?? [] }
 }
 
-export type DadosOrdem = Pick<Ordem, 'contato_id' | 'cliente_nome' | 'nf_cliente' | 'numero_cliente' | 'recebida_em' | 'observacao' | 'responsavel_id'>
+export type DadosOrdem = Pick<Ordem, 'contato_id' | 'cliente_id' | 'cliente_nome' | 'nf_cliente' | 'numero_cliente' | 'recebida_em' | 'observacao' | 'responsavel_id'>
 export type DadosItem = Pick<ItemOs, 'tipo_id' | 'servico_id' | 'modelo' | 'identificacao' | 'campos' | 'valor' | 'cobranca' | 'observacao'>
 
 const linhaItem = (d: Partial<DadosItem>) => ({ ...d, campos: d.campos as Json | undefined })
@@ -356,6 +360,8 @@ export async function buscarPainel(orgId: string, de: string, ate: string): Prom
 
 export type LinhaImportacao = {
   cliente: string | null
+  /** CNPJ ou CPF: acha o cliente cadastrado (ou cria com ele). */
+  documento: string | null
   nf_cliente: string | null
   numero_cliente: string | null
   recebida_em: string
@@ -372,8 +378,8 @@ export type LinhaImportacao = {
   pago_em: string | null
 }
 
-export async function importar(orgId: string, linhas: LinhaImportacao[]): Promise<{ ordens: number; itens: number }> {
+export async function importar(orgId: string, linhas: LinhaImportacao[]): Promise<{ ordens: number; itens: number; clientes_criados: number }> {
   const { data, error } = await supabase.rpc('os_importar', { p_org: orgId, p_linhas: linhas as unknown as Json })
   if (error) throw amigavel(error, 'Não foi possível importar. Nada foi gravado.')
-  return data as { ordens: number; itens: number }
+  return data as { ordens: number; itens: number; clientes_criados: number }
 }

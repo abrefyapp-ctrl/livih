@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { listarContatos, type ContatoLista } from '../services/crm'
 import { lerNumero, moeda, nomeDoContato } from '../services/formato'
+import { clienteResumo, contatosDoCliente, type ContatoDoCliente } from '../services/clientes'
+import { ModalEscolherCliente } from './ClienteDoContato'
+import { ModalCliente } from './ModalCliente'
 import {
   adicionarItens,
   atualizarItem,
@@ -506,7 +509,13 @@ export function ModalOrdem({ orgId, cfg, ordem, aoFechar, aoSalvar }: {
   const [contatos, setContatos] = useState<ContatoLista[] | null>(null)
   const [busca, setBusca] = useState('')
   const [contatoId, setContatoId] = useState(ordem?.contato_id ?? '')
-  const [clienteNome, setClienteNome] = useState(ordem && !ordem.contato_id ? (ordem.cliente_nome ?? '') : '')
+  // Cliente do cadastro (docs/clientes.md); o contato fica como "A/C". Contato sozinho traz o cliente dele (banco).
+  const [cliente, setCliente] = useState<{ id: string; nome: string } | null>(
+    ordem?.cliente_id ? { id: ordem.cliente_id, nome: ordem.cliente_nome ?? 'Cliente' } : null,
+  )
+  const [contatosCliente, setContatosCliente] = useState<{ clienteId: string; lista: ContatoDoCliente[] } | null>(null)
+  const [escolherCliente, setEscolherCliente] = useState(false)
+  const [novoCliente, setNovoCliente] = useState(false)
   const [nf, setNf] = useState(ordem?.nf_cliente ?? '')
   const [numeroCliente, setNumeroCliente] = useState(ordem?.numero_cliente ?? '')
   const [recebida, setRecebida] = useState(ordem?.recebida_em ?? hojeIso())
@@ -526,13 +535,26 @@ export function ModalOrdem({ orgId, cfg, ordem, aoFechar, aoSalvar }: {
     }
   }, [orgId])
 
+  useEffect(() => {
+    if (!cliente) return
+    let ativo = true
+    const clienteId = cliente.id
+    contatosDoCliente(clienteId)
+      .then((lista) => ativo && setContatosCliente({ clienteId, lista }))
+      .catch(() => ativo && setContatosCliente({ clienteId, lista: [] }))
+    return () => {
+      ativo = false
+    }
+  }, [cliente])
+  const doCliente = cliente && contatosCliente?.clienteId === cliente.id ? contatosCliente.lista : null
+
   const filtrados = useMemo(() => {
     const t = busca.trim().toLowerCase()
     const l = contatos ?? []
     return (t ? l.filter((c) => `${nomeDoContato(c)} ${c.empresa ?? ''} ${c.telefone ?? ''}`.toLowerCase().includes(t)) : l).slice(0, 50)
   }, [busca, contatos])
 
-  const problema = !contatoId && !clienteNome.trim() ? 'Escolha o cliente ou digite o nome.' : (itens.map((r) => problemaItem(r, cfg)).find(Boolean) ?? null)
+  const problema = !cliente && !contatoId && !ordem?.cliente_nome ? 'Escolha o cliente (ou um contato).' : (itens.map((r) => problemaItem(r, cfg)).find(Boolean) ?? null)
 
   async function salvar(e: FormEvent) {
     e.preventDefault()
@@ -540,7 +562,9 @@ export function ModalOrdem({ orgId, cfg, ordem, aoFechar, aoSalvar }: {
     setErro(null)
     const dados: DadosOrdem = {
       contato_id: contatoId || null,
-      cliente_nome: contatoId ? null : clienteNome.trim(),
+      cliente_id: cliente?.id ?? null,
+      // O banco põe o nome do cliente (ou do contato) quando eles mudam; sem mudança, fica o que já estava.
+      cliente_nome: cliente?.nome ?? ordem?.cliente_nome ?? null,
       nf_cliente: nf.trim() || null,
       numero_cliente: numeroCliente.trim() || null,
       recebida_em: recebida,
@@ -573,12 +597,36 @@ export function ModalOrdem({ orgId, cfg, ordem, aoFechar, aoSalvar }: {
       <form id="form-ordem" onSubmit={salvar} className="space-y-5">
         <fieldset className="space-y-3">
           <legend className="mb-2 font-semibold text-texto">Cliente</legend>
-          {contatoId ? (
+          {cliente ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <p className="text-pequeno font-medium text-texto-2">Cliente</p>
+                <p className="flex flex-wrap items-center gap-2 text-pequeno">
+                  <span className="font-medium">{cliente.nome}</span>
+                  <button type="button" onClick={() => (setCliente(null), setContatoId(''))} className="text-primaria hover:underline">
+                    Trocar
+                  </button>
+                </p>
+              </div>
+              <Campo rotulo="A/C (contato, opcional)" id="os-ac">
+                <select id="os-ac" value={contatoId} onChange={(e) => setContatoId(e.target.value)} className={CLASSE_CAMPO}>
+                  <option value="">Ninguém</option>
+                  {(doCliente ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {nomeDoContato(c)}
+                    </option>
+                  ))}
+                  {contatoId && doCliente && !doCliente.some((c) => c.id === contatoId) && <option value={contatoId}>{contatoAtual ? nomeDoContato(contatoAtual) : 'Contato atual'}</option>}
+                </select>
+              </Campo>
+            </div>
+          ) : contatoId ? (
             <p className="flex items-center gap-2 text-pequeno">
               <span className="font-medium">{contatoAtual ? `${nomeDoContato(contatoAtual)}${contatoAtual.empresa ? ` · ${contatoAtual.empresa}` : ''}` : (ordem?.cliente_nome ?? 'Contato')}</span>
               <button type="button" onClick={() => setContatoId('')} className="text-primaria hover:underline">
                 Trocar
               </button>
+              <span className="text-legenda text-texto-3">Se o contato estiver ligado a um cliente, a OS fica nesse cliente.</span>
             </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -603,13 +651,21 @@ export function ModalOrdem({ orgId, cfg, ordem, aoFechar, aoSalvar }: {
                   ))}
                 </select>
               </div>
-              <CampoTexto
-                rotulo="Ou o nome do cliente"
-                value={clienteNome}
-                maxLength={200}
-                onChange={(e) => setClienteNome(e.target.value)}
-                ajuda="Para cliente que não conversa pelo WhatsApp do Livih."
-              />
+              <div className="space-y-1.5">
+                <p className="text-pequeno font-medium text-texto-2">Ou pelo cadastro de clientes</p>
+                <div className="flex flex-wrap gap-2">
+                  <Botao variante="secundario" tamanho="sm" icone="busca" onClick={() => setEscolherCliente(true)}>
+                    Escolher cliente
+                  </Botao>
+                  <Botao variante="secundario" tamanho="sm" icone="mais" onClick={() => setNovoCliente(true)}>
+                    Novo cliente
+                  </Botao>
+                </div>
+                <p className="text-legenda text-texto-3">Para empresa que não conversa pelo WhatsApp do Livih.</p>
+                {ordem?.cliente_nome && !ordem.cliente_id && !ordem.contato_id && (
+                  <p className="text-legenda text-texto-3">Hoje: {ordem.cliente_nome} (sem cadastro)</p>
+                )}
+              </div>
             </div>
           )}
           <div className="grid gap-3 sm:grid-cols-3">
@@ -664,9 +720,29 @@ export function ModalOrdem({ orgId, cfg, ordem, aoFechar, aoSalvar }: {
           </fieldset>
         )}
 
-        {problema && (contatoId || clienteNome) && <p className="text-legenda text-atencao">{problema}</p>}
+        {problema && (contatoId || cliente) && <p className="text-legenda text-atencao">{problema}</p>}
         {erro && <Aviso tom="erro">{erro}</Aviso>}
       </form>
+      {escolherCliente && (
+        <ModalEscolherCliente
+          orgId={orgId}
+          aoFechar={() => setEscolherCliente(false)}
+          aoEscolher={(id, c) => {
+            setCliente({ id, nome: c.nome })
+            setContatoId('')
+            setEscolherCliente(false)
+          }}
+        />
+      )}
+      {novoCliente && (
+        <ModalCliente
+          aoFechar={() => setNovoCliente(false)}
+          aoSalvar={(id) => {
+            setNovoCliente(false)
+            void clienteResumo(id).then((c) => c && setCliente({ id, nome: c.nome }))
+          }}
+        />
+      )}
     </Modal>
   )
 }

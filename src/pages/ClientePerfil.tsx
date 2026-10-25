@@ -8,12 +8,14 @@ import {
   enderecoEmLinha,
   formatarDocumento,
   ligarContato,
+  ordensDoCliente,
   pedidosDoCliente,
   procurarContatos,
   type Cliente,
   type ContatoDoCliente,
   type ConversaDoCliente,
   type NegocioDoCliente,
+  type OrdemDoCliente,
   type PedidoDoCliente,
 } from '../services/clientes'
 import type { StatusPedido } from '../services/erp'
@@ -58,6 +60,7 @@ type Dados = {
   cliente: Cliente | null
   contatos: ContatoDoCliente[]
   pedidos: PedidoDoCliente[]
+  ordens: OrdemDoCliente[]
   negocios: NegocioDoCliente[]
   conversas: ConversaDoCliente[]
 }
@@ -69,6 +72,7 @@ export function ClientePerfil() {
   const orgId = orgAtiva!.id
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const comPedidos = !!modulos?.has('erp')
+  const comOs = !!modulos?.has('os')
   const navegar = useNavigate()
   const [dados, setDados] = useState<Dados | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -84,18 +88,23 @@ export function ClientePerfil() {
   useEffect(() => {
     if (!id) return
     let ativo = true
-    Promise.all([buscarCliente(id), contatosDoCliente(id), comPedidos ? pedidosDoCliente(id) : Promise.resolve([])])
-      .then(async ([cliente, contatos, pedidos]) => {
+    Promise.all([
+      buscarCliente(id),
+      contatosDoCliente(id),
+      comPedidos ? pedidosDoCliente(id) : Promise.resolve([]),
+      comOs ? ordensDoCliente(id) : Promise.resolve([]),
+    ])
+      .then(async ([cliente, contatos, pedidos, ordens]) => {
         const atividade = await atividadeDosContatos(contatos.map((c) => c.id))
         if (!ativo) return
-        setDados({ id, cliente, contatos, pedidos, ...atividade })
+        setDados({ id, cliente, contatos, pedidos, ordens, ...atividade })
         setErro(null)
       })
       .catch(() => ativo && setErro('Não foi possível carregar o cliente.'))
     return () => {
       ativo = false
     }
-  }, [id, comPedidos, versao])
+  }, [id, comPedidos, comOs, versao])
 
   const atual = dados?.id === id ? dados : null
   const recarregar = () => setVersao((v) => v + 1)
@@ -238,6 +247,28 @@ export function ClientePerfil() {
                   </ul>
                 ) : (
                   <p className="text-pequeno text-texto-3">Nenhum pedido. O pedido de um contato ligado entra aqui sozinho.</p>
+                )}
+              </Bloco>
+            )}
+
+            {comOs && (
+              <Bloco titulo="Ordens de serviço">
+                {atual.ordens.length ? (
+                  <ul className="divide-y divide-borda">
+                    {atual.ordens.map((o) => (
+                      <li key={o.id}>
+                        <Link to={`/os/${o.id}`} className="flex flex-wrap items-center gap-3 py-2.5 hover:bg-fundo">
+                          <span className="font-medium tabular-nums">OS nº {o.numero}</span>
+                          {o.nf_cliente && <span className="text-legenda text-texto-3">NF {o.nf_cliente}</span>}
+                          <span className="ml-auto text-legenda text-texto-3">
+                            recebida {new Date(`${o.recebida_em}T12:00:00`).toLocaleDateString('pt-BR')}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-pequeno text-texto-3">Nenhuma ordem de serviço deste cliente.</p>
                 )}
               </Bloco>
             )}

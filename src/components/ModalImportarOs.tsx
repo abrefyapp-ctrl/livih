@@ -19,7 +19,7 @@ export function ModalImportarOs({ orgId, cfg, aoFechar, aoImportar }: {
   const [leitura, setLeitura] = useState<(LeituraOs & { arquivo: string }) | null>(null)
   const [importando, setImportando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
-  const [feito, setFeito] = useState<{ ordens: number; itens: number } | null>(null)
+  const [feito, setFeito] = useState<{ ordens: number; itens: number; clientes_criados: number } | null>(null)
 
   function baixarModelo() {
     const blob = new Blob([modeloPlanilha(cfg.etapas)], { type: 'text/csv;charset=utf-8' })
@@ -79,6 +79,9 @@ export function ModalImportarOs({ orgId, cfg, aoFechar, aoImportar }: {
       {feito ? (
         <Aviso tom="info">
           Importados {feito.itens} itens em {feito.ordens} ordens de serviço. As datas da planilha entraram no histórico de cada item.
+          {feito.clientes_criados > 0 &&
+            ` ${feito.clientes_criados} ${feito.clientes_criados === 1 ? 'cliente novo foi cadastrado' : 'clientes novos foram cadastrados'} em Clientes (confira o CNPJ e o endereço lá).`}
+          {' '}Cada OS ficou ligada ao cliente pelo CNPJ/CPF ou pelo nome.
         </Aviso>
       ) : (
         <div className="space-y-4">

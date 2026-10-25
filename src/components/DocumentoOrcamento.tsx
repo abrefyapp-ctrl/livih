@@ -5,7 +5,7 @@
 import { Document, Font, Image, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer'
 // Só formato.ts e tipos: o mesmo componente roda no navegador e no serviço livih-pdf (servidor).
 import { formatarCep, formatarCnpj, formatarDocumento, formatarTelefone, moeda as moedaTela, quantidade } from '../services/formato'
-import type { DadosOrcamento } from '../services/orcamento'
+import type { DadosFiscais, DadosOrcamento } from '../services/orcamento'
 
 // Sem hifenização automática: em português ela quebra palavras em lugares errados ("grampea-mento").
 Font.registerHyphenationCallback((palavra) => [palavra])
@@ -145,12 +145,44 @@ export function Rodape({ d, titulo }: { d: Emitente; titulo: string }) {
   )
 }
 
+/**
+ * Bloco "Cliente" do PDF (orçamento e OS). Com o cadastro do cliente (docs/clientes.md): razão social, CNPJ/CPF,
+ * IE e endereço, no mesmo formato do endereço da emissora, e o contato como "A/C". Sem cadastro, só o contato.
+ */
+export function ClientePdf({ cliente, fiscal: f }: { cliente: DadosOrcamento['cliente']; fiscal?: DadosFiscais | null }) {
+  if (f) {
+    const endereco = juntar([juntar([f.logradouro, f.numero], ', '), f.complemento, f.bairro], ' - ')
+    const cidade = juntar([juntar([f.cidade, f.uf], '/'), f.cep && `CEP ${formatarCep(f.cep)}`], ' - ')
+    return (
+      <>
+        <Text style={s.rotulo}>Cliente</Text>
+        <Text style={s.negrito}>{f.razao_social || f.nome}</Text>
+        {f.razao_social && f.nome !== f.razao_social && <Text>{f.nome}</Text>}
+        {(f.documento || f.inscricao_estadual) && (
+          <Text>{juntar([f.documento && `${f.tipo === 'pf' ? 'CPF' : 'CNPJ'} ${formatarDocumento(f.documento)}`, f.inscricao_estadual && `IE ${f.inscricao_estadual}`])}</Text>
+        )}
+        {(endereco || cidade) && <Text style={s.suave}>{juntar([endereco, cidade], ' - ')}</Text>}
+        {cliente ? (
+          <Text style={s.suave}>{juntar([`A/C ${cliente.nome}`, formatarTelefone(cliente.telefone), cliente.email || f.email])}</Text>
+        ) : (
+          f.email && <Text style={s.suave}>{f.email}</Text>
+        )}
+      </>
+    )
+  }
+  if (!cliente) return null
+  return (
+    <>
+      <Text style={s.rotulo}>Cliente</Text>
+      <Text style={s.negrito}>{cliente.nome}</Text>
+      {cliente.empresa && cliente.empresa !== cliente.nome && <Text>{cliente.empresa}</Text>}
+      {(cliente.telefone || cliente.email) && <Text style={s.suave}>{juntar([formatarTelefone(cliente.telefone), cliente.email])}</Text>}
+    </>
+  )
+}
+
 function Documento({ d }: { d: DadosOrcamento }) {
   const { pedido, emissora: e, cliente, vendedor } = d
-  // Cadastro do cliente: endereço no mesmo formato do da empresa emissora, no cabeçalho.
-  const f = d.fiscal
-  const enderecoCliente = f && juntar([juntar([f.logradouro, f.numero], ', '), f.complemento, f.bairro], ' - ')
-  const cidadeCliente = f && juntar([juntar([f.cidade, f.uf], '/'), f.cep && `CEP ${formatarCep(f.cep)}`], ' - ')
   const orcamento = pedido.status === 'rascunho'
   const titulo = `${orcamento ? 'Orçamento' : 'Pedido'} nº ${pedido.numero}`
   const desconto = Number(pedido.desconto)
@@ -169,32 +201,10 @@ function Documento({ d }: { d: DadosOrcamento }) {
           </View>
         </View>
 
-        {f ? (
+        {(cliente || d.fiscal) && (
           <View style={s.bloco}>
-            <Text style={s.rotulo}>Cliente</Text>
-            <Text style={s.negrito}>{f.razao_social || f.nome}</Text>
-            {f.razao_social && f.nome !== f.razao_social && <Text>{f.nome}</Text>}
-            {(f.documento || f.inscricao_estadual) && (
-              <Text>
-                {juntar([f.documento && `${f.tipo === 'pf' ? 'CPF' : 'CNPJ'} ${formatarDocumento(f.documento)}`, f.inscricao_estadual && `IE ${f.inscricao_estadual}`])}
-              </Text>
-            )}
-            {(enderecoCliente || cidadeCliente) && <Text style={s.suave}>{juntar([enderecoCliente, cidadeCliente], ' - ')}</Text>}
-            {cliente ? (
-              <Text style={s.suave}>{juntar([`A/C ${cliente.nome}`, formatarTelefone(cliente.telefone), cliente.email || f.email])}</Text>
-            ) : (
-              f.email && <Text style={s.suave}>{f.email}</Text>
-            )}
+            <ClientePdf cliente={cliente} fiscal={d.fiscal} />
           </View>
-        ) : (
-          cliente && (
-            <View style={s.bloco}>
-              <Text style={s.rotulo}>Cliente</Text>
-              <Text style={s.negrito}>{cliente.nome}</Text>
-              {cliente.empresa && <Text>{cliente.empresa}</Text>}
-              {(cliente.telefone || cliente.email) && <Text style={s.suave}>{juntar([formatarTelefone(cliente.telefone), cliente.email])}</Text>}
-            </View>
-          )
         )}
 
         <View style={s.tabela}>
