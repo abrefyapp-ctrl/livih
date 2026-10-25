@@ -41,6 +41,8 @@ if ((await rpc('agente_deve_responder', { p_conversa: conversa_id, p_mensagem: m
 const c = await rpc('agente_contexto', { p_conversa: conversa_id });
 const contato = c.contato || {};
 const op = c.oportunidade;
+// Cliente do cadastro (docs/clientes.md): a empresa (ou pessoa) a que o contato pertence. Só leitura.
+const cl = c.cliente;
 const regras = c.agente?.regras_humano?.casos || [];
 
 // Arquivo/imagem: o `texto` é só o nome do arquivo ou a legenda. Sem esta marcação o agente lia
@@ -136,6 +138,7 @@ ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar co
 - **Produto identificado pela foto**: a descrição da foto pode terminar com a comparação com as fotos do catálogo da empresa. Com "Produto do catálogo identificado pela foto (confiança alta ou média)", trate esse como o produto da foto: busque pelo código com buscar_produtos (preço e estoque) e confirme com o cliente numa frase antes de montar o orçamento ("É o grampeador X, código Y?"); se ajudar o cliente a conferir, envie a foto do catálogo com enviar_documento, usando o id do documento indicado ali. Com "talvez seja" ou "nenhum produto bateu com certeza", não afirme qual é: pergunte ao cliente, citando os parecidos se fizer sentido, ou peça uma foto da etiqueta ou o código.
 - **O que você consegue enviar**: só o PDF do orçamento (enviar_orcamento) e os documentos da biblioteca (buscar_documentos + enviar_documento). Nunca prometa um arquivo antes de achá-lo na biblioteca, e nunca prometa link, boleto, nota fiscal ou qualquer outro arquivo: diga que a equipe envia e chame chamar_humano com o motivo (ex.: "Cliente pediu a vista explodida do grampeador 14/45, que não está na biblioteca"). Prometer e não enviar deixa o cliente esperando.
 - **Nunca diga que enviou sem ter enviado**: só diga "enviei", "reenviei", "segue" ou "está acima na conversa" sobre um arquivo se enviar_orcamento ou enviar_documento devolveu enviado: true NESTA resposta (ou se a ferramenta avisou que o documento já tinha sido enviado). Se não, nada foi enviado. Se o cliente disser que não recebeu, não insista: reenvie ou chame a equipe.
+- **Empresa do cliente**: quando "Cliente (cadastro)" estiver preenchido, o contato fala por essa empresa: o orçamento sai no nome dela, com a razão social e o CNPJ do cadastro. Não pergunte CNPJ, razão social nem endereço que já estão lá. Se o cliente pedir para faturar em outro CNPJ, mudar o endereço ou outro dado do cadastro, não prometa a mudança: diga que a equipe ajusta e chame chamar_humano com o pedido. Sem cliente ligado, não peça CNPJ só para cadastrar; se o cliente mandar, guarde com atualizar_contato.
 - **Nome do cliente**: use o nome que está em "O que já sabemos deste contato". Um nome que o cliente escreve num cumprimento ("boa tarde, Flávio") é de quem ele espera que atenda, não o dele.
 
 Nunca fale de ferramentas, CRM ou sistema com o cliente. A sua resposta final é exatamente o texto que será enviado no WhatsApp.
@@ -152,6 +155,7 @@ ${blocoAbertura}
 
 - Nome: ${contato.nome || contato.nome_whatsapp || 'não informado'}${contato.nome ? '' : ' (nome do perfil do WhatsApp, não confirmado)'}
 - Empresa: ${contato.empresa || 'não informada'}
+- Cliente (cadastro): ${cl ? `${cl.nome}${cl.razao_social && cl.razao_social !== cl.nome ? ` (razão social: ${cl.razao_social})` : ''}${cl.cidade ? ` — ${cl.cidade}${cl.uf ? `/${cl.uf}` : ''}` : ''}${cl.tem_documento ? '; CNPJ/CPF no cadastro' : '; sem CNPJ/CPF no cadastro'}` : 'não ligado a um cliente cadastrado'}
 - E-mail: ${contato.email || 'não informado'}
 - Outros dados: ${Object.keys(contato.dados || {}).length ? JSON.stringify(contato.dados) : 'nenhum'}
 - Oportunidade aberta: ${op ? `"${op.titulo}" — etapa ${op.etapa}${op.resumo ? `. Resumo: ${op.resumo}` : ''}` : 'nenhuma ainda'}

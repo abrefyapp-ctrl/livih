@@ -155,6 +155,10 @@ admin mudam (pela função que já altera papel e status do membro, com auditori
    só), atualiza só o que veio preenchido, cria sem vendedor responsável e liga o celular ao contato (ou cria o
    contato). Documento, CEP, UF ou celular inválidos não derrubam a linha: voltam como aviso.
 5. **n8n:** texto do contexto do agente.
+   Feita em 25/10: linha "Cliente (cadastro)" em "O que já sabemos deste contato" e a instrução "Empresa do cliente"
+   (orçamento no nome dela, não pedir o que já está no cadastro, mudança de cadastro vai para a equipe), no agente e
+   no simulador. O PDF do agente recebe `fiscal` (n8n) e o serviço livih-pdf desenha o bloco de cliente novo
+   (`dist/entrada.js` reconstruído). Vai ao ar reimportando os dois workflows e reconstruindo o livih-pdf na VPS.
 
 Esforço estimado: 2 a 3 dias, mais meio dia para a OS.
 
