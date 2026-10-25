@@ -2665,5 +2665,158 @@ begin
 exception when others then
   insert into resultado (teste, ok) values ('os: histórico das etapas é imutável até para o banco', sqlerrm like 'o histórico das etapas%');
 end $$;
+
+-- ============ clientes (migration 20261024120000) ============
+-- a1 dono; b1 atendente sem "ver todos"; d1 (Vítor) vira o balcão com "ver todos".
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_cli uuid; v_ct uuid;
+begin
+  insert into public.clientes (org_id, tipo, nome, razao_social, documento, cep, uf, cidade)
+  values (v_org, 'pj', 'Metalúrgica Alfa', 'Alfa Indústria de Metais Ltda', '11.222.333/0001-81', '80010-000', 'pr', 'Curitiba')
+  returning id into v_cli;
+  perform set_config('teste.cliente', v_cli::text, false);
+  insert into resultado (teste, ok) select 'clientes: dono cadastra; documento e CEP só com números, UF maiúscula, carteira de quem criou',
+    documento = '11222333000181' and cep = '80010000' and uf = 'PR' and responsavel_id = auth.uid()
+    from public.clientes where id = v_cli;
+
+  -- contato da carteira do dono, ligado ao cliente, com um negócio aberto
+  insert into public.contatos (org_id, telefone, nome, cliente_id) values (v_org, '5541900077001', 'Comprador Alfa', v_cli)
+  returning id into v_ct;
+  perform set_config('teste.contato_cliente', v_ct::text, false);
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo)
+  values (v_org, v_ct, (select id from public.etapas_funil where org_id = v_org and nome = 'Novo'), 'Negócio da Alfa');
+
+  insert into public.clientes (org_id, tipo, nome, documento) values (v_org, 'pf', 'João da Silva', '529.982.247-25');
+  insert into resultado (teste, ok) values ('clientes: pessoa física com CPF válido', true);
+exception when others then
+  insert into resultado (teste, ok) values ('clientes: cadastro inicial: ' || sqlerrm, false);
+end $$;
+do $$ begin
+  insert into public.clientes (org_id, tipo, nome, documento) values (current_setting('teste.f7')::uuid, 'pj', 'Errado', '11222333000182');
+  insert into resultado (teste, ok) values ('clientes: CNPJ inválido é recusado', false);
+exception when check_violation then
+  insert into resultado (teste, ok) values ('clientes: CNPJ inválido é recusado', true);
+end $$;
+do $$ begin
+  insert into public.clientes (org_id, tipo, nome, documento) values (current_setting('teste.f7')::uuid, 'pj', 'CPF no PJ', '52998224725');
+  insert into resultado (teste, ok) values ('clientes: CPF em cliente PJ é recusado', false);
+exception when check_violation then
+  insert into resultado (teste, ok) values ('clientes: CPF em cliente PJ é recusado', true);
+end $$;
+do $$ begin
+  insert into public.clientes (org_id, tipo, nome, documento) values (current_setting('teste.f7')::uuid, 'pj', 'Alfa de novo', '11222333000181');
+  insert into resultado (teste, ok) values ('clientes: o mesmo CNPJ não entra duas vezes', false);
+exception when unique_violation then
+  insert into resultado (teste, ok) values ('clientes: o mesmo CNPJ não entra duas vezes', true);
+end $$;
+
+-- b1 sem "ver todos": o cliente é da carteira do dono e o contato também
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'clientes: atendente não vê cliente nem contato da carteira do dono',
+  not exists (select 1 from public.clientes where id = current_setting('teste.cliente')::uuid)
+  and not exists (select 1 from public.contatos where id = current_setting('teste.contato_cliente')::uuid);
+do $$ begin
+  perform public.membro_definir_ve_todos_clientes(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000b1', true);
+  insert into resultado (teste, ok) values ('clientes: atendente não liga "ver todos" para si', false);
+exception when others then
+  insert into resultado (teste, ok) values ('clientes: atendente não liga "ver todos" para si', sqlerrm like 'só dono e admin%');
+end $$;
+do $$ begin
+  insert into public.contatos (org_id, telefone, nome, cliente_id)
+  values (current_setting('teste.f7')::uuid, '5541900077002', 'Intruso', current_setting('teste.cliente')::uuid);
+  insert into resultado (teste, ok) values ('clientes: não liga contato a cliente que não vê', false);
+exception when others then
+  insert into resultado (teste, ok) values ('clientes: não liga contato a cliente que não vê', sqlerrm = 'cliente não encontrado');
+end $$;
+
+-- dono liga "ver todos" para o Vítor (d1)
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+select public.membro_definir_ve_todos_clientes(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000d1', true);
+insert into resultado (teste, ok) select 'clientes: dono liga "ver todos" e fica na auditoria',
+  (select ve_todos_clientes from public.membros_org where org_id = current_setting('teste.f7')::uuid
+      and user_id = '00000000-0000-0000-0000-0000000000d1')
+  and exists (select 1 from public.auditoria where org_id = current_setting('teste.f7')::uuid and acao = 've_todos_clientes');
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000d1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'clientes: com "ver todos" vê o cliente e o contato ligado',
+  exists (select 1 from public.clientes where id = current_setting('teste.cliente')::uuid)
+  and exists (select 1 from public.contatos where id = current_setting('teste.contato_cliente')::uuid);
+insert into resultado (teste, ok) select 'clientes: "ver todos" não abre o negócio do contato',
+  not exists (select 1 from public.oportunidades where titulo = 'Negócio da Alfa')
+  and not public.pode_ver_contato(current_setting('teste.contato_cliente')::uuid);
+do $$
+declare n integer;
+begin
+  update public.clientes set observacoes = 'entrega pela manhã' where id = current_setting('teste.cliente')::uuid;
+  get diagnostics n = row_count;
+  insert into resultado (teste, ok) values ('clientes: com "ver todos" corrige o cadastro', n = 1);
+end $$;
+do $$ begin
+  update public.clientes set responsavel_id = '00000000-0000-0000-0000-0000000000d1' where id = current_setting('teste.cliente')::uuid;
+  insert into resultado (teste, ok) values ('clientes: só dono e admin trocam o vendedor', false);
+exception when others then
+  insert into resultado (teste, ok) values ('clientes: só dono e admin trocam o vendedor', sqlerrm like 'só dono e admin trocam%');
+end $$;
+do $$
+declare n integer;
+begin
+  delete from public.clientes where id = current_setting('teste.cliente')::uuid;
+  get diagnostics n = row_count;
+  insert into resultado (teste, ok) values ('clientes: só dono e admin apagam', n = 0);
+end $$;
+do $$
+declare v_ped uuid;
+begin
+  insert into public.pedidos (org_id, contato_id) values (current_setting('teste.f7')::uuid, current_setting('teste.contato_cliente')::uuid)
+  returning id into v_ped;
+  insert into resultado (teste, ok) select 'clientes: balcão vende para o contato do cliente e o pedido leva o cliente',
+    cliente_id = current_setting('teste.cliente')::uuid from public.pedidos where id = v_ped;
+  perform set_config('teste.pedido_cliente', v_ped::text, false);
+exception when others then
+  insert into resultado (teste, ok) values ('clientes: balcão vende para o contato do cliente: ' || sqlerrm, false);
+end $$;
+
+-- b1 continua sem ver o pedido do cliente (não tem "ver todos" nem o contato)
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'clientes: sem "ver todos" o pedido do cliente fica na carteira',
+  not exists (select 1 from public.pedidos where id = nullif(current_setting('teste.pedido_cliente', true), '')::uuid);
+
+-- outra empresa
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'clientes: outra empresa não vê', not exists (select 1 from public.clientes);
+
+-- agente e OS (sem RLS): o contexto traz o cliente; a OS pega o cliente e o nome dele pelo contato
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_conv uuid; ctx jsonb; v_os public.ordens_servico;
+begin
+  select id into v_conv from public.conversas where id = current_setting('teste.conversa')::uuid;
+  update public.contatos set cliente_id = current_setting('teste.cliente')::uuid
+   where id = (select contato_id from public.conversas where id = v_conv);
+  ctx := public.agente_contexto(v_conv);
+  insert into resultado (teste, ok) values ('clientes: contexto do agente traz o cliente do contato',
+    ctx -> 'cliente' ->> 'nome' = 'Metalúrgica Alfa' and (ctx -> 'cliente' ->> 'tem_documento')::boolean
+    and ctx -> 'cliente' ->> 'uf' = 'PR');
+
+  insert into public.ordens_servico (org_id, contato_id) values (v_org, current_setting('teste.contato_cliente')::uuid)
+  returning * into v_os;
+  insert into resultado (teste, ok) values ('clientes: OS pelo contato leva o cliente e o nome dele',
+    v_os.cliente_id = current_setting('teste.cliente')::uuid and v_os.cliente_nome = 'Metalúrgica Alfa');
+
+  delete from public.clientes where id = current_setting('teste.cliente')::uuid;
+  insert into resultado (teste, ok) select 'clientes: apagar o cliente solta contato, pedido e OS',
+    (select cliente_id from public.contatos where id = current_setting('teste.contato_cliente')::uuid) is null
+    and (select cliente_id from public.ordens_servico where id = v_os.id) is null
+    and exists (select 1 from public.contatos where id = current_setting('teste.contato_cliente')::uuid);
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

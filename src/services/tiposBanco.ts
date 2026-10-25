@@ -399,6 +399,89 @@ export type Database = {
           },
         ]
       }
+      clientes: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          complemento: string | null
+          criado_em: string
+          criado_por: string | null
+          documento: string | null
+          email: string | null
+          id: string
+          inscricao_estadual: string | null
+          logradouro: string | null
+          nome: string
+          numero: string | null
+          observacoes: string | null
+          org_id: string
+          razao_social: string | null
+          responsavel_id: string | null
+          telefone: string | null
+          tipo: string
+          uf: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          documento?: string | null
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          logradouro?: string | null
+          nome: string
+          numero?: string | null
+          observacoes?: string | null
+          org_id: string
+          razao_social?: string | null
+          responsavel_id?: string | null
+          telefone?: string | null
+          tipo?: string
+          uf?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          documento?: string | null
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          logradouro?: string | null
+          nome?: string
+          numero?: string | null
+          observacoes?: string | null
+          org_id?: string
+          razao_social?: string | null
+          responsavel_id?: string | null
+          telefone?: string | null
+          tipo?: string
+          uf?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compromissos: {
         Row: {
           atualizado_em: string
@@ -484,6 +567,7 @@ export type Database = {
       contatos: {
         Row: {
           atualizado_em: string
+          cliente_id: string | null
           criado_em: string
           dados: Json
           email: string | null
@@ -501,6 +585,7 @@ export type Database = {
         }
         Insert: {
           atualizado_em?: string
+          cliente_id?: string | null
           criado_em?: string
           dados?: Json
           email?: string | null
@@ -518,6 +603,7 @@ export type Database = {
         }
         Update: {
           atualizado_em?: string
+          cliente_id?: string | null
           criado_em?: string
           dados?: Json
           email?: string | null
@@ -534,6 +620,13 @@ export type Database = {
           whatsapp_lid?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "contatos_cliente_fk"
+            columns: ["cliente_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id", "org_id"]
+          },
           {
             foreignKeyName: "contatos_org_id_fkey"
             columns: ["org_id"]
@@ -1161,6 +1254,7 @@ export type Database = {
           org_id: string
           papel: Database["public"]["Enums"]["papel_org"]
           user_id: string
+          ve_todos_clientes: boolean
         }
         Insert: {
           ativo?: boolean
@@ -1168,6 +1262,7 @@ export type Database = {
           org_id: string
           papel?: Database["public"]["Enums"]["papel_org"]
           user_id: string
+          ve_todos_clientes?: boolean
         }
         Update: {
           ativo?: boolean
@@ -1175,6 +1270,7 @@ export type Database = {
           org_id?: string
           papel?: Database["public"]["Enums"]["papel_org"]
           user_id?: string
+          ve_todos_clientes?: boolean
         }
         Relationships: [
           {
@@ -1614,6 +1710,7 @@ export type Database = {
       ordens_servico: {
         Row: {
           atualizado_em: string
+          cliente_id: string | null
           cliente_nome: string | null
           contato_id: string | null
           criado_em: string
@@ -1629,6 +1726,7 @@ export type Database = {
         }
         Insert: {
           atualizado_em?: string
+          cliente_id?: string | null
           cliente_nome?: string | null
           contato_id?: string | null
           criado_em?: string
@@ -1644,6 +1742,7 @@ export type Database = {
         }
         Update: {
           atualizado_em?: string
+          cliente_id?: string | null
           cliente_nome?: string | null
           contato_id?: string | null
           criado_em?: string
@@ -1658,6 +1757,13 @@ export type Database = {
           responsavel_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ordens_servico_cliente_fk"
+            columns: ["cliente_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id", "org_id"]
+          },
           {
             foreignKeyName: "ordens_servico_contato_id_org_id_fkey"
             columns: ["contato_id", "org_id"]
@@ -2161,6 +2267,7 @@ export type Database = {
       pedidos: {
         Row: {
           atualizado_em: string
+          cliente_id: string | null
           condicoes_pagamento: string | null
           confirmado_em: string | null
           contato_id: string | null
@@ -2185,6 +2292,7 @@ export type Database = {
         }
         Insert: {
           atualizado_em?: string
+          cliente_id?: string | null
           condicoes_pagamento?: string | null
           confirmado_em?: string | null
           contato_id?: string | null
@@ -2209,6 +2317,7 @@ export type Database = {
         }
         Update: {
           atualizado_em?: string
+          cliente_id?: string | null
           condicoes_pagamento?: string | null
           confirmado_em?: string | null
           contato_id?: string | null
@@ -2232,6 +2341,13 @@ export type Database = {
           validade?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pedidos_cliente_fk"
+            columns: ["cliente_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id", "org_id"]
+          },
           {
             foreignKeyName: "pedidos_contato_id_org_id_fkey"
             columns: ["contato_id", "org_id"]
@@ -2894,6 +3010,7 @@ export type Database = {
         Args: { p_conversa: string }
         Returns: {
           atualizado_em: string
+          cliente_id: string | null
           condicoes_pagamento: string | null
           confirmado_em: string | null
           contato_id: string | null
@@ -3013,6 +3130,7 @@ export type Database = {
         }
         Returns: string
       }
+      cpf_valido: { Args: { p: string }; Returns: boolean }
       criar_organizacao: {
         Args: { p_dono?: string; p_nome: string; p_slug: string }
         Returns: string
@@ -3172,6 +3290,10 @@ export type Database = {
           p_texto?: string
         }
         Returns: string
+      }
+      membro_definir_ve_todos_clientes: {
+        Args: { p_org: string; p_usuario: string; p_valor: boolean }
+        Returns: undefined
       }
       meta_guardar_pin: {
         Args: { p_canal: string; p_pin: string }
@@ -3346,7 +3468,13 @@ export type Database = {
         }[]
       }
       pode_acessar_midia: { Args: { p_nome: string }; Returns: boolean }
+      pode_usar_contato: { Args: { p_contato: string }; Returns: boolean }
       pode_ver_canal: { Args: { p_canal: string }; Returns: boolean }
+      pode_ver_cliente: { Args: { p_cliente: string }; Returns: boolean }
+      pode_ver_cliente_linha: {
+        Args: { p_cliente: string; p_org: string; p_responsavel: string }
+        Returns: boolean
+      }
       pode_ver_compromisso: {
         Args: { p_contato: string; p_org: string; p_responsavel: string }
         Returns: boolean
@@ -3357,10 +3485,20 @@ export type Database = {
         Returns: boolean
       }
       pode_ver_conversa: { Args: { p_conversa: string }; Returns: boolean }
-      pode_ver_pedido: {
-        Args: { p_contato: string; p_org: string; p_responsavel: string }
-        Returns: boolean
-      }
+      pode_ver_pedido:
+        | {
+            Args: { p_contato: string; p_org: string; p_responsavel: string }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_cliente: string
+              p_contato: string
+              p_org: string
+              p_responsavel: string
+            }
+            Returns: boolean
+          }
       push_cancelar: { Args: { p_endpoint: string }; Returns: undefined }
       push_chaves: { Args: never; Returns: Json }
       push_enfileirar: {
@@ -3479,6 +3617,7 @@ export type Database = {
           senha_definida: boolean
         }[]
       }
+      ve_todos_clientes: { Args: { p_org: string }; Returns: boolean }
       verificar_segredo_interno: {
         Args: { p_segredo: string }
         Returns: boolean
