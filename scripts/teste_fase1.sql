@@ -2058,7 +2058,13 @@ begin
   insert into resultado (teste, ok) select 'lembrete: WhatsApp do responsável por um número da empresa',
     (select count(*) from public.alertas where org_id = v_org) = v_alertas + 1
     and exists (select 1 from public.alertas where org_id = v_org and telefone = '5541999990001'
-                 and texto like '%Lembrete de compromisso%Visita na Wyllis%Hoje às%Local: Rua X, 10%');
+                 and texto like '%Lembrete de compromisso%Visita na Wyllis%'
+                   -- O compromisso é daqui a 20 min: depois das 23h40 (Brasília) ele cai no dia seguinte e o
+                   -- lembrete diz "Amanhã às", corretamente. O teste espera o que vale para a hora em que roda.
+                   || case when ((now() + interval '20 minutes') at time zone 'America/Sao_Paulo')::date
+                                = (now() at time zone 'America/Sao_Paulo')::date
+                           then 'Hoje às' else 'Amanhã às' end
+                   || '%Local: Rua X, 10%');
 
   n := public.agenda_lembretes();
   insert into resultado (teste, ok) values ('lembrete: não repete', n = 0);
