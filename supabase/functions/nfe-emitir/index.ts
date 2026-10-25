@@ -96,6 +96,10 @@ Deno.serve(async (req) => {
   if (!emi) faltando.push("Escolha o CNPJ que emite (Configurações → Empresa).");
   else {
     if (emi.nfe_status !== "pronta") faltando.push(`O CNPJ ${emi.nome_fantasia || emi.razao_social} não está pronto na Focus (Configurações → Empresa → Nota fiscal).`);
+    // A NF-e exige a IE do emitente: números, ou ISENTO quando a empresa é dispensada (caso F7, 25/10: rejeição de schema).
+    if (!so(emi.inscricao_estadual) && !/isent/i.test(emi.inscricao_estadual ?? "")) {
+      faltando.push(`Informe a inscrição estadual do CNPJ ${emi.nome_fantasia || emi.razao_social} (ou ISENTO, se a empresa for dispensada) em Configurações → Empresa → Editar.`);
+    }
     if (emi.regime_tributario === 3) faltando.push("Regime normal (Presumido/Real) ainda não é emitido por esta versão: use o Simples ou fale com o suporte.");
     if (!emi.cfop_estadual || !emi.cfop_interestadual) faltando.push("Informe os CFOPs na configuração da nota fiscal do CNPJ.");
     if (!emi.icms_situacao || !CSOSN_ACEITOS.includes(emi.icms_situacao)) faltando.push(`CSOSN do ICMS: esta versão emite com ${CSOSN_ACEITOS.join(", ")} (configuração do CNPJ).`);
@@ -149,6 +153,8 @@ Deno.serve(async (req) => {
     presenca_comprador: [1, 2, 3, 4, 9].includes(Number(p.presenca)) ? Number(p.presenca) : 9,
     modalidade_frete: Number(ped.frete) > 0 ? 0 : 9,
     cnpj_emitente: emi!.cnpj,
+    // A do cadastro do Livih (a API de empresas da Focus só guarda IE numérica).
+    inscricao_estadual_emitente: so(emi!.inscricao_estadual) || "ISENTO",
     nome_destinatario: ambiente === "homologacao" ? HOMOLOGACAO : (cli!.razao_social || cli!.nome).slice(0, 60),
     ...(cli!.documento!.length === 14 ? { cnpj_destinatario: cli!.documento } : { cpf_destinatario: cli!.documento }),
     indicador_inscricao_estadual_destinatario: indicadorIe,
