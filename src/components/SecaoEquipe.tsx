@@ -9,6 +9,7 @@ import {
   type Papel,
 } from '../services/configuracoes'
 import { quandoCurto } from '../services/formato'
+import { definirVeTodosClientes, listarVeTodosClientes } from '../services/clientes'
 import { Avatar } from './Avatar'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
@@ -46,15 +47,35 @@ export function SecaoEquipe() {
   const [erroAcao, setErroAcao] = useState<string | null>(null)
   const [novoLink, setNovoLink] = useState<{ nome: string; link: string; tipo: 'convite' | 'senha' } | null>(null)
 
+  // "Vê todos os clientes" (docs/clientes.md): dono e admin ligam para quem atende no balcão, faturamento etc.
+  const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
+  const [veTodos, setVeTodos] = useState<Set<string>>(new Set())
+
   useEffect(() => {
     let ativo = true
     listarEquipeCompleta(orgId)
       .then((lista) => ativo && (setEquipe({ orgId, lista }), setErro(null)))
       .catch(() => ativo && setErro('Não foi possível carregar a equipe.'))
+    listarVeTodosClientes(orgId)
+      .then((s) => ativo && setVeTodos(s))
+      .catch(() => ativo && setVeTodos(new Set()))
     return () => {
       ativo = false
     }
   }, [orgId, versao])
+
+  async function alternarVeTodos(m: MembroEquipe) {
+    setSalvando(m.user_id)
+    setErroAcao(null)
+    try {
+      await definirVeTodosClientes(orgId, m.user_id, !veTodos.has(m.user_id))
+      recarregar()
+    } catch (e) {
+      setErroAcao((e as Error).message)
+    } finally {
+      setSalvando(null)
+    }
+  }
 
   const lista = equipe?.orgId === orgId ? equipe.lista : null
   const recarregar = () => setVersao((v) => v + 1)
@@ -145,6 +166,20 @@ export function SecaoEquipe() {
                       {m.email}
                       {m.ultimo_acesso && ` · último acesso ${quandoCurto(m.ultimo_acesso).toLowerCase()}`}
                     </p>
+                    {m.papel === 'atendente' && m.ativo && (gerencia ? (
+                      <label className="mt-1 inline-flex cursor-pointer items-center gap-2 text-legenda text-texto-2">
+                        <input
+                          type="checkbox"
+                          checked={veTodos.has(m.user_id)}
+                          disabled={salvando === m.user_id}
+                          onChange={() => void alternarVeTodos(m)}
+                          className="size-3.5 accent-primaria"
+                        />
+                        Vê todos os clientes
+                      </label>
+                    ) : (
+                      veTodos.has(m.user_id) && <p className="mt-1 text-legenda text-texto-3">Vê todos os clientes</p>
+                    ))}
                   </div>
                   <div className="flex items-center gap-2">
                     {editavel ? (
@@ -198,6 +233,11 @@ export function SecaoEquipe() {
           </div>
         ))}
       </dl>
+      <p className="text-pequeno text-texto-3">
+        <span className="font-medium text-texto-2">Vê todos os clientes:</span> para quem atende no balcão ou cuida do faturamento.
+        Libera o cadastro de todos os clientes, os contatos ligados a eles e vender para qualquer um. Não libera as conversas nem os
+        negócios dos outros vendedores, nem trocar o vendedor responsável. Dono e admin já veem todos.
+      </p>
 
       <Convite
         aberto={convidando}

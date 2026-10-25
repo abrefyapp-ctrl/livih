@@ -12,6 +12,7 @@ export type ItemPedido = Tabelas['pedido_itens']['Row']
 export type Pedido = Omit<Tabelas['pedidos']['Row'], 'status'> & {
   status: StatusPedido
   contato: { id: string; nome: string | null; nome_whatsapp: string | null; telefone: string | null } | null
+  cliente: { id: string; nome: string } | null
 }
 export type Movimento = Tabelas['estoque_movimentos']['Row'] & { pedido: { numero: number } | null }
 
@@ -34,7 +35,7 @@ export const PROXIMOS: Record<StatusPedido, StatusPedido[]> = {
   cancelado: [],
 }
 
-const CAMPOS_PEDIDO = '*, contato:contatos(id, nome, nome_whatsapp, telefone)'
+const CAMPOS_PEDIDO = '*, contato:contatos(id, nome, nome_whatsapp, telefone), cliente:clientes(id, nome)'
 
 const amigavel = (m: string, padrao: string) => {
   const conhecidos = [
@@ -191,6 +192,7 @@ export async function atualizarPedido(
   dados: Partial<Pick<
       Tabelas['pedidos']['Update'],
       | 'contato_id'
+      | 'cliente_id'
       | 'desconto'
       | 'frete'
       | 'observacao'

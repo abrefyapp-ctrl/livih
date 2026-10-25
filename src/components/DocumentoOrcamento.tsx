@@ -4,7 +4,7 @@
 // menos é "-" e não "−" (fora da tabela da Helvetica).
 import { Document, Font, Image, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer'
 // Só formato.ts e tipos: o mesmo componente roda no navegador e no serviço livih-pdf (servidor).
-import { formatarCnpj, formatarTelefone, moeda as moedaTela, quantidade } from '../services/formato'
+import { formatarCep, formatarCnpj, formatarDocumento, formatarTelefone, moeda as moedaTela, quantidade } from '../services/formato'
 import type { DadosOrcamento } from '../services/orcamento'
 
 // Sem hifenização automática: em português ela quebra palavras em lugares errados ("grampea-mento").
@@ -147,6 +147,10 @@ export function Rodape({ d, titulo }: { d: Emitente; titulo: string }) {
 
 function Documento({ d }: { d: DadosOrcamento }) {
   const { pedido, emissora: e, cliente, vendedor } = d
+  // Cadastro do cliente: endereço no mesmo formato do da empresa emissora, no cabeçalho.
+  const f = d.fiscal
+  const enderecoCliente = f && juntar([juntar([f.logradouro, f.numero], ', '), f.complemento, f.bairro], ' - ')
+  const cidadeCliente = f && juntar([juntar([f.cidade, f.uf], '/'), f.cep && `CEP ${formatarCep(f.cep)}`], ' - ')
   const orcamento = pedido.status === 'rascunho'
   const titulo = `${orcamento ? 'Orçamento' : 'Pedido'} nº ${pedido.numero}`
   const desconto = Number(pedido.desconto)
@@ -165,13 +169,32 @@ function Documento({ d }: { d: DadosOrcamento }) {
           </View>
         </View>
 
-        {cliente && (
+        {f ? (
           <View style={s.bloco}>
             <Text style={s.rotulo}>Cliente</Text>
-            <Text style={s.negrito}>{cliente.nome}</Text>
-            {cliente.empresa && <Text>{cliente.empresa}</Text>}
-            {(cliente.telefone || cliente.email) && <Text style={s.suave}>{juntar([formatarTelefone(cliente.telefone), cliente.email])}</Text>}
+            <Text style={s.negrito}>{f.razao_social || f.nome}</Text>
+            {f.razao_social && f.nome !== f.razao_social && <Text>{f.nome}</Text>}
+            {(f.documento || f.inscricao_estadual) && (
+              <Text>
+                {juntar([f.documento && `${f.tipo === 'pf' ? 'CPF' : 'CNPJ'} ${formatarDocumento(f.documento)}`, f.inscricao_estadual && `IE ${f.inscricao_estadual}`])}
+              </Text>
+            )}
+            {(enderecoCliente || cidadeCliente) && <Text style={s.suave}>{juntar([enderecoCliente, cidadeCliente], ' - ')}</Text>}
+            {cliente ? (
+              <Text style={s.suave}>{juntar([`A/C ${cliente.nome}`, formatarTelefone(cliente.telefone), cliente.email || f.email])}</Text>
+            ) : (
+              f.email && <Text style={s.suave}>{f.email}</Text>
+            )}
           </View>
+        ) : (
+          cliente && (
+            <View style={s.bloco}>
+              <Text style={s.rotulo}>Cliente</Text>
+              <Text style={s.negrito}>{cliente.nome}</Text>
+              {cliente.empresa && <Text>{cliente.empresa}</Text>}
+              {(cliente.telefone || cliente.email) && <Text style={s.suave}>{juntar([formatarTelefone(cliente.telefone), cliente.email])}</Text>}
+            </View>
+          )
         )}
 
         <View style={s.tabela}>

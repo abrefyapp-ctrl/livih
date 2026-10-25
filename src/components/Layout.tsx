@@ -35,6 +35,7 @@ export function Layout() {
     { para: '/conversas', rotulo: 'Conversas', icone: 'conversas', contador: aguardando },
     { para: '/painel', rotulo: 'Painel', icone: 'grafico' },
     { para: '/contatos', rotulo: 'Contatos', icone: 'usuario' },
+    { para: '/clientes', rotulo: 'Clientes', icone: 'empresa' },
     { para: '/oportunidades', rotulo: 'Oportunidades', icone: 'funil' },
     ...(modulos?.has('agenda') ? [{ para: '/agenda', rotulo: 'Agenda', icone: 'calendario' as const }] : []),
     ...(modulos?.has('erp')

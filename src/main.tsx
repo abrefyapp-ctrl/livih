@@ -13,6 +13,8 @@ import { NaoEncontrada } from './pages/NaoEncontrada'
 import { Configuracoes } from './pages/Configuracoes'
 import { Contatos } from './pages/Contatos'
 import { ContatoPerfil } from './pages/ContatoPerfil'
+import { Clientes } from './pages/Clientes'
+import { ClientePerfil } from './pages/ClientePerfil'
 import { Agenda } from './pages/Agenda'
 import { Oportunidades } from './pages/Oportunidades'
 import { PedidoDetalhe } from './pages/PedidoDetalhe'
@@ -58,6 +60,8 @@ createRoot(document.getElementById('root')!).render(
             <Route path="painel" element={<Painel />} />
             <Route path="contatos" element={<Contatos />} />
             <Route path="contatos/:id" element={<ContatoPerfil />} />
+            <Route path="clientes" element={<Clientes />} />
+            <Route path="clientes/:id" element={<ClientePerfil />} />
             <Route path="oportunidades" element={<Oportunidades />} />
             <Route path="agenda" element={<Agenda />} />
             <Route path="pedidos" element={<Pedidos />} />

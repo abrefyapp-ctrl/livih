@@ -12,9 +12,33 @@ export type DadosOrcamento = {
   emissora: Emissora | null
   /** Logo como data URL: o gerador de PDF não precisa buscar nada na rede. */
   logo: string | null
+  /** A pessoa (contato do WhatsApp) com quem o pedido foi feito. */
   cliente: { nome: string; empresa: string | null; telefone: string | null; email: string | null } | null
+  /**
+   * O cadastro do cliente (docs/clientes.md): razão social, documento e endereço. Opcional: o agente monta os
+   * mesmos dados no banco (agente_dados_orcamento), e pedido sem cliente sai só com o contato.
+   */
+  fiscal?: DadosFiscais | null
   vendedor: { nome: string; telefone: string | null; email: string | null } | null
 }
+
+export type DadosFiscais = {
+  tipo: string
+  nome: string
+  razao_social: string | null
+  documento: string | null
+  inscricao_estadual: string | null
+  logradouro: string | null
+  numero: string | null
+  complemento: string | null
+  bairro: string | null
+  cidade: string | null
+  uf: string | null
+  cep: string | null
+  email: string | null
+}
+
+const CAMPOS_FISCAIS = 'tipo, nome, razao_social, documento, inscricao_estadual, logradouro, numero, complemento, bairro, cidade, uf, cep, email'
 
 export async function comoDataUrl(url: string): Promise<string | null> {
   try {
@@ -36,7 +60,7 @@ export async function montarOrcamento(orgId: string, pedidoId: string): Promise<
   const { pedido, itens } = achado
 
   const idsProdutos = itens.map((i) => i.produto_id).filter((x): x is string => !!x)
-  const [emissoras, equipe, contato, produtos, perfil] = await Promise.all([
+  const [emissoras, equipe, contato, produtos, perfil, cliente] = await Promise.all([
     listarEmissoras(orgId),
     listarEquipeCompleta(orgId).catch(() => []),
     pedido.contato_id
@@ -44,6 +68,7 @@ export async function montarOrcamento(orgId: string, pedidoId: string): Promise<
       : null,
     idsProdutos.length ? supabase.from('produtos').select('id, codigo, unidade').in('id', idsProdutos) : null,
     pedido.responsavel_id ? supabase.from('perfis').select('nome, telefone').eq('user_id', pedido.responsavel_id).maybeSingle() : null,
+    pedido.cliente_id ? supabase.from('clientes').select(CAMPOS_FISCAIS).eq('id', pedido.cliente_id).maybeSingle() : null,
   ])
 
   // Pedido antigo sem emissora sai pela padrão de hoje.
@@ -66,6 +91,7 @@ export async function montarOrcamento(orgId: string, pedidoId: string): Promise<
     cliente: c
       ? { nome: nomeDoContato({ nome: c.nome, nome_whatsapp: c.nome_whatsapp, telefone: c.telefone }), empresa: c.empresa, telefone: c.telefone, email: c.email }
       : null,
+    fiscal: cliente?.data ?? null,
     vendedor: pedido.responsavel_id
       ? {
           nome: perfil?.data?.nome || membro?.nome || membro?.email || 'Equipe',

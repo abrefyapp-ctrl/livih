@@ -2818,5 +2818,40 @@ begin
     and exists (select 1 from public.contatos where id = current_setting('teste.contato_cliente')::uuid);
 end $$;
 
+-- Cliente no pedido e no PDF do agente (migration 20261024130000)
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_cli uuid; v_ct uuid; v_conv uuid; v_ped uuid; r jsonb;
+begin
+  insert into public.clientes (org_id, tipo, nome, razao_social, documento, cidade, uf)
+  values (v_org, 'pj', 'Beta', 'Beta Comércio Ltda', '11444777000161', 'Joinville', 'SC') returning id into v_cli;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900077010', 'Comprador Beta') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado)
+  values (v_org, (select id from public.canais where instance_id = 'INST-F7'), v_ct, 'bot') returning id into v_conv;
+  insert into public.pedidos (org_id, contato_id, origem) values (v_org, v_ct, 'agente') returning id into v_ped;
+  insert into public.pedido_itens (org_id, pedido_id, descricao, quantidade, preco_unitario, ordem)
+  values (v_org, v_ped, 'Grampo', 2, 10, 0);
+
+  update public.contatos set cliente_id = v_cli where id = v_ct;
+  insert into resultado (teste, ok) select 'clientes: ligar o contato põe o cliente no rascunho dele',
+    cliente_id = v_cli from public.pedidos where id = v_ped;
+
+  r := public.agente_dados_orcamento(v_conv);
+  insert into resultado (teste, ok) values ('clientes: PDF do agente leva o cadastro do cliente',
+    r -> 'fiscal' ->> 'documento' = '11444777000161' and r -> 'fiscal' ->> 'razao_social' = 'Beta Comércio Ltda'
+    and r -> 'cliente' ->> 'nome' = 'Comprador Beta');
+
+  perform set_config('livih.pedido_status', 'on', true);
+  update public.pedidos set status = 'confirmado' where id = v_ped;
+  perform set_config('livih.pedido_status', 'off', true);
+  begin
+    update public.pedidos set cliente_id = null where id = v_ped;
+    insert into resultado (teste, ok) values ('clientes: pedido confirmado não troca de cliente', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('clientes: pedido confirmado não troca de cliente', sqlerrm like 'cliente, valores e condições%');
+  end;
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

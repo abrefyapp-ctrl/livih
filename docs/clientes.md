@@ -140,6 +140,10 @@ admin mudam (pela função que já altera papel e status do membro, com auditori
    - o bloco Cliente no contato e na conversa;
    - o cliente no pedido e no PDF;
    - a chave "Vê todos os clientes" na Equipe.
+
+   Feita em 24/10, com a migration `20261024130000_clientes_pedido.sql` (cliente do pedido só muda no rascunho, ligar
+   o contato preenche os rascunhos dele, `fiscal` no `agente_dados_orcamento`). O PDF do agente só mostra o cadastro
+   depois de reimportar o `livih-agente.json` e reconstruir o serviço livih-pdf na VPS (junto com a entrega 5).
 3. **OS:** cliente na OS, no PDF, nos prazos e na importação.
 4. **Importação** de planilha de clientes.
 5. **n8n:** texto do contexto do agente.

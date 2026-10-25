@@ -28,6 +28,7 @@ import {
   type DadosOrcamento,
 } from '../services/orcamento'
 import { moeda, nomeDoContato, quandoCurto } from '../services/formato'
+import { ModalEscolherCliente } from '../components/ClienteDoContato'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
@@ -65,6 +66,7 @@ export function PedidoDetalhe() {
   const [confirmarEnvio, setConfirmarEnvio] = useState(false)
   const [enviadoEm, setEnviadoEm] = useState<string | null>(null)
   const [previa, setPrevia] = useState<{ dados: DadosOrcamento | null; pdf: Blob | null; erro: string | null } | null>(null)
+  const [escolherCliente, setEscolherCliente] = useState(false)
 
   const chave = `${id}|${versao}`
   useEffect(() => {
@@ -196,12 +198,46 @@ export function PedidoDetalhe() {
               Pedido #{pedido.numero} <EtiquetaPedido status={pedido.status} />
             </h1>
             <p className="text-pequeno text-texto-2">
+              {pedido.cliente && (
+                <>
+                  <Link to={`/clientes/${pedido.cliente.id}`} className="font-medium text-primaria hover:underline">
+                    {pedido.cliente.nome}
+                  </Link>
+                  {pedido.contato && <span className="text-texto-3"> · A/C </span>}
+                </>
+              )}
               {pedido.contato ? (
                 <Link to={`/contatos/${pedido.contato.id}`} className="font-medium text-primaria hover:underline">
                   {nomeDoContato(pedido.contato)}
                 </Link>
               ) : (
-                'Sem cliente'
+                !pedido.cliente && 'Sem cliente'
+              )}
+              {rascunho && (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    onClick={() => setEscolherCliente(true)}
+                    disabled={!!ocupado}
+                    className="text-legenda font-medium text-primaria underline disabled:opacity-60"
+                  >
+                    {pedido.cliente ? 'trocar cliente' : 'escolher cliente'}
+                  </button>
+                  {pedido.cliente && (
+                    <>
+                      {' · '}
+                      <button
+                        type="button"
+                        onClick={() => void executar('cliente', () => atualizarPedido(pedido.id, { cliente_id: null }))}
+                        disabled={!!ocupado}
+                        className="text-legenda text-texto-3 underline disabled:opacity-60"
+                      >
+                        tirar
+                      </button>
+                    </>
+                  )}
+                </>
               )}
               <span className="text-texto-3"> · criado {quandoCurto(pedido.criado_em).toLowerCase()}</span>
               {pedido.origem === 'agente' && <span className="text-texto-3"> · montado pelo agente</span>}
@@ -335,6 +371,17 @@ export function PedidoDetalhe() {
             ? `O pedido fica registrado como cancelado${pedido.estoque_baixado ? ' e os itens voltam para o estoque' : ''}. Não dá para desfazer.`
             : `Os itens ${pedido.estoque_baixado ? 'voltam para o estoque e ' : ''}podem ser editados de novo.`}
       </DialogoConfirmacao>
+
+      {escolherCliente && (
+        <ModalEscolherCliente
+          orgId={orgId}
+          salvando={ocupado === 'cliente'}
+          aoFechar={() => setEscolherCliente(false)}
+          aoEscolher={(clienteId) =>
+            void executar('cliente', () => atualizarPedido(pedido.id, { cliente_id: clienteId })).then(() => setEscolherCliente(false))
+          }
+        />
+      )}
     </div>
   )
 }

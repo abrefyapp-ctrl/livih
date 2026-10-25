@@ -10,6 +10,7 @@ import { EtiquetaEtapa } from './EtiquetaEtapa'
 import { Icone, type NomeIcone } from './Icone'
 import { ModalContato } from './ModalContato'
 import { NotasContato } from './NotasContato'
+import { ClienteDoContato } from './ClienteDoContato'
 
 function Linha({ icone, children }: { icone: NomeIcone; children: ReactNode }) {
   return (
@@ -102,6 +103,10 @@ export function PainelContato({ contatoId, conversaId }: { contatoId: string; co
             ))}
           </ul>
         )}
+      </Secao>
+
+      <Secao titulo="Cliente">
+        <ClienteDoContato contato={contato} aoMudar={() => setRecarregar((n) => n + 1)} />
       </Secao>
 
       <Secao titulo="Agente">

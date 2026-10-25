@@ -277,7 +277,7 @@ if (assinatura.statusCode >= 400 || !assinatura.body?.url) {
   return JSON.stringify({ erro: `não foi possível preparar o envio do PDF (HTTP ${assinatura.statusCode}); chame a equipe` });
 }
 
-const dados = { pedido: { ...d.pedido, contato: null }, itens: d.itens, emissora: d.emissora, cliente: d.cliente, vendedor: d.vendedor };
+const dados = { pedido: { ...d.pedido, contato: null }, itens: d.itens, emissora: d.emissora, cliente: d.cliente, fiscal: d.fiscal, vendedor: d.vendedor };
 const pdf = await this.helpers.httpRequest({
   method: 'POST', url: 'http://livih-pdf:3000/orcamento',
   headers: { 'x-livih-token': $env.LIVIH_PDF_TOKEN },

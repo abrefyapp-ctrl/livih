@@ -81,6 +81,29 @@ export function formatarCnpj(cnpj: string | null | undefined): string {
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
 }
 
+/** CNPJ (14) ou CPF (11) com pontuação; o resto volta como veio. */
+export function formatarDocumento(v: string | null | undefined): string {
+  const d = (v ?? '').replace(/\D/g, '')
+  if (d.length === 14) return formatarCnpj(d)
+  if (d.length === 11) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+  return v ?? ''
+}
+
+/** 80010000 → 80010-000 */
+export function formatarCep(v: string | null | undefined): string {
+  const d = (v ?? '').replace(/\D/g, '')
+  return d.length === 8 ? `${d.slice(0, 5)}-${d.slice(5)}` : (v ?? '')
+}
+
+type Endereco = { logradouro: string | null; numero: string | null; complemento: string | null; bairro: string | null; cidade: string | null; uf: string | null; cep: string | null }
+
+/** "Rua X, 100 - sala 2 · Centro · Curitiba/PR · 80010-000", sem as partes vazias. */
+export function enderecoEmLinha(c: Endereco): string {
+  const rua = [c.logradouro, c.numero].filter(Boolean).join(', ') + (c.complemento ? ` - ${c.complemento}` : '')
+  const cidade = [c.cidade, c.uf].filter(Boolean).join('/')
+  return [rua, c.bairro, cidade, c.cep ? formatarCep(c.cep) : null].filter(Boolean).join(' · ')
+}
+
 /** 1,5 / 10 / 2,125 (até 3 casas); vazio → —. */
 export const quantidade = (n: number | null | undefined) =>
   n == null ? '—' : Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 3 })

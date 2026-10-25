@@ -23,6 +23,7 @@ import { ModalNovaConversa } from '../components/ModalNovaConversa'
 import { ModalOportunidade } from '../components/ModalOportunidade'
 import { horaCurta, proximosDoContato, ROTULO_STATUS, type Compromisso } from '../services/agenda'
 import { NotasContato } from '../components/NotasContato'
+import { ClienteDoContato } from '../components/ClienteDoContato'
 
 function Bloco({ titulo, acao, children }: { titulo: string; acao?: ReactNode; children: ReactNode }) {
   return (
@@ -218,9 +219,14 @@ export function ContatoPerfil() {
             </Bloco>
           </div>
 
-          <Bloco titulo="Notas da equipe">
-            <NotasContato contatoId={c.id} />
-          </Bloco>
+          <div className="space-y-4">
+            <Bloco titulo="Cliente">
+              <ClienteDoContato contato={c} aoMudar={recarregar} />
+            </Bloco>
+            <Bloco titulo="Notas da equipe">
+              <NotasContato contatoId={c.id} />
+            </Bloco>
+          </div>
         </div>
       </div>
 
