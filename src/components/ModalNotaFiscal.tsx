@@ -5,6 +5,7 @@ import {
   limitePadrao,
   ORIGENS,
   REGIMES,
+  REGIMES_ESPECIAIS,
   ROTULO_STATUS,
   salvarFiscal,
   sincronizarFocus,
@@ -44,6 +45,16 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
     cofins: e.cofins_situacao ?? '',
     limite: e.limite_faturamento != null ? String(e.limite_faturamento).replace('.', ',') : '',
     balcao: e.padrao_balcao,
+    // NFS-e (docs/nfse.md)
+    nfse: e.nfse_ativa,
+    im: e.inscricao_municipal ?? '',
+    tribNacional: e.nfse_codigo_tributacao_nacional ?? '',
+    tribMunicipal: e.nfse_codigo_tributacao_municipal ?? '',
+    nbs: e.nfse_codigo_nbs ?? '',
+    descricaoServico: e.nfse_descricao_padrao ?? '',
+    regimeEspecial: String(e.nfse_regime_especial),
+    ibsCst: e.ibs_cbs_cst ?? '',
+    ibsClass: e.ibs_cbs_classificacao ?? '',
   })
   const [certificado, setCertificado] = useState<File | null>(null)
   const [senha, setSenha] = useState('')
@@ -66,6 +77,11 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
     (!!c.pis && !/^\d{2}$/.test(c.pis)) ||
     (!!c.cofins && !/^\d{2}$/.test(c.cofins)) ||
     (limiteNum != null && !(limiteNum > 0)) ||
+    (c.nfse && !/^\d{6}$/.test(c.tribNacional)) ||
+    (!!c.tribMunicipal && !/^\d{3}$/.test(c.tribMunicipal)) ||
+    (!!c.nbs && !/^\d{9}$/.test(c.nbs)) ||
+    (!!c.ibsCst && !/^\d{3}$/.test(c.ibsCst)) ||
+    (!!c.ibsClass && !/^\d{6}$/.test(c.ibsClass)) ||
     (!!certificado && !senha)
   const dias = diasAte(e.certificado_validade)
 
@@ -98,6 +114,15 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
       cofins_situacao: c.cofins || null,
       limite_faturamento: limiteNum,
       padrao_balcao: c.balcao,
+      nfse_ativa: c.nfse,
+      inscricao_municipal: c.im.trim() || null,
+      nfse_codigo_tributacao_nacional: c.tribNacional || null,
+      nfse_codigo_tributacao_municipal: c.tribMunicipal || null,
+      nfse_codigo_nbs: c.nbs || null,
+      nfse_descricao_padrao: c.descricaoServico.trim() || null,
+      nfse_regime_especial: Number(c.regimeEspecial),
+      ibs_cbs_cst: c.ibsCst || null,
+      ibs_cbs_classificacao: c.ibsClass || null,
     }
     try {
       await salvarFiscal(e.id, campos)
@@ -223,6 +248,55 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
             O arquivo e a senha vão direto para a Focus NFe, que assina as notas. O Livih não guarda nenhum dos dois. Se o CNPJ já
             foi cadastrado com o certificado no painel da Focus, salve sem escolher o arquivo: o Livih usa o cadastro de lá.
           </p>
+        </fieldset>
+
+        <fieldset className="space-y-3">
+          <legend className="mb-1 font-semibold text-texto">Nota de serviço (NFS-e)</legend>
+          <label className="flex items-center gap-2 text-pequeno text-texto-2">
+            <input type="checkbox" checked={c.nfse} onChange={(ev) => muda({ nfse: ev.target.checked })} className="size-4 accent-primaria" />
+            Emitir nota de serviço por este CNPJ (padrão nacional)
+          </label>
+          {e.nfse_provedor && (
+            <p className={`text-legenda ${e.nfse_provedor === 'Nacional' ? 'text-texto-3' : 'text-atencao'}`}>
+              {e.cidade}: NFS-e pelo padrão {e.nfse_provedor === 'Nacional' ? 'nacional' : `da prefeitura (${e.nfse_provedor}), que o Livih ainda não emite`}
+              {e.nfse_habilitada_focus ? ' · ativa na Focus' : ''}.
+            </p>
+          )}
+          {c.nfse && (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <CampoTexto rotulo="Código de tributação nacional do ISS" inputMode="numeric" maxLength={6} value={c.tribNacional} placeholder="010101"
+                  onChange={(ev) => muda({ tribNacional: ev.target.value.replace(/\D/g, '') })}
+                  erro={c.tribNacional && !/^\d{6}$/.test(c.tribNacional) ? '6 números' : undefined}
+                  ajuda="Identifica o serviço (ex.: 01.01.01 desenvolvimento de software). Peça à contabilidade." />
+                <CampoTexto rotulo="Inscrição municipal (opcional)" maxLength={15} value={c.im} onChange={(ev) => muda({ im: ev.target.value })} />
+                <CampoTexto rotulo="Código de tributação municipal (opcional)" inputMode="numeric" maxLength={3} value={c.tribMunicipal}
+                  onChange={(ev) => muda({ tribMunicipal: ev.target.value.replace(/\D/g, '') })} />
+                <CampoTexto rotulo="Código NBS (opcional)" inputMode="numeric" maxLength={9} value={c.nbs}
+                  onChange={(ev) => muda({ nbs: ev.target.value.replace(/\D/g, '') })} />
+                <Campo rotulo="Regime especial de tributação" id="nfse-regime-especial">
+                  <select id="nfse-regime-especial" value={c.regimeEspecial} onChange={(ev) => muda({ regimeEspecial: ev.target.value })} className={CLASSE_CAMPO}>
+                    {REGIMES_ESPECIAIS.map((r) => (
+                      <option key={r.valor} value={r.valor}>{r.rotulo}</option>
+                    ))}
+                  </select>
+                </Campo>
+              </div>
+              <Campo rotulo="Descrição padrão do serviço (opcional)" id="nfse-descricao" ajuda="Sugestão para a nota avulsa; na emissão dá para ajustar.">
+                <textarea id="nfse-descricao" rows={2} maxLength={1000} value={c.descricaoServico} onChange={(ev) => muda({ descricaoServico: ev.target.value })}
+                  className="block w-full rounded-md border border-borda bg-superficie px-3 py-2 text-pequeno focus:border-primaria focus:outline-none" />
+              </Campo>
+              <details className="text-pequeno">
+                <summary className="cursor-pointer text-texto-2">IBS/CBS (reforma tributária, opcional)</summary>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  <CampoTexto rotulo="CST do IBS/CBS" inputMode="numeric" maxLength={3} value={c.ibsCst} onChange={(ev) => muda({ ibsCst: ev.target.value.replace(/\D/g, '') })} />
+                  <CampoTexto rotulo="Classificação tributária" inputMode="numeric" maxLength={6} value={c.ibsClass} onChange={(ev) => muda({ ibsClass: ev.target.value.replace(/\D/g, '') })} />
+                </div>
+                <p className="mt-1 text-legenda text-texto-3">Preencha quando a contabilidade pedir; enquanto a prefeitura não exige, a nota sai sem eles.</p>
+              </details>
+              <p className="text-legenda text-texto-3">A alíquota do ISS não é pedida: no padrão nacional ela vem da prefeitura.</p>
+            </>
+          )}
         </fieldset>
 
         <fieldset className="space-y-3">

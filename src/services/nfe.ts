@@ -9,6 +9,9 @@ export type CamposFiscais = Pick<
   Emissora,
   | 'regime_tributario' | 'nfe_ambiente' | 'nfe_serie' | 'cfop_estadual' | 'cfop_interestadual' | 'icms_situacao'
   | 'icms_origem' | 'pis_situacao' | 'cofins_situacao' | 'limite_faturamento' | 'padrao_balcao'
+  // NFS-e (docs/nfse.md)
+  | 'nfse_ativa' | 'inscricao_municipal' | 'nfse_codigo_tributacao_nacional' | 'nfse_codigo_tributacao_municipal'
+  | 'nfse_codigo_nbs' | 'nfse_descricao_padrao' | 'nfse_regime_especial' | 'ibs_cbs_cst' | 'ibs_cbs_classificacao'
 >
 
 export const REGIMES: { valor: number; rotulo: string }[] = [
@@ -112,19 +115,26 @@ export type NotaFiscal = {
   numero: number | null; serie: number | null; chave: string | null; valor: number; mensagem: string | null;
   xml_path: string | null; danfe_path: string | null; xml_cancelamento_path: string | null; emissora_id: string;
   autorizada_em: string | null; cancelada_em: string | null; criado_em: string;
+  modelo: 'nfe' | 'nfse'; descricao: string | null; pedido_id: string | null; os_id: string | null;
 }
+
+const CAMPOS_NOTA =
+  'id, status, ambiente, numero, serie, chave, valor, mensagem, xml_path, danfe_path, xml_cancelamento_path, emissora_id, ' +
+  'autorizada_em, cancelada_em, criado_em, modelo, descricao, pedido_id, os_id'
+
+export const NOME_MODELO = { nfe: 'NF-e', nfse: 'NFS-e' } as const
 
 /** A nota mais recente do pedido (viva, ou a última rejeitada/cancelada). */
 export async function notaDoPedido(pedidoId: string): Promise<NotaFiscal | null> {
   const { data, error } = await supabase
     .from('notas_fiscais')
-    .select('id, status, ambiente, numero, serie, chave, valor, mensagem, xml_path, danfe_path, xml_cancelamento_path, emissora_id, autorizada_em, cancelada_em, criado_em')
+    .select(CAMPOS_NOTA)
     .eq('pedido_id', pedidoId)
     .order('criado_em', { ascending: false })
     .limit(1)
     .maybeSingle()
   if (error) throw error
-  return data as NotaFiscal | null
+  return data as unknown as NotaFiscal | null
 }
 
 export async function podeEmitirNota(orgId: string): Promise<boolean> {
@@ -175,4 +185,46 @@ export async function urlArquivoNota(path: string): Promise<string> {
   const { data, error } = await supabase.storage.from('notas-fiscais').createSignedUrl(path, 3600, { download: true })
   if (error) throw new Error('Não foi possível abrir o arquivo da nota.')
   return data.signedUrl
+}
+
+// ---- NFS-e (docs/nfse.md) ----
+
+export const REGIMES_ESPECIAIS: { valor: number; rotulo: string }[] = [
+  { valor: 0, rotulo: 'Nenhum' },
+  { valor: 3, rotulo: 'Microempresa municipal' },
+  { valor: 5, rotulo: 'Profissional autônomo' },
+  { valor: 6, rotulo: 'Sociedade de profissionais' },
+  { valor: 2, rotulo: 'Estimativa' },
+  { valor: 1, rotulo: 'Ato cooperado (cooperativa)' },
+  { valor: 4, rotulo: 'Notário ou registrador' },
+  { valor: 9, rotulo: 'Outros' },
+]
+
+export async function notaDaOs(osId: string): Promise<NotaFiscal | null> {
+  const { data, error } = await supabase.from('notas_fiscais').select(CAMPOS_NOTA).eq('os_id', osId)
+    .order('criado_em', { ascending: false }).limit(1).maybeSingle()
+  if (error) throw error
+  return data as unknown as NotaFiscal | null
+}
+
+export async function notasDoCliente(clienteId: string): Promise<NotaFiscal[]> {
+  const { data, error } = await supabase.from('notas_fiscais').select(CAMPOS_NOTA).eq('cliente_id', clienteId)
+    .order('criado_em', { ascending: false }).limit(50)
+  if (error) throw error
+  return (data ?? []) as unknown as NotaFiscal[]
+}
+
+export type ServicoEmissao = {
+  pedido_id?: string; os_id?: string; cliente_id?: string; valor?: number; emissora_id: string; descricao: string;
+  data_competencia: string; iss_retido: boolean; informacoes: string
+}
+
+export async function emitirNotaServico(dados: ServicoEmissao): Promise<NotaFiscal> {
+  const { data, error } = await supabase.functions.invoke('nfse-emitir', { body: dados })
+  if (error) {
+    const r = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null
+    if (r?.faltando?.length) throw new FaltaParaEmitir(r.erro ?? 'Falta arrumar antes de emitir:', r.faltando)
+    throw new Error(r?.erro ?? 'Não foi possível emitir a nota de serviço. Tente de novo.')
+  }
+  return (data as { nota: NotaFiscal }).nota
 }

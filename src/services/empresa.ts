@@ -9,6 +9,9 @@ export type DadosEmissora = Omit<
   | 'regime_tributario' | 'nfe_ambiente' | 'nfe_serie' | 'cfop_estadual' | 'cfop_interestadual' | 'icms_situacao' | 'icms_origem'
   | 'pis_situacao' | 'cofins_situacao' | 'limite_faturamento' | 'padrao_balcao' | 'nfe_status' | 'nfe_erro' | 'focus_empresa_id'
   | 'certificado_validade' | 'certificado_cnpj' | 'nfe_sincronizado_em'
+  | 'nfse_ativa' | 'codigo_municipio_ibge' | 'nfse_provedor' | 'nfse_habilitada_focus' | 'inscricao_municipal'
+  | 'nfse_codigo_tributacao_nacional' | 'nfse_codigo_tributacao_municipal' | 'nfse_codigo_nbs' | 'nfse_descricao_padrao'
+  | 'nfse_regime_especial' | 'ibs_cbs_cst' | 'ibs_cbs_classificacao'
 >
 
 // Em formato.ts (sem Supabase) para o PDF do orçamento rodar também no servidor (serviço livih-pdf).

@@ -16,7 +16,7 @@ const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE
 const emSegundoPlano = (tarefa: Promise<unknown>) => globalThis.EdgeRuntime?.waitUntil?.(tarefa);
 
 async function conferir() {
-  const { data } = await admin.from("notas_fiscais").select("id, org_id, emissora_id, ref, ambiente, status, consultas")
+  const { data } = await admin.from("notas_fiscais").select("id, org_id, emissora_id, ref, ambiente, status, consultas, modelo")
     .eq("status", "processando").lt("atualizado_em", new Date(Date.now() - 120_000).toISOString()).lt("consultas", 60)
     .order("atualizado_em").limit(20);
   for (const nota of (data ?? []) as Nota[]) await consultarNota(admin, nota);
@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
   if (!segredo || req.headers.get("x-livih-focus") !== segredo) return new Response("não autorizado", { status: 401 });
   if (!corpo?.ref) return Response.json({ ok: true, ignorado: "sem ref" });
 
-  const { data: nota } = await admin.from("notas_fiscais").select("id, org_id, emissora_id, ref, ambiente, status, consultas")
+  const { data: nota } = await admin.from("notas_fiscais").select("id, org_id, emissora_id, ref, ambiente, status, consultas, modelo")
     .eq("ref", corpo.ref).maybeSingle<Nota>();
   // Nota que não é do Livih (outro sistema no mesmo CNPJ): só confirma o recebimento.
   if (!nota) return Response.json({ ok: true, ignorado: "ref desconhecida" });

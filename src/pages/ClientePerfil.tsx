@@ -33,6 +33,7 @@ import { Icone, type NomeIcone } from '../components/Icone'
 import { Modal } from '../components/Modal'
 import { ModalCliente } from '../components/ModalCliente'
 import { ModalContato } from '../components/ModalContato'
+import { NotasDoCliente } from '../components/NotaFiscal'
 
 function Bloco({ titulo, acao, children }: { titulo: string; acao?: ReactNode; children: ReactNode }) {
   return (
@@ -302,13 +303,16 @@ export function ClientePerfil() {
             )}
           </div>
 
-          <Bloco titulo="Sobre o cadastro">
-            <ul className="space-y-2 text-pequeno text-texto-2">
-              <li>{c.tipo === 'pj' ? 'Empresa (CNPJ)' : 'Pessoa física (CPF)'}</li>
-              <li>Cadastrado {quandoCurto(c.criado_em)}</li>
-              {!c.documento && <li className="text-texto-3">Sem documento, o orçamento sai só com o nome.</li>}
-            </ul>
-          </Bloco>
+          <div className="space-y-4">
+            <NotasDoCliente orgId={orgId} clienteId={c.id} nome={c.nome} />
+            <Bloco titulo="Sobre o cadastro">
+              <ul className="space-y-2 text-pequeno text-texto-2">
+                <li>{c.tipo === 'pj' ? 'Empresa (CNPJ)' : 'Pessoa física (CPF)'}</li>
+                <li>Cadastrado {quandoCurto(c.criado_em)}</li>
+                {!c.documento && <li className="text-texto-3">Sem documento, o orçamento e a nota saem só com o nome.</li>}
+              </ul>
+            </Bloco>
+          </div>
         </div>
       </div>
 

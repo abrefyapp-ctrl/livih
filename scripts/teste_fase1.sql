@@ -3110,5 +3110,62 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 insert into resultado (teste, ok) select 'nfe emissão: outra empresa não vê a nota',
   not exists (select 1 from public.notas_fiscais where id = current_setting('teste.nota')::uuid);
 
+-- NFS-e (migration 20261025150000)
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_emi uuid := (select id from public.emissoras where org_id = current_setting('teste.f7')::uuid and cnpj = '11222333000181');
+  n integer;
+begin
+  update public.emissoras set nfse_ativa = true, nfse_codigo_tributacao_nacional = '010101', inscricao_municipal = '123456',
+                              nfse_regime_especial = 0 where id = v_emi;
+  get diagnostics n = row_count;
+  insert into resultado (teste, ok) values ('nfse: dono configura a nota de serviço do CNPJ', n = 1);
+  begin
+    update public.emissoras set nfse_habilitada_focus = true where id = v_emi;
+    insert into resultado (teste, ok) values ('nfse: a tela não liga a NFS-e na Focus sozinha', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('nfse: a tela não liga a NFS-e na Focus sozinha', sqlerrm like 'a situação na Focus%');
+  end;
+  begin
+    update public.emissoras set nfse_codigo_tributacao_nacional = '01.01.01' where id = v_emi;
+    insert into resultado (teste, ok) values ('nfse: código de tributação nacional tem 6 números', false);
+  exception when check_violation then
+    insert into resultado (teste, ok) values ('nfse: código de tributação nacional tem 6 números', true);
+  end;
+end $$;
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_emi uuid := (select id from public.emissoras where org_id = current_setting('teste.f7')::uuid and cnpj = '11222333000181');
+  v_os uuid := (select id from public.ordens_servico where org_id = current_setting('teste.f7')::uuid order by numero limit 1);
+  v_cli uuid := (select id from public.clientes where org_id = current_setting('teste.f7')::uuid and documento = '11444777000161');
+begin
+  insert into public.notas_fiscais (org_id, emissora_id, os_id, cliente_id, ref, ambiente, modelo, valor, descricao)
+  values (v_org, v_emi, v_os, v_cli, 'lvsteste1', 'homologacao', 'nfse', 150, 'Conserto');
+  begin
+    insert into public.notas_fiscais (org_id, emissora_id, os_id, ref, ambiente, modelo) values (v_org, v_emi, v_os, 'lvsteste2', 'homologacao', 'nfse');
+    insert into resultado (teste, ok) values ('nfse: uma OS tem uma nota viva só', false);
+  exception when unique_violation then
+    insert into resultado (teste, ok) values ('nfse: uma OS tem uma nota viva só', true);
+  end;
+  insert into public.notas_fiscais (org_id, emissora_id, cliente_id, ref, ambiente, modelo, valor, descricao, status, chave)
+  values (v_org, v_emi, v_cli, 'lvsteste3', 'homologacao', 'nfse', 80, 'Consultoria', 'processando', null);
+  update public.notas_fiscais set status = 'autorizada', chave = repeat('4', 50), numero = 7 where ref = 'lvsteste3';
+  insert into resultado (teste, ok) values ('nfse: aceita a chave de 50 dígitos da NFS-e Nacional',
+    (select chave from public.notas_fiscais where ref = 'lvsteste3') = repeat('4', 50));
+end $$;
+set local role authenticated;
+-- b1 tem "Emite nota fiscal" (teste da configuração); d1 não, mas é da oficina (módulo os).
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'nfse: quem emite vê a nota avulsa',
+  exists (select 1 from public.notas_fiscais where ref = 'lvsteste3');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000d1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'nfse: a oficina vê a nota da OS; sem a permissão, não vê a avulsa',
+  exists (select 1 from public.notas_fiscais where ref = 'lvsteste1')
+  and not exists (select 1 from public.notas_fiscais where ref = 'lvsteste3');
+
 reset role;
 select n, teste, ok from resultado order by n;

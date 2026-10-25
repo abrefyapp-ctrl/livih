@@ -23,6 +23,7 @@ import {
 import { conversaDoCliente, type ConversaEnvio } from '../services/orcamento'
 import { enviarPdfOsWhatsapp, gerarPdfOs, montarPdfOs, nomeArquivoOs, type DadosPdfOs } from '../services/orcamentoOs'
 import { VisualizadorPdf } from '../components/VisualizadorPdf'
+import { BlocoNota } from '../components/NotaFiscal'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
@@ -246,6 +247,8 @@ export function OrdemServicoDetalhe() {
                 )}
               </div>
             </header>
+
+            <BlocoNota orgId={orgId} alvo={{ tipo: 'os', osId: o.id, numero: o.numero }} />
 
             <dl className="grid gap-3 rounded-lg border border-borda bg-superficie p-4 text-pequeno sm:grid-cols-4">
               <Dado rotulo="Recebida em" valor={data(o.recebida_em)} />

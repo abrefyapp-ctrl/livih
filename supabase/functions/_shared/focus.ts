@@ -10,9 +10,12 @@ export const BASE: Record<Ambiente, string> = {
 };
 export const basic = (token: string) => `Basic ${btoa(`${token}:`)}`;
 
+export type Modelo = "nfe" | "nfse";
 export type Nota = {
-  id: string; org_id: string; emissora_id: string; ref: string; ambiente: Ambiente; status: string; consultas: number;
+  id: string; org_id: string; emissora_id: string; ref: string; ambiente: Ambiente; status: string; consultas: number; modelo: Modelo;
 };
+/** Caminho da API por modelo: NF-e em /v2/nfe, NFS-e Nacional em /v2/nfsen. */
+export const ROTA: Record<Modelo, string> = { nfe: "nfe", nfse: "nfsen" };
 
 /** Mensagens de erro da Focus em texto (vêm em erros[] com campo e mensagem, ou em mensagem/mensagem_sefaz). */
 export function mensagemFocus(corpo: unknown, status: number): string {
@@ -54,7 +57,11 @@ async function guardar(admin: SupabaseClient, nota: Nota, token: string, caminho
 type Retorno = {
   status?: string; numero?: string | number; serie?: string | number; chave_nfe?: string; mensagem_sefaz?: string;
   status_sefaz?: string; caminho_xml_nota_fiscal?: string; caminho_danfe?: string; caminho_xml_cancelamento?: string;
+  // NFS-e Nacional: o PDF vem como URL completa e a chave (50 dígitos) dentro da URL de consulta pública.
+  url_danfse?: string; url?: string; codigo_verificacao?: string; erros?: { codigo?: string; mensagem?: string }[];
 };
+
+const chaveDe = (r: Retorno) => (r.chave_nfe ?? "").replace(/\D/g, "") || (r.url?.match(/chave=(\d{44,50})/)?.[1] ?? null);
 
 /**
  * Aplica o retorno da Focus (do gatilho ou da consulta) à nota: autorizada guarda XML e DANFE; rejeitada guarda o
@@ -66,11 +73,11 @@ export async function aplicarRetorno(admin: SupabaseClient, nota: Nota, r: Retor
   const agora = new Date().toISOString();
 
   if (r.status === "autorizado" && nota.status !== "autorizada" && nota.status !== "cancelada") {
-    const chave = (r.chave_nfe ?? "").replace(/\D/g, "") || null;
+    const chave = chaveDe(r);
     const base = chave ?? nota.ref;
     const [xml, danfe] = await Promise.all([
-      guardar(admin, nota, token, r.caminho_xml_nota_fiscal, `${base}-nfe.xml`, "application/xml"),
-      guardar(admin, nota, token, r.caminho_danfe, `${base}.pdf`, "application/pdf"),
+      guardar(admin, nota, token, r.caminho_xml_nota_fiscal, `${base}-${nota.modelo}.xml`, "application/xml"),
+      guardar(admin, nota, token, r.caminho_danfe ?? r.url_danfse, `${base}.pdf`, "application/pdf"),
     ]);
     const { error } = await admin.from("notas_fiscais").update({
       status: "autorizada", numero: r.numero ? Number(r.numero) : null, serie: r.serie ? Number(r.serie) : null, chave,
@@ -82,8 +89,9 @@ export async function aplicarRetorno(admin: SupabaseClient, nota: Nota, r: Retor
   if ((r.status === "erro_autorizacao" || r.status === "denegado") && nota.status === "processando") {
     await admin.from("notas_fiscais").update({
       status: "rejeitada",
-      mensagem: [r.status === "denegado" ? "Uso denegado pela SEFAZ." : null, r.status_sefaz ? `${r.status_sefaz}:` : null, r.mensagem_sefaz]
-        .filter(Boolean).join(" ").slice(0, 4000) || "A SEFAZ não autorizou a nota.",
+      mensagem: [r.status === "denegado" ? "Uso denegado pela SEFAZ." : null, r.status_sefaz ? `${r.status_sefaz}:` : null, r.mensagem_sefaz,
+                 ...(r.erros ?? []).map((e) => [e.codigo, e.mensagem].filter(Boolean).join(": "))]
+        .filter(Boolean).join(" ").slice(0, 4000) || (nota.modelo === "nfse" ? "A prefeitura não autorizou a nota." : "A SEFAZ não autorizou a nota."),
     }).eq("id", nota.id);
     return;
   }
@@ -101,7 +109,7 @@ export async function aplicarRetorno(admin: SupabaseClient, nota: Nota, r: Retor
 export async function consultarNota(admin: SupabaseClient, nota: Nota) {
   const token = await tokenDoCnpj(admin, nota.emissora_id, nota.ambiente);
   if (!token) return;
-  const r = await fetch(`${BASE[nota.ambiente]}/v2/nfe/${encodeURIComponent(nota.ref)}`, {
+  const r = await fetch(`${BASE[nota.ambiente]}/v2/${ROTA[nota.modelo]}/${encodeURIComponent(nota.ref)}`, {
     headers: { Authorization: basic(token) }, signal: AbortSignal.timeout(30000),
   });
   const corpo = await r.json().catch(() => null);
@@ -127,14 +135,17 @@ export async function registrarGatilhos(admin: SupabaseClient, emissoraId: strin
     try {
       const lista = await fetch(`${BASE[ambiente]}/v2/hooks`, { headers: { Authorization: basic(token) }, signal: AbortSignal.timeout(20000) });
       const existentes = ((await lista.json().catch(() => [])) ?? []) as { url?: string; event?: string; cnpj?: string }[];
-      if (Array.isArray(existentes) && existentes.some((h) => h.url === url && h.event === "nfe" && (h.cnpj ?? cnpj) === cnpj)) continue;
-      const r = await fetch(`${BASE[ambiente]}/v2/hooks`, {
-        method: "POST",
-        headers: { Authorization: basic(token), "Content-Type": "application/json" },
-        body: JSON.stringify({ cnpj, event: "nfe", url, authorization: segredo, authorization_header: "X-Livih-Focus" }),
-        signal: AbortSignal.timeout(20000),
-      });
-      if (!r.ok) console.error("criar gatilho", ambiente, r.status, mensagemFocus(await r.json().catch(() => null), r.status).slice(0, 200));
+      // Um gatilho por evento: NF-e e NFS-e Nacional.
+      for (const evento of ["nfe", "nfsen"]) {
+        if (Array.isArray(existentes) && existentes.some((h) => h.url === url && h.event === evento && (h.cnpj ?? cnpj) === cnpj)) continue;
+        const r = await fetch(`${BASE[ambiente]}/v2/hooks`, {
+          method: "POST",
+          headers: { Authorization: basic(token), "Content-Type": "application/json" },
+          body: JSON.stringify({ cnpj, event: evento, url, authorization: segredo, authorization_header: "X-Livih-Focus" }),
+          signal: AbortSignal.timeout(20000),
+        });
+        if (!r.ok) console.error("criar gatilho", ambiente, evento, r.status, mensagemFocus(await r.json().catch(() => null), r.status).slice(0, 200));
+      }
     } catch (e) {
       console.error("gatilho", ambiente, String(e).slice(0, 200));
     }

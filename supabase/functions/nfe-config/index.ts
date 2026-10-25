@@ -30,6 +30,7 @@ type Emissora = {
   complemento: string | null; bairro: string | null; cidade: string | null; uf: string | null; telefone: string | null;
   email: string | null; regime_tributario: number | null; nfe_serie: number; nfe_status: string;
   focus_empresa_id: number | null; certificado_validade: string | null;
+  nfse_ativa: boolean; inscricao_municipal: string | null; codigo_municipio_ibge: string | null;
 };
 
 /** O que falta no cadastro do CNPJ para a Focus aceitar (a tela mostra a lista). */
@@ -107,7 +108,24 @@ Deno.serve(async (req) => {
     return json(422, { erro: "Envie o certificado digital A1 (.pfx) com a senha para cadastrar o CNPJ na Focus." });
   }
 
+  // Município do CNPJ na Focus: código IBGE e o padrão de NFS-e (docs/nfse.md; esta versão emite no "Nacional").
+  let ibge = e.codigo_municipio_ibge;
+  let provedor: string | null = null;
+  try {
+    const m = await fetch(
+      `https://api.focusnfe.com.br/v2/municipios?sigla_uf=${e.uf}&nome_municipio=${encodeURIComponent(e.cidade ?? "")}`,
+      { headers: autorizacaoRevenda, signal: AbortSignal.timeout(20000) },
+    );
+    const lista = (await m.json().catch(() => null)) as { codigo_municipio?: string; provedor_nfse?: string }[] | null;
+    const achado = Array.isArray(lista) ? lista[0] : null;
+    if (achado?.codigo_municipio) ibge = ibge ?? String(achado.codigo_municipio);
+    provedor = achado?.provedor_nfse ?? null;
+  } catch (err) {
+    console.error("focus município", String(err).slice(0, 200));
+  }
+
   const ie = (e.inscricao_estadual ?? "").replace(/\D/g, "");
+  const im = (e.inscricao_municipal ?? "").replace(/\D/g, "");
   const corpo: Record<string, unknown> = {
     nome: e.razao_social,
     nome_fantasia: e.nome_fantasia || e.razao_social,
@@ -128,6 +146,9 @@ Deno.serve(async (req) => {
     enviar_email_destinatario: true,
     serie_nfe_producao: String(e.nfe_serie),
     serie_nfe_homologacao: String(e.nfe_serie),
+    // NFS-e Nacional (padrão nacional; não junto com habilita_nfse, a municipal).
+    ...(e.nfse_ativa ? { habilita_nfsen_homologacao: true, habilita_nfsen_producao: true } : {}),
+    ...(im ? { inscricao_municipal: Number(im) } : {}),
     ...(temCertificado
       ? { arquivo_certificado_base64: p.certificado_base64, senha_certificado: p.senha_certificado, certificado_especifico: true }
       : {}),
@@ -177,7 +198,11 @@ Deno.serve(async (req) => {
   const status = validade && !vencido && temTokens ? "pronta" : "pendente";
   const mensagem = vencido
     ? "O certificado está vencido: envie o novo."
-    : !validade ? "A Focus ainda não registrou o certificado: envie o arquivo .pfx com a senha." : null;
+    : !validade
+      ? "A Focus ainda não registrou o certificado: envie o arquivo .pfx com a senha."
+      : e.nfse_ativa && provedor && provedor !== "Nacional"
+        ? `A NFS-e de ${e.cidade} é pelo sistema da prefeitura (${provedor}), que o Livih ainda não emite. A NF-e segue normal.`
+        : null;
   await admin.from("emissoras").update({
     focus_empresa_id: f.id ?? focusId,
     certificado_validade: validade,
@@ -185,6 +210,9 @@ Deno.serve(async (req) => {
     nfe_status: status,
     nfe_erro: mensagem,
     nfe_sincronizado_em: new Date().toISOString(),
+    codigo_municipio_ibge: ibge,
+    nfse_provedor: provedor,
+    nfse_habilitada_focus: e.nfse_ativa && provedor === "Nacional",
   }).eq("id", e.id);
 
   // O resultado das notas chega pelo gatilho da Focus (função nfe-retorno), um por ambiente.

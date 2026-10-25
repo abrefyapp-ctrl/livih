@@ -871,16 +871,20 @@ export type Database = {
           cfop_interestadual: string | null
           cidade: string | null
           cnpj: string
+          codigo_municipio_ibge: string | null
           cofins_situacao: string | null
           complemento: string | null
           condicoes_pagamento: string | null
           criado_em: string
           email: string | null
           focus_empresa_id: number | null
+          ibs_cbs_classificacao: string | null
+          ibs_cbs_cst: string | null
           icms_origem: number
           icms_situacao: string | null
           id: string
           inscricao_estadual: string | null
+          inscricao_municipal: string | null
           limite_faturamento: number | null
           logo_path: string | null
           logradouro: string | null
@@ -889,6 +893,14 @@ export type Database = {
           nfe_serie: number
           nfe_sincronizado_em: string | null
           nfe_status: string
+          nfse_ativa: boolean
+          nfse_codigo_nbs: string | null
+          nfse_codigo_tributacao_municipal: string | null
+          nfse_codigo_tributacao_nacional: string | null
+          nfse_descricao_padrao: string | null
+          nfse_habilitada_focus: boolean
+          nfse_provedor: string | null
+          nfse_regime_especial: number
           nome_fantasia: string | null
           numero: string | null
           org_id: string
@@ -914,16 +926,20 @@ export type Database = {
           cfop_interestadual?: string | null
           cidade?: string | null
           cnpj: string
+          codigo_municipio_ibge?: string | null
           cofins_situacao?: string | null
           complemento?: string | null
           condicoes_pagamento?: string | null
           criado_em?: string
           email?: string | null
           focus_empresa_id?: number | null
+          ibs_cbs_classificacao?: string | null
+          ibs_cbs_cst?: string | null
           icms_origem?: number
           icms_situacao?: string | null
           id?: string
           inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
           limite_faturamento?: number | null
           logo_path?: string | null
           logradouro?: string | null
@@ -932,6 +948,14 @@ export type Database = {
           nfe_serie?: number
           nfe_sincronizado_em?: string | null
           nfe_status?: string
+          nfse_ativa?: boolean
+          nfse_codigo_nbs?: string | null
+          nfse_codigo_tributacao_municipal?: string | null
+          nfse_codigo_tributacao_nacional?: string | null
+          nfse_descricao_padrao?: string | null
+          nfse_habilitada_focus?: boolean
+          nfse_provedor?: string | null
+          nfse_regime_especial?: number
           nome_fantasia?: string | null
           numero?: string | null
           org_id: string
@@ -957,16 +981,20 @@ export type Database = {
           cfop_interestadual?: string | null
           cidade?: string | null
           cnpj?: string
+          codigo_municipio_ibge?: string | null
           cofins_situacao?: string | null
           complemento?: string | null
           condicoes_pagamento?: string | null
           criado_em?: string
           email?: string | null
           focus_empresa_id?: number | null
+          ibs_cbs_classificacao?: string | null
+          ibs_cbs_cst?: string | null
           icms_origem?: number
           icms_situacao?: string | null
           id?: string
           inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
           limite_faturamento?: number | null
           logo_path?: string | null
           logradouro?: string | null
@@ -975,6 +1003,14 @@ export type Database = {
           nfe_serie?: number
           nfe_sincronizado_em?: string | null
           nfe_status?: string
+          nfse_ativa?: boolean
+          nfse_codigo_nbs?: string | null
+          nfse_codigo_tributacao_municipal?: string | null
+          nfse_codigo_tributacao_nacional?: string | null
+          nfse_descricao_padrao?: string | null
+          nfse_habilitada_focus?: boolean
+          nfse_provedor?: string | null
+          nfse_regime_especial?: number
           nome_fantasia?: string | null
           numero?: string | null
           org_id?: string
@@ -1655,12 +1691,16 @@ export type Database = {
           criado_em: string
           criado_por: string | null
           danfe_path: string | null
+          data_competencia: string | null
+          descricao: string | null
           emissora_id: string
           id: string
           justificativa_cancelamento: string | null
           mensagem: string | null
+          modelo: string
           numero: number | null
           org_id: string
+          os_id: string | null
           pedido_id: string | null
           ref: string
           serie: number | null
@@ -1680,12 +1720,16 @@ export type Database = {
           criado_em?: string
           criado_por?: string | null
           danfe_path?: string | null
+          data_competencia?: string | null
+          descricao?: string | null
           emissora_id: string
           id?: string
           justificativa_cancelamento?: string | null
           mensagem?: string | null
+          modelo?: string
           numero?: number | null
           org_id: string
+          os_id?: string | null
           pedido_id?: string | null
           ref: string
           serie?: number | null
@@ -1705,12 +1749,16 @@ export type Database = {
           criado_em?: string
           criado_por?: string | null
           danfe_path?: string | null
+          data_competencia?: string | null
+          descricao?: string | null
           emissora_id?: string
           id?: string
           justificativa_cancelamento?: string | null
           mensagem?: string | null
+          modelo?: string
           numero?: number | null
           org_id?: string
+          os_id?: string | null
           pedido_id?: string | null
           ref?: string
           serie?: number | null
@@ -1740,6 +1788,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizacoes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_fiscais_os_fk"
+            columns: ["os_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id", "org_id"]
           },
           {
             foreignKeyName: "notas_fiscais_pedido_id_org_id_fkey"

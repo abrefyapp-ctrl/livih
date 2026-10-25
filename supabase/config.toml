@@ -475,3 +475,7 @@ verify_jwt = false
 # nfe-retorno: gatilho da Focus (cabeçalho X-Livih-Focus com o segredo do Vault) e conferência do cron (x-livih-segredo).
 [functions.nfe-retorno]
 verify_jwt = false
+
+# nfse-emitir: nota de serviço (pedido, OS ou avulsa); login, origem visível e "Emite nota fiscal" conferidos dentro.
+[functions.nfse-emitir]
+verify_jwt = false
