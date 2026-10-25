@@ -130,6 +130,7 @@ Você trabalha dentro do CRM da ${c.organizacao?.nome || 'empresa'}. As ferramen
 - **montar_pedido**: quando o cliente disser o que quer comprar E as quantidades, monte o pedido com o código exato que veio da busca (campo codigo) e a quantidade na unidade do produto (ex.: 10 caixinhas = quantidade 10). Mande SEMPRE a lista completa do pedido (se o cliente mudar algo, reenvie tudo). O preço vem do cadastro: confirme ao cliente os itens e o total exatamente como a ferramenta devolveu, e diga que o frete não está incluso e é calculado pela equipe. Se algum código voltar em nao_encontrados, busque de novo antes de remontar. Para o cliente, o que você monta é um ORÇAMENTO: chame sempre de "orçamento nº X", usando o campo orcamento_numero (o mesmo número do PDF), nunca de "pedido", porque ainda não foi confirmado pela equipe.
 - **enviar_orcamento**: envia ao cliente o PDF do pedido montado. Use quando o cliente pedir o orçamento, a proposta ou o PDF, ou confirmar os itens. Antes, monte (ou atualize) com montar_pedido. Depois de enviar, diga em uma frase que o orçamento foi enviado e que a equipe confirma frete e pagamento.
 - **buscar_documentos** e **enviar_documento**: quando o cliente pedir um arquivo (vista explodida, desenho de peças, manual, catálogo, ficha técnica, foto do produto), busque na biblioteca com o produto e o tipo que ele disse. Se vier exatamente o que ele pediu, envie com enviar_documento; se vierem vários parecidos, pergunte qual; se não vier nenhum, diga que a equipe envia e chame chamar_humano. Envie só o que ele pediu (no máximo 3 por resposta). Se a ferramenta disser que o documento já foi enviado, diga que está na mensagem daquele horário; reenvie (reenviar=sim) só se o cliente disser que não recebeu.
+- **consultar_os**: quando o cliente perguntar de equipamento que deixou para conserto ("meu motor ficou pronto?", "como está a OS 123?", "já aprovaram o orçamento?"), consulte antes de responder; com o nº da OS, NF ou modelo que ele citar, use como busca. Responda a etapa e desde quando; a previsão de término é estimativa: diga "a previsão é…", nunca prometa a data. Pronto: diga que está pronto para retirada (combinar a retirada é com a equipe). Aguardando aprovação: informe o valor do orçamento se ele perguntar. Se o cliente aprovar ou recusar o orçamento por escrito, NÃO diga que já está aprovado no sistema: registre com registrar_nota ("Cliente aprovou o orçamento da OS nº X, item Y") e chame a equipe com chamar_humano. Se não achar a OS, peça o nº da OS ou a NF; se ainda assim não achar, chame a equipe.
 - **chamar_humano**: chame quando acontecer um destes casos:
 ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar com uma pessoa'}
   Depois de chamar, diga ao cliente, em uma frase, que um especialista vai continuar a conversa por aqui. Não continue o atendimento depois disso.
@@ -436,6 +437,13 @@ FERRAMENTAS = [
         "{ p_conversa: conversa, p_motivo: args.motivo }",
         obj({"motivo": "Por que a equipe deve assumir, em uma frase"}, ["motivo"]),
     ),
+    ferramenta(
+        "consultar_os",
+        "Consulta as ordens de serviço (equipamentos em conserto) do cliente desta conversa: etapa, desde quando, previsão de término, se está pronto, entregue ou aguardando a aprovação do orçamento.",
+        "agente_consultar_os",
+        "{ p_conversa: conversa, p_busca: args.busca || null }",
+        obj({"busca": "Opcional: nº da OS, NF, nº da OS do cliente, modelo ou nº de série que o cliente citou"}),
+    ),
 ]
 
 
@@ -564,6 +572,7 @@ CORPO_SIM = {
     "enviar_orcamento": "JSON.stringify({ enviado: true, simulado: true })",
     "enviar_documento": "JSON.stringify(await rpc('simulador_documento', { p_org: org, p_documento: String(args.documento_id || '').trim() }))",
     "chamar_humano": "JSON.stringify({ sucesso: true, simulado: true })",
+    "consultar_os": "JSON.stringify(await rpc('simulador_consultar_os', { p_org: org, p_busca: args.busca || null }))",
 }
 
 ferramentas_sim = []

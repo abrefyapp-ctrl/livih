@@ -29,7 +29,11 @@ Mudanças em relação ao plano:
   pedido (cabeçalho e rodapé compartilhados, `src/components/DocumentoOs.tsx`). Gerado no navegador, com a empresa
   emissora padrão. Sai como "Orçamento" enquanto todos os itens estão até a etapa de aprovação; depois, "Ordem de
   serviço". Vão os itens selecionados ou, sem seleção, os que não foram encerrados.
-- **Ainda não feito:** a fase 2 (agente).
+- **Fase 2 (agente), 25/10:** feita a consulta (`agente_consultar_os`, ferramenta `consultar_os`, migration
+  `20261025120000_agente_os.sql`): o agente acha as OS do cliente do contato (e as do próprio contato) e responde
+  etapa, desde quando, previsão (estimativa), pronto/entregue e o valor do orçamento. A aprovação por escrito vira nota
+  + chamar a equipe (instrução do agente). **Ainda não feito:** o aviso de pronto (precisa do texto da mensagem e, na
+  API oficial, de um modelo aprovado pela Meta).
 
 O que o dono do piloto pediu, nas palavras dele:
 - ver quantos itens estão em cada etapa (recebido, desmontagem, preparação, finalizado, faturado);

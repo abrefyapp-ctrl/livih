@@ -2937,5 +2937,52 @@ exception when others then
   insert into resultado (teste, ok) values ('clientes: atendente não importa', sqlerrm like 'só dono e admin%');
 end $$;
 
+-- Agente consulta a OS (migration 20261025120000): o cliente Beta tem as OS B1 e B2 (importação acima), sem contato
+-- na OS; o "Comprador Beta" está ligado ao cliente e tem conversa.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_conv uuid; v_outra uuid; r jsonb;
+begin
+  select v.id into v_conv from public.conversas v join public.contatos c on c.id = v.contato_id
+   where c.org_id = v_org and c.telefone = '5541900077010';
+  select v.id into v_outra from public.conversas v join public.contatos c on c.id = v.contato_id
+   where c.org_id = v_org and c.cliente_id is null limit 1;
+
+  r := public.agente_consultar_os(v_conv);
+  insert into resultado (teste, ok) values ('os agente: acha as OS do cliente do contato, com etapa e previsão',
+    (r ->> 'encontrados')::int = 2
+    and exists (select 1 from jsonb_array_elements(r -> 'itens') x
+                 where x ->> 'item' like '%B-1%' and x ->> 'situacao' is not null and x ->> 'desde' is not null
+                   and not (x ->> 'pronto')::boolean));
+  r := public.agente_consultar_os(v_conv, 'b-2');
+  insert into resultado (teste, ok) values ('os agente: filtra pelo modelo',
+    (r ->> 'encontrados')::int = 1 and r -> 'itens' -> 0 ->> 'item' like '%B-2%');
+  r := public.agente_consultar_os(v_conv, 'xyz-inexistente');
+  insert into resultado (teste, ok) values ('os agente: sem resultado orienta a perguntar o nº da OS',
+    (r ->> 'encontrados')::int = 0 and r ->> 'aviso' like 'Nada com esse termo%');
+  r := public.agente_consultar_os(v_outra);
+  insert into resultado (teste, ok) values ('os agente: outro cliente não vê as OS do Beta',
+    not exists (select 1 from jsonb_array_elements(r -> 'itens') x where x ->> 'item' like '%B-%'));
+  r := public.simulador_consultar_os(v_org, null);
+  insert into resultado (teste, ok) values ('os agente: simulador mostra exemplos da empresa', (r ->> 'simulado')::boolean);
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$ begin
+  perform public.os_previsao_itens(current_setting('teste.f7')::uuid);
+  insert into resultado (teste, ok) values ('os agente: previsão continua fechada para quem não é da oficina', false);
+exception when others then
+  insert into resultado (teste, ok) values ('os agente: previsão continua fechada para quem não é da oficina', true);
+end $$;
+do $$ begin
+  perform public.agente_consultar_os((select id from public.conversas limit 1));
+  insert into resultado (teste, ok) values ('os agente: usuário logado não chama a consulta do agente', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('os agente: usuário logado não chama a consulta do agente', true);
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;
