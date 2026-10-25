@@ -75,6 +75,15 @@ com a opção de exceção por produto mais adiante.
 Uma nota por pedido; a rejeitada pode ser corrigida e reenviada. A nota autorizada fica imutável, e o cancelamento
 vira um evento.
 
+**Onde a nota fica (decisão de 25/10):**
+- Cópia própria no Livih: o XML e o DANFE (PDF) são baixados da Focus quando a nota é autorizada e guardados no
+  bucket privado `notas-fiscais` (`org/emissora/AAAA-MM/chave`), com o XML do cancelamento junto quando houver.
+- A empresa precisa guardar o XML por pelo menos 5 anos. Com a cópia, ela não depende do prazo de guarda da Focus
+  (conferir no contrato) e não perde nada se trocar de emissor.
+- Também ficam a Focus, a SEFAZ (consulta pela chave) e o e-mail do comprador, que a Focus envia.
+- **Baixar XMLs do mês:** um .zip por CNPJ e mês com os XMLs autorizados e cancelados, para mandar à contabilidade.
+  Dono, admin e quem emite.
+
 **Permissão:** `membros_org.emite_nota_fiscal`, com o mesmo esquema do "Vê todos os clientes": **desligada por padrão**
 (decisão de 25/10; a nota tem efeito fiscal). O admin liga, pessoa por pessoa.
 
@@ -138,8 +147,13 @@ vira um evento.
    - `nfe-emitir`, `nfe-retorno` e o cron;
    - botão no pedido, DANFE e XML.
    Teste: notas de teste autorizadas na SEFAZ.
-3. **Cancelar e enviar:** cancelamento, envio do DANFE pelo WhatsApp, coluna "Nota" em Pedidos e as notas no perfil
-   do cliente.
+   **Construída em 25/10** (`20261025140000_nfe_emissao.sql`, funções `nfe-emitir` e `nfe-retorno`, `_shared/focus.ts`,
+   bloco Nota fiscal no pedido). Primeira versão: Simples e MEI (CSOSN 102, 103, 300 ou 400; PIS/COFINS 04 a 09, 49 ou
+   99 com valores zerados), desconto e frete do pedido rateados nos itens, destinatário pelo cliente do pedido (IE:
+   contribuinte, isento ou não contribuinte). Em homologação o nome do destinatário vai como manda a SEFAZ ("NF-E
+   EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"). Falta o teste de ponta a ponta com um CNPJ pronto.
+3. **Cancelar e enviar:** cancelamento, envio do DANFE pelo WhatsApp, coluna "Nota" em Pedidos, as notas no perfil
+   do cliente e **Baixar XMLs do mês** (.zip por CNPJ, para a contabilidade).
 4. **Faturamento por CNPJ:** sugestão, "CNPJ do balcão" e aviso de certificado vencendo.
 5. **Produção:** passar o primeiro cliente (JoGrampo) para produção, acompanhando as primeiras notas reais.
 

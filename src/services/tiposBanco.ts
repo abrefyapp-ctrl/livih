@@ -1643,6 +1643,113 @@ export type Database = {
           },
         ]
       }
+      notas_fiscais: {
+        Row: {
+          ambiente: string
+          atualizado_em: string
+          autorizada_em: string | null
+          cancelada_em: string | null
+          chave: string | null
+          cliente_id: string | null
+          consultas: number
+          criado_em: string
+          criado_por: string | null
+          danfe_path: string | null
+          emissora_id: string
+          id: string
+          justificativa_cancelamento: string | null
+          mensagem: string | null
+          numero: number | null
+          org_id: string
+          pedido_id: string | null
+          ref: string
+          serie: number | null
+          status: string
+          valor: number
+          xml_cancelamento_path: string | null
+          xml_path: string | null
+        }
+        Insert: {
+          ambiente: string
+          atualizado_em?: string
+          autorizada_em?: string | null
+          cancelada_em?: string | null
+          chave?: string | null
+          cliente_id?: string | null
+          consultas?: number
+          criado_em?: string
+          criado_por?: string | null
+          danfe_path?: string | null
+          emissora_id: string
+          id?: string
+          justificativa_cancelamento?: string | null
+          mensagem?: string | null
+          numero?: number | null
+          org_id: string
+          pedido_id?: string | null
+          ref: string
+          serie?: number | null
+          status?: string
+          valor?: number
+          xml_cancelamento_path?: string | null
+          xml_path?: string | null
+        }
+        Update: {
+          ambiente?: string
+          atualizado_em?: string
+          autorizada_em?: string | null
+          cancelada_em?: string | null
+          chave?: string | null
+          cliente_id?: string | null
+          consultas?: number
+          criado_em?: string
+          criado_por?: string | null
+          danfe_path?: string | null
+          emissora_id?: string
+          id?: string
+          justificativa_cancelamento?: string | null
+          mensagem?: string | null
+          numero?: number | null
+          org_id?: string
+          pedido_id?: string | null
+          ref?: string
+          serie?: number | null
+          status?: string
+          valor?: number
+          xml_cancelamento_path?: string | null
+          xml_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notas_fiscais_cliente_id_org_id_fkey"
+            columns: ["cliente_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "notas_fiscais_emissora_id_org_id_fkey"
+            columns: ["emissora_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "emissoras"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "notas_fiscais_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_fiscais_pedido_id_org_id_fkey"
+            columns: ["pedido_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       oportunidade_historico: {
         Row: {
           autor_id: string | null
@@ -3385,10 +3492,12 @@ export type Database = {
         Args: { p_modulo: string; p_org: string }
         Returns: boolean
       }
+      nfe_manutencao: { Args: never; Returns: undefined }
       nfe_salvar_tokens: {
         Args: { p_emissora: string; p_homologacao: string; p_producao: string }
         Returns: undefined
       }
+      nfe_segredo_webhook: { Args: never; Returns: string }
       nfe_token: {
         Args: { p_ambiente: string; p_emissora: string }
         Returns: string

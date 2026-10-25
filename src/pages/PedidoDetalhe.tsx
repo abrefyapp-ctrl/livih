@@ -29,6 +29,7 @@ import {
 } from '../services/orcamento'
 import { moeda, nomeDoContato, quandoCurto } from '../services/formato'
 import { ModalEscolherCliente } from '../components/ClienteDoContato'
+import { NotaFiscalPedido } from '../components/NotaFiscalPedido'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
@@ -298,6 +299,8 @@ export function PedidoDetalhe() {
         <Itens orgId={orgId} pedido={pedido} itens={itens} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />
 
         <Totais pedido={pedido} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />
+
+        <NotaFiscalPedido orgId={orgId} pedido={pedido} />
 
         {/* Recria ao trocar a empresa: o banco recarrega validade, condições e prazo. */}
         <Orcamento key={pedido.emissora_id ?? 'sem'} orgId={orgId} pedido={pedido} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />

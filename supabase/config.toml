@@ -467,3 +467,11 @@ verify_jwt = false
 # nfe-config: Configurações → Empresa → Nota fiscal; login e papel (dono/admin ou plataforma) validados dentro da função.
 [functions.nfe-config]
 verify_jwt = false
+
+# nfe-emitir: botão Emitir NF-e no pedido; login, pedido visível e "Emite nota fiscal" conferidos dentro da função.
+[functions.nfe-emitir]
+verify_jwt = false
+
+# nfe-retorno: gatilho da Focus (cabeçalho X-Livih-Focus com o segredo do Vault) e conferência do cron (x-livih-segredo).
+[functions.nfe-retorno]
+verify_jwt = false

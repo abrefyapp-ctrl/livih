@@ -6,6 +6,7 @@
 // para a Focus: não são gravados nem aparecem em log. Os tokens que a Focus devolve para o CNPJ ficam no Vault.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { registrarGatilhos } from "../_shared/focus.ts";
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
   auth: { persistSession: false },
@@ -163,6 +164,9 @@ Deno.serve(async (req) => {
     nfe_erro: mensagem,
     nfe_sincronizado_em: new Date().toISOString(),
   }).eq("id", e.id);
+
+  // O resultado das notas chega pelo gatilho da Focus (função nfe-retorno), um por ambiente.
+  if (status === "pronta") await registrarGatilhos(admin, e.id, e.cnpj);
 
   return json(200, { status, certificado_validade: validade, mensagem });
 });

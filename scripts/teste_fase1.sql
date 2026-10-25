@@ -3053,5 +3053,62 @@ begin
     and (select nfe_status from public.emissoras where id = v_emi) = 'pronta');
 end $$;
 
+-- NF-e, emissão (migration 20261025140000). Ainda como serviço (as funções nfe-* gravam).
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_emi uuid := (select id from public.emissoras where org_id = current_setting('teste.f7')::uuid and cnpj = '11222333000181');
+  v_ped uuid := (select id from public.pedidos where org_id = current_setting('teste.f7')::uuid and cliente_id is not null order by criado_em limit 1);
+  v_nota uuid;
+begin
+  perform set_config('teste.pedido_nf', v_ped::text, false);
+  insert into public.notas_fiscais (org_id, emissora_id, pedido_id, ref, ambiente, valor)
+  values (v_org, v_emi, v_ped, 'lvhteste1', 'homologacao', 20) returning id into v_nota;
+  perform set_config('teste.nota', v_nota::text, false);
+  begin
+    insert into public.notas_fiscais (org_id, emissora_id, pedido_id, ref, ambiente) values (v_org, v_emi, v_ped, 'lvhteste2', 'homologacao');
+    insert into resultado (teste, ok) values ('nfe emissão: um pedido tem uma nota viva só', false);
+  exception when unique_violation then
+    insert into resultado (teste, ok) values ('nfe emissão: um pedido tem uma nota viva só', true);
+  end;
+  update public.notas_fiscais set status = 'autorizada', numero = 1, serie = 1, chave = repeat('1', 44), autorizada_em = now() where id = v_nota;
+  update public.notas_fiscais set xml_path = v_org || '/' || v_emi || '/2026-10/x-nfe.xml' where id = v_nota;
+  insert into resultado (teste, ok) values ('nfe emissão: autorizada recebe o XML depois (cópia atrasada)',
+    (select xml_path is not null from public.notas_fiscais where id = v_nota));
+  begin
+    update public.notas_fiscais set valor = 999 where id = v_nota;
+    insert into resultado (teste, ok) values ('nfe emissão: nota autorizada não muda', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('nfe emissão: nota autorizada não muda', sqlerrm like 'nota fiscal autorizada não muda%');
+  end;
+  begin
+    update public.notas_fiscais set xml_path = 'outro.xml' where id = v_nota;
+    insert into resultado (teste, ok) values ('nfe emissão: o XML guardado não é trocado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('nfe emissão: o XML guardado não é trocado', sqlerrm like 'nota fiscal autorizada não muda%');
+  end;
+  begin
+    delete from public.notas_fiscais where id = v_nota;
+    insert into resultado (teste, ok) values ('nfe emissão: nota autorizada não é apagada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('nfe emissão: nota autorizada não é apagada', sqlerrm like 'nota fiscal autorizada não é apagada%');
+  end;
+  insert into resultado (teste, ok) values ('nfe emissão: segredo do gatilho da Focus no Vault', length(public.nfe_segredo_webhook()) = 64);
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'nfe emissão: quem vê o pedido vê a nota',
+  exists (select 1 from public.notas_fiscais where id = current_setting('teste.nota')::uuid);
+do $$ begin
+  insert into public.notas_fiscais (org_id, emissora_id, ref, ambiente)
+  values (current_setting('teste.f7')::uuid, (select id from public.emissoras limit 1), 'lvhinvasor', 'homologacao');
+  insert into resultado (teste, ok) values ('nfe emissão: usuário logado não grava nota', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('nfe emissão: usuário logado não grava nota', true);
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'nfe emissão: outra empresa não vê a nota',
+  not exists (select 1 from public.notas_fiscais where id = current_setting('teste.nota')::uuid);
+
 reset role;
 select n, teste, ok from resultado order by n;

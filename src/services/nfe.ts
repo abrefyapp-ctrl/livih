@@ -104,3 +104,75 @@ export async function listarEmiteNotaFiscal(orgId: string): Promise<Set<string>>
   if (error) throw error
   return new Set((data ?? []).map((m) => m.user_id))
 }
+
+// ---- emissão (entrega 2) ----
+
+export type NotaFiscal = {
+  id: string; status: 'processando' | 'autorizada' | 'rejeitada' | 'cancelada'; ambiente: 'homologacao' | 'producao';
+  numero: number | null; serie: number | null; chave: string | null; valor: number; mensagem: string | null;
+  xml_path: string | null; danfe_path: string | null; xml_cancelamento_path: string | null; emissora_id: string;
+  autorizada_em: string | null; cancelada_em: string | null; criado_em: string;
+}
+
+/** A nota mais recente do pedido (viva, ou a última rejeitada/cancelada). */
+export async function notaDoPedido(pedidoId: string): Promise<NotaFiscal | null> {
+  const { data, error } = await supabase
+    .from('notas_fiscais')
+    .select('id, status, ambiente, numero, serie, chave, valor, mensagem, xml_path, danfe_path, xml_cancelamento_path, emissora_id, autorizada_em, cancelada_em, criado_em')
+    .eq('pedido_id', pedidoId)
+    .order('criado_em', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data as NotaFiscal | null
+}
+
+export async function podeEmitirNota(orgId: string): Promise<boolean> {
+  const { data } = await supabase.rpc('emite_nota_fiscal', { p_org: orgId })
+  return data === true
+}
+
+export const FORMAS_PAGAMENTO: { valor: string; rotulo: string }[] = [
+  { valor: '15', rotulo: 'Boleto' },
+  { valor: '17', rotulo: 'PIX' },
+  { valor: '01', rotulo: 'Dinheiro' },
+  { valor: '03', rotulo: 'Cartão de crédito' },
+  { valor: '04', rotulo: 'Cartão de débito' },
+  { valor: '16', rotulo: 'Depósito bancário' },
+  { valor: '18', rotulo: 'Transferência bancária' },
+  { valor: '90', rotulo: 'Sem pagamento (bonificação, remessa)' },
+  { valor: '99', rotulo: 'Outros' },
+]
+
+export const PRESENCAS: { valor: number; rotulo: string }[] = [
+  { valor: 1, rotulo: 'Presencial (no balcão)' },
+  { valor: 2, rotulo: 'Pela internet' },
+  { valor: 3, rotulo: 'Por telefone ou WhatsApp' },
+  { valor: 9, rotulo: 'Outros, não presencial' },
+]
+
+export type PedidoEmissao = { pedido_id: string; emissora_id: string; forma_pagamento: string; a_prazo: boolean; presenca: number; informacoes: string }
+export class FaltaParaEmitir extends Error {
+  faltando: string[]
+  constructor(mensagem: string, faltando: string[]) {
+    super(mensagem)
+    this.faltando = faltando
+  }
+}
+
+export async function emitirNota(dados: PedidoEmissao): Promise<NotaFiscal> {
+  const { data, error } = await supabase.functions.invoke('nfe-emitir', { body: dados })
+  if (error) {
+    const r = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null
+    if (r?.faltando?.length) throw new FaltaParaEmitir(r.erro ?? 'Falta arrumar antes de emitir:', r.faltando)
+    throw new Error(r?.erro ?? 'Não foi possível emitir a nota. Tente de novo.')
+  }
+  return (data as { nota: NotaFiscal }).nota
+}
+
+/** Link temporário (1 h) para baixar o XML ou o DANFE guardados no Livih. */
+export async function urlArquivoNota(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from('notas-fiscais').createSignedUrl(path, 3600, { download: true })
+  if (error) throw new Error('Não foi possível abrir o arquivo da nota.')
+  return data.signedUrl
+}
