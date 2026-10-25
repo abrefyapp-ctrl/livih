@@ -24,6 +24,8 @@ import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { EstadoVazio } from './EstadoVazio'
 import { Icone } from './Icone'
 import { Modal } from './Modal'
+import { ModalNotaFiscal } from './ModalNotaFiscal'
+import { ROTULO_STATUS as ROTULO_STATUS_NFE } from '../services/nfe'
 
 const LIMITE_LOGO = 2 * 1024 * 1024
 
@@ -163,6 +165,7 @@ export function SecaoEmpresa() {
   const [erroForm, setErroForm] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [remover, setRemover] = useState<Emissora | null>(null)
+  const [notaFiscal, setNotaFiscal] = useState<Emissora | null>(null)
   const seletorLogo = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -343,6 +346,14 @@ export function SecaoEmpresa() {
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-2 font-medium">
                   {e.nome_fantasia || e.razao_social}
+                  {e.nfe_status !== 'nao_configurada' && (
+                    <span className={`rounded-sm px-1.5 py-0.5 text-legenda font-normal ${e.nfe_status === 'pronta' ? 'bg-primaria-suave text-primaria' : e.nfe_status === 'erro' ? 'bg-erro-suave text-erro' : 'bg-atencao-suave text-atencao'}`}>
+                      NF-e: {ROTULO_STATUS_NFE[e.nfe_status] ?? e.nfe_status}{e.nfe_status === 'pronta' && e.nfe_ambiente === 'homologacao' ? ' (teste)' : ''}
+                    </span>
+                  )}
+                  {e.padrao_balcao && lista.length > 1 && (
+                    <span className="rounded-sm bg-fundo px-1.5 py-0.5 text-legenda font-normal text-texto-2 ring-1 ring-borda">Balcão</span>
+                  )}
                   {e.padrao && lista.length > 1 && (
                     <span className="rounded-sm bg-primaria-suave px-1.5 py-0.5 text-legenda font-normal text-primaria">
                       Padrão
@@ -367,6 +378,9 @@ export function SecaoEmpresa() {
                   )}
                   <Botao tamanho="sm" variante="secundario" onClick={() => abrir(paraForm(e))}>
                     Editar
+                  </Botao>
+                  <Botao tamanho="sm" variante="secundario" icone="nota" onClick={() => setNotaFiscal(e)}>
+                    Nota fiscal
                   </Botao>
                   <Botao
                     tamanho="sm"
@@ -512,6 +526,13 @@ export function SecaoEmpresa() {
         {remover?.nome_fantasia || remover?.razao_social} (CNPJ {formatarCnpj(remover?.cnpj)}) sai da lista, junto com a logo.
         {remover?.padrao && lista && lista.length > 1 && ' Outra empresa passa a ser a padrão.'}
       </DialogoConfirmacao>
+      {notaFiscal && (
+        <ModalNotaFiscal
+          emissora={notaFiscal}
+          aoFechar={() => (setNotaFiscal(null), setVersao((v) => v + 1))}
+          aoSalvar={() => (setNotaFiscal(null), setVersao((v) => v + 1))}
+        />
+      )}
     </section>
   )
 }

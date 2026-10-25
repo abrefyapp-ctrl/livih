@@ -2,7 +2,14 @@ import { supabase } from './supabaseClient'
 import type { Database } from './tiposBanco'
 
 export type Emissora = Database['public']['Tables']['emissoras']['Row']
-export type DadosEmissora = Omit<Emissora, 'id' | 'org_id' | 'logo_path' | 'padrao' | 'criado_em' | 'atualizado_em'>
+// Dados do cadastro (tela Empresa). Os fiscais e a situação na Focus têm a tela e a função deles (services/nfe.ts).
+export type DadosEmissora = Omit<
+  Emissora,
+  | 'id' | 'org_id' | 'logo_path' | 'padrao' | 'criado_em' | 'atualizado_em'
+  | 'regime_tributario' | 'nfe_ambiente' | 'nfe_serie' | 'cfop_estadual' | 'cfop_interestadual' | 'icms_situacao' | 'icms_origem'
+  | 'pis_situacao' | 'cofins_situacao' | 'limite_faturamento' | 'padrao_balcao' | 'nfe_status' | 'nfe_erro' | 'focus_empresa_id'
+  | 'certificado_validade' | 'certificado_cnpj' | 'nfe_sincronizado_em'
+>
 
 // Em formato.ts (sem Supabase) para o PDF do orçamento rodar também no servidor (serviço livih-pdf).
 export { formatarCnpj } from './formato'

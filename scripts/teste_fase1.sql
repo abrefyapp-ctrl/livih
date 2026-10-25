@@ -2984,5 +2984,74 @@ exception when insufficient_privilege then
   insert into resultado (teste, ok) values ('os agente: usuário logado não chama a consulta do agente', true);
 end $$;
 
+-- NF-e, configuração (migration 20261025130000). a1 dono, b1 atendente; emissoras da F7 dos testes de orçamento.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_emi uuid := (select id from public.emissoras where org_id = current_setting('teste.f7')::uuid and cnpj = '11222333000181');
+  v_outra uuid := (select id from public.emissoras where org_id = current_setting('teste.f7')::uuid and cnpj = '11444777000161');
+  n integer;
+begin
+  update public.emissoras set regime_tributario = 1, cfop_estadual = '5102', cfop_interestadual = '6102', icms_situacao = '102',
+                              pis_situacao = '49', cofins_situacao = '49', padrao_balcao = true where id = v_emi;
+  get diagnostics n = row_count;
+  insert into resultado (teste, ok) values ('nfe: dono grava regime e padrões fiscais do CNPJ',
+    n = 1 and (select nfe_status = 'nao_configurada' and nfe_ambiente = 'homologacao' from public.emissoras where id = v_emi));
+  begin
+    update public.emissoras set padrao_balcao = true where id = v_outra;
+    insert into resultado (teste, ok) values ('nfe: só um CNPJ do balcão por empresa', false);
+  exception when unique_violation then
+    insert into resultado (teste, ok) values ('nfe: só um CNPJ do balcão por empresa', true);
+  end;
+  begin
+    update public.emissoras set nfe_status = 'pronta' where id = v_emi;
+    insert into resultado (teste, ok) values ('nfe: a tela não marca o CNPJ como pronto na Focus', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('nfe: a tela não marca o CNPJ como pronto na Focus', sqlerrm like 'a situação na Focus%');
+  end;
+  begin
+    update public.emissoras set cfop_estadual = '6102' where id = v_emi;
+    insert into resultado (teste, ok) values ('nfe: CFOP estadual começa com 5', false);
+  exception when check_violation then
+    insert into resultado (teste, ok) values ('nfe: CFOP estadual começa com 5', true);
+  end;
+  perform public.membro_definir_emite_nota_fiscal(v_org, '00000000-0000-0000-0000-0000000000b1', true);
+  insert into resultado (teste, ok) select 'nfe: "Emite nota fiscal" nasce desligada e o dono liga',
+    (select emite_nota_fiscal from public.membros_org where org_id = v_org and user_id = '00000000-0000-0000-0000-0000000000b1')
+    and not (select emite_nota_fiscal from public.membros_org where org_id = v_org and user_id = '00000000-0000-0000-0000-0000000000d1');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'nfe: atendente com a permissão emite; sem ela, não',
+  public.emite_nota_fiscal(current_setting('teste.f7')::uuid);
+do $$ begin
+  perform public.membro_definir_emite_nota_fiscal(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000d1', true);
+  insert into resultado (teste, ok) values ('nfe: atendente não dá a permissão', false);
+exception when others then
+  insert into resultado (teste, ok) values ('nfe: atendente não dá a permissão', sqlerrm like 'só dono e admin%');
+end $$;
+do $$ begin
+  perform public.nfe_token((select id from public.emissoras limit 1), 'producao');
+  insert into resultado (teste, ok) values ('nfe: usuário logado não lê o token da Focus', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('nfe: usuário logado não lê o token da Focus', true);
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000d1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'nfe: sem a permissão, o atendente não emite', not public.emite_nota_fiscal(current_setting('teste.f7')::uuid);
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_emi uuid := (select id from public.emissoras where org_id = current_setting('teste.f7')::uuid and cnpj = '11222333000181');
+begin
+  perform public.nfe_salvar_tokens(v_emi, 'tok-prod-1', 'tok-hom-1');
+  perform public.nfe_salvar_tokens(v_emi, 'tok-prod-2', null);
+  update public.emissoras set nfe_status = 'pronta', focus_empresa_id = 123 where id = v_emi;
+  insert into resultado (teste, ok) values ('nfe: tokens no Vault (atualiza sem duplicar) e a função grava a situação',
+    public.nfe_token(v_emi, 'producao') = 'tok-prod-2' and public.nfe_token(v_emi, 'homologacao') = 'tok-hom-1'
+    and (select count(*) from vault.secrets where name like 'focus_%_' || v_emi) = 2
+    and (select nfe_status from public.emissoras where id = v_emi) = 'pronta');
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

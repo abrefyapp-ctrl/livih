@@ -865,22 +865,39 @@ export type Database = {
           atualizado_em: string
           bairro: string | null
           cep: string | null
+          certificado_cnpj: string | null
+          certificado_validade: string | null
+          cfop_estadual: string | null
+          cfop_interestadual: string | null
           cidade: string | null
           cnpj: string
+          cofins_situacao: string | null
           complemento: string | null
           condicoes_pagamento: string | null
           criado_em: string
           email: string | null
+          focus_empresa_id: number | null
+          icms_origem: number
+          icms_situacao: string | null
           id: string
           inscricao_estadual: string | null
+          limite_faturamento: number | null
           logo_path: string | null
           logradouro: string | null
+          nfe_ambiente: string
+          nfe_erro: string | null
+          nfe_serie: number
+          nfe_sincronizado_em: string | null
+          nfe_status: string
           nome_fantasia: string | null
           numero: string | null
           org_id: string
           padrao: boolean
+          padrao_balcao: boolean
+          pis_situacao: string | null
           prazo_entrega: string | null
           razao_social: string
+          regime_tributario: number | null
           rodape: string | null
           site: string | null
           telefone: string | null
@@ -891,22 +908,39 @@ export type Database = {
           atualizado_em?: string
           bairro?: string | null
           cep?: string | null
+          certificado_cnpj?: string | null
+          certificado_validade?: string | null
+          cfop_estadual?: string | null
+          cfop_interestadual?: string | null
           cidade?: string | null
           cnpj: string
+          cofins_situacao?: string | null
           complemento?: string | null
           condicoes_pagamento?: string | null
           criado_em?: string
           email?: string | null
+          focus_empresa_id?: number | null
+          icms_origem?: number
+          icms_situacao?: string | null
           id?: string
           inscricao_estadual?: string | null
+          limite_faturamento?: number | null
           logo_path?: string | null
           logradouro?: string | null
+          nfe_ambiente?: string
+          nfe_erro?: string | null
+          nfe_serie?: number
+          nfe_sincronizado_em?: string | null
+          nfe_status?: string
           nome_fantasia?: string | null
           numero?: string | null
           org_id: string
           padrao?: boolean
+          padrao_balcao?: boolean
+          pis_situacao?: string | null
           prazo_entrega?: string | null
           razao_social: string
+          regime_tributario?: number | null
           rodape?: string | null
           site?: string | null
           telefone?: string | null
@@ -917,22 +951,39 @@ export type Database = {
           atualizado_em?: string
           bairro?: string | null
           cep?: string | null
+          certificado_cnpj?: string | null
+          certificado_validade?: string | null
+          cfop_estadual?: string | null
+          cfop_interestadual?: string | null
           cidade?: string | null
           cnpj?: string
+          cofins_situacao?: string | null
           complemento?: string | null
           condicoes_pagamento?: string | null
           criado_em?: string
           email?: string | null
+          focus_empresa_id?: number | null
+          icms_origem?: number
+          icms_situacao?: string | null
           id?: string
           inscricao_estadual?: string | null
+          limite_faturamento?: number | null
           logo_path?: string | null
           logradouro?: string | null
+          nfe_ambiente?: string
+          nfe_erro?: string | null
+          nfe_serie?: number
+          nfe_sincronizado_em?: string | null
+          nfe_status?: string
           nome_fantasia?: string | null
           numero?: string | null
           org_id?: string
           padrao?: boolean
+          padrao_balcao?: boolean
+          pis_situacao?: string | null
           prazo_entrega?: string | null
           razao_social?: string
+          regime_tributario?: number | null
           rodape?: string | null
           site?: string | null
           telefone?: string | null
@@ -1251,6 +1302,7 @@ export type Database = {
         Row: {
           ativo: boolean
           criado_em: string
+          emite_nota_fiscal: boolean
           org_id: string
           papel: Database["public"]["Enums"]["papel_org"]
           user_id: string
@@ -1259,6 +1311,7 @@ export type Database = {
         Insert: {
           ativo?: boolean
           criado_em?: string
+          emite_nota_fiscal?: boolean
           org_id: string
           papel?: Database["public"]["Enums"]["papel_org"]
           user_id: string
@@ -1267,6 +1320,7 @@ export type Database = {
         Update: {
           ativo?: boolean
           criado_em?: string
+          emite_nota_fiscal?: boolean
           org_id?: string
           papel?: Database["public"]["Enums"]["papel_org"]
           user_id?: string
@@ -2504,6 +2558,7 @@ export type Database = {
           ativo: boolean
           atualizado_em: string
           categoria: string | null
+          cest: string | null
           codigo: string | null
           controla_estoque: boolean
           criado_em: string
@@ -2514,6 +2569,7 @@ export type Database = {
           ncm: string | null
           nome: string
           org_id: string
+          origem: number | null
           preco: number
           unidade: string
         }
@@ -2521,6 +2577,7 @@ export type Database = {
           ativo?: boolean
           atualizado_em?: string
           categoria?: string | null
+          cest?: string | null
           codigo?: string | null
           controla_estoque?: boolean
           criado_em?: string
@@ -2531,6 +2588,7 @@ export type Database = {
           ncm?: string | null
           nome: string
           org_id: string
+          origem?: number | null
           preco?: number
           unidade?: string
         }
@@ -2538,6 +2596,7 @@ export type Database = {
           ativo?: boolean
           atualizado_em?: string
           categoria?: string | null
+          cest?: string | null
           codigo?: string | null
           controla_estoque?: boolean
           criado_em?: string
@@ -2548,6 +2607,7 @@ export type Database = {
           ncm?: string | null
           nome?: string
           org_id?: string
+          origem?: number | null
           preco?: number
           unidade?: string
         }
@@ -2952,6 +3012,10 @@ export type Database = {
         Args: { p_conversa: string; p_motivo: string }
         Returns: Json
       }
+      agente_consultar_os: {
+        Args: { p_busca?: string; p_conversa: string }
+        Returns: Json
+      }
       agente_contexto: {
         Args: { p_conversa: string; p_limite?: number }
         Returns: Json
@@ -3149,6 +3213,7 @@ export type Database = {
         Args: { p_canal: string; p_texto: string }
         Returns: boolean
       }
+      emite_nota_fiscal: { Args: { p_org: string }; Returns: boolean }
       enfileirar_saida: {
         Args: {
           p_autor: Database["public"]["Enums"]["autor_tipo"]
@@ -3295,6 +3360,10 @@ export type Database = {
         }
         Returns: string
       }
+      membro_definir_emite_nota_fiscal: {
+        Args: { p_org: string; p_usuario: string; p_valor: boolean }
+        Returns: undefined
+      }
       membro_definir_ve_todos_clientes: {
         Args: { p_org: string; p_usuario: string; p_valor: boolean }
         Returns: undefined
@@ -3315,6 +3384,14 @@ export type Database = {
       modulo_ativo: {
         Args: { p_modulo: string; p_org: string }
         Returns: boolean
+      }
+      nfe_salvar_tokens: {
+        Args: { p_emissora: string; p_homologacao: string; p_producao: string }
+        Returns: undefined
+      }
+      nfe_token: {
+        Args: { p_ambiente: string; p_emissora: string }
+        Returns: string
       }
       nota_entrada_lancar: {
         Args: { p_itens: Json; p_nota: Json; p_org: string }
@@ -3382,6 +3459,19 @@ export type Database = {
       }
       os_preparar: { Args: { p_org: string }; Returns: undefined }
       os_previsao_itens: {
+        Args: { p_org: string }
+        Returns: {
+          dias_na_etapa: number
+          em_orcamento: boolean
+          fatura_em: string
+          finaliza_em: string
+          item_id: string
+          normal_etapa: number
+          parado: boolean
+          recebe_em: string
+        }[]
+      }
+      os_previsao_itens_base: {
         Args: { p_org: string }
         Returns: {
           dias_na_etapa: number
@@ -3594,6 +3684,10 @@ export type Database = {
         Returns: Json
       }
       sem_acento: { Args: { p: string }; Returns: string }
+      simulador_consultar_os: {
+        Args: { p_busca?: string; p_org: string }
+        Returns: Json
+      }
       simulador_documento: {
         Args: { p_documento: string; p_org: string }
         Returns: Json

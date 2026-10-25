@@ -463,3 +463,7 @@ verify_jwt = false
 # indexar-fotos: fotos de produto da biblioteca para a identificação pela foto; chamada só pelo banco (x-livih-segredo).
 [functions.indexar-fotos]
 verify_jwt = false
+
+# nfe-config: Configurações → Empresa → Nota fiscal; login e papel (dono/admin ou plataforma) validados dentro da função.
+[functions.nfe-config]
+verify_jwt = false

@@ -10,6 +10,7 @@ import {
 } from '../services/configuracoes'
 import { quandoCurto } from '../services/formato'
 import { definirVeTodosClientes, listarVeTodosClientes } from '../services/clientes'
+import { definirEmiteNotaFiscal, listarEmiteNotaFiscal } from '../services/nfe'
 import { Avatar } from './Avatar'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
@@ -50,6 +51,8 @@ export function SecaoEquipe() {
   // "Vê todos os clientes" (docs/clientes.md): dono e admin ligam para quem atende no balcão, faturamento etc.
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const [veTodos, setVeTodos] = useState<Set<string>>(new Set())
+  // "Emite nota fiscal" (docs/nfe.md): desligada por padrão; dono e admin ligam.
+  const [emiteNota, setEmiteNota] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let ativo = true
@@ -59,10 +62,26 @@ export function SecaoEquipe() {
     listarVeTodosClientes(orgId)
       .then((s) => ativo && setVeTodos(s))
       .catch(() => ativo && setVeTodos(new Set()))
+    listarEmiteNotaFiscal(orgId)
+      .then((s) => ativo && setEmiteNota(s))
+      .catch(() => ativo && setEmiteNota(new Set()))
     return () => {
       ativo = false
     }
   }, [orgId, versao])
+
+  async function alternarEmiteNota(m: MembroEquipe) {
+    setSalvando(m.user_id)
+    setErroAcao(null)
+    try {
+      await definirEmiteNotaFiscal(orgId, m.user_id, !emiteNota.has(m.user_id))
+      recarregar()
+    } catch (e) {
+      setErroAcao((e as Error).message)
+    } finally {
+      setSalvando(null)
+    }
+  }
 
   async function alternarVeTodos(m: MembroEquipe) {
     setSalvando(m.user_id)
@@ -180,6 +199,20 @@ export function SecaoEquipe() {
                     ) : (
                       veTodos.has(m.user_id) && <p className="mt-1 text-legenda text-texto-3">Vê todos os clientes</p>
                     ))}
+                    {m.papel === 'atendente' && m.ativo && (gerencia ? (
+                      <label className="mt-1 ml-4 inline-flex cursor-pointer items-center gap-2 text-legenda text-texto-2">
+                        <input
+                          type="checkbox"
+                          checked={emiteNota.has(m.user_id)}
+                          disabled={salvando === m.user_id}
+                          onChange={() => void alternarEmiteNota(m)}
+                          className="size-3.5 accent-primaria"
+                        />
+                        Emite nota fiscal
+                      </label>
+                    ) : (
+                      emiteNota.has(m.user_id) && <p className="mt-1 text-legenda text-texto-3">Emite nota fiscal</p>
+                    ))}
                   </div>
                   <div className="flex items-center gap-2">
                     {editavel ? (
@@ -237,6 +270,10 @@ export function SecaoEquipe() {
         <span className="font-medium text-texto-2">Vê todos os clientes:</span> para quem atende no balcão ou cuida do faturamento.
         Libera o cadastro de todos os clientes, os contatos ligados a eles e vender para qualquer um. Não libera as conversas nem os
         negócios dos outros vendedores, nem trocar o vendedor responsável. Dono e admin já veem todos.
+      </p>
+      <p className="text-pequeno text-texto-3">
+        <span className="font-medium text-texto-2">Emite nota fiscal:</span> emite a NF-e dos pedidos que a pessoa vê (balcão,
+        venda online, faturamento). Nasce desligada. Cancelar nota continua só com dono e admin, que já emitem.
       </p>
 
       <Convite
