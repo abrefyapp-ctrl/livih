@@ -86,7 +86,23 @@ Deno.serve(async (req) => {
   if (falta.length) return json(422, { erro: `Preencha no cadastro do CNPJ: ${falta.join(", ")}.`, faltando: falta });
   const temCertificado = !!p.certificado_base64;
   if (temCertificado && !p.senha_certificado) return json(422, { erro: "Informe a senha do certificado." });
-  if (!temCertificado && !e.focus_empresa_id) {
+  const autorizacaoRevenda = { Authorization: `Basic ${btoa(`${TOKEN_REVENDA}:`)}` };
+
+  // CNPJ que ainda não está ligado: pode já existir na conta (cadastrado direto no painel da Focus). Nesse caso o
+  // Livih adota o cadastro (atualiza em vez de criar) e o certificado já enviado lá vale.
+  let focusId = e.focus_empresa_id;
+  if (!focusId) {
+    try {
+      const busca = await fetch(`${FOCUS_EMPRESAS}?cnpj=${e.cnpj}`, { headers: autorizacaoRevenda, signal: AbortSignal.timeout(30000) });
+      const achadas = await busca.json().catch(() => null);
+      const achada = Array.isArray(achadas) ? (achadas as { id?: number; cnpj?: string }[]).find((x) => (x.cnpj ?? "").replace(/\D/g, "") === e.cnpj) : null;
+      if (achada?.id) focusId = achada.id;
+      else if (!busca.ok) console.error("focus buscar empresa", busca.status, mensagemFocus(achadas, busca.status).slice(0, 200));
+    } catch (err) {
+      console.error("focus buscar empresa", String(err).slice(0, 200));
+    }
+  }
+  if (!temCertificado && !focusId) {
     return json(422, { erro: "Envie o certificado digital A1 (.pfx) com a senha para cadastrar o CNPJ na Focus." });
   }
 
@@ -116,12 +132,12 @@ Deno.serve(async (req) => {
       : {}),
   };
 
-  const url = e.focus_empresa_id ? `${FOCUS_EMPRESAS}/${e.focus_empresa_id}` : FOCUS_EMPRESAS;
+  const url = focusId ? `${FOCUS_EMPRESAS}/${focusId}` : FOCUS_EMPRESAS;
   let r: Response;
   try {
     r = await fetch(url, {
-      method: e.focus_empresa_id ? "PUT" : "POST",
-      headers: { Authorization: `Basic ${btoa(`${TOKEN_REVENDA}:`)}`, "Content-Type": "application/json" },
+      method: focusId ? "PUT" : "POST",
+      headers: { ...autorizacaoRevenda, "Content-Type": "application/json" },
       body: JSON.stringify(corpo),
       signal: AbortSignal.timeout(60000),
     });
@@ -141,9 +157,14 @@ Deno.serve(async (req) => {
     return json(422, { erro: mensagem, status: e.nfe_status === "pronta" ? "pronta" : "erro" });
   }
 
-  const f = resposta as {
-    id?: number; token_producao?: string; token_homologacao?: string; certificado_valido_ate?: string | null; certificado_cnpj?: string | null;
-  };
+  type Empresa = { id?: number; token_producao?: string; token_homologacao?: string; certificado_valido_ate?: string | null; certificado_cnpj?: string | null };
+  let f = resposta as Empresa;
+  // A atualização pode não devolver os tokens: busca a empresa para tê-los.
+  if (focusId && (!f.token_homologacao || !f.token_producao || !f.certificado_valido_ate)) {
+    const c = await fetch(`${FOCUS_EMPRESAS}/${focusId}`, { headers: autorizacaoRevenda, signal: AbortSignal.timeout(30000) }).catch(() => null);
+    const dados = c?.ok ? ((await c.json().catch(() => null)) as Empresa | null) : null;
+    if (dados) f = { ...dados, ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)) };
+  }
   const { error: erroTokens } = await admin.rpc("nfe_salvar_tokens", {
     p_emissora: e.id, p_producao: f.token_producao ?? null, p_homologacao: f.token_homologacao ?? null,
   });
@@ -157,7 +178,7 @@ Deno.serve(async (req) => {
     ? "O certificado está vencido: envie o novo."
     : !validade ? "A Focus ainda não registrou o certificado: envie o arquivo .pfx com a senha." : null;
   await admin.from("emissoras").update({
-    focus_empresa_id: f.id ?? e.focus_empresa_id,
+    focus_empresa_id: f.id ?? focusId,
     certificado_validade: validade,
     certificado_cnpj: f.certificado_cnpj ?? null,
     nfe_status: status,

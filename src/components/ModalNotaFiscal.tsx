@@ -101,12 +101,8 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
     }
     try {
       await salvarFiscal(e.id, campos)
-      // Sem certificado e ainda fora da Focus: só os dados fiscais ficam salvos.
-      if (!certificado && !e.focus_empresa_id) {
-        setAviso('Dados fiscais salvos. Para ativar a emissão, envie o certificado digital A1 (.pfx) com a senha.')
-        setSalvando(false)
-        return
-      }
+      // Sempre fala com a Focus: sem certificado, ela adota o CNPJ que já foi cadastrado direto no painel da Focus
+      // (ou responde que falta o certificado).
       const r = await sincronizarFocus(e.id, certificado, senha)
       setSenha('')
       setCertificado(null)
@@ -131,7 +127,7 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
             Fechar
           </Botao>
           <Botao type="submit" form="form-nfe" carregando={salvando} disabled={invalido}>
-            {certificado || e.focus_empresa_id ? 'Salvar e enviar à Focus' : 'Salvar'}
+            Salvar e enviar à Focus
           </Botao>
         </>
       }
@@ -224,7 +220,8 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
             )}
           </div>
           <p className="text-legenda text-texto-3">
-            O arquivo e a senha vão direto para a Focus NFe, que assina as notas. O Livih não guarda nenhum dos dois.
+            O arquivo e a senha vão direto para a Focus NFe, que assina as notas. O Livih não guarda nenhum dos dois. Se o CNPJ já
+            foi cadastrado com o certificado no painel da Focus, salve sem escolher o arquivo: o Livih usa o cadastro de lá.
           </p>
         </fieldset>
 
