@@ -11,6 +11,8 @@ import { Modal } from './Modal'
 import { useInstalarApp } from '../pwa'
 
 type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: number }
+/** Bloco do menu: rótulo pequeno em cima (no menu só de ícones vira uma linha); bloco vazio não aparece. */
+type GrupoMenu = { rotulo?: string; itens: ItemMenu[] }
 
 /**
  * Casca da aplicação. Desktop (lg+): barra lateral com rótulos. Tablet (md): só ícones.
@@ -31,55 +33,87 @@ export function Layout() {
     document.title = aguardando ? `(${aguardando}) Livih` : 'Livih'
   }, [aguardando])
 
-  const itens: ItemMenu[] = [
-    { para: '/conversas', rotulo: 'Conversas', icone: 'conversas', contador: aguardando },
-    { para: '/painel', rotulo: 'Painel', icone: 'grafico' },
-    { para: '/contatos', rotulo: 'Contatos', icone: 'usuario' },
-    { para: '/clientes', rotulo: 'Clientes', icone: 'empresa' },
-    { para: '/oportunidades', rotulo: 'Oportunidades', icone: 'funil' },
-    ...(modulos?.has('agenda') ? [{ para: '/agenda', rotulo: 'Agenda', icone: 'calendario' as const }] : []),
-    ...(modulos?.has('erp')
-      ? [
-          { para: '/pedidos', rotulo: 'Pedidos', icone: 'pedido' as const },
-          { para: '/produtos', rotulo: 'Produtos', icone: 'caixa' as const },
-        ]
-      : []),
-    ...(modulos?.has('os') ? [{ para: '/os', rotulo: 'Ordens de serviço', icone: 'ferramenta' as const }] : []),
+  // Por tarefa: o dia a dia em cima, vendas, operação (módulos) e, no pé, o que se ajusta de vez em quando.
+  const grupos: GrupoMenu[] = [
+    {
+      itens: [
+        { para: '/painel', rotulo: 'Painel', icone: 'grafico' },
+        { para: '/conversas', rotulo: 'Conversas', icone: 'conversas', contador: aguardando },
+      ],
+    },
+    {
+      rotulo: 'Vendas',
+      itens: [
+        { para: '/oportunidades', rotulo: 'Oportunidades', icone: 'funil' },
+        { para: '/contatos', rotulo: 'Contatos', icone: 'usuario' },
+        { para: '/clientes', rotulo: 'Clientes', icone: 'empresa' },
+        ...(modulos?.has('agenda') ? [{ para: '/agenda', rotulo: 'Agenda', icone: 'calendario' as const }] : []),
+      ],
+    },
+    {
+      rotulo: 'Operação',
+      itens: [
+        ...(modulos?.has('erp')
+          ? [
+              { para: '/pedidos', rotulo: 'Pedidos', icone: 'pedido' as const },
+              { para: '/produtos', rotulo: 'Produtos', icone: 'caixa' as const },
+            ]
+          : []),
+        ...(modulos?.has('os') ? [{ para: '/os', rotulo: 'Ordens de serviço', icone: 'ferramenta' as const }] : []),
+      ],
+    },
+  ]
+  const rodape: ItemMenu[] = [
     { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
-    ...(adminPlataforma ? [{ para: '/empresas', rotulo: 'Empresas', icone: 'empresa' as const }] : []),
+    ...(adminPlataforma ? [{ para: '/empresas', rotulo: 'Empresas', icone: 'painel' as const }] : []),
   ]
 
   const userId = sessao?.user.id
   const meuNome = (userId && equipe.get(userId)?.nome) || sessao?.user.email || ''
 
-  const menu = (compacto: boolean) => (
-    <nav aria-label="Principal" className="flex flex-col gap-1 p-3">
-      {itens.map((item) => (
-        <NavLink
-          key={item.para}
-          to={item.para}
-          title={compacto ? item.rotulo : undefined}
-          onClick={() => setGaveta(false)}
-          className={({ isActive }) =>
-            `relative flex h-10 items-center gap-3 rounded-md px-3 font-medium transition-colors ${
-              isActive ? 'bg-primaria-suave text-primaria' : 'text-texto-2 hover:bg-fundo hover:text-texto'
-            } ${compacto ? 'justify-center px-0' : ''}`
-          }
+  const link = (item: ItemMenu, compacto: boolean) => (
+    <NavLink
+      key={item.para}
+      to={item.para}
+      title={compacto ? item.rotulo : undefined}
+      onClick={() => setGaveta(false)}
+      className={({ isActive }) =>
+        `relative flex h-10 items-center gap-3 rounded-md px-3 font-medium transition-colors ${
+          isActive ? 'bg-primaria-suave text-primaria' : 'text-texto-2 hover:bg-fundo hover:text-texto'
+        } ${compacto ? 'justify-center px-0' : ''}`
+      }
+    >
+      <Icone nome={item.icone} />
+      {!compacto && <span className="flex-1">{item.rotulo}</span>}
+      {!!item.contador && (
+        <span
+          aria-label={`${item.contador} aguardando`}
+          className={`rounded-full bg-atencao px-1.5 text-legenda font-semibold text-white ${
+            compacto ? 'absolute top-1 right-1' : ''
+          }`}
         >
-          <Icone nome={item.icone} />
-          {!compacto && <span className="flex-1">{item.rotulo}</span>}
-          {!!item.contador && (
-            <span
-              aria-label={`${item.contador} aguardando`}
-              className={`rounded-full bg-atencao px-1.5 text-legenda font-semibold text-white ${
-                compacto ? 'absolute top-1 right-1' : ''
-              }`}
-            >
-              {item.contador}
-            </span>
-          )}
-        </NavLink>
-      ))}
+          {item.contador}
+        </span>
+      )}
+    </NavLink>
+  )
+
+  const menu = (compacto: boolean) => (
+    <nav aria-label="Principal" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3">
+      {grupos
+        .filter((g) => g.itens.length)
+        .map((g, n) => (
+          <div key={g.rotulo ?? n} role="group" aria-label={g.rotulo} className="flex flex-col gap-1">
+            {g.rotulo &&
+              (compacto ? (
+                <hr className="mx-2 my-2 border-borda" />
+              ) : (
+                <p className="px-3 pt-4 pb-1 text-legenda font-semibold tracking-wide text-texto-3 uppercase">{g.rotulo}</p>
+              ))}
+            {g.itens.map((item) => link(item, compacto))}
+          </div>
+        ))}
+      <div className="mt-auto flex flex-col gap-1 border-t border-borda pt-3">{rodape.map((item) => link(item, compacto))}</div>
     </nav>
   )
 
@@ -99,8 +133,8 @@ export function Layout() {
             <Logo />
           </span>
         </div>
-        <div className="lg:hidden">{menu(true)}</div>
-        <div className="hidden lg:block">{menu(false)}</div>
+        <div className="flex min-h-0 flex-1 flex-col lg:hidden">{menu(true)}</div>
+        <div className="hidden min-h-0 flex-1 flex-col lg:flex">{menu(false)}</div>
       </aside>
 
       {/* gaveta no celular */}
