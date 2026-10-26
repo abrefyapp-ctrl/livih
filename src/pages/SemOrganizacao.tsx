@@ -20,7 +20,7 @@ export function SemOrganizacao({ suspensas = [] }: { suspensas?: Organizacao[] }
       <div className="flex h-full flex-col items-center justify-center p-6">
         <Logo />
         <EstadoVazio icone="empresa" titulo={`O acesso da ${suspensas[0].nome} está suspenso`} acao={botaoSair}>
-          As conversas, os contatos e as configurações continuam guardados. Para voltar a usar o Livih, fale com o
+          As conversas, os contatos e as configurações continuam guardados. Para voltar a usar a Livih, fale com o
           responsável pela sua empresa ou com a equipe da Livih.
         </EstadoVazio>
       </div>

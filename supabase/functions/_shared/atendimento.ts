@@ -86,7 +86,7 @@ export async function transcreverEAvisar(
   if (chamar) await avisarAgente(supabase, entrada);
 }
 
-// Celular brasileiro sem o 9 (contas antigas, e a Meta manda o wa_id assim) ganha o 9: no Livih todo telefone tem.
+// Celular brasileiro sem o 9 (contas antigas, e a Meta manda o wa_id assim) ganha o 9: na Livih todo telefone tem.
 export function normalizarTelefone(numero: string | null | undefined): string | undefined {
   const d = String(numero ?? "").replace(/\D/g, "");
   const br = d.match(/^55(\d{2})(\d{8})$/);

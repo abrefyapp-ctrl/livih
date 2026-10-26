@@ -1,4 +1,4 @@
-// Service worker do Livih (PWA). Simples de propósito:
+// Service worker da Livih (PWA). Simples de propósito:
 // - páginas: rede primeiro; sem internet, devolve a última casca salva (o app abre, sem dados até a conexão voltar);
 // - /assets/* (nomes com hash do Vite, nunca mudam): cache primeiro — mas só guarda o arquivo de verdade.
 //   Durante o deploy, um asset que ainda não chegou ao servidor volta como index.html com 200 (o Worker é SPA);
@@ -88,7 +88,7 @@ self.addEventListener('push', (e) => {
   )
 })
 
-// Toque na notificação: abre a conversa numa janela do Livih que já esteja aberta, ou abre uma nova.
+// Toque na notificação: abre a conversa numa janela da Livih que já esteja aberta, ou abre uma nova.
 self.addEventListener('notificationclick', (e) => {
   e.notification.close()
   const url = new URL((e.notification.data && e.notification.data.url) || '/conversas', self.location.origin).href

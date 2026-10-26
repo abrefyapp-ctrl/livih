@@ -19,11 +19,11 @@ export function LinkConvite({
   const oi = `Oi${primeiroNome ? `, ${primeiroNome}` : ''}!`
   const mensagem =
     tipo === 'senha'
-      ? `${oi} Este é o link para você criar uma senha nova no Livih (vale por 24 horas): ${link}`
+      ? `${oi} Este é o link para você criar uma senha nova na Livih (vale por 24 horas): ${link}`
       : tipo === 'dono'
-        ? `${oi} A conta da ${nomeOrg} no Livih está pronta. Crie sua senha por este link (vale por 24 horas) ` +
+        ? `${oi} A conta da ${nomeOrg} na Livih está pronta. Crie sua senha por este link (vale por 24 horas) ` +
           `e siga os primeiros passos para conectar o WhatsApp e configurar o agente: ${link}`
-        : `${oi} Você foi convidado(a) para atender as conversas da ${nomeOrg} no Livih. ` +
+        : `${oi} Você foi convidado(a) para atender as conversas da ${nomeOrg} na Livih. ` +
         `Crie sua senha por este link (vale por 24 horas): ${link}`
 
   async function copiar() {

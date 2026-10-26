@@ -160,10 +160,10 @@ export function OrdemServicoDetalhe() {
     if (!pdf?.dados || !pdf.arquivo) return
     const pronto = { dados: pdf.dados, arquivo: pdf.arquivo }
     setPdf(null)
-    if (!contatoId) return setErro('O cliente desta OS não é um contato do Livih: baixe o PDF e mande por outro canal.')
+    if (!contatoId) return setErro('O cliente desta OS não é um contato da Livih: baixe o PDF e mande por outro canal.')
     const info = conversa?.contatoId === contatoId ? conversa.info : undefined
     if (info === undefined) return setErro('Procurando a conversa do cliente. Tente de novo em instantes.')
-    if (!info) return setErro('O cliente ainda não tem conversa no Livih. Comece uma em Conversas → Nova conversa, ou baixe o PDF.')
+    if (!info) return setErro('O cliente ainda não tem conversa na Livih. Comece uma em Conversas → Nova conversa, ou baixe o PDF.')
     if (info.janelaFechada)
       return setErro(
         `Faz mais de 24 horas que o cliente escreveu no número ${info.numero} (API oficial): só dá para retomar com um modelo aprovado. Depois que o cliente responder, o PDF pode ir.`,

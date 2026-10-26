@@ -5,7 +5,7 @@
 //
 // Quem pode: dono, admin e quem tem "Emite nota fiscal". O pedido, a OS e o cliente são lidos com o login da pessoa
 // (a RLS decide o que ela vê). A nota nasce "processando"; o resultado vem pelo gatilho da Focus (nfe-retorno).
-// No padrão nacional a alíquota do ISS vem parametrizada pela prefeitura: o Livih não manda.
+// No padrão nacional a alíquota do ISS vem parametrizada pela prefeitura: a Livih não manda.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { type Ambiente, BASE, basic, mensagemFocus, tokenDoCnpj } from "../_shared/focus.ts";
@@ -232,7 +232,7 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("emitir nfse", ref, String(e).slice(0, 200));
-    return json(202, { nota, aviso: "A Focus demorou a responder. O Livih confere sozinho em instantes." });
+    return json(202, { nota, aviso: "A Focus demorou a responder. A Livih confere sozinha em instantes." });
   }
   if (!r.ok && r.status !== 202) {
     const mensagem = mensagemFocus(await r.json().catch(() => null), r.status);

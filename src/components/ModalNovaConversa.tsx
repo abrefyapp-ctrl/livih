@@ -17,7 +17,7 @@ const semAcento = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLo
 
 /**
  * Prospecção ativa: o vendedor escolhe alguém da agenda do celular do número dele (ou digita o número) e começa
- * a conversa pelo Livih. Na API oficial a primeira mensagem é um modelo: a conversa abre e o modelo sai de lá.
+ * a conversa pela Livih. Na API oficial a primeira mensagem é um modelo: a conversa abre e o modelo sai de lá.
  */
 export function ModalNovaConversa({
   inicial,

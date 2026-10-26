@@ -21,7 +21,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Só o Livih (Edge Function waha-webhook) chama este webhook: confere o token compartilhado.\nconst req = $input.first().json;\nif ((req.headers?.['x-livih-token'] || '') !== $env.LIVIH_AGENTE_TOKEN) return [];\nconst { conversa_id, mensagem_id } = req.body || {};\nif (!conversa_id || !mensagem_id) return [];\nreturn [{ json: { conversa_id, mensagem_id } }];\n"
+        "jsCode": "// Só a Livih (Edge Function waha-webhook) chama este webhook: confere o token compartilhado.\nconst req = $input.first().json;\nif ((req.headers?.['x-livih-token'] || '') !== $env.LIVIH_AGENTE_TOKEN) return [];\nconst { conversa_id, mensagem_id } = req.body || {};\nif (!conversa_id || !mensagem_id) return [];\nreturn [{ json: { conversa_id, mensagem_id } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

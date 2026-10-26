@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
     : !validade
       ? "A Focus ainda não registrou o certificado: envie o arquivo .pfx com a senha."
       : e.nfse_ativa && provedor && provedor !== "Nacional"
-        ? `A NFS-e de ${e.cidade} é pelo sistema da prefeitura (${provedor}), que o Livih ainda não emite. A NF-e segue normal.`
+        ? `A NFS-e de ${e.cidade} é pelo sistema da prefeitura (${provedor}), que a Livih ainda não emite. A NF-e segue normal.`
         : null;
   await admin.from("emissoras").update({
     focus_empresa_id: f.id ?? focusId,

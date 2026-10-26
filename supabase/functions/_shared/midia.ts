@@ -55,7 +55,7 @@ export async function guardarMidiaRecebida(
     const mb = (tamanho / 1024 / 1024).toFixed(0);
     const { error: erroAviso } = await supabase.rpc("registrar_descricao", {
       p_mensagem: destino.mensagem_id,
-      p_descricao: `Arquivo de ${mb} MB: grande demais para guardar no Livih (limite de 50 MB). Abra pelo WhatsApp do celular.`,
+      p_descricao: `Arquivo de ${mb} MB: grande demais para guardar na Livih (limite de 50 MB). Abra pelo WhatsApp do celular.`,
     });
     if (erroAviso) console.error("aviso de arquivo grande", erroAviso.message);
     return null;

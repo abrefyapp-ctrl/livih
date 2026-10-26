@@ -1,5 +1,5 @@
 // Notificações push neste aparelho (migration 20261009160000 e Edge Function push-enviar).
-// O aparelho se inscreve no serviço de push do navegador com a chave pública do Livih (push_config) e o banco
+// O aparelho se inscreve no serviço de push do navegador com a chave pública da Livih (push_config) e o banco
 // guarda a inscrição (push_inscrever). Quem decide quando notificar é o banco.
 import { ehIos, rodandoComoApp } from '../pwa'
 import { supabase } from './supabaseClient'
@@ -46,7 +46,7 @@ export async function ativarNotificacoes(): Promise<string | null> {
   if (permissao !== 'granted') return 'Sem permissão, o navegador não deixa mostrar notificações.'
 
   const reg = await registro()
-  if (!reg) return 'As notificações funcionam só na versão publicada do Livih.'
+  if (!reg) return 'As notificações funcionam só na versão publicada da Livih.'
   const { data: config } = await supabase.from('push_config').select('chave_publica').maybeSingle()
   if (!config) return 'As notificações ainda não foram configuradas no servidor. Avise o suporte da Livih.'
   const chave = chaveParaBytes(config.chave_publica)

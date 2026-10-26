@@ -3,7 +3,7 @@
 Vem antes da entrega 3 da NF-e (decisão de 25/10): a F7 presta serviço, não tem inscrição estadual e não emite NF-e
 de mercadoria (rejeição 554 no teste). A NFS-e aproveita a base da NF-e ([nfe.md](nfe.md)): conta de revenda na
 Focus, CNPJ configurado em Configurações → Empresa, permissão "Emite nota fiscal", tabela de notas, gatilho da Focus
-com conferência de reserva e cópia do PDF e do XML no Livih.
+com conferência de reserva e cópia do PDF e do XML na Livih.
 
 ## Decisões de 25/10
 
@@ -11,7 +11,7 @@ com conferência de reserva e cópia do PDF e do XML no Livih.
 |---|---|
 | Padrão | **NFS-e Nacional** (Focus `/v2/nfsen`). Curitiba: provedor "Nacional", com homologação e cancelamento pela API (consulta à API de municípios da Focus, 25/10) |
 | De onde sai a nota | Da **ordem de serviço**, de um **pedido de serviço** e de uma **nota avulsa** |
-| Município que não for do padrão nacional | Fora desta etapa: o Livih consulta o município do CNPJ na Focus e avisa se não for "Nacional" |
+| Município que não for do padrão nacional | Fora desta etapa: a Livih consulta o município do CNPJ na Focus e avisa se não for "Nacional" |
 
 ## Configuração (por CNPJ, na mesma tela Nota fiscal)
 
@@ -42,10 +42,10 @@ não é pedida: no padrão nacional, ela vem parametrizada pela prefeitura.
    digitados.
 
 Na janela de emissão: CNPJ, descrição do serviço (editável), valor, data de competência (padrão hoje), ISS retido pelo
-tomador ou não, e informações complementares. Antes de enviar, o Livih confere o que falta: o tomador precisa de
+tomador ou não, e informações complementares. Antes de enviar, a Livih confere o que falta: o tomador precisa de
 CNPJ ou CPF e, com endereço, o município; e o CNPJ, da NFS-e ativa e do código de tributação nacional.
 
-O retorno segue a NF-e: gatilho da Focus (evento de NFS-e Nacional) e a conferência de reserva; autorizada, o Livih
+O retorno segue a NF-e: gatilho da Focus (evento de NFS-e Nacional) e a conferência de reserva; autorizada, a Livih
 guarda o XML e o PDF (DANFSe) no bucket `notas-fiscais`. Uma nota viva por pedido e por OS.
 
 ## Dados (migration)

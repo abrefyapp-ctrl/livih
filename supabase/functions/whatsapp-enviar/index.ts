@@ -45,7 +45,7 @@ async function urlArquivo(path: string): Promise<string> {
 
 // Para quem enviar. O LID é o identificador que o WhatsApp realmente usa, então tem preferência.
 // Sem LID, pergunta ao WAHA o id certo do número: contas brasileiras antigas existem SEM o nono
-// dígito, e o telefone guardado no Livih sempre tem o 9 (o GOWS não acha "55419…" se a conta é "5541…").
+// dígito, e o telefone guardado na Livih sempre tem o 9 (o GOWS não acha "55419…" se a conta é "5541…").
 async function chatIdWaha(item: ItemFila): Promise<string | null> {
   if (item.whatsapp_lid) return `${item.whatsapp_lid}@lid`;
   if (!item.telefone) return null;

@@ -51,7 +51,7 @@ O que o dono do piloto pediu, nas palavras dele:
 - **Desfechos que não são "pronto"**: "não foi aprovado orçamento", "não deu conserto", garantia, retorno em
   garantia, "aguardando compra de vedação".
 - **A coluna BOLETO mistura data e "GARANTIA"**: faturar e cobrar são coisas separadas.
-- O Excel transformou números de série em data. No Livih, a identificação é sempre texto.
+- O Excel transformou números de série em data. Na Livih, a identificação é sempre texto.
 
 ## Para o usuário
 
@@ -196,7 +196,7 @@ melhora sozinha depois de 1 a 2 meses de uso.
 
 ## Ordem e esforço
 
-0. **Validação sem código** (2–3 h): empresa do piloto no Livih com o funil configurado nas etapas acima, um card
+0. **Validação sem código** (2–3 h): empresa do piloto na Livih com o funil configurado nas etapas acima, um card
    por item, enquanto o módulo é feito.
 1. Banco, funções e testes: ~1 dia.
 2. Telas (configuração, nova OS, quadro, lista, ficha, PDF): 2–3 dias.

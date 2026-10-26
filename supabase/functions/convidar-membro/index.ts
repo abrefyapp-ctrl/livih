@@ -3,7 +3,7 @@
 // Só o dono da organização convida (mesma regra da policy membros_gerir) — ou a equipe da plataforma, que
 // também cria o dono de uma empresa nova (papel 'dono', pelo painel da F7). Não manda e-mail: devolve
 // um link de convite para o dono repassar (WhatsApp, por exemplo) — o link abre /definir-senha já
-// logado. Se a pessoa já tem conta no Livih, só entra na equipe e usa a senha que já tem.
+// logado. Se a pessoa já tem conta na Livih, só entra na equipe e usa a senha que já tem.
 //
 // POST { org_id, email, nome?, papel: 'admin' | 'atendente' | 'dono' (só a plataforma), redirect_to }
 //   → { link } (conta nova ou ainda sem senha) | { link: null } (já tinha conta: entra com a senha dela)

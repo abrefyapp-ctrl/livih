@@ -306,7 +306,7 @@ async function conectarComTokenSistema(orgId: string, p: { waba_id?: string; pho
   return canal;
 }
 
-// Agenda do celular: só os contatos salvos (com nome), números individuais, com o 9 como no resto do Livih.
+// Agenda do celular: só os contatos salvos (com nome), números individuais, com o 9 como no resto da Livih.
 async function agendaDoCelular(sessao: string, eu: string | null) {
   const vistos = new Map<string, string>();
   for (let offset = 0; offset < 20_000; offset += 1000) {

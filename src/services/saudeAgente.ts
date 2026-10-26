@@ -46,7 +46,7 @@ export function medir(agente: AgenteSaude | null, base: ItemBase[], historico = 
     { id: 'instrucoes', rotulo: 'Instruções', caracteres: agente?.prompt.length ?? 0 },
     { id: 'regras', rotulo: 'Quando chamar a equipe', caracteres: (agente?.casos ?? []).reduce((s, c) => s + c.length, 0) },
     { id: 'base', rotulo: 'Base de conhecimento', caracteres: base.filter((b) => b.ativo).reduce((s, b) => s + b.conteudo.length, 0) },
-    { id: 'fixa', rotulo: 'Parte fixa do Livih', caracteres: PARTE_FIXA },
+    { id: 'fixa', rotulo: 'Parte fixa da Livih', caracteres: PARTE_FIXA },
     { id: 'historico', rotulo: 'Conversa (histórico)', caracteres: Math.round(historico) },
   ]
 }

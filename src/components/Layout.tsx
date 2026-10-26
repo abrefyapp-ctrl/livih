@@ -264,9 +264,9 @@ export function Layout() {
           <Outlet />
         </main>
 
-        <Modal aberto={ajudaIos} titulo="Instalar o Livih no iPhone" aoFechar={() => setAjudaIos(false)}>
+        <Modal aberto={ajudaIos} titulo="Instalar a Livih no iPhone" aoFechar={() => setAjudaIos(false)}>
           <ol className="list-decimal space-y-2 pl-5 text-pequeno text-texto-2">
-            <li>Abra o Livih no <strong>Safari</strong>.</li>
+            <li>Abra a Livih no <strong>Safari</strong>.</li>
             <li>
               Toque em <strong>Compartilhar</strong> (o quadrado com a seta para cima).
             </li>
@@ -274,7 +274,7 @@ export function Layout() {
               Escolha <strong>Adicionar à Tela de Início</strong> e confirme em <strong>Adicionar</strong>.
             </li>
           </ol>
-          <p className="mt-3 text-legenda text-texto-3">O ícone do Livih aparece na tela inicial e abre como um app, sem a barra do navegador.</p>
+          <p className="mt-3 text-legenda text-texto-3">O ícone da Livih aparece na tela inicial e abre como um app, sem a barra do navegador.</p>
         </Modal>
       </div>
     </div>

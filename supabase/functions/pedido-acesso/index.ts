@@ -62,7 +62,7 @@ async function avisarEquipe(p: { empresa: string; nome: string; email: string; t
       headers: h, signal: AbortSignal.timeout(8000),
     }).then((r) => r.json());
     if (!existe?.numberExists) return;
-    const msg = `🆕 *Pedido de acesso ao Livih pelo site*\nEmpresa: ${p.empresa}\nContato: ${p.nome}\nE-mail: ${p.email}` +
+    const msg = `🆕 *Pedido de acesso à Livih pelo site*\nEmpresa: ${p.empresa}\nContato: ${p.nome}\nE-mail: ${p.email}` +
       (p.telefone ? `\nTelefone: ${p.telefone}` : "") + `\n\nVeja em app.livih.com.br/empresas`;
     await fetch(`${WAHA_URL}/api/sendText`, {
       method: "POST", headers: h, signal: AbortSignal.timeout(10000),

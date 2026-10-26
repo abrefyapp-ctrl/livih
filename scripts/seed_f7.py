@@ -1,4 +1,4 @@
-"""Configuração inicial do agente da F7 no Livih, a partir do workflow "Agente F7" do n8n.
+"""Configuração inicial do agente da F7 na Livih, a partir do workflow "Agente F7" do n8n.
 
 Uso: python scripts/seed_f7.py <export do workflow Agente F7 (.json)>
 Grava/atualiza o agente do canal da F7 (sessão WAHA "f7") e a base de conhecimento. O agente
@@ -18,7 +18,7 @@ prompt = nos["AI Agent"]["parameters"]["options"]["systemMessage"].lstrip("=")
 base = nos["base_conhecimento_f7"]["parameters"]["jsCode"].strip()
 base = base[base.index("`") + 1:base.rindex("`")]
 
-# No Livih a base vem injetada no fim do prompt, não por ferramenta.
+# Na Livih a base vem injetada no fim do prompt, não por ferramenta.
 trocas = {
     "consulte obrigatoriamente a ferramenta:\n\n*base_conhecimento_f7*":
         "use somente a seção BASE DE CONHECIMENTO, no fim destas instruções.",

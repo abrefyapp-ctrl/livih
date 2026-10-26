@@ -37,14 +37,14 @@ export function CredenciamentoSefaz({ uf }: { uf?: string | null }) {
   return (
     <div className="space-y-2 text-pequeno text-texto-2">
       <p>
-        A SEFAZ só aceita notas emitidas por um sistema que a própria empresa autorizou. As notas do Livih são geradas pela{' '}
+        A SEFAZ só aceita notas emitidas por um sistema que a própria empresa autorizou. As notas da Livih são geradas pela{' '}
         <span className="font-medium text-texto">{FOCUS_RESPONSAVEL_TECNICO.razao}</span>, nossa parceira de emissão, e é ela que
         precisa ser autorizada. É uma vez só por CNPJ, leva poucos minutos e costuma ser feito pelo contador.
       </p>
       {outroEstado ? (
         <p>
           No portal da SEFAZ do seu estado, autorize a Focus NFe (CNPJ {cnpjFocus}) como sistema emissor da sua empresa e avise
-          o suporte do Livih. Se não souber onde fica, mande esta mensagem ao contador.
+          o suporte da Livih. Se não souber onde fica, mande esta mensagem ao contador.
         </p>
       ) : (
         <>
@@ -70,8 +70,8 @@ export function CredenciamentoSefaz({ uf }: { uf?: string | null }) {
             <Passo titulo="Guarde o comprovante.">
               Quando aparecer “Solicitação concluída com êxito”, clique em Visualizar Documento e salve o arquivo.
             </Passo>
-            <Passo titulo="Avise o Livih.">
-              Mande o comprovante ao suporte do Livih. Nós pedimos à Focus NFe o aceite da vinculação, que ela faz no portal da
+            <Passo titulo="Avise a Livih.">
+              Mande o comprovante ao suporte da Livih. Nós pedimos à Focus NFe o aceite da vinculação, que ela faz no portal da
               SEFAZ-PR.
             </Passo>
             <Passo titulo="Emita de novo.">
@@ -81,7 +81,7 @@ export function CredenciamentoSefaz({ uf }: { uf?: string | null }) {
           <p className="text-legenda text-texto-3">
             Vale para as notas de teste e as de verdade. Se a empresa já autorizou outro sistema antes, não precisa desfazer.
           </p>
-          {!uf && <p>Em outro estado, faça o equivalente no portal da SEFAZ do estado e avise o suporte do Livih.</p>}
+          {!uf && <p>Em outro estado, faça o equivalente no portal da SEFAZ do estado e avise o suporte da Livih.</p>}
         </>
       )}
     </div>

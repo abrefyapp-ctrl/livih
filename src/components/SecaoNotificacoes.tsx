@@ -91,16 +91,16 @@ export function SecaoNotificacoes() {
           </div>
         ) : estado === 'instalar_ios' ? (
           <p className="text-pequeno text-texto-2">
-            No iPhone, as notificações só funcionam com o Livih instalado na tela inicial. Use o botão <strong>Instalar app</strong> no
-            topo, abra o Livih pelo ícone e ative aqui.
+            No iPhone, as notificações só funcionam com a Livih instalada na tela inicial. Use o botão <strong>Instalar app</strong> no
+            topo, abra a Livih pelo ícone e ative aqui.
           </p>
         ) : estado === 'bloqueadas' ? (
           <p className="text-pequeno text-texto-2">
-            As notificações estão bloqueadas para o Livih neste navegador. Libere nas permissões do site (o ícone ao lado do endereço) ou,
+            As notificações estão bloqueadas para a Livih neste navegador. Libere nas permissões do site (o ícone ao lado do endereço) ou,
             no celular, nas configurações de notificação do aparelho, e recarregue a página.
           </p>
         ) : estado === 'sem_service_worker' ? (
-          <p className="text-pequeno text-texto-2">As notificações funcionam só na versão publicada do Livih.</p>
+          <p className="text-pequeno text-texto-2">As notificações funcionam só na versão publicada da Livih.</p>
         ) : (
           <p className="text-pequeno text-texto-2">Este navegador não aceita notificações. Use o Chrome, o Edge ou o Safari atualizados.</p>
         )}

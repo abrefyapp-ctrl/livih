@@ -195,7 +195,7 @@ export async function iniciarConversa(canalId: string, telefone: string, nome: s
           : m.includes('suspensa')
             ? 'Esta empresa está suspensa.'
             : m.includes('Failed to fetch') || m.includes('NetworkError')
-              ? 'A conexão com o Livih falhou e nada foi enviado. Confira a internet e tente de novo.'
+              ? 'A conexão com a Livih falhou e nada foi enviado. Confira a internet e tente de novo.'
               : m.includes('JWT')
                 ? 'Sua sessão expirou. Recarregue a página e tente de novo.'
                 : `Não foi possível iniciar a conversa (${m}).`,

@@ -365,7 +365,7 @@ function Convite({
           <LinkConvite link={resultado.link} nome={nome || email} nomeOrg={nomeOrg} />
         ) : (
           <div className="space-y-3">
-            <p>{email} já tinha conta no Livih e agora está na equipe.</p>
+            <p>{email} já tinha conta na Livih e agora está na equipe.</p>
             {resultado.aviso ? <Aviso tom="atencao">{resultado.aviso}</Aviso> : <p>Entra com a senha que já usa.</p>}
           </div>
         )}

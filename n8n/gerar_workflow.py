@@ -1,4 +1,4 @@
-"""Gera n8n/livih-agente.json (workflow do agente do Livih) e n8n/livih-simulador.json (simulador de conversa).
+"""Gera n8n/livih-agente.json (workflow do agente da Livih) e n8n/livih-simulador.json (simulador de conversa).
 
 O JSON é gerado daqui para que o código dos nós fique legível e versionado.
 Uso (na raiz do repo): python n8n/gerar_workflow.py
@@ -7,7 +7,7 @@ import copy
 import json
 import uuid
 
-# Chamada às funções do Supabase do Livih (só service_role). Variáveis na VPS: LIVIH_SUPABASE_URL,
+# Chamada às funções do Supabase da Livih (só service_role). Variáveis na VPS: LIVIH_SUPABASE_URL,
 # LIVIH_SUPABASE_KEY, LIVIH_AGENTE_TOKEN (repassadas ao n8n e ao worker, e na N8N_RUNNERS_ENV_ALLOWLIST).
 RPC = """const rpc = async (fn, body) => {
   const r = await this.helpers.httpRequest({
@@ -24,7 +24,7 @@ RPC = """const rpc = async (fn, body) => {
 };
 """
 
-VALIDAR = """// Só o Livih (Edge Function waha-webhook) chama este webhook: confere o token compartilhado.
+VALIDAR = """// Só a Livih (Edge Function waha-webhook) chama este webhook: confere o token compartilhado.
 const req = $input.first().json;
 if ((req.headers?.['x-livih-token'] || '') !== $env.LIVIH_AGENTE_TOKEN) return [];
 const { conversa_id, mensagem_id } = req.body || {};
@@ -621,7 +621,7 @@ def trocar(texto, antigo, novo):
     return texto.replace(antigo, novo)
 
 
-VALIDAR_SIM = """// Só o Livih (Edge Function agente-simular) chama este webhook.
+VALIDAR_SIM = """// Só a Livih (Edge Function agente-simular) chama este webhook.
 const req = $input.first().json;
 if ((req.headers?.['x-livih-token'] || '') !== $env.LIVIH_AGENTE_TOKEN) throw new Error('não autorizado');
 const { org_id, mensagens, prompt, casos, base } = req.body || {};

@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
   if (!chat || chat.endsWith("@g.us") || chat.endsWith("@broadcast") || chat.endsWith("@newsletter")) {
     return resposta(200, { ignorado: "grupo/status/canal" });
   }
-  if (p.fromMe && p.source === "api") return resposta(200, { ignorado: "enviada pelo Livih" });
+  if (p.fromMe && p.source === "api") return resposta(200, { ignorado: "enviada pela Livih" });
 
   const tipo = tipoDaMensagem(p);
   if (!tipo || !p.id) return resposta(200, { ignorado: "sem conteúdo" });

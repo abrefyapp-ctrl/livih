@@ -52,7 +52,7 @@ export function Login() {
       <TelaAcesso titulo="Recuperar acesso" subtitulo="Enviamos um link para você criar uma senha nova.">
         {linkEnviado ? (
           <Aviso>
-            Se <strong>{email}</strong> tiver acesso ao Livih, o link chega em alguns minutos. Confira também o spam.
+            Se <strong>{email}</strong> tiver acesso à Livih, o link chega em alguns minutos. Confira também o spam.
           </Aviso>
         ) : (
           <form onSubmit={recuperar} className="space-y-4">

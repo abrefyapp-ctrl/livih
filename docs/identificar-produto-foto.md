@@ -1,7 +1,7 @@
 # Identificar o produto pela foto do cliente
 
 Pedido de 22/10. O cliente manda a foto ("quero outro igual a este") e a descrição automática dizia só "grampeador
-preto". Com as fotos dos produtos na biblioteca, o Livih acha qual produto do catálogo é.
+preto". Com as fotos dos produtos na biblioteca, a Livih acha qual produto do catálogo é.
 
 Migration `20261022120000_identificar_produto_foto.sql`; código em `supabase/functions/_shared/fotos.ts`,
 `supabase/functions/indexar-fotos` e `src/services/fotosProdutos.ts`.

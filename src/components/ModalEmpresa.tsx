@@ -64,7 +64,7 @@ export function ModalEmpresa({
         ) : (
           <div className="space-y-3">
             <p>
-              {email} já tinha conta no Livih e agora é dono(a) da {nomeEmpresa}.
+              {email} já tinha conta na Livih e agora é dono(a) da {nomeEmpresa}.
             </p>
             {resultado.aviso ? <Aviso tom="atencao">{resultado.aviso}</Aviso> : <p>Entra com a senha que já usa.</p>}
           </div>

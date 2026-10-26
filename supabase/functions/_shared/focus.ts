@@ -94,7 +94,7 @@ export async function aplicarRetorno(admin: SupabaseClient, nota: Nota, r: Retor
     ]);
     const { error } = await admin.from("notas_fiscais").update({
       status: "autorizada", numero: r.numero ? Number(r.numero) : null, serie: r.serie ? Number(r.serie) : null, chave,
-      xml_path: xml, danfe_path: danfe, autorizada_em: agora, mensagem: xml && danfe ? null : "Autorizada; o XML ou o DANFE ainda não foi copiado para o Livih.",
+      xml_path: xml, danfe_path: danfe, autorizada_em: agora, mensagem: xml && danfe ? null : "Autorizada; o XML ou o DANFE ainda não foi copiado para a Livih.",
     }).eq("id", nota.id);
     if (error) console.error("nota autorizada", error.message);
     return;
@@ -108,7 +108,7 @@ export async function aplicarRetorno(admin: SupabaseClient, nota: Nota, r: Retor
     const danfe = atual.danfe_path ?? await guardar(admin, nota, token, r.caminho_danfe ?? r.url_danfse, `${base}.pdf`, "application/pdf");
     await admin.from("notas_fiscais").update({
       xml_path: xml, danfe_path: danfe, consultas: nota.consultas + 1,
-      mensagem: xml && danfe ? null : "Autorizada; o XML ou o DANFE ainda não foi copiado para o Livih.",
+      mensagem: xml && danfe ? null : "Autorizada; o XML ou o DANFE ainda não foi copiado para a Livih.",
     }).eq("id", nota.id);
     return;
   }

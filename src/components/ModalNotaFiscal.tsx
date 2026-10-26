@@ -265,8 +265,8 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
             )}
           </div>
           <p className="text-legenda text-texto-3">
-            O arquivo e a senha vão direto para a Focus NFe, que assina as notas. O Livih não guarda nenhum dos dois. Se o CNPJ já
-            foi cadastrado com o certificado no painel da Focus, salve sem escolher o arquivo: o Livih usa o cadastro de lá.
+            O arquivo e a senha vão direto para a Focus NFe, que assina as notas. A Livih não guarda nenhum dos dois. Se o CNPJ já
+            foi cadastrado com o certificado no painel da Focus, salve sem escolher o arquivo: a Livih usa o cadastro de lá.
           </p>
         </fieldset>
 
@@ -278,7 +278,7 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
           </label>
           {e.nfse_provedor && (
             <p className={`text-legenda ${e.nfse_provedor === 'Nacional' ? 'text-texto-3' : 'text-atencao'}`}>
-              {e.cidade}: NFS-e pelo padrão {e.nfse_provedor === 'Nacional' ? 'nacional' : `da prefeitura (${e.nfse_provedor}), que o Livih ainda não emite`}
+              {e.cidade}: NFS-e pelo padrão {e.nfse_provedor === 'Nacional' ? 'nacional' : `da prefeitura (${e.nfse_provedor}), que a Livih ainda não emite`}
               {e.nfse_habilitada_focus ? ' · ativa na Focus' : ''}.
             </p>
           )}
@@ -358,7 +358,7 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
             value={c.limite}
             onChange={(ev) => muda({ limite: ev.target.value })}
             placeholder={limitePadrao(regime) ? moeda(limitePadrao(regime)!) : 'R$'}
-            ajuda={`Para o Livih sugerir qual CNPJ usar. Vazio: ${limitePadrao(regime) ? `${moeda(limitePadrao(regime)!)} (teto do regime)` : 'sem sugestão'}.`}
+            ajuda={`Para a Livih sugerir qual CNPJ usar. Vazio: ${limitePadrao(regime) ? `${moeda(limitePadrao(regime)!)} (teto do regime)` : 'sem sugestão'}.`}
             className="sm:max-w-xs"
           />
           <label className="flex items-center gap-2 text-pequeno text-texto-2">

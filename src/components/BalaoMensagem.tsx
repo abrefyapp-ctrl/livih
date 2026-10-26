@@ -24,7 +24,7 @@ const ENTREGA: Record<Mensagem['status_entrega'], { icone: NomeIcone; rotulo: st
 }
 
 /**
- * Arquivo guardado no Livih (enviado pela equipe ou recebido do cliente): imagem, figurinha, vídeo e áudio aparecem;
+ * Arquivo guardado na Livih (enviado pela equipe ou recebido do cliente): imagem, figurinha, vídeo e áudio aparecem;
  * o resto vira link de baixar.
  */
 function Arquivo({ m, saida }: { m: Mensagem; saida: boolean }) {
@@ -150,7 +150,7 @@ function Conteudo({ m }: { m: Mensagem }) {
       {['imagem', 'video', 'documento', 'figurinha'].includes(m.tipo) && (
         <p className="text-legenda italic opacity-80">
           {m.descricao ??
-            'Este arquivo não ficou guardado no Livih (chegou antes de 16/10 ou não deu para baixar). Abra pelo WhatsApp do celular.'}
+            'Este arquivo não ficou guardado na Livih (chegou antes de 16/10 ou não deu para baixar). Abra pelo WhatsApp do celular.'}
         </p>
       )}
     </div>

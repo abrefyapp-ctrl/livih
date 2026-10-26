@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
     presenca_comprador: [1, 2, 3, 4, 9].includes(Number(p.presenca)) ? Number(p.presenca) : 9,
     modalidade_frete: Number(ped.frete) > 0 ? 0 : 9,
     cnpj_emitente: emi!.cnpj,
-    // A do cadastro do Livih (a API de empresas da Focus só guarda IE numérica).
+    // A do cadastro da Livih (a API de empresas da Focus só guarda IE numérica).
     inscricao_estadual_emitente: so(emi!.inscricao_estadual) || "ISENTO",
     nome_destinatario: ambiente === "homologacao" ? HOMOLOGACAO : (cli!.razao_social || cli!.nome).slice(0, 60),
     ...(cli!.documento!.length === 14 ? { cnpj_destinatario: cli!.documento } : { cpf_destinatario: cli!.documento }),
@@ -230,7 +230,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     // Sem resposta: a nota fica processando e a conferência do cron descobre se a Focus recebeu.
     console.error("emitir", ref, String(e).slice(0, 200));
-    return json(202, { nota, aviso: "A Focus demorou a responder. O Livih confere sozinho em instantes." });
+    return json(202, { nota, aviso: "A Focus demorou a responder. A Livih confere sozinha em instantes." });
   }
   const resposta = await r.json().catch(() => null);
   if (r.status === 201 || r.status === 200) await aplicarRetorno(admin, nota as Nota, resposta ?? {});

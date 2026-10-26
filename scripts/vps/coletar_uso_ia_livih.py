@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Coletor do consumo de IA do agente do Livih (n8n) para a tabela uso_ia do Supabase do Livih.
+"""Coletor do consumo de IA do agente da Livih (n8n) para a tabela uso_ia do Supabase da Livih.
 
 O agente roda no n8n (workflow LvhAgenteLivih01). Cada execução guarda, nos dados da execução, os tokens de cada
 chamada ao modelo (promptTokens/completionTokens) e a referência enviada pelo waha-webhook (org_id, conversa_id,

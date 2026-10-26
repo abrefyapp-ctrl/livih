@@ -632,7 +632,7 @@ export function ModalOrdem({ orgId, cfg, ordem, aoFechar, aoSalvar }: {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label htmlFor="os-busca" className="block text-pequeno font-medium text-texto-2">
-                  Contato do Livih
+                  Contato da Livih
                 </label>
                 <input id="os-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, empresa ou telefone" className={CLASSE_CAMPO} />
                 <select
@@ -661,7 +661,7 @@ export function ModalOrdem({ orgId, cfg, ordem, aoFechar, aoSalvar }: {
                     Novo cliente
                   </Botao>
                 </div>
-                <p className="text-legenda text-texto-3">Para empresa que não conversa pelo WhatsApp do Livih.</p>
+                <p className="text-legenda text-texto-3">Para empresa que não conversa pelo WhatsApp da Livih.</p>
                 {ordem?.cliente_nome && !ordem.cliente_id && !ordem.contato_id && (
                   <p className="text-legenda text-texto-3">Hoje: {ordem.cliente_nome} (sem cadastro)</p>
                 )}

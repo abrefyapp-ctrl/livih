@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
   const { data: nota } = await admin.from("notas_fiscais").select("id, org_id, emissora_id, ref, ambiente, status, consultas, modelo")
     .eq("ref", corpo.ref).maybeSingle<Nota>();
-  // Nota que não é do Livih (outro sistema no mesmo CNPJ): só confirma o recebimento.
+  // Nota que não é da Livih (outro sistema no mesmo CNPJ): só confirma o recebimento.
   if (!nota) return Response.json({ ok: true, ignorado: "ref desconhecida" });
   emSegundoPlano(aplicarRetorno(admin, nota, corpo as Parameters<typeof aplicarRetorno>[2])
     .catch((e) => console.error("retorno nota", nota.ref, String(e))));

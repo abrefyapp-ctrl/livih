@@ -212,7 +212,7 @@ begin
   select 'resposta pelo celular para o bot', estado = 'humano' and motivo_humano = 'respondida pelo celular'
     from public.conversas where id = v_conv;
   r := public.registrar_saida_celular(v_canal, 'WAMID-OUT-1', '5541988887777', null, 'texto', 'Olá! Me conta mais.', '{}');
-  insert into resultado (teste, ok) values ('eco do que o Livih enviou é ignorado', (r ->> 'duplicada')::boolean);
+  insert into resultado (teste, ok) values ('eco do que a Livih enviou é ignorado', (r ->> 'duplicada')::boolean);
   insert into resultado (teste, ok)
   select 'segredo interno confere só o certo', public.verificar_segredo_interno(
       (select decrypted_secret from vault.decrypted_secrets where name = 'livih_interno'))
@@ -1287,7 +1287,7 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 insert into resultado (teste, ok) select 'erp: módulo desligado esconde pedidos',
   not exists (select 1 from public.pedidos where org_id = (select id from public.organizacoes where slug = 'teste-f7'));
 
--- Prospecção: iniciar conversa pelo Livih (atendente da F7, número da empresa)
+-- Prospecção: iniciar conversa pela Livih (atendente da F7, número da empresa)
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);

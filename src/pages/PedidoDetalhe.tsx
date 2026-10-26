@@ -155,7 +155,7 @@ export function PedidoDetalhe() {
     if (envio === undefined) return setErro('Procurando a conversa do cliente. Tente de novo em instantes.')
     if (!envio)
       return setErro(
-        `${nomeDoContato(pedido.contato)} ainda não tem conversa no Livih. Comece uma em Conversas → Nova conversa e envie o PDF de lá, ou baixe e mande por outro canal.`,
+        `${nomeDoContato(pedido.contato)} ainda não tem conversa na Livih. Comece uma em Conversas → Nova conversa e envie o PDF de lá, ou baixe e mande por outro canal.`,
       )
     if (envio.janelaFechada)
       return setErro(

@@ -181,7 +181,7 @@ export async function emitirNota(dados: PedidoEmissao): Promise<NotaFiscal> {
   return (data as { nota: NotaFiscal }).nota
 }
 
-/** Link temporário (1 h) para baixar o XML ou o DANFE guardados no Livih. */
+/** Link temporário (1 h) para baixar o XML ou o DANFE guardados na Livih. */
 export async function urlArquivoNota(path: string): Promise<string> {
   const { data, error } = await supabase.storage.from('notas-fiscais').createSignedUrl(path, 3600, { download: true })
   if (error) throw new Error('Não foi possível abrir o arquivo da nota.')
@@ -234,7 +234,7 @@ export async function emitirNotaServico(dados: ServicoEmissao): Promise<NotaFisc
  * Credenciamento do emissor na SEFAZ (docs/nfe.md). O Paraná (e outros estados que validam o responsável técnico)
  * só autoriza NF-e de sistema que o próprio contribuinte cadastrou no portal: sem isso, rejeição 974 ("CNPJ do
  * responsável técnico diverge do cadastrado") ou 203 (emissor não habilitado). O responsável técnico das notas
- * é a Focus NFe, que emite para o Livih. Vale uma vez por CNPJ, para homologação e produção.
+ * é a Focus NFe, que emite para a Livih. Vale uma vez por CNPJ, para homologação e produção.
  */
 export const FOCUS_RESPONSAVEL_TECNICO = { cnpj: '07.504.505/0001-32', razao: 'Focus NFe' }
 

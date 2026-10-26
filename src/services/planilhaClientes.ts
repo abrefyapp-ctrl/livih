@@ -63,7 +63,7 @@ const ORDEM_MODELO: Coluna[] = [
 
 export type LeituraClientes = {
   linhas: LinhaCliente[]
-  /** Colunas reconhecidas (rótulo do Livih → cabeçalho da planilha). */
+  /** Colunas reconhecidas (rótulo da Livih → cabeçalho da planilha). */
   reconhecidas: { coluna: string; cabecalho: string }[]
   ignoradas: string[]
   /** Linhas sem nome nem documento (não vão para o banco). */

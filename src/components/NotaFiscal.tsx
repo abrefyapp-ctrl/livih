@@ -377,7 +377,7 @@ function ModalEmitirNota({ orgId, alvo, aoFechar, aoEmitir }: { orgId: string; a
             <Campo
               rotulo="Descrição do serviço"
               id="nota-descricao"
-              ajuda={alvo.tipo === 'cliente' ? 'Sai na nota como o serviço prestado.' : 'Vazio: o Livih monta pelos itens. Até 1.000 caracteres.'}
+              ajuda={alvo.tipo === 'cliente' ? 'Sai na nota como o serviço prestado.' : 'Vazio: a Livih monta pelos itens. Até 1.000 caracteres.'}
             >
               <textarea id="nota-descricao" rows={3} maxLength={1000} value={descricao} onChange={(e) => setDescricao(e.target.value)}
                 className="block w-full rounded-md border border-borda bg-superficie px-3 py-2 text-pequeno focus:border-primaria focus:outline-none" />

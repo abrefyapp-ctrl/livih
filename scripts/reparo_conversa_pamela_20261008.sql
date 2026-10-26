@@ -4,7 +4,7 @@
 -- O que faz:
 --   1. O contato errado (telefone = o da Pâmela, LID = o do 1º prospect) passa a ter o telefone do 1º prospect,
 --      dono daquele LID. A conversa 26cedff7 vira a conversa com ele (onde já estão a prospecção dele e o
---      teste enviado pelo Livih, que de fato chegou para ele).
+--      teste enviado pela Livih, que de fato chegou para ele).
 --   2. Cada outra mensagem dessa conversa vai para a conversa do destinatário real, lido do evento bruto do WAHA
 --      (chat = LID do destinatário, RecipientAlt = telefone). Contato e conversa são achados ou criados pela mesma
 --      função do sistema (contato_por_whatsapp).

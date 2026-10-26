@@ -1,6 +1,6 @@
 # Nota fiscal eletrônica (NF-e) pela Focus NFe (proposto em 25/10)
 
-Roadmap, item 5 ("ERP: cobrança e nota fiscal"). O pedido confirmado vira NF-e emitida pelo Livih, com o CNPJ escolhido
+Roadmap, item 5 ("ERP: cobrança e nota fiscal"). O pedido confirmado vira NF-e emitida pela Livih, com o CNPJ escolhido
 entre as emissoras da empresa. A emissão é pela **Focus NFe**. O cadastro de clientes ([clientes.md](clientes.md)) já
 deixou pronto o que a nota precisa do comprador: razão social, CNPJ/CPF, IE e endereço.
 
@@ -8,32 +8,32 @@ deixou pronto o que a nota precisa do comprador: razão social, CNPJ/CPF, IE e e
 
 | Pergunta | Decisão |
 |---|---|
-| Emissor | Focus NFe, integrada ao Livih |
+| Emissor | Focus NFe, integrada à Livih |
 | Conta na Focus | **Uma conta da Livih** (revenda): cada CNPJ do cliente é cadastrado pela API; o cliente não abre conta na Focus. A Livih paga a Focus e repassa no plano |
-| Vários CNPJs | Na emissão, a pessoa escolhe o CNPJ (vem o do pedido). O Livih **sugere ao admin**, pelo faturamento, qual CNPJ usar; o admin define o **CNPJ do balcão** |
+| Vários CNPJs | Na emissão, a pessoa escolhe o CNPJ (vem o do pedido). A Livih **sugere ao admin**, pelo faturamento, qual CNPJ usar; o admin define o **CNPJ do balcão** |
 | Balcão | **Só NF-e** (sem NFC-e), inclusive para consumidor final |
 | De onde sai a nota | De **qualquer pedido**: do balcão, do vendedor online, do montado pelo agente ou criado pelo admin. O balcão só muda o CNPJ que vem escolhido (o "CNPJ do balcão") |
 | Quem emite | Dono, admin e quem tiver a permissão **"Emite nota fiscal"** (o admin liga para os vendedores, online ou de balcão, e para o faturamento). O vendedor emite a nota dos pedidos que ele vê (a carteira dele, ou todos com "Vê todos os clientes"). Cancelar: só dono e admin |
-| Certificado | Obrigatório (A1, arquivo .pfx), enviado pela tela do Livih |
+| Certificado | Obrigatório (A1, arquivo .pfx), enviado pela tela da Livih |
 | Regime tributário e padrões fiscais | Painel de configuração por CNPJ, em **Configurações → Empresa** |
 | NFS-e (serviço, para as OS) | Depois, numa etapa própria (cada prefeitura tem regras) |
 
 ## Como funciona
 
 1. **Configuração (por CNPJ):** em Configurações → Empresa, cada emissora ganha a seção **Nota fiscal**. O dono ou o
-   admin informa regime, certificado e os padrões fiscais. O Livih cadastra o CNPJ na Focus e mostra a situação
+   admin informa regime, certificado e os padrões fiscais. A Livih cadastra o CNPJ na Focus e mostra a situação
    ("pronta para emitir em teste", "em produção", "certificado vence em 12 dias").
 2. **Emissão:** em qualquer pedido confirmado (balcão, vendedor online, agente ou admin), **Emitir NF-e**. Vem o CNPJ
-   do pedido; dá para trocar. Antes de enviar, o Livih
+   do pedido; dá para trocar. Antes de enviar, a Livih
    confere o que falta (cliente sem CNPJ/CPF ou endereço, produto sem NCM, CNPJ sem certificado) e diz onde arrumar.
-3. **Retorno:** a Focus autoriza na SEFAZ em segundos a minutos. O Livih recebe o resultado (gatilho da Focus, com
+3. **Retorno:** a Focus autoriza na SEFAZ em segundos a minutos. A Livih recebe o resultado (gatilho da Focus, com
    uma conferência periódica de reserva), guarda o PDF (DANFE) e o XML e mostra no pedido.
 4. **Depois:** baixar o DANFE e o XML, **enviar o DANFE pelo WhatsApp** na conversa do cliente (como o orçamento),
    e **cancelar** em até 24 horas, com justificativa (dono e admin).
 
 ### Sugestão de CNPJ pelo faturamento
 
-O Livih soma as notas autorizadas dos últimos 12 meses por CNPJ e compara com o **limite** de cada um:
+A Livih soma as notas autorizadas dos últimos 12 meses por CNPJ e compara com o **limite** de cada um:
 - informado na configuração;
 - ou o padrão do regime: Simples Nacional R$ 4,8 milhões por ano, MEI R$ 81 mil.
 
@@ -58,7 +58,7 @@ escolhe, e o padrão do balcão é o admin que define.
 | `padrao_balcao` | O CNPJ do balcão (um por empresa) |
 | Padrões fiscais | CFOP dentro e fora do estado, situação do ICMS (CSOSN no Simples, CST no regime normal), origem da mercadoria, PIS e COFINS |
 
-O certificado e a senha vão direto para a Focus e não ficam no Livih. O token que a Focus devolve para cada CNPJ fica
+O certificado e a senha vão direto para a Focus e não ficam na Livih. O token que a Focus devolve para cada CNPJ fica
 no Vault do Supabase, fora das tabelas que o app lê.
 
 **Produto:** além do NCM, que já existe, entram CEST (quando houver) e origem. CFOP e ICMS vêm dos padrões do CNPJ,
@@ -76,7 +76,7 @@ Uma nota por pedido; a rejeitada pode ser corrigida e reenviada. A nota autoriza
 vira um evento.
 
 **Onde a nota fica (decisão de 25/10):**
-- Cópia própria no Livih: o XML e o DANFE (PDF) são baixados da Focus quando a nota é autorizada e guardados no
+- Cópia própria na Livih: o XML e o DANFE (PDF) são baixados da Focus quando a nota é autorizada e guardados no
   bucket privado `notas-fiscais` (`org/emissora/AAAA-MM/chave`), com o XML do cancelamento junto quando houver.
 - A empresa precisa guardar o XML por pelo menos 5 anos. Com a cópia, ela não depende do prazo de guarda da Focus
   (conferir no contrato) e não perde nada se trocar de emissor.
@@ -139,7 +139,7 @@ Primeira NF-e da FIXOTEC (JoGrampo, Curitiba), em 26/10, em homologação: rejei
 diverge do cadastrado".
 
 - **Causa:** o Paraná só autoriza NF-e de sistema emissor que o próprio contribuinte cadastrou no portal da Receita/PR.
-  O responsável técnico das notas do Livih é a **Focus NFe Ltda, CNPJ 07.504.505/0001-32** (confirmado na Receita).
+  O responsável técnico das notas da Livih é a **Focus NFe Ltda, CNPJ 07.504.505/0001-32** (confirmado na Receita).
   É a mesma exigência de qualquer emissor de fora do estado: a Omie, por exemplo, pede o mesmo cadastro com o CNPJ
   dela.
 - **O cliente faz uma vez por CNPJ** (vale para homologação e produção), normalmente o contador:
@@ -148,7 +148,7 @@ diverge do cadastrado".
      **ACRAS, código 54078**; a confirmar com a Focus;
   3. o CAD/ICMS da empresa, modelo 55, e concluir.
 
-  Depois a Focus **aceita a vinculação**: o cliente avisa o suporte do Livih, e nós pedimos o aceite à Focus. A
+  Depois a Focus **aceita a vinculação**: o cliente avisa o suporte da Livih, e nós pedimos o aceite à Focus. A
   documentação da Focus confirma as duas etapas: "regiões como o Estado do Paraná (PR) exigem o registro e aceite de
   vinculação da Software House (API Focus NF-e) no portal da Receita Estadual".
 - **Na tela** (`CredenciamentoSefaz`):

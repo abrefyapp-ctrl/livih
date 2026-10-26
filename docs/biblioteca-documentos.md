@@ -42,7 +42,7 @@ Serve para qualquer cliente: não depende do módulo de pedidos. A ligação com
 - Toda a equipe da empresa vê e envia.
 - Dono e admin cadastram, editam e desativam.
 - A plataforma também, no modo suporte.
-- Isolamento por empresa, como no resto do Livih, com testes no `teste_fase1.sql`.
+- Isolamento por empresa, como no resto da Livih, com testes no `teste_fase1.sql`.
 
 ## Telas
 

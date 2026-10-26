@@ -50,7 +50,7 @@ financeiro, dono). Um cliente tem vários contatos; um contato é de no máximo 
   sugerido. Na lista de contatos, com cliente ligado, aparece o nome do cliente.
 
 - `ordens_servico.cliente_id`: de quem é a OS. Escolher o contato preenche o cliente dele; dá para escolher só o
-  cliente (empresa sem WhatsApp no Livih). `cliente_nome` continua como o nome mostrado e passa a vir do cliente.
+  cliente (empresa sem WhatsApp na Livih). `cliente_nome` continua como o nome mostrado e passa a vir do cliente.
 - `os_prazos_cliente` passa a ser por **cliente** (hoje é por contato): o prazo de pagamento é da empresa que paga.
 
 **Permissão "Vê todos os clientes":** coluna `membros_org.ve_todos_clientes` (boolean, padrão false). Só dono e
@@ -91,7 +91,7 @@ admin mudam (pela função que já altera papel e status do membro, com auditori
    - sem cliente ligado: **Ligar a cliente** (busca) ou **Criar cliente**, já com o texto de `empresa` e o e-mail do contato.
 4. **Formulário do cliente** (modal, usado na lista, no perfil e a partir do contato):
    - escolha de PJ ou PF;
-   - **busca pelo CNPJ:** digitou um CNPJ válido, o Livih consulta a BrasilAPI e preenche razão social, nome fantasia, endereço e CEP, que você confere antes de salvar;
+   - **busca pelo CNPJ:** digitou um CNPJ válido, a Livih consulta a BrasilAPI e preenche razão social, nome fantasia, endereço e CEP, que você confere antes de salvar;
    - **busca pelo CEP** (BrasilAPI) para PF, ou quando o endereço não veio.
 5. **Pedido:**
    - o campo **Cliente** aparece no detalhe do pedido;

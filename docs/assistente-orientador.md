@@ -64,7 +64,7 @@ Fica em Configurações → Agente → **Assistente**.
   base até ~5 mil.
 - **Nada de catálogo ou preços na base:** isso vai para Produtos, pelo importador.
 - **Arquivos:** vão para a biblioteca de Documentos.
-- **Não repetir o que o Livih já põe sozinho:** ferramentas, regra de envio de arquivo, horário, saudação e dados
+- **Não repetir o que a Livih já põe sozinho:** ferramentas, regra de envio de arquivo, horário, saudação e dados
   do contato.
 - **Manter o jeito de falar da empresa** e não inventar política: o que não souber, pergunta ao dono.
 

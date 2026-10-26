@@ -138,7 +138,7 @@ function Etapas({ orgId, cfg, itensPorEtapa, aoSalvar }: { orgId: string; cfg: C
   return (
     <Bloco
       titulo="Etapas"
-      descricao="Os nomes do seu processo, na ordem do quadro. O marco diz ao Livih o que a etapa significa (para o painel e a previsão); o prazo padrão é o tempo normal da etapa até haver histórico."
+      descricao="Os nomes do seu processo, na ordem do quadro. O marco diz à Livih o que a etapa significa (para o painel e a previsão); o prazo padrão é o tempo normal da etapa até haver histórico."
     >
       <form onSubmit={salvar} className="space-y-3">
         <div className="hidden grid-cols-[1.5rem_1fr_11rem_6rem_6.5rem] gap-2 text-legenda text-texto-3 sm:grid">

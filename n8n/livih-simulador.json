@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Só o Livih (Edge Function agente-simular) chama este webhook.\nconst req = $input.first().json;\nif ((req.headers?.['x-livih-token'] || '') !== $env.LIVIH_AGENTE_TOKEN) throw new Error('não autorizado');\nconst { org_id, mensagens, prompt, casos, base } = req.body || {};\nif (!org_id || !Array.isArray(mensagens) || !mensagens.length) throw new Error('pedido inválido');\nreturn [{ json: { org_id, mensagens, prompt: prompt ?? null, casos: casos ?? null, base: base ?? null } }];\n"
+        "jsCode": "// Só a Livih (Edge Function agente-simular) chama este webhook.\nconst req = $input.first().json;\nif ((req.headers?.['x-livih-token'] || '') !== $env.LIVIH_AGENTE_TOKEN) throw new Error('não autorizado');\nconst { org_id, mensagens, prompt, casos, base } = req.body || {};\nif (!org_id || !Array.isArray(mensagens) || !mensagens.length) throw new Error('pedido inválido');\nreturn [{ json: { org_id, mensagens, prompt: prompt ?? null, casos: casos ?? null, base: base ?? null } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
