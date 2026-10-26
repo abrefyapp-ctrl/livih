@@ -180,7 +180,8 @@ Deno.serve(async (req) => {
     ...(p.informacoes?.trim() ? { informacoes_complementares: p.informacoes.trim().slice(0, 2000) } : {}),
     // Finalidade (finNFSe, 0 = NFS-e regular): obrigatória no corpo da DPS no leiaute da reforma. O Ambiente Nacional
     // recusou a nota sem ela (E1235: "esperado finNFSe" depois de tpEmit; teste da F7, 25/10).
-    finalidade_emissao: 0,
+    // Como texto: com o número 0 (o valor padrão) a Focus deixava o campo fora do XML de homologação (mesmo E1235).
+    finalidade_emissao: "0",
     // Grupo IBS/CBS: só com o CST e a classificação configurados no CNPJ (consumidor final e destinatário vão nele).
     ...(emi!.ibs_cbs_cst && emi!.ibs_cbs_classificacao
       ? {
