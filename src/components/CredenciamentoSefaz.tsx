@@ -56,8 +56,8 @@ export function CredenciamentoSefaz({ uf }: { uf?: string | null }) {
         </>
       )}
       <p>
-        Depois, avise o suporte do Livih: o fornecedor do sistema confirma a autorização do lado dele. Com tudo liberado,
-        emita de novo.
+        Depois, avise o suporte do Livih: a Focus NFe precisa aceitar a vinculação do lado dela. Com o aceite, emita de
+        novo.
       </p>
     </div>
   )

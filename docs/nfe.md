@@ -148,7 +148,9 @@ diverge do cadastrado".
      **ACRAS, código 54078**; a confirmar com a Focus;
   3. o CAD/ICMS da empresa, modelo 55, e concluir.
 
-  Depois o fornecedor confirma a autorização: o cliente avisa o suporte do Livih, e nós pedimos à Focus.
+  Depois a Focus **aceita a vinculação**: o cliente avisa o suporte do Livih, e nós pedimos o aceite à Focus. A
+  documentação da Focus confirma as duas etapas: "regiões como o Estado do Paraná (PR) exigem o registro e aceite de
+  vinculação da Software House (API Focus NF-e) no portal da Receita Estadual".
 - **Na tela** (`CredenciamentoSefaz`):
   - CNPJ do Paraná: o aviso com o passo a passo aparece na configuração da nota;
   - nota recusada com 974 ou 203 (emissor não habilitado): o mesmo passo a passo aparece no lugar do texto da SEFAZ.
