@@ -56,6 +56,7 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
     ibsCst: e.ibs_cbs_cst ?? '',
     ibsClass: e.ibs_cbs_classificacao ?? '',
     ibsOp: e.nfse_codigo_indicador_operacao ?? '',
+    aliquotaSimples: e.aliquota_simples != null ? String(e.aliquota_simples).replace('.', ',') : '',
   })
   const [certificado, setCertificado] = useState<File | null>(null)
   const [senha, setSenha] = useState('')
@@ -67,6 +68,10 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
 
   const regime = c.regime ? Number(c.regime) : null
   const simples = regime === 1 || regime === 2 || regime === 4
+  // Alíquota efetiva do Simples (ME/EPP): vai na NFS-e como o total aproximado dos tributos (pTotTribSN).
+  const meEpp = regime === 1 || regime === 2
+  const aliquotaNum = c.aliquotaSimples.trim() ? Number(c.aliquotaSimples.replace(',', '.')) : null
+  const aliquotaRuim = aliquotaNum != null && !(aliquotaNum >= 0 && aliquotaNum < 100)
   const limiteNum = c.limite.trim() ? Number(c.limite.replace(/\./g, '').replace(',', '.')) : null
   const serieNum = Number(c.serie)
   const invalido =
@@ -84,6 +89,7 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
     (!!c.ibsCst && !/^\d{3}$/.test(c.ibsCst)) ||
     (!!c.ibsClass && !/^\d{6}$/.test(c.ibsClass)) ||
     (!!c.ibsOp && !/^\d{6}$/.test(c.ibsOp)) ||
+    aliquotaRuim ||
     (!!certificado && !senha)
   const dias = diasAte(e.certificado_validade)
 
@@ -126,6 +132,7 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
       ibs_cbs_cst: c.ibsCst || null,
       ibs_cbs_classificacao: c.ibsClass || null,
       nfse_codigo_indicador_operacao: c.ibsOp || null,
+      aliquota_simples: meEpp && aliquotaNum != null ? Math.round(aliquotaNum * 100) / 100 : null,
     }
     try {
       await salvarFiscal(e.id, campos)
@@ -278,6 +285,12 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
                   onChange={(ev) => muda({ tribMunicipal: ev.target.value.replace(/\D/g, '') })} />
                 <CampoTexto rotulo="Código NBS (opcional)" inputMode="numeric" maxLength={9} value={c.nbs}
                   onChange={(ev) => muda({ nbs: ev.target.value.replace(/\D/g, '') })} />
+                {meEpp && (
+                  <CampoTexto rotulo="Alíquota efetiva do Simples (%)" inputMode="decimal" maxLength={6} value={c.aliquotaSimples} placeholder="6,00"
+                    onChange={(ev) => muda({ aliquotaSimples: ev.target.value.replace(/[^\d,]/g, '') })}
+                    erro={aliquotaRuim ? 'Um número entre 0 e 99,99' : undefined}
+                    ajuda="A do último DAS (a contabilidade sabe). Vai na nota como o total aproximado dos tributos." />
+                )}
                 <Campo rotulo="Regime especial de tributação" id="nfse-regime-especial">
                   <select id="nfse-regime-especial" value={c.regimeEspecial} onChange={(ev) => muda({ regimeEspecial: ev.target.value })} className={CLASSE_CAMPO}>
                     {REGIMES_ESPECIAIS.map((r) => (

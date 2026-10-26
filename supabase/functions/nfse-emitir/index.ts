@@ -140,6 +140,10 @@ Deno.serve(async (req) => {
                 ["classificação tributária do IBS/CBS", emi.ibs_cbs_classificacao],
                 // Com IBS/CBS o Ambiente Nacional exige o NBS (E0322, teste da F7 em 25/10).
                 ["código NBS", emi.nfse_codigo_nbs]].filter(([, v]) => !v).map(([n]) => n);
+    // ME/EPP: o total aproximado dos tributos vai como a alíquota do Simples (E0712 sem ela, teste da F7 em 26/10).
+    if (opcaoSimples(emi.regime_tributario) === "3" && emi.aliquota_simples == null) {
+      faltando.push("Informe a alíquota efetiva do Simples Nacional na configuração da NFS-e do CNPJ (a do último DAS; a contabilidade sabe).");
+    }
     if (rt.length) faltando.push(`Informe os códigos da reforma tributária na configuração da NFS-e do CNPJ (a contabilidade sabe): ${rt.join(", ")}.`);
   }
   if (!cli) faltando.push("Ligue a nota a um cliente do cadastro (com CNPJ ou CPF).");
@@ -187,9 +191,12 @@ Deno.serve(async (req) => {
     valor_servico: valor,
     tributacao_iss: 1,
     tipo_retencao_iss: p.iss_retido ? 2 : 1,
-    // Total aproximado de tributos (Lei da Transparência): obrigatório no XML; o emitente opta por não informar o
-    // valor estimado (Decreto 8.264/2014). Primeiro teste da F7 (25/10) recusado sem ele.
-    indicador_total_tributacao: 0,
+    // Total aproximado de tributos (Lei da Transparência), obrigatório no XML. ME/EPP: o percentual da alíquota do
+    // Simples (o indicador é recusado, E0712). Os outros optam por não informar o valor estimado (Decreto 8.264/2014;
+    // primeiro teste da F7, 25/10, recusado sem nenhum dos dois).
+    ...(opcaoSimples(emi!.regime_tributario) === "3"
+      ? { percentual_total_tributos_simples_nacional: Number(emi!.aliquota_simples).toFixed(2) }
+      : { indicador_total_tributacao: 0 }),
     ...(p.informacoes?.trim() ? { informacoes_complementares: p.informacoes.trim().slice(0, 2000) } : {}),
     // Finalidade (finNFSe, 0 = NFS-e regular): obrigatória no corpo da DPS no leiaute da reforma. O Ambiente Nacional
     // recusou a nota sem ela (E1235: "esperado finNFSe" depois de tpEmit; teste da F7, 25/10).
