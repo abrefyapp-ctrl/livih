@@ -14,7 +14,7 @@ financeiro, dono). Um cliente tem vários contatos; um contato é de no máximo 
 | Contato em mais de um cliente? | Não: um cliente só (`contatos.cliente_id`) |
 | Para quais empresas? | Todas, com ou sem o módulo de pedidos |
 | Primeira entrega | Cadastro + vínculo nos dois sentidos, cliente no pedido e no orçamento, busca pelo CNPJ, importar planilha |
-| Agente | Só lê o cliente do contato; não cria nem edita |
+| Agente | Só lê o cliente do contato; não cria nem edita (mudou em 26/10: com a opção ligada, identifica pelo CNPJ/CPF, liga e cadastra; [agente-identificar-cliente.md](agente-identificar-cliente.md)) |
 
 ## Decisões de 23/10
 
@@ -119,7 +119,8 @@ admin mudam (pela função que já altera papel e status do membro, com auditori
 - `agente_contexto` passa a mandar o **cliente** do contato: nome, razão social, cidade/UF e se tem documento.
 - O agente usa isso para tratar pelo nome da empresa e saber que o orçamento sai no nome dela.
 - O pedido montado pelo agente (`agente_montar_pedido`) já leva o `cliente_id` do contato.
-- O agente não cria nem edita clientes.
+- O agente não cria nem edita clientes. Desde 26/10, com a opção "Identificar o cliente antes do orçamento", ele liga o
+  contato ao cliente pelo CNPJ/CPF e cadastra o cliente novo ([agente-identificar-cliente.md](agente-identificar-cliente.md)).
 - Mudança no `gerar_workflow.py` (texto do contexto) e reimportação no n8n, como na identificação pela foto.
 
 ## Busca pelo CNPJ e pelo CEP

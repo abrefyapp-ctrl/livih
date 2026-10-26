@@ -3167,5 +3167,114 @@ insert into resultado (teste, ok) select 'nfse: a oficina vê a nota da OS; sem 
   exists (select 1 from public.notas_fiscais where ref = 'lvsteste1')
   and not exists (select 1 from public.notas_fiscais where ref = 'lvsteste3');
 
+-- O agente identifica o cliente pelo CNPJ/CPF antes do orçamento (migration 20261026130000).
+-- Clientes que já existem: Beta (CNPJ 11444777000161), Delta Peças (04252011000110) e João da Silva (CPF 52998224725).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select id from public.canais where instance_id = 'INST-F7');
+  v_c1 uuid; v_c2 uuid; v_c3 uuid; v_c4 uuid; r jsonb; v_ct uuid; n_cli int;
+begin
+  update public.agentes set identificar_cliente = true where canal_id = v_canal;
+  insert into resultado (teste, ok) values ('identificar: a opção vale para todos os agentes da empresa',
+    not exists (select 1 from public.agentes where org_id = v_org and not identificar_cliente));
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900088001', 'Comprador Delta') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_ct, 'bot') returning id into v_c1;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900088002', 'João') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_ct, 'bot') returning id into v_c2;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900088003', 'Empresa nova') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_ct, 'bot') returning id into v_c3;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900088004', 'Outro da empresa nova') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_ct, 'bot') returning id into v_c4;
+
+  r := public.agente_montar_pedido(v_c1, '[{"codigo":"X","quantidade":1}]');
+  insert into resultado (teste, ok) values ('identificar: sem cliente, o orçamento pede a identificação antes',
+    (r ->> 'identificar_cliente')::boolean and not (r ->> 'sucesso')::boolean);
+  r := public.agente_identificar_cliente(v_c1, '04.252.011/0001-11');
+  insert into resultado (teste, ok) values ('identificar: CNPJ com dígito errado é recusado',
+    not (r ->> 'sucesso')::boolean and r ->> 'aviso' like 'CNPJ ou CPF inválido%');
+
+  r := public.agente_identificar_cliente(v_c1, '04.252.011/0001-10');
+  insert into resultado (teste, ok) values ('identificar: CNPJ que já existe liga o contato e avisa a equipe',
+    (r ->> 'sucesso')::boolean and (r ->> 'encontrado')::boolean
+    and (select cl.documento from public.contatos ct join public.clientes cl on cl.id = ct.cliente_id
+          where ct.id = (select contato_id from public.conversas where id = v_c1)) = '04252011000110'
+    and (select count(*) from public.mensagens where conversa_id = v_c1 and autor_tipo = 'sistema'
+           and texto like 'O agente ligou este contato ao cliente%') = 1);
+  r := public.agente_identificar_cliente(v_c1, '04252011000110');
+  insert into resultado (teste, ok) values ('identificar: de novo, já identificado', (r ->> 'ja_identificado')::boolean);
+  r := public.agente_identificar_cliente(v_c1, '11444777000161');
+  insert into resultado (teste, ok) values ('identificar: contato de outro cliente não troca e chama a equipe',
+    not (r ->> 'sucesso')::boolean and r ->> 'aviso' like '%chamar_humano%'
+    and (select cl.documento from public.contatos ct join public.clientes cl on cl.id = ct.cliente_id
+          where ct.id = (select contato_id from public.conversas where id = v_c1)) = '04252011000110');
+  r := public.agente_montar_pedido(v_c1, '[{"codigo":"X","quantidade":1}]');
+  insert into resultado (teste, ok) values ('identificar: identificado, o orçamento segue', r -> 'identificar_cliente' is null);
+
+  -- CPF: só liga se o nome conferir, e não revela o nome do cadastro.
+  r := public.agente_identificar_cliente(v_c2, '529.982.247-25');
+  insert into resultado (teste, ok) values ('identificar: CPF que existe pede o nome antes de ligar',
+    not (r ->> 'sucesso')::boolean and r ->> 'aviso' like '%nome completo%' and r::text not like '%Silva%'
+    and (select cliente_id from public.contatos where id = (select contato_id from public.conversas where id = v_c2)) is null);
+  r := public.agente_identificar_cliente(v_c2, '52998224725', 'Pedro Silva');
+  insert into resultado (teste, ok) values ('identificar: CPF com nome que não confere não liga',
+    not (r ->> 'sucesso')::boolean and r::text not like '%João%'
+    and (select cliente_id from public.contatos where id = (select contato_id from public.conversas where id = v_c2)) is null);
+  r := public.agente_identificar_cliente(v_c2, '52998224725', 'joao silva');
+  insert into resultado (teste, ok) values ('identificar: CPF com o nome certo (sem acento, sem "da") liga',
+    (r ->> 'sucesso')::boolean
+    and (select cliente_id from public.contatos where id = (select contato_id from public.conversas where id = v_c2)) is not null);
+
+  -- Cliente novo: CNPJ que não existe.
+  r := public.agente_identificar_cliente(v_c3, '11222333000181');
+  insert into resultado (teste, ok) values ('identificar: CNPJ novo pede o cadastro',
+    (r ->> 'sucesso')::boolean and not (r ->> 'encontrado')::boolean and r ->> 'tipo' = 'pj');
+  r := public.agente_cadastrar_cliente(v_c3, '11222333000181', null);
+  insert into resultado (teste, ok) values ('identificar: sem a razão social (Receita fora), pede a razão social',
+    not (r ->> 'sucesso')::boolean and r ->> 'aviso' like '%razão social%');
+  select count(*) into n_cli from public.clientes where org_id = v_org;
+  r := public.agente_cadastrar_cliente(v_c3, '11222333000181', null,
+    '{"razao_social":"EMPRESA NOVA COMERCIO LTDA","nome":"Empresa Nova","cep":"89201-000","cidade":"Joinville","uf":"sc","logradouro":"Rua A"}');
+  insert into resultado (teste, ok) values ('identificar: cadastra com os dados da Receita e liga o contato',
+    (r ->> 'cadastrado')::boolean
+    and exists (select 1 from public.clientes c join public.contatos ct on ct.cliente_id = c.id
+                 where ct.id = (select contato_id from public.conversas where id = v_c3)
+                   and c.razao_social = 'EMPRESA NOVA COMERCIO LTDA' and c.nome = 'Empresa Nova' and c.uf = 'SC'
+                   and c.cep = '89201000' and c.tipo = 'pj')
+    and exists (select 1 from public.mensagens where conversa_id = v_c3 and texto like 'O agente cadastrou o cliente%'));
+  r := public.agente_cadastrar_cliente(v_c4, '11222333000181', 'Outra razão');
+  insert into resultado (teste, ok) values ('identificar: o mesmo CNPJ por outro contato liga ao cadastro, sem duplicar',
+    (r ->> 'sucesso')::boolean and (r ->> 'encontrado')::boolean
+    and (select count(*) from public.clientes where org_id = v_org) = n_cli + 1);
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.agente_identificar_cliente(current_setting('teste.conversa')::uuid, '04252011000110');
+  insert into resultado (teste, ok) values ('identificar: usuário logado não chama as funções do agente', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('identificar: usuário logado não chama as funções do agente', true);
+end $$;
+-- Opção desligada: o agente não liga nem cadastra, e o orçamento não pede identificação (como antes).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select id from public.canais where instance_id = 'INST-F7');
+  v_conv uuid; v_ct uuid; r jsonb;
+begin
+  update public.agentes set identificar_cliente = false where canal_id = v_canal;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900088005', 'Sem a opção') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_ct, 'bot') returning id into v_conv;
+  r := public.agente_identificar_cliente(v_conv, '04252011000110');
+  insert into resultado (teste, ok) values ('identificar: com a opção desligada, não liga',
+    not (r ->> 'sucesso')::boolean and (select cliente_id from public.contatos where id = v_ct) is null);
+  r := public.agente_montar_pedido(v_conv, '[{"codigo":"X","quantidade":1}]');
+  insert into resultado (teste, ok) values ('identificar: com a opção desligada, o orçamento não pede identificação',
+    r -> 'identificar_cliente' is null);
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

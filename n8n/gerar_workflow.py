@@ -131,6 +131,7 @@ Você trabalha dentro do CRM da ${c.organizacao?.nome || 'empresa'}. As ferramen
 - **enviar_orcamento**: envia ao cliente o PDF do pedido montado. Use quando o cliente pedir o orçamento, a proposta ou o PDF, ou confirmar os itens. Antes, monte (ou atualize) com montar_pedido. Depois de enviar, diga em uma frase que o orçamento foi enviado e que a equipe confirma frete e pagamento.
 - **buscar_documentos** e **enviar_documento**: quando o cliente pedir um arquivo (vista explodida, desenho de peças, manual, catálogo, ficha técnica, foto do produto), busque na biblioteca com o produto e o tipo que ele disse. Se vier exatamente o que ele pediu, envie com enviar_documento; se vierem vários parecidos, pergunte qual; se não vier nenhum, diga que a equipe envia e chame chamar_humano. Envie só o que ele pediu (no máximo 3 por resposta). Se a ferramenta disser que o documento já foi enviado, diga que está na mensagem daquele horário; reenvie (reenviar=sim) só se o cliente disser que não recebeu.
 - **consultar_os**: quando o cliente perguntar de equipamento que deixou para conserto ("meu motor ficou pronto?", "como está a OS 123?", "já aprovaram o orçamento?"), consulte antes de responder; com o nº da OS, NF ou modelo que ele citar, use como busca. Responda a etapa e desde quando; a previsão de término é estimativa: diga "a previsão é…", nunca prometa a data. Pronto: diga que está pronto para retirada (combinar a retirada é com a equipe). Aguardando aprovação: informe o valor do orçamento se ele perguntar. Se o cliente aprovar ou recusar o orçamento por escrito, NÃO diga que já está aprovado no sistema: registre com registrar_nota ("Cliente aprovou o orçamento da OS nº X, item Y") e chame a equipe com chamar_humano. Se não achar a OS, peça o nº da OS ou a NF; se ainda assim não achar, chame a equipe.
+- **identificar_cliente** e **cadastrar_cliente**: se montar_pedido responder com identificar_cliente, antes do orçamento peça, numa pergunta só, o CNPJ (empresa) ou o CPF (pessoa), explicando que é para o orçamento sair no nome certo. Com o número, chame identificar_cliente (com CPF, mande também o nome completo; se não tiver, peça). Encontrado: monte o orçamento de novo e siga. Cliente novo com CNPJ: confirme com o cliente a razão social que veio da Receita (receita.razao_social) e chame cadastrar_cliente com o CNPJ; se a Receita não respondeu, peça a razão social e mande em nome. Cliente novo com CPF: chame cadastrar_cliente com o CPF e o nome completo. Depois de cadastrar, monte o orçamento de novo. Do cadastro, diga ao cliente só a razão social que a ferramenta devolveu, nunca endereço, e-mail ou outro dado. Se o cliente mandar o CNPJ ou o CPF por conta própria, use identificar_cliente. Se a ferramenta mandar chamar a equipe, chame chamar_humano.
 - **chamar_humano**: chame quando acontecer um destes casos:
 ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar com uma pessoa'}
   Depois de chamar, diga ao cliente, em uma frase, que um especialista vai continuar a conversa por aqui. Não continue o atendimento depois disso.
@@ -139,7 +140,7 @@ ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar co
 - **Produto identificado pela foto**: a descrição da foto pode terminar com a comparação com as fotos do catálogo da empresa. Com "Produto do catálogo identificado pela foto (confiança alta ou média)", trate esse como o produto da foto: busque pelo código com buscar_produtos (preço e estoque) e confirme com o cliente numa frase antes de montar o orçamento ("É o grampeador X, código Y?"); se ajudar o cliente a conferir, envie a foto do catálogo com enviar_documento, usando o id do documento indicado ali. Com "talvez seja" ou "nenhum produto bateu com certeza", não afirme qual é: pergunte ao cliente, citando os parecidos se fizer sentido, ou peça uma foto da etiqueta ou o código.
 - **O que você consegue enviar**: só o PDF do orçamento (enviar_orcamento) e os documentos da biblioteca (buscar_documentos + enviar_documento). Nunca prometa um arquivo antes de achá-lo na biblioteca, e nunca prometa link, boleto, nota fiscal ou qualquer outro arquivo: diga que a equipe envia e chame chamar_humano com o motivo (ex.: "Cliente pediu a vista explodida do grampeador 14/45, que não está na biblioteca"). Prometer e não enviar deixa o cliente esperando.
 - **Nunca diga que enviou sem ter enviado**: só diga "enviei", "reenviei", "segue" ou "está acima na conversa" sobre um arquivo se enviar_orcamento ou enviar_documento devolveu enviado: true NESTA resposta (ou se a ferramenta avisou que o documento já tinha sido enviado). Se não, nada foi enviado. Se o cliente disser que não recebeu, não insista: reenvie ou chame a equipe.
-- **Empresa do cliente**: quando "Cliente (cadastro)" estiver preenchido, o contato fala por essa empresa: o orçamento sai no nome dela, com a razão social e o CNPJ do cadastro. Não pergunte CNPJ, razão social nem endereço que já estão lá. Se o cliente pedir para faturar em outro CNPJ, mudar o endereço ou outro dado do cadastro, não prometa a mudança: diga que a equipe ajusta e chame chamar_humano com o pedido. Sem cliente ligado, não peça CNPJ só para cadastrar; se o cliente mandar, guarde com atualizar_contato.
+- **Empresa do cliente**: quando "Cliente (cadastro)" estiver preenchido, o contato fala por essa empresa: o orçamento sai no nome dela, com a razão social e o CNPJ do cadastro. Não pergunte CNPJ, razão social nem endereço que já estão lá. Se o cliente pedir para faturar em outro CNPJ, mudar o endereço ou outro dado do cadastro, não prometa a mudança: diga que a equipe ajusta e chame chamar_humano com o pedido. Sem cliente ligado, só peça CNPJ ou CPF quando montar_pedido pedir a identificação (veja identificar_cliente).
 - **Nome do cliente**: use o nome que está em "O que já sabemos deste contato". Um nome que o cliente escreve num cumprimento ("boa tarde, Flávio") é de quem ele espera que atenda, não o dele.
 
 Nunca fale de ferramentas, CRM ou sistema com o cliente. A sua resposta final é exatamente o texto que será enviado no WhatsApp.
@@ -332,6 +333,98 @@ return JSON.stringify({ enviado: !!e?.enviado, titulo: e?.titulo || p.titulo, av
 """
 
 
+# Identificação do cliente pelo CNPJ/CPF antes do orçamento (docs/agente-identificar-cliente.md; migration
+# 20261026130000). A Receita (BrasilAPI) traz a razão social e o endereço do CNPJ novo.
+IDENTIFICAR_CLIENTE = r"""
+// Consulta o CNPJ na Receita (BrasilAPI, gratuita, a mesma da tela de clientes). Fora do ar: null.
+const receitaCnpj = async (doc) => {
+  const cnpj = String(doc || '').replace(/\D/g, '');
+  if (cnpj.length !== 14) return null;
+  try {
+    const r = await this.helpers.httpRequest({
+      method: 'GET', url: `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, json: true, timeout: 15000,
+      ignoreHttpStatusErrors: true, returnFullResponse: true,
+    });
+    const d = r.statusCode === 200 ? r.body : null;
+    if (!d?.razao_social) return null;
+    const t = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+    // "RUA DAS FLORES" -> "Rua das Flores" (a Receita devolve tudo em maiúsculas).
+    const cap = (v) => v && v.toLowerCase().replace(/(^|\s|\/|-)(\p{L})/gu, (_, s, l) => s + l.toUpperCase())
+      .replace(/\b(Da|De|Do|Das|Dos|E)\b/g, (m) => m.toLowerCase());
+    return {
+      razao_social: t(d.razao_social),
+      nome: cap(t(d.nome_fantasia) || t(d.razao_social)),
+      cep: String(d.cep || '').replace(/\D/g, '') || null,
+      logradouro: cap([t(d.descricao_tipo_de_logradouro), t(d.logradouro)].filter(Boolean).join(' ') || null),
+      numero: t(d.numero), complemento: cap(t(d.complemento)), bairro: cap(t(d.bairro)),
+      cidade: cap(t(d.municipio)), uf: t(d.uf), email: t(d.email),
+      situacao: t(d.descricao_situacao_cadastral),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const conversa = $('Validar').first().json.conversa_id;
+const CAMPOS = ["documento", "nome"];
+const args = Object.fromEntries(Object.entries($input.item.json || {}).filter(([k]) => CAMPOS.includes(k)));
+const r = await rpc('agente_identificar_cliente', { p_conversa: conversa, p_documento: String(args.documento || ''), p_nome: args.nome || null });
+// CNPJ novo: a razão social da Receita, para o agente confirmar com o cliente antes de cadastrar.
+if (r && r.encontrado === false && r.tipo === 'pj') {
+  const rec = await receitaCnpj(args.documento);
+  if (rec) r.receita = { razao_social: rec.razao_social, nome_fantasia: rec.nome, cidade: rec.cidade, uf: rec.uf, situacao: rec.situacao };
+  else r.aviso = 'Cliente novo, e a consulta do CNPJ na Receita não respondeu: peça a razão social e chame cadastrar_cliente com o CNPJ e a razão social em nome.';
+}
+return JSON.stringify(r);
+"""
+
+CADASTRAR_CLIENTE = r"""
+// Consulta o CNPJ na Receita (BrasilAPI, gratuita, a mesma da tela de clientes). Fora do ar: null.
+const receitaCnpj = async (doc) => {
+  const cnpj = String(doc || '').replace(/\D/g, '');
+  if (cnpj.length !== 14) return null;
+  try {
+    const r = await this.helpers.httpRequest({
+      method: 'GET', url: `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, json: true, timeout: 15000,
+      ignoreHttpStatusErrors: true, returnFullResponse: true,
+    });
+    const d = r.statusCode === 200 ? r.body : null;
+    if (!d?.razao_social) return null;
+    const t = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+    // "RUA DAS FLORES" -> "Rua das Flores" (a Receita devolve tudo em maiúsculas).
+    const cap = (v) => v && v.toLowerCase().replace(/(^|\s|\/|-)(\p{L})/gu, (_, s, l) => s + l.toUpperCase())
+      .replace(/\b(Da|De|Do|Das|Dos|E)\b/g, (m) => m.toLowerCase());
+    return {
+      razao_social: t(d.razao_social),
+      nome: cap(t(d.nome_fantasia) || t(d.razao_social)),
+      cep: String(d.cep || '').replace(/\D/g, '') || null,
+      logradouro: cap([t(d.descricao_tipo_de_logradouro), t(d.logradouro)].filter(Boolean).join(' ') || null),
+      numero: t(d.numero), complemento: cap(t(d.complemento)), bairro: cap(t(d.bairro)),
+      cidade: cap(t(d.municipio)), uf: t(d.uf), email: t(d.email),
+      situacao: t(d.descricao_situacao_cadastral),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const conversa = $('Validar').first().json.conversa_id;
+const CAMPOS = ["documento", "nome"];
+const args = Object.fromEntries(Object.entries($input.item.json || {}).filter(([k]) => CAMPOS.includes(k)));
+const doc = String(args.documento || '').replace(/\D/g, '');
+// CNPJ: os dados vêm da Receita; se ela não responder, vale a razão social que o cliente informou (nome).
+let dados = null;
+if (doc.length === 14) {
+  const rec = await receitaCnpj(doc);
+  if (rec) {
+    const { situacao, ...resto } = rec;
+    dados = resto;
+  }
+}
+return JSON.stringify(await rpc('agente_cadastrar_cliente', { p_conversa: conversa, p_documento: doc, p_nome: args.nome || null, p_dados: dados }));
+"""
+
+
 def obj(props, obrig=None):
     o = {"type": "object", "properties": {k: {"type": "string", "description": v} for k, v in props.items()}}
     if obrig:
@@ -443,6 +536,20 @@ FERRAMENTAS = [
         "agente_consultar_os",
         "{ p_conversa: conversa, p_busca: args.busca || null }",
         obj({"busca": "Opcional: nº da OS, NF, nº da OS do cliente, modelo ou nº de série que o cliente citou"}),
+    ),
+    ferramenta_codigo(
+        "identificar_cliente",
+        "Identifica o cliente pelo CNPJ ou CPF que ele informou: se já existe no cadastro, liga este WhatsApp a ele; se não existe, diz que é cliente novo (com CNPJ, traz a razão social da Receita para confirmar).",
+        IDENTIFICAR_CLIENTE,
+        obj({"documento": "CNPJ ou CPF exatamente como o cliente informou",
+             "nome": "Nome completo da pessoa: obrigatório quando for CPF"}, ["documento"]),
+    ),
+    ferramenta_codigo(
+        "cadastrar_cliente",
+        "Cadastra o cliente novo (depois de identificar_cliente dizer que não existe) e liga este WhatsApp a ele. Com CNPJ, os dados vêm da Receita.",
+        CADASTRAR_CLIENTE,
+        obj({"documento": "O mesmo CNPJ ou CPF usado em identificar_cliente",
+             "nome": "CPF: nome completo. CNPJ: a razão social, só quando a Receita não respondeu"}, ["documento"]),
     ),
 ]
 
@@ -573,6 +680,8 @@ CORPO_SIM = {
     "enviar_documento": "JSON.stringify(await rpc('simulador_documento', { p_org: org, p_documento: String(args.documento_id || '').trim() }))",
     "chamar_humano": "JSON.stringify({ sucesso: true, simulado: true })",
     "consultar_os": "JSON.stringify(await rpc('simulador_consultar_os', { p_org: org, p_busca: args.busca || null }))",
+    "identificar_cliente": "JSON.stringify(await rpc('simulador_identificar_cliente', { p_org: org, p_documento: String(args.documento || ''), p_nome: args.nome || null }))",
+    "cadastrar_cliente": "JSON.stringify({ sucesso: true, simulado: true, cadastrado: true })",
 }
 
 ferramentas_sim = []

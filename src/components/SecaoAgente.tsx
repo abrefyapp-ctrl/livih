@@ -21,6 +21,7 @@ type Formulario = {
   foraHorario: string
   casos: string[]
   telefone: string
+  identificarCliente: boolean
 }
 
 const casosDe = (a: Agente): string[] => {
@@ -35,6 +36,7 @@ const paraFormulario = (a: Agente): Formulario => ({
   foraHorario: a.mensagem_fora_horario ?? '',
   casos: casosDe(a),
   telefone: a.telefone_alerta ? formatarTelefone(a.telefone_alerta) : '',
+  identificarCliente: a.identificar_cliente,
 })
 
 /** (41) 99999-8888 → 5541999998888; vazio → null; inválido → undefined. */
@@ -47,7 +49,7 @@ function normalizarTelefone(v: string): string | null | undefined {
 }
 
 export function SecaoAgente() {
-  const { orgAtiva } = useSessao()
+  const { orgAtiva, modulos } = useSessao()
   const orgId = orgAtiva!.id
   const podeEditar = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const [agente, setAgente] = useState<{ orgId: string; dado: Agente | null } | null>(null)
@@ -112,6 +114,7 @@ export function SecaoAgente() {
         mensagem_fora_horario: form.foraHorario.trim() || null,
         telefone_alerta: telefone ?? null,
         regras_humano: { ...((atual.dado.regras_humano as object) ?? {}), casos: form.casos },
+        identificar_cliente: form.identificarCliente,
       }
       await salvarAgente(atual.dado.id, campos)
       setAgente({ orgId, dado: { ...atual.dado, ...campos } })
@@ -309,6 +312,25 @@ export function SecaoAgente() {
             </div>
           )}
         </div>
+
+        {/* Orçamento pelo agente existe só com pedidos (ERP). docs/agente-identificar-cliente.md */}
+        {modulos?.has('erp') && (
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-borda p-3">
+            <input
+              type="checkbox"
+              checked={form.identificarCliente}
+              onChange={(e) => mudar({ identificarCliente: e.target.checked })}
+              className="mt-0.5 size-4 shrink-0 accent-primaria"
+            />
+            <span>
+              <span className="block text-pequeno font-medium text-texto">Identificar o cliente antes do orçamento</span>
+              <span className="block text-legenda text-texto-3">
+                O agente pede o CNPJ ou CPF. Se o cliente já está cadastrado, liga este WhatsApp a ele; se não, cadastra
+                (com CNPJ, pelos dados da Receita). Cada ligação aparece na conversa para a equipe conferir.
+              </span>
+            </span>
+          </label>
+        )}
 
         <CampoTexto
           rotulo="WhatsApp para alertas"

@@ -70,7 +70,7 @@ export async function salvarAgente(
   id: string,
   campos: Pick<
     Agente,
-    'prompt' | 'telefone_alerta' | 'regras_humano' | 'saudacao' | 'horario' | 'mensagem_fora_horario'
+    'prompt' | 'telefone_alerta' | 'regras_humano' | 'saudacao' | 'horario' | 'mensagem_fora_horario' | 'identificar_cliente'
   >,
 ) {
   // As outras linhas da organização acompanham (trigger agentes_sincronizar).
