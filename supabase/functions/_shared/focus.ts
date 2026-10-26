@@ -41,7 +41,10 @@ export async function tokenDoCnpj(admin: SupabaseClient, emissoraId: string, amb
 }
 
 async function baixar(url: string, token: string): Promise<Uint8Array | null> {
-  const r = await fetch(url, { headers: { Authorization: basic(token) }, signal: AbortSignal.timeout(60000) });
+  // O token só vai para a API da Focus. O DANFSe da NFS-e Nacional vem como link aberto no S3, que recusa (403) um
+  // pedido com cabeçalho de autorização (primeira NFS-e da F7, 26/10).
+  const daFocus = Object.values(BASE).some((b) => url.startsWith(b));
+  const r = await fetch(url, { headers: daFocus ? { Authorization: basic(token) } : {}, signal: AbortSignal.timeout(60000) });
   if (!r.ok) {
     console.error("focus arquivo", r.status, url.slice(-80));
     return null;
@@ -94,6 +97,19 @@ export async function aplicarRetorno(admin: SupabaseClient, nota: Nota, r: Retor
       xml_path: xml, danfe_path: danfe, autorizada_em: agora, mensagem: xml && danfe ? null : "Autorizada; o XML ou o DANFE ainda não foi copiado para o Livih.",
     }).eq("id", nota.id);
     if (error) console.error("nota autorizada", error.message);
+    return;
+  }
+  // Autorizada sem o XML ou o DANFE (a cópia falhou na hora): a conferência tenta de novo só o que falta.
+  if (r.status === "autorizado" && nota.status === "autorizada") {
+    const { data: atual } = await admin.from("notas_fiscais").select("chave, xml_path, danfe_path").eq("id", nota.id).single();
+    if (!atual || (atual.xml_path && atual.danfe_path)) return;
+    const base = atual.chave ?? nota.ref;
+    const xml = atual.xml_path ?? await guardar(admin, nota, token, r.caminho_xml_nota_fiscal, `${base}-${nota.modelo}.xml`, "application/xml");
+    const danfe = atual.danfe_path ?? await guardar(admin, nota, token, r.caminho_danfe ?? r.url_danfse, `${base}.pdf`, "application/pdf");
+    await admin.from("notas_fiscais").update({
+      xml_path: xml, danfe_path: danfe, consultas: nota.consultas + 1,
+      mensagem: xml && danfe ? null : "Autorizada; o XML ou o DANFE ainda não foi copiado para o Livih.",
+    }).eq("id", nota.id);
     return;
   }
   if ((r.status === "erro_autorizacao" || r.status === "denegado") && nota.status === "processando") {

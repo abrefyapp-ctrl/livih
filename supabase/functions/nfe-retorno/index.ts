@@ -3,7 +3,8 @@
 // Duas entradas:
 //   - gatilho da Focus (POST com o corpo da nota e o segredo no cabeçalho X-Livih-Focus), cadastrado pela nfe-config;
 //   - conferência de reserva do banco ({ conferir: true } com x-livih-segredo), para nota processando há mais de
-//     2 minutos (gatilho perdido). A Focus tenta o gatilho por até 48 h; a conferência cobre o resto.
+//     2 minutos (gatilho perdido), e para nota autorizada sem o XML ou o DANFE (cópia que falhou). A Focus tenta o
+//     gatilho por até 48 h; a conferência cobre o resto.
 // Responde rápido e processa em segundo plano (recomendação da Focus).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -20,6 +21,11 @@ async function conferir() {
     .eq("status", "processando").lt("atualizado_em", new Date(Date.now() - 120_000).toISOString()).lt("consultas", 60)
     .order("atualizado_em").limit(20);
   for (const nota of (data ?? []) as Nota[]) await consultarNota(admin, nota);
+  const { data: semArquivo } = await admin.from("notas_fiscais").select("id, org_id, emissora_id, ref, ambiente, status, consultas, modelo")
+    .eq("status", "autorizada").or("xml_path.is.null,danfe_path.is.null")
+    .lt("atualizado_em", new Date(Date.now() - 120_000).toISOString()).lt("consultas", 60)
+    .order("atualizado_em").limit(20);
+  for (const nota of (semArquivo ?? []) as Nota[]) await consultarNota(admin, nota);
 }
 
 Deno.serve(async (req) => {
