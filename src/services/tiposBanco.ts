@@ -862,6 +862,7 @@ export type Database = {
       }
       emissoras: {
         Row: {
+          aliquota_simples: number | null
           atualizado_em: string
           bairro: string | null
           cep: string | null
@@ -918,6 +919,7 @@ export type Database = {
           validade_dias: number
         }
         Insert: {
+          aliquota_simples?: number | null
           atualizado_em?: string
           bairro?: string | null
           cep?: string | null
@@ -974,6 +976,7 @@ export type Database = {
           validade_dias?: number
         }
         Update: {
+          aliquota_simples?: number | null
           atualizado_em?: string
           bairro?: string | null
           cep?: string | null
