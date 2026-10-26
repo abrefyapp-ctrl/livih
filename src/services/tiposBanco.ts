@@ -894,6 +894,7 @@ export type Database = {
           nfe_sincronizado_em: string | null
           nfe_status: string
           nfse_ativa: boolean
+          nfse_codigo_indicador_operacao: string | null
           nfse_codigo_nbs: string | null
           nfse_codigo_tributacao_municipal: string | null
           nfse_codigo_tributacao_nacional: string | null
@@ -949,6 +950,7 @@ export type Database = {
           nfe_sincronizado_em?: string | null
           nfe_status?: string
           nfse_ativa?: boolean
+          nfse_codigo_indicador_operacao?: string | null
           nfse_codigo_nbs?: string | null
           nfse_codigo_tributacao_municipal?: string | null
           nfse_codigo_tributacao_nacional?: string | null
@@ -1004,6 +1006,7 @@ export type Database = {
           nfe_sincronizado_em?: string | null
           nfe_status?: string
           nfse_ativa?: boolean
+          nfse_codigo_indicador_operacao?: string | null
           nfse_codigo_nbs?: string | null
           nfse_codigo_tributacao_municipal?: string | null
           nfse_codigo_tributacao_nacional?: string | null

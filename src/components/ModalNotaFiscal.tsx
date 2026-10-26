@@ -55,6 +55,7 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
     regimeEspecial: String(e.nfse_regime_especial),
     ibsCst: e.ibs_cbs_cst ?? '',
     ibsClass: e.ibs_cbs_classificacao ?? '',
+    ibsOp: e.nfse_codigo_indicador_operacao ?? '',
   })
   const [certificado, setCertificado] = useState<File | null>(null)
   const [senha, setSenha] = useState('')
@@ -82,6 +83,7 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
     (!!c.nbs && !/^\d{9}$/.test(c.nbs)) ||
     (!!c.ibsCst && !/^\d{3}$/.test(c.ibsCst)) ||
     (!!c.ibsClass && !/^\d{6}$/.test(c.ibsClass)) ||
+    (!!c.ibsOp && !/^\d{6}$/.test(c.ibsOp)) ||
     (!!certificado && !senha)
   const dias = diasAte(e.certificado_validade)
 
@@ -123,6 +125,7 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
       nfse_regime_especial: Number(c.regimeEspecial),
       ibs_cbs_cst: c.ibsCst || null,
       ibs_cbs_classificacao: c.ibsClass || null,
+      nfse_codigo_indicador_operacao: c.ibsOp || null,
     }
     try {
       await salvarFiscal(e.id, campos)
@@ -286,14 +289,21 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
                 <textarea id="nfse-descricao" rows={2} maxLength={1000} value={c.descricaoServico} onChange={(ev) => muda({ descricaoServico: ev.target.value })}
                   className="block w-full rounded-md border border-borda bg-superficie px-3 py-2 text-pequeno focus:border-primaria focus:outline-none" />
               </Campo>
-              <details className="text-pequeno">
-                <summary className="cursor-pointer text-texto-2">IBS/CBS (reforma tributária, opcional)</summary>
-                <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                  <CampoTexto rotulo="CST do IBS/CBS" inputMode="numeric" maxLength={3} value={c.ibsCst} onChange={(ev) => muda({ ibsCst: ev.target.value.replace(/\D/g, '') })} />
-                  <CampoTexto rotulo="Classificação tributária" inputMode="numeric" maxLength={6} value={c.ibsClass} onChange={(ev) => muda({ ibsClass: ev.target.value.replace(/\D/g, '') })} />
+              <div className="space-y-2 rounded-md border border-borda p-3">
+                <p className="text-pequeno font-medium text-texto-2">Reforma tributária (IBS/CBS), obrigatória desde 2026</p>
+                <p className="text-legenda text-texto-3">
+                  Os três códigos dependem do serviço (tabela de correlação da Receita entre o item da LC 116/NBS, o indicador
+                  da operação e a classificação). Peça à contabilidade. Em 2026 os valores só aparecem na nota, sem recolhimento.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <CampoTexto rotulo="Indicador da operação (cIndOp)" inputMode="numeric" maxLength={6} value={c.ibsOp}
+                    onChange={(ev) => muda({ ibsOp: ev.target.value.replace(/\D/g, '') })} erro={c.ibsOp && !/^\d{6}$/.test(c.ibsOp) ? '6 números' : undefined} />
+                  <CampoTexto rotulo="CST do IBS/CBS" inputMode="numeric" maxLength={3} value={c.ibsCst}
+                    onChange={(ev) => muda({ ibsCst: ev.target.value.replace(/\D/g, '') })} erro={c.ibsCst && !/^\d{3}$/.test(c.ibsCst) ? '3 números' : undefined} />
+                  <CampoTexto rotulo="Classificação (cClassTrib)" inputMode="numeric" maxLength={6} value={c.ibsClass}
+                    onChange={(ev) => muda({ ibsClass: ev.target.value.replace(/\D/g, '') })} erro={c.ibsClass && !/^\d{6}$/.test(c.ibsClass) ? '6 números' : undefined} />
                 </div>
-                <p className="mt-1 text-legenda text-texto-3">Preencha quando a contabilidade pedir; enquanto a prefeitura não exige, a nota sai sem eles.</p>
-              </details>
+              </div>
               <p className="text-legenda text-texto-3">A alíquota do ISS não é pedida: no padrão nacional ela vem da prefeitura.</p>
             </>
           )}

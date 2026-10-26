@@ -12,6 +12,7 @@ export type CamposFiscais = Pick<
   // NFS-e (docs/nfse.md)
   | 'nfse_ativa' | 'inscricao_municipal' | 'nfse_codigo_tributacao_nacional' | 'nfse_codigo_tributacao_municipal'
   | 'nfse_codigo_nbs' | 'nfse_descricao_padrao' | 'nfse_regime_especial' | 'ibs_cbs_cst' | 'ibs_cbs_classificacao'
+  | 'nfse_codigo_indicador_operacao'
 >
 
 export const REGIMES: { valor: number; rotulo: string }[] = [
