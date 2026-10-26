@@ -30,6 +30,11 @@ const moeda = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curr
 
 /** Opção pelo Simples na NFS-e Nacional, pelo regime do CNPJ: 1 não optante, 2 MEI, 3 ME/EPP. */
 const opcaoSimples = (regime: number | null) => (regime === 4 ? "2" : regime === 1 || regime === 2 ? "3" : "1");
+/**
+ * Apuração pelo Simples (regApTribSN), obrigatória para ME/EPP (E0166): 1 tributos federais e ISS pelo SN; 2 ISS por
+ * fora, que é o caso do excesso de sublimite.
+ */
+const apuracaoSimples = (regime: number | null) => (regime === 1 ? "1" : regime === 2 ? "2" : null);
 
 /** Código IBGE de um município pela Focus (para o endereço do tomador). */
 async function ibgeDe(cidade: string | null, uf: string | null): Promise<string | null> {
@@ -160,6 +165,7 @@ Deno.serve(async (req) => {
     cnpj_prestador: emi!.cnpj,
     ...(so(emi!.inscricao_municipal) ? { inscricao_municipal_prestador: so(emi!.inscricao_municipal) } : {}),
     codigo_opcao_simples_nacional: opcaoSimples(emi!.regime_tributario),
+    ...(apuracaoSimples(emi!.regime_tributario) ? { regime_tributario_simples_nacional: apuracaoSimples(emi!.regime_tributario) } : {}),
     regime_especial_tributacao: String(emi!.nfse_regime_especial ?? 0),
     ...(cli!.documento!.length === 14 ? { cnpj_tomador: cli!.documento } : { cpf_tomador: cli!.documento }),
     razao_social_tomador: (cli!.razao_social || cli!.nome).slice(0, 150),
