@@ -12,11 +12,13 @@ import {
   notaDoPedido,
   notasDoCliente,
   podeEmitirNota,
+  rejeicaoCredenciamento,
   PRESENCAS,
   urlArquivoNota,
   type NotaFiscal,
 } from '../services/nfe'
 import { Aviso } from './Aviso'
+import { CredenciamentoSefaz } from './CredenciamentoSefaz'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
 import { Campo, CLASSE_CAMPO } from './ModaisOs'
@@ -53,6 +55,15 @@ function Situacao({ nota }: { nota: NotaFiscal }) {
         <span className="size-4 animate-spin rounded-full border-2 border-primaria border-t-transparent" />
         {nome}: enviando à {nota.modelo === 'nfse' ? 'prefeitura' : 'SEFAZ'}… costuma levar de segundos a poucos minutos.
       </p>
+    )
+  }
+  if (nota.status === 'rejeitada' && nota.modelo === 'nfe' && rejeicaoCredenciamento(nota.mensagem)) {
+    return (
+      <Aviso tom="erro">
+        <span className="font-medium">A NF-e não foi autorizada: a SEFAZ ainda não reconhece o sistema emissor deste CNPJ.</span>{' '}
+        <span className="text-legenda">({nota.mensagem})</span>
+        <div className="mt-2"><CredenciamentoSefaz /></div>
+      </Aviso>
     )
   }
   if (nota.status === 'rejeitada') {

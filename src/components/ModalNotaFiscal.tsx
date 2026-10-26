@@ -13,6 +13,7 @@ import {
   type CamposFiscais,
 } from '../services/nfe'
 import { Aviso } from './Aviso'
+import { CredenciamentoSefaz } from './CredenciamentoSefaz'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
 import { Campo, CLASSE_CAMPO } from './ModaisOs'
@@ -184,6 +185,15 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
         {e.nfe_erro && <Aviso tom={e.nfe_status === 'erro' ? 'erro' : 'atencao'}>{e.nfe_erro}</Aviso>}
         {erro && <Aviso tom="erro">{erro}</Aviso>}
         {aviso && <Aviso tom="atencao">{aviso}</Aviso>}
+        {/* Paraná: o sistema emissor precisa ser autorizado no portal da Receita/PR antes da primeira NF-e (rejeição 974). */}
+        {e.uf === 'PR' && (
+          <details className="rounded-md border border-atencao/40 bg-atencao-suave p-3">
+            <summary className="cursor-pointer text-pequeno font-medium text-texto">
+              Empresa do Paraná: autorize a Focus NFe no portal da Receita/PR antes da primeira NF-e
+            </summary>
+            <div className="mt-2"><CredenciamentoSefaz uf={e.uf} /></div>
+          </details>
+        )}
 
         <fieldset className="space-y-3">
           <legend className="mb-1 font-semibold text-texto">Empresa</legend>

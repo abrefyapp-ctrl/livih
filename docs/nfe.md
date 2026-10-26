@@ -133,6 +133,27 @@ vira um evento.
   - o formato do gatilho;
   - o custo por nota e por CNPJ.
 
+## Credenciamento do emissor na SEFAZ (Paraná)
+
+Primeira NF-e da FIXOTEC (JoGrampo, Curitiba), em 26/10, em homologação: rejeição **974**, "CNPJ do responsável técnico
+diverge do cadastrado".
+
+- **Causa:** o Paraná só autoriza NF-e de sistema emissor que o próprio contribuinte cadastrou no portal da Receita/PR.
+  O responsável técnico das notas do Livih é a **Focus NFe Ltda, CNPJ 07.504.505/0001-32** (confirmado na Receita).
+  É a mesma exigência de qualquer emissor de fora do estado: a Omie, por exemplo, pede o mesmo cadastro com o CNPJ
+  dela.
+- **O cliente faz uma vez por CNPJ** (vale para homologação e produção), normalmente o contador:
+  1. no portal da Receita/PR, **UPD → Autorização de Uso → Cadastro de Autorização de Uso**;
+  2. o CNPJ da Focus e o sistema que aparecer para ele. Pela orientação da Aegro, que também emite pela Focus, é
+     **ACRAS, código 54078**; a confirmar com a Focus;
+  3. o CAD/ICMS da empresa, modelo 55, e concluir.
+
+  Depois o fornecedor confirma a autorização: o cliente avisa o suporte do Livih, e nós pedimos à Focus.
+- **Na tela** (`CredenciamentoSefaz`):
+  - CNPJ do Paraná: o aviso com o passo a passo aparece na configuração da nota;
+  - nota recusada com 974 ou 203 (emissor não habilitado): o mesmo passo a passo aparece no lugar do texto da SEFAZ.
+- **Na implantação** de cliente do Paraná: mandar o passo a passo ao contador junto com o pedido do certificado A1.
+
 ## Entregas
 
 1. **Conta e configuração:**

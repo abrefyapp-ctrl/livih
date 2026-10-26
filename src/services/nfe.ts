@@ -229,3 +229,14 @@ export async function emitirNotaServico(dados: ServicoEmissao): Promise<NotaFisc
   }
   return (data as { nota: NotaFiscal }).nota
 }
+
+/**
+ * Credenciamento do emissor na SEFAZ (docs/nfe.md). O Paraná (e outros estados que validam o responsável técnico)
+ * só autoriza NF-e de sistema que o próprio contribuinte cadastrou no portal: sem isso, rejeição 974 ("CNPJ do
+ * responsável técnico diverge do cadastrado") ou 203 (emissor não habilitado). O responsável técnico das notas
+ * é a Focus NFe, que emite para o Livih. Vale uma vez por CNPJ, para homologação e produção.
+ */
+export const FOCUS_RESPONSAVEL_TECNICO = { cnpj: '07.504.505/0001-32', razao: 'Focus NFe Ltda', sistema: 'ACRAS (código 54078)' }
+
+/** A rejeição é a do sistema emissor não credenciado? */
+export const rejeicaoCredenciamento = (mensagem: string | null) => !!mensagem && /^\s*(974|203)\b/.test(mensagem)
