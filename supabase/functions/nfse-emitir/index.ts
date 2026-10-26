@@ -129,6 +129,11 @@ Deno.serve(async (req) => {
     if (!emi.nfse_habilitada_focus) faltando.push("Ative a nota de serviço (NFS-e) na configuração do CNPJ e salve (Configurações → Empresa → Nota fiscal).");
     if (!emi.nfse_codigo_tributacao_nacional) faltando.push("Informe o código de tributação nacional do ISS na configuração do CNPJ (a contabilidade sabe).");
     if (!emi.codigo_municipio_ibge) faltando.push("O município do CNPJ não foi reconhecido: confira a cidade e a UF no cadastro e salve a configuração de novo.");
+    // Reforma tributária (2026): o Ambiente Nacional exige o leiaute novo, e a Focus só o gera com o grupo IBS/CBS
+    // completo. Os três códigos dependem do serviço e vêm da contabilidade.
+    const rt = [["indicador da operação (cIndOp)", emi.nfse_codigo_indicador_operacao], ["CST do IBS/CBS", emi.ibs_cbs_cst],
+                ["classificação tributária do IBS/CBS", emi.ibs_cbs_classificacao]].filter(([, v]) => !v).map(([n]) => n);
+    if (rt.length) faltando.push(`Informe os códigos da reforma tributária na configuração da NFS-e do CNPJ (a contabilidade sabe): ${rt.join(", ")}.`);
   }
   if (!cli) faltando.push("Ligue a nota a um cliente do cadastro (com CNPJ ou CPF).");
   else if (!cli.documento) faltando.push(`O cliente ${cli.nome} não tem CNPJ/CPF no cadastro.`);
@@ -180,17 +185,14 @@ Deno.serve(async (req) => {
     ...(p.informacoes?.trim() ? { informacoes_complementares: p.informacoes.trim().slice(0, 2000) } : {}),
     // Finalidade (finNFSe, 0 = NFS-e regular): obrigatória no corpo da DPS no leiaute da reforma. O Ambiente Nacional
     // recusou a nota sem ela (E1235: "esperado finNFSe" depois de tpEmit; teste da F7, 25/10).
-    // Como texto: com o número 0 (o valor padrão) a Focus deixava o campo fora do XML de homologação (mesmo E1235).
+    // Leiaute da reforma, completo (a Focus só gera o novo com o grupo inteiro): finalidade regular, consumidor final
+    // (pessoa física), destinatário = tomador, indicador da operação e CST/classificação do IBS/CBS.
     finalidade_emissao: "0",
-    // Grupo IBS/CBS: só com o CST e a classificação configurados no CNPJ (consumidor final e destinatário vão nele).
-    ...(emi!.ibs_cbs_cst && emi!.ibs_cbs_classificacao
-      ? {
-          consumidor_final: cli!.tipo === "pf" ? 1 : 0,
-          indicador_destinatario: 0,
-          ibs_cbs_situacao_tributaria: emi!.ibs_cbs_cst,
-          ibs_cbs_classificacao_tributaria: emi!.ibs_cbs_classificacao,
-        }
-      : {}),
+    consumidor_final: cli!.tipo === "pf" ? "1" : "0",
+    indicador_destinatario: "0",
+    codigo_indicador_operacao: emi!.nfse_codigo_indicador_operacao,
+    ibs_cbs_situacao_tributaria: emi!.ibs_cbs_cst,
+    ibs_cbs_classificacao_tributaria: emi!.ibs_cbs_classificacao,
   };
 
   // ---- grava e envia ----
