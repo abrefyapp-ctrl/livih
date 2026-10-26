@@ -236,7 +236,7 @@ export async function emitirNotaServico(dados: ServicoEmissao): Promise<NotaFisc
  * responsável técnico diverge do cadastrado") ou 203 (emissor não habilitado). O responsável técnico das notas
  * é a Focus NFe, que emite para o Livih. Vale uma vez por CNPJ, para homologação e produção.
  */
-export const FOCUS_RESPONSAVEL_TECNICO = { cnpj: '07.504.505/0001-32', razao: 'Focus NFe Ltda', sistema: 'ACRAS (código 54078)' }
+export const FOCUS_RESPONSAVEL_TECNICO = { cnpj: '07.504.505/0001-32', razao: 'Focus NFe' }
 
 /** A rejeição é a do sistema emissor não credenciado? */
 export const rejeicaoCredenciamento = (mensagem: string | null) => !!mensagem && /^\s*(974|203)\b/.test(mensagem)

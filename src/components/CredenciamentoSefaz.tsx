@@ -1,8 +1,14 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { FOCUS_RESPONSAVEL_TECNICO } from '../services/nfe'
 import { Icone } from './Icone'
 
-/** Como credenciar o emissor (a Focus NFe) na SEFAZ; ver FOCUS_RESPONSAVEL_TECNICO em services/nfe. */
+const Passo = ({ titulo, children }: { titulo: string; children: ReactNode }) => (
+  <li>
+    <span className="font-medium text-texto">{titulo}</span> {children}
+  </li>
+)
+
+/** Como credenciar o emissor (a Focus NFe) na SEFAZ; ver FOCUS_RESPONSAVEL_TECNICO em services/nfe e docs/nfe.md. */
 export function CredenciamentoSefaz({ uf }: { uf?: string | null }) {
   const [copiado, setCopiado] = useState(false)
   const outroEstado = !!uf && uf !== 'PR'
@@ -17,48 +23,67 @@ export function CredenciamentoSefaz({ uf }: { uf?: string | null }) {
     }
   }
 
+  const cnpjFocus = (
+    <>
+      <span className="font-medium text-texto">{FOCUS_RESPONSAVEL_TECNICO.cnpj}</span>
+      <button type="button" onClick={() => void copiar()} title="Copiar o CNPJ"
+        className="ml-1 inline-flex items-center gap-1 rounded-sm px-1 align-middle text-legenda text-primaria hover:bg-primaria-suave">
+        <Icone nome={copiado ? 'check' : 'copiar'} className="size-3.5" />
+        {copiado ? 'Copiado' : 'Copiar'}
+      </button>
+    </>
+  )
+
   return (
     <div className="space-y-2 text-pequeno text-texto-2">
       <p>
-        A SEFAZ precisa saber qual sistema emite as notas deste CNPJ. As notas do Livih saem pela{' '}
-        <span className="font-medium text-texto">{FOCUS_RESPONSAVEL_TECNICO.razao}</span>, CNPJ{' '}
-        <span className="font-medium text-texto">{FOCUS_RESPONSAVEL_TECNICO.cnpj}</span>
-        <button type="button" onClick={() => void copiar()} title="Copiar o CNPJ"
-          className="ml-1 inline-flex items-center gap-1 rounded-sm px-1 align-middle text-legenda text-primaria hover:bg-primaria-suave">
-          <Icone nome={copiado ? 'check' : 'copiar'} className="size-3.5" />
-          {copiado ? 'Copiado' : 'Copiar'}
-        </button>
-        . É uma vez só por CNPJ, e quem costuma fazer é o contador.
+        A SEFAZ só aceita notas emitidas por um sistema que a própria empresa autorizou. As notas do Livih são geradas pela{' '}
+        <span className="font-medium text-texto">{FOCUS_RESPONSAVEL_TECNICO.razao}</span>, nossa parceira de emissão, e é ela que
+        precisa ser autorizada. É uma vez só por CNPJ, leva poucos minutos e costuma ser feito pelo contador.
       </p>
       {outroEstado ? (
         <p>
-          No portal da SEFAZ do seu estado, autorize esse CNPJ como sistema emissor (responsável técnico) da sua empresa. Se não
-          souber onde fica, mande esta mensagem ao contador.
+          No portal da SEFAZ do seu estado, autorize a Focus NFe (CNPJ {cnpjFocus}) como sistema emissor da sua empresa e avise
+          o suporte do Livih. Se não souber onde fica, mande esta mensagem ao contador.
         </p>
       ) : (
         <>
-          {!uf && <p>No Paraná, o caminho é:</p>}
+          <p>
+            {!uf && 'No Paraná: '}tenha em mãos o certificado digital da empresa (A1 ou A3), ou o acesso do contador ao portal,
+            e o CNPJ da Focus NFe: {cnpjFocus}.
+          </p>
           <ol className="list-decimal space-y-1 pl-5">
-            <li>
-              Entre no portal da{' '}
+            <Passo titulo="Entre no portal da Receita/PR.">
+              Acesse{' '}
               <a href="https://receita.pr.gov.br/login" target="_blank" rel="noreferrer" className="font-medium text-primaria underline">
-                Receita/PR
+                receita.pr.gov.br
               </a>{' '}
-              com o login da empresa (ou do contador).
-            </li>
-            <li>
-              Vá em <span className="font-medium text-texto">UPD → Autorização de Uso → Cadastro de Autorização de Uso</span>.
-            </li>
-            <li>Informe o CNPJ da Focus e escolha o sistema que aparecer para ele (deve ser {FOCUS_RESPONSAVEL_TECNICO.sistema}).</li>
-            <li>Informe o CAD/ICMS da empresa, marque o modelo 55 (NF-e) e conclua.</li>
+              e faça login com o certificado digital da empresa.
+            </Passo>
+            <Passo titulo="Abra o UPD.">No menu à esquerda (role a página, se precisar), clique em UPD.</Passo>
+            <Passo titulo="Peça a autorização de uso.">Clique em Autorização de Uso e depois em Cadastro de Autorização de Uso.</Passo>
+            <Passo titulo="Informe o fornecedor.">Digite o CNPJ da Focus NFe e clique em Continuar.</Passo>
+            <Passo titulo="Escolha o sistema e informe a sua empresa.">
+              Selecione o sistema da Focus NFe que aparecer na lista, informe o CNPJ da sua empresa e clique em Continuar.
+            </Passo>
+            <Passo titulo="Escolha o modelo de nota.">Marque o modelo 55 (NF-e) e clique em Continuar.</Passo>
+            <Passo titulo="Guarde o comprovante.">
+              Quando aparecer “Solicitação concluída com êxito”, clique em Visualizar Documento e salve o arquivo.
+            </Passo>
+            <Passo titulo="Avise o Livih.">
+              Mande o comprovante ao suporte do Livih. Nós pedimos à Focus NFe o aceite da vinculação, que ela faz no portal da
+              SEFAZ-PR.
+            </Passo>
+            <Passo titulo="Emita de novo.">
+              Depois do aceite, a SEFAZ conclui a liberação e avisamos você. Aí é só abrir a nota e clicar em Emitir de novo.
+            </Passo>
           </ol>
-          {!uf && <p>Em outro estado, faça o equivalente no portal da SEFAZ do estado.</p>}
+          <p className="text-legenda text-texto-3">
+            Vale para as notas de teste e as de verdade. Se a empresa já autorizou outro sistema antes, não precisa desfazer.
+          </p>
+          {!uf && <p>Em outro estado, faça o equivalente no portal da SEFAZ do estado e avise o suporte do Livih.</p>}
         </>
       )}
-      <p>
-        Depois, avise o suporte do Livih: a Focus NFe precisa aceitar a vinculação do lado dela. Com o aceite, emita de
-        novo.
-      </p>
     </div>
   )
 }
