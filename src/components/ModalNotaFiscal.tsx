@@ -117,7 +117,7 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
       limite_faturamento: limiteNum,
       padrao_balcao: c.balcao,
       nfse_ativa: c.nfse,
-      inscricao_municipal: c.im.trim() || null,
+      inscricao_municipal: c.im.replace(/\D/g, '') || null,
       nfse_codigo_tributacao_nacional: c.tribNacional || null,
       nfse_codigo_tributacao_municipal: c.tribMunicipal || null,
       nfse_codigo_nbs: c.nbs || null,
@@ -272,7 +272,8 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
                   onChange={(ev) => muda({ tribNacional: ev.target.value.replace(/\D/g, '') })}
                   erro={c.tribNacional && !/^\d{6}$/.test(c.tribNacional) ? '6 números' : undefined}
                   ajuda="Identifica o serviço (ex.: 01.01.01 desenvolvimento de software). Peça à contabilidade." />
-                <CampoTexto rotulo="Inscrição municipal (opcional)" maxLength={15} value={c.im} onChange={(ev) => muda({ im: ev.target.value })} />
+                <CampoTexto rotulo="Inscrição municipal (opcional)" maxLength={20} value={c.im} onChange={(ev) => muda({ im: ev.target.value })}
+                  ajuda="O número inteiro, como no cadastro da prefeitura (ex.: 01 05 1.262.340-0), com os zeros do começo." />
                 <CampoTexto rotulo="Código de tributação municipal (opcional)" inputMode="numeric" maxLength={3} value={c.tribMunicipal}
                   onChange={(ev) => muda({ tribMunicipal: ev.target.value.replace(/\D/g, '') })} />
                 <CampoTexto rotulo="Código NBS (opcional)" inputMode="numeric" maxLength={9} value={c.nbs}

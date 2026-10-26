@@ -148,7 +148,8 @@ Deno.serve(async (req) => {
     serie_nfe_homologacao: String(e.nfe_serie),
     // NFS-e Nacional (padrão nacional; não junto com habilita_nfse, a municipal).
     ...(e.nfse_ativa ? { habilita_nfsen_homologacao: true, habilita_nfsen_producao: true } : {}),
-    ...(im ? { inscricao_municipal: Number(im) } : {}),
+    // Como texto: a IM de Curitiba começa com zero (01 05 ...) e como número o zero se perdia.
+    ...(im ? { inscricao_municipal: im } : {}),
     ...(temCertificado
       ? { arquivo_certificado_base64: p.certificado_base64, senha_certificado: p.senha_certificado, certificado_especifico: true }
       : {}),
