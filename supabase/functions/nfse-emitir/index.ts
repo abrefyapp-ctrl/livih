@@ -132,7 +132,9 @@ Deno.serve(async (req) => {
     // Reforma tributária (2026): o Ambiente Nacional exige o leiaute novo, e a Focus só o gera com o grupo IBS/CBS
     // completo. Os três códigos dependem do serviço e vêm da contabilidade.
     const rt = [["indicador da operação (cIndOp)", emi.nfse_codigo_indicador_operacao], ["CST do IBS/CBS", emi.ibs_cbs_cst],
-                ["classificação tributária do IBS/CBS", emi.ibs_cbs_classificacao]].filter(([, v]) => !v).map(([n]) => n);
+                ["classificação tributária do IBS/CBS", emi.ibs_cbs_classificacao],
+                // Com IBS/CBS o Ambiente Nacional exige o NBS (E0322, teste da F7 em 25/10).
+                ["código NBS", emi.nfse_codigo_nbs]].filter(([, v]) => !v).map(([n]) => n);
     if (rt.length) faltando.push(`Informe os códigos da reforma tributária na configuração da NFS-e do CNPJ (a contabilidade sabe): ${rt.join(", ")}.`);
   }
   if (!cli) faltando.push("Ligue a nota a um cliente do cadastro (com CNPJ ou CPF).");
