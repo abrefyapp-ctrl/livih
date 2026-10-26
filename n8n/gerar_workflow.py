@@ -343,6 +343,8 @@ const receitaCnpj = async (doc) => {
   try {
     const r = await this.helpers.httpRequest({
       method: 'GET', url: `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, json: true, timeout: 15000,
+      // Sem User-Agent a BrasilAPI responde 403 para o servidor (teste da VPS, 26/10).
+      headers: { 'User-Agent': 'Livih/1.0 (+https://livih.com.br)', Accept: 'application/json' },
       ignoreHttpStatusErrors: true, returnFullResponse: true,
     });
     const d = r.statusCode === 200 ? r.body : null;
@@ -386,6 +388,8 @@ const receitaCnpj = async (doc) => {
   try {
     const r = await this.helpers.httpRequest({
       method: 'GET', url: `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, json: true, timeout: 15000,
+      // Sem User-Agent a BrasilAPI responde 403 para o servidor (teste da VPS, 26/10).
+      headers: { 'User-Agent': 'Livih/1.0 (+https://livih.com.br)', Accept: 'application/json' },
       ignoreHttpStatusErrors: true, returnFullResponse: true,
     });
     const d = r.statusCode === 200 ? r.body : null;
