@@ -63,6 +63,7 @@ export type Database = {
           canal_id: string
           horario: Json | null
           id: string
+          identificar_cliente: boolean
           mensagem_fora_horario: string | null
           modelo: string
           nome: string
@@ -80,6 +81,7 @@ export type Database = {
           canal_id: string
           horario?: Json | null
           id?: string
+          identificar_cliente?: boolean
           mensagem_fora_horario?: string | null
           modelo?: string
           nome?: string
@@ -97,6 +99,7 @@ export type Database = {
           canal_id?: string
           horario?: Json | null
           id?: string
+          identificar_cliente?: boolean
           mensagem_fora_horario?: string | null
           modelo?: string
           nome?: string
@@ -3176,6 +3179,15 @@ export type Database = {
         Args: { p_busca: string; p_conversa: string; p_limite?: number }
         Returns: Json
       }
+      agente_cadastrar_cliente: {
+        Args: {
+          p_conversa: string
+          p_dados?: Json
+          p_documento: string
+          p_nome: string
+        }
+        Returns: Json
+      }
       agente_chamar_humano: {
         Args: { p_conversa: string; p_motivo: string }
         Returns: Json
@@ -3217,8 +3229,24 @@ export type Database = {
         Returns: Json
       }
       agente_horario_valido: { Args: { p: Json }; Returns: boolean }
+      agente_identificar_cliente: {
+        Args: { p_conversa: string; p_documento: string; p_nome?: string }
+        Returns: Json
+      }
+      agente_ligar_cliente: {
+        Args: {
+          p_cliente: Database["public"]["Tables"]["clientes"]["Row"]
+          p_como: string
+          p_conv: Database["public"]["Tables"]["conversas"]["Row"]
+        }
+        Returns: Json
+      }
       agente_marcar: { Args: never; Returns: undefined }
       agente_montar_pedido: {
+        Args: { p_conversa: string; p_itens: Json; p_observacao?: string }
+        Returns: Json
+      }
+      agente_montar_pedido_itens: {
         Args: { p_conversa: string; p_itens: Json; p_observacao?: string }
         Returns: Json
       }
@@ -3375,6 +3403,10 @@ export type Database = {
         Args: { p_canal: string; p_token: string }
         Returns: undefined
       }
+      documento_cliente: {
+        Args: { p: string }
+        Returns: Record<string, unknown>
+      }
       eh_admin_plataforma: { Args: never; Returns: boolean }
       eh_membro: { Args: { p_org: string }; Returns: boolean }
       eh_mensagem_automatica: {
@@ -3469,6 +3501,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      formatar_documento: { Args: { p: string }; Returns: string }
       fotos_candidatas: {
         Args: {
           p_embedding: string
@@ -3563,6 +3596,7 @@ export type Database = {
         Args: { p_ambiente: string; p_emissora: string }
         Returns: string
       }
+      nomes_conferem: { Args: { p_a: string; p_b: string }; Returns: boolean }
       nota_entrada_lancar: {
         Args: { p_itens: Json; p_nota: Json; p_org: string }
         Returns: Json
@@ -3860,6 +3894,10 @@ export type Database = {
       }
       simulador_documento: {
         Args: { p_documento: string; p_org: string }
+        Returns: Json
+      }
+      simulador_identificar_cliente: {
+        Args: { p_documento: string; p_nome?: string; p_org: string }
         Returns: Json
       }
       simulador_montar_pedido: {
