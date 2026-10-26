@@ -17,10 +17,20 @@ export type Nota = {
 /** Caminho da API por modelo: NF-e em /v2/nfe, NFS-e Nacional em /v2/nfsen. */
 export const ROTA: Record<Modelo, string> = { nfe: "nfe", nfse: "nfsen" };
 
+/**
+ * Um erro da Focus em texto, com tudo o que vier nele: além de código e mensagem, o Ambiente Nacional da NFS-e manda
+ * o detalhe em outros campos (ex.: "complemento", com o elemento rejeitado no E1235), que antes ficavam de fora.
+ */
+export function textoErro(e: Record<string, unknown>): string {
+  const partes = [e.codigo, e.mensagem, ...Object.entries(e).filter(([k]) => k !== "codigo" && k !== "mensagem").map(([, v]) => v)]
+    .filter((v) => typeof v === "string" && v.trim()) as string[];
+  return partes.join(" — ");
+}
+
 /** Mensagens de erro da Focus em texto (vêm em erros[] com campo e mensagem, ou em mensagem/mensagem_sefaz). */
 export function mensagemFocus(corpo: unknown, status: number): string {
   const c = corpo as { mensagem?: string; mensagem_sefaz?: string; erros?: { mensagem?: string }[] } | null;
-  const lista = (c?.erros ?? []).map((e) => e.mensagem).filter(Boolean);
+  const lista = ((c?.erros ?? []) as Record<string, unknown>[]).map(textoErro).filter(Boolean);
   if (lista.length) return lista.join(" · ");
   return c?.mensagem_sefaz || c?.mensagem || (status === 401 ? "A Focus recusou o acesso (token do CNPJ)." : `A Focus respondeu ${status}.`);
 }
@@ -58,7 +68,7 @@ type Retorno = {
   status?: string; numero?: string | number; serie?: string | number; chave_nfe?: string; mensagem_sefaz?: string;
   status_sefaz?: string; caminho_xml_nota_fiscal?: string; caminho_danfe?: string; caminho_xml_cancelamento?: string;
   // NFS-e Nacional: o PDF vem como URL completa e a chave (50 dígitos) dentro da URL de consulta pública.
-  url_danfse?: string; url?: string; codigo_verificacao?: string; erros?: { codigo?: string; mensagem?: string }[];
+  url_danfse?: string; url?: string; codigo_verificacao?: string; erros?: Record<string, unknown>[];
 };
 
 const chaveDe = (r: Retorno) => (r.chave_nfe ?? "").replace(/\D/g, "") || (r.url?.match(/chave=(\d{44,50})/)?.[1] ?? null);
@@ -90,7 +100,7 @@ export async function aplicarRetorno(admin: SupabaseClient, nota: Nota, r: Retor
     await admin.from("notas_fiscais").update({
       status: "rejeitada",
       mensagem: [r.status === "denegado" ? "Uso denegado pela SEFAZ." : null, r.status_sefaz ? `${r.status_sefaz}:` : null, r.mensagem_sefaz,
-                 ...(r.erros ?? []).map((e) => [e.codigo, e.mensagem].filter(Boolean).join(": "))]
+                 ...(r.erros ?? []).map(textoErro)]
         .filter(Boolean).join(" ").slice(0, 4000) || (nota.modelo === "nfse" ? "A prefeitura não autorizou a nota." : "A SEFAZ não autorizou a nota."),
     }).eq("id", nota.id);
     return;
