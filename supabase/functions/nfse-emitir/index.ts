@@ -178,12 +178,17 @@ Deno.serve(async (req) => {
     // valor estimado (Decreto 8.264/2014). Primeiro teste da F7 (25/10) recusado sem ele.
     indicador_total_tributacao: 0,
     ...(p.informacoes?.trim() ? { informacoes_complementares: p.informacoes.trim().slice(0, 2000) } : {}),
-    // Reforma tributária: finalidade regular, consumidor final (pessoa física) e destinatário = tomador.
-    finalidade_emissao: 0,
-    consumidor_final: cli!.tipo === "pf" ? 1 : 0,
-    indicador_destinatario: 0,
+    // Reforma tributária (grupo IBS/CBS): só com o CST e a classificação configurados no CNPJ. Mandar finalidade,
+    // consumidor final e destinatário sem eles monta o grupo pela metade e o Ambiente Nacional recusa o esquema
+    // (E1235, teste da F7 em 25/10). Sem configuração, a nota sai no leiaute de antes da reforma.
     ...(emi!.ibs_cbs_cst && emi!.ibs_cbs_classificacao
-      ? { ibs_cbs_situacao_tributaria: emi!.ibs_cbs_cst, ibs_cbs_classificacao_tributaria: emi!.ibs_cbs_classificacao }
+      ? {
+          finalidade_emissao: 0,
+          consumidor_final: cli!.tipo === "pf" ? 1 : 0,
+          indicador_destinatario: 0,
+          ibs_cbs_situacao_tributaria: emi!.ibs_cbs_cst,
+          ibs_cbs_classificacao_tributaria: emi!.ibs_cbs_classificacao,
+        }
       : {}),
   };
 
