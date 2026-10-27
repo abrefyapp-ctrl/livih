@@ -161,6 +161,7 @@ export function PainelContato({ contatoId, conversaId }: { contatoId: string; co
             email: contato.email,
             responsavel_id: contato.responsavel_id,
             sem_agente: contato.sem_agente,
+            descadastrado_em: contato.descadastrado_em,
           }}
           aoFechar={() => setEditando(false)}
           aoSalvar={() => {

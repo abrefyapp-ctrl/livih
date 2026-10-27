@@ -13,6 +13,7 @@ import { NaoEncontrada } from './pages/NaoEncontrada'
 import { Configuracoes } from './pages/Configuracoes'
 import { Contatos } from './pages/Contatos'
 import { ContatoPerfil } from './pages/ContatoPerfil'
+import { Campanhas } from './pages/Campanhas'
 import { Clientes } from './pages/Clientes'
 import { ClientePerfil } from './pages/ClientePerfil'
 import { Agenda } from './pages/Agenda'
@@ -64,6 +65,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="clientes/:id" element={<ClientePerfil />} />
             <Route path="oportunidades" element={<Oportunidades />} />
             <Route path="agenda" element={<Agenda />} />
+            <Route path="campanhas" element={<Campanhas />} />
             <Route path="pedidos" element={<Pedidos />} />
             <Route path="pedidos/:id" element={<PedidoDetalhe />} />
             <Route path="produtos" element={<Produtos />} />

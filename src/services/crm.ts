@@ -40,7 +40,7 @@ export type PassoFunil = {
   criado_em: string
 }
 
-export type DadosContato = Pick<Tabelas['contatos']['Row'], 'nome' | 'telefone' | 'empresa' | 'email' | 'responsavel_id' | 'sem_agente'>
+export type DadosContato = Pick<Tabelas['contatos']['Row'], 'nome' | 'telefone' | 'empresa' | 'email' | 'responsavel_id' | 'sem_agente' | 'descadastrado_em'>
 
 /** 41999998888 / (41) 99999-8888 / +55… → 5541999998888; vazio → null; inválido → undefined. */
 export function normalizarTelefone(v: string): string | null | undefined {

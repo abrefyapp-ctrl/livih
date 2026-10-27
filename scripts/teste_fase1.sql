@@ -3276,5 +3276,134 @@ begin
   insert into resultado (teste, ok) values ('identificar: com a opção desligada, o orçamento não pede identificação',
     r -> 'identificar_cliente' is null);
 end $$;
+-- Campanhas (migration 20261027120000): público, criação, envio aos poucos, descadastro e resposta.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  update public.canais set ativo = true where instance_id = 'PNID-TESTE-1';
+  insert into public.contatos (org_id, telefone, nome, tags) values
+    (v_org, '5541911100001', 'Ana Campanha', '{promo}'),
+    (v_org, '5541911100002', 'Bruno Campanha', '{promo}'),
+    (v_org, '5541911100003', null, '{promo}'),
+    (v_org, '5541911100004', 'Carla Descadastrada', '{promo}');
+  update public.contatos set descadastrado_em = now() where org_id = v_org and telefone = '5541911100004';
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_meta uuid := (select id from public.canais where instance_id = 'PNID-TESTE-1');
+  v_waha uuid := (select id from public.canais where instance_id = 'INST-F7');
+  r jsonb; v_id uuid;
+  v_dados jsonb;
+begin
+  r := public.campanha_publico(v_org, '{"tags":["promo"]}');
+  insert into resultado (teste, ok) values ('campanhas: público pela etiqueta, sem os descadastrados',
+    (r ->> 'total')::int = 3 and jsonb_array_length(r -> 'amostra') = 3);
+  insert into resultado (teste, ok) values ('campanhas: etiquetas em uso para o filtro',
+    'promo' = any (public.campanha_etiquetas(v_org)));
+
+  v_dados := jsonb_build_object('nome', 'Promo outubro', 'canal_id', v_meta, 'filtros', '{"tags":["promo"]}'::jsonb,
+    'modelo', '{"nome":"promo_outubro","idioma":"pt_BR","categoria":"MARKETING","cabecalho":"Novidade","corpo":"Oi {{1}}, temos {{2}} para você.","rodape":"Responda SAIR para não receber","variaveis":[{"fonte":"nome"},{"fonte":"fixo","valor":"grampos em promoção"}]}'::jsonb);
+  begin
+    perform public.campanha_criar(v_org, v_dados);
+    insert into resultado (teste, ok) values ('campanhas: exige a confirmação do consentimento', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('campanhas: exige a confirmação do consentimento', sqlerrm like 'confirme%');
+  end;
+  begin
+    perform public.campanha_criar(v_org, v_dados || jsonb_build_object('consentimento', true, 'canal_id', v_waha));
+    insert into resultado (teste, ok) values ('campanhas: número do celular (QR code) não dispara', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('campanhas: número do celular (QR code) não dispara', sqlerrm like '%API oficial%');
+  end;
+  begin
+    perform public.campanha_criar(v_org, v_dados || jsonb_build_object('consentimento', true,
+      'modelo', (v_dados -> 'modelo') || '{"variaveis":[{"fonte":"nome"}]}'::jsonb));
+    insert into resultado (teste, ok) values ('campanhas: toda variável do modelo precisa de valor', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('campanhas: toda variável do modelo precisa de valor', sqlerrm like 'preencha%');
+  end;
+
+  v_id := public.campanha_criar(v_org, v_dados || jsonb_build_object('consentimento', true, 'limite_dia', 2));
+  perform set_config('teste.campanha', v_id::text, false);
+  insert into resultado (teste, ok) values ('campanhas: cria com a lista de destinatários do momento',
+    (select count(*) from public.campanha_destinatarios where campanha_id = v_id) = 3
+    and (select status from public.campanhas where id = v_id) = 'agendada');
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.campanha_publico(current_setting('teste.f7')::uuid, '{}');
+  insert into resultado (teste, ok) values ('campanhas: atendente não faz campanha', false);
+exception when others then
+  insert into resultado (teste, ok) values ('campanhas: atendente não faz campanha', sqlerrm like 'só dono%');
+end $$;
+insert into resultado (teste, ok) select 'campanhas: atendente não vê as campanhas',
+  not exists (select 1 from public.campanhas where id = current_setting('teste.campanha')::uuid);
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_id uuid := current_setting('teste.campanha')::uuid;
+  v_ana uuid := (select id from public.contatos where telefone = '5541911100001');
+  v_conv uuid;
+  m public.mensagens;
+begin
+  perform public.campanhas_liberar();
+  insert into resultado (teste, ok) values ('campanhas: envia aos poucos, até o limite do dia do número',
+    (select count(*) from public.campanha_destinatarios where campanha_id = v_id and status = 'enviado') = 2
+    and (select status from public.campanhas where id = v_id) = 'enviando'
+    and (select count(*) from public.fila_envio f join public.campanha_destinatarios d on d.mensagem_id = f.mensagem_id
+          where d.campanha_id = v_id) = 2);
+  select * into m from public.mensagens where id = (select mensagem_id from public.campanha_destinatarios
+                                                     where campanha_id = v_id and contato_id = v_ana);
+  insert into resultado (teste, ok) values ('campanhas: modelo com as variáveis do contato, na conversa do número',
+    m.modelo -> 'parametros' = '["Ana Campanha", "grampos em promoção"]'::jsonb and m.modelo ->> 'nome' = 'promo_outubro'
+    and m.texto = E'*Novidade*\n\nOi Ana Campanha, temos grampos em promoção para você.\n\n_Responda SAIR para não receber_'
+    and (select canal_id from public.conversas where id = m.conversa_id) = (select id from public.canais where instance_id = 'PNID-TESTE-1'));
+
+  -- A Ana responde "Sair.": conta como resposta e sai das campanhas.
+  v_conv := m.conversa_id;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, status_entrega)
+  values (m.org_id, v_conv, 'entrada', 'contato', 'texto', 'Sair.', 'recebida');
+  insert into resultado (teste, ok) values ('campanhas: "SAIR" depois da campanha descadastra e conta como resposta',
+    (select descadastrado_em from public.contatos where id = v_ana) is not null
+    and (select respondido_em from public.campanha_destinatarios where campanha_id = v_id and contato_id = v_ana) is not null
+    and exists (select 1 from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema' and texto like 'O contato pediu%'));
+
+  -- No dia seguinte (limite zerado): sai o último e a campanha termina.
+  update public.campanha_destinatarios set enviado_em = enviado_em - interval '1 day' where campanha_id = v_id and status = 'enviado';
+  perform public.campanhas_liberar();
+  insert into resultado (teste, ok) values ('campanhas: termina quando não sobra ninguém',
+    (select status from public.campanhas where id = v_id) = 'concluida'
+    and not exists (select 1 from public.campanha_destinatarios where campanha_id = v_id and status = 'pendente'));
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  r record; v_id uuid;
+begin
+  select * into r from public.campanhas_resumo(v_org) where campanha_id = current_setting('teste.campanha')::uuid;
+  insert into resultado (teste, ok) values ('campanhas: resumo com enviadas e respostas',
+    r.total = 3 and r.enviadas = 3 and r.respostas = 1 and r.pendentes = 0);
+  -- Pausar e cancelar (a Ana saiu, então a nova campanha tem 2).
+  v_id := public.campanha_criar(v_org, jsonb_build_object('nome', 'Outra', 'consentimento', true, 'filtros', '{"tags":["promo"]}'::jsonb,
+    'canal_id', (select id from public.canais where instance_id = 'PNID-TESTE-1'),
+    'modelo', '{"nome":"promo","idioma":"pt_BR","corpo":"Oi","variaveis":[]}'::jsonb, 'agendada_para', now() + interval '1 day'));
+  perform public.campanha_acao(v_id, 'pausar');
+  perform public.campanha_acao(v_id, 'cancelar');
+  insert into resultado (teste, ok) values ('campanhas: pausa e cancela sem enviar',
+    (select status from public.campanhas where id = v_id) = 'cancelada'
+    and (select count(*) from public.campanha_destinatarios where campanha_id = v_id and status = 'pulado') = 2);
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

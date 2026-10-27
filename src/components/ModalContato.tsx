@@ -30,6 +30,7 @@ export function ModalContato({
   const [empresa, setEmpresa] = useState(inicial?.empresa ?? '')
   const [email, setEmail] = useState(inicial?.email ?? '')
   const [semAgente, setSemAgente] = useState(inicial?.sem_agente ?? false)
+  const [semCampanhas, setSemCampanhas] = useState(!!inicial?.descadastrado_em)
   // Em modo suporte a plataforma não é da equipe: começa sem responsável.
   const [responsavel, setResponsavel] = useState(
     editando ? (inicial?.responsavel_id ?? '') : orgAtiva?.suporte ? '' : (sessao?.user.id ?? ''),
@@ -46,7 +47,7 @@ export function ModalContato({
     if (!orgAtiva || telInvalido || emailInvalido) return
     setSalvando(true)
     setErro(null)
-    const dados: DadosContato = {
+    const dados: Partial<DadosContato> = {
       nome: nome.trim() || null,
       telefone: tel ?? null,
       empresa: empresa.trim() || null,
@@ -54,12 +55,16 @@ export function ModalContato({
       responsavel_id: responsavel || null,
       sem_agente: semAgente,
     }
+    // Só grava o descadastro quando sabe o valor atual (quem abriu o modal sem ele não apaga o "SAIR" do contato).
+    if (!editando || inicial?.descadastrado_em !== undefined) {
+      dados.descadastrado_em = semCampanhas ? (inicial?.descadastrado_em ?? new Date().toISOString()) : null
+    }
     try {
       if (editando) {
         await atualizarContato(inicial!.id!, dados)
         aoSalvar(inicial!.id!)
       } else {
-        aoSalvar(await criarContato(orgAtiva.id, dados))
+        aoSalvar(await criarContato(orgAtiva.id, dados as DadosContato))
       }
     } catch (err) {
       setErro((err as Error).message)
@@ -132,6 +137,15 @@ export function ModalContato({
             <span className="block text-pequeno font-medium text-texto">Não atender pelo agente</span>
             <span className="block text-legenda text-texto-3">
               As mensagens deste contato vão direto para a equipe. Use para clientes antigos, fornecedores, parceiros ou contatos pessoais.
+            </span>
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-borda p-3">
+          <input type="checkbox" checked={semCampanhas} onChange={(e) => setSemCampanhas(e.target.checked)} className="mt-0.5 size-4 shrink-0 accent-primaria" />
+          <span>
+            <span className="block text-pequeno font-medium text-texto">Não receber campanhas</span>
+            <span className="block text-legenda text-texto-3">
+              Fica fora das campanhas de divulgação. Marcado sozinho quando o contato responde SAIR a uma campanha.
             </span>
           </span>
         </label>

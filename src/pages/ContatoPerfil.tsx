@@ -233,7 +233,7 @@ export function ContatoPerfil() {
       {editando && (
         <ModalContato
           aberto
-          inicial={{ id: c.id, nome: c.nome ?? c.nome_whatsapp, telefone: c.telefone, empresa: c.empresa, email: c.email, responsavel_id: c.responsavel_id, sem_agente: c.sem_agente }}
+          inicial={{ id: c.id, nome: c.nome ?? c.nome_whatsapp, telefone: c.telefone, empresa: c.empresa, email: c.email, responsavel_id: c.responsavel_id, sem_agente: c.sem_agente, descadastrado_em: c.descadastrado_em }}
           aoFechar={() => setEditando(false)}
           aoSalvar={() => {
             setEditando(false)
