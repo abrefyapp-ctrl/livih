@@ -29,7 +29,7 @@ CRM de atendimento e vendas pelo WhatsApp, multiempresa, com agente de IA. Produ
 | Checar tipos e lint | `npx tsc -b --noEmit` e `npx eslint <arquivos>` (ou `npm run lint`) |
 | Checar uma Edge Function | `npx -y deno check supabase/functions/<nome>/index.ts` |
 | Testar migrations | `PYTHONIOENCODING=utf-8 python scripts/testar_migrations.py`: aplica as migrations pendentes e `scripts/teste_fase1.sql` dentro de `begin … rollback` no banco linkado; nada fica gravado |
-| Consultar o banco | `npx supabase db query --linked -o json "<sql>"` |
+| Consultar o banco | Supabase MCP (`.mcp.json`, só leitura: SQL, logs das funções, avisos de segurança) ou `npx supabase db query --linked -o json "<sql>"` |
 | Gerar os tipos do banco | `npm run tipos` (gera `src/services/tiposBanco.ts`) |
 | Publicar o app | `npm run publicar` |
 | Conferir o app publicado | `npm run verificar` |
