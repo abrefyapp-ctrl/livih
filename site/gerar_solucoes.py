@@ -362,9 +362,9 @@ def pagina(p: dict) -> str:
     <section class="chamada" aria-labelledby="titulo-chamada">
       <div class="container">
         <h2 id="titulo-chamada">Organize o WhatsApp da sua equipe</h2>
-        <p>Peça o acesso à Livih. Nós entramos em contato para conhecer a sua operação e ajudar a conectar os números.</p>
+        <p>As 10 primeiras empresas testam a Livih por 30 dias, grátis e sem cartão. No fim, você decide se continua. Nós entramos em contato para conhecer a sua operação, conectar os números e configurar o agente com você.</p>
         <div class="acoes" style="justify-content:center;display:flex;flex-wrap:wrap;gap:.75rem">
-          <a class="botao claro" href="/#solicitar">Peça acesso à Livih</a>
+          <a class="botao claro" href="/#solicitar">Quero meus 30 dias grátis</a>
         </div>
         <p class="alternativa">Prefere conversar agora? <a href="{WHATSAPP}" rel="noopener">Fale com a gente no WhatsApp</a>.</p>
       </div>
