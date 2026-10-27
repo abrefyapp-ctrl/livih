@@ -137,7 +137,7 @@ PAGINAS = [
         "perguntas": [
             ("O agente pode inventar informação?", "Ele é instruído a responder só com as informações da sua empresa e do seu catálogo, e a chamar a equipe quando não sabe. Como todo agente de IA, pode errar. Por isso a equipe acompanha as conversas e ajusta as instruções quando precisa."),
             ("Dá para desligar o agente?", "Sim. Você liga e desliga o agente em cada número e também para clientes específicos."),
-            ("O agente faz disparo de mensagens?", "Não. Ele responde quem escreve para a sua empresa. Envio em massa não faz parte da Livih."),
+            ("O agente faz disparo de mensagens?", "Não. Ele responde quem escreve para a sua empresa. As campanhas de divulgação saem pela equipe, pela API oficial do WhatsApp e só para quem autorizou; quando o cliente responde, o agente atende."),
         ],
         "relacionadas": ["atendimento-whatsapp-equipe", "orcamento-pedidos-whatsapp", "crm-whatsapp"],
     },

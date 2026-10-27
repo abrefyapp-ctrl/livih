@@ -58,6 +58,8 @@ header.topo { border-bottom: 1px solid var(--borda); background: #fff; position:
 .heroi h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.12; margin: 0 0 1.25rem; letter-spacing: -.02em; }
 .heroi p.sub { font-size: clamp(1.05rem, 2vw, 1.25rem); color: #cbd5e1; margin: 0 0 2rem; max-width: 40rem; }
 .heroi .acoes { display: flex; flex-wrap: wrap; gap: .75rem; }
+.heroi .oficial { margin: 1.25rem 0 0; color: rgba(255,255,255,.85); font-size: .9rem; }
+.heroi .oficial span { color: var(--destaque); font-weight: 700; margin-right: .25rem; }
 .heroi .acoes .botao.secundario { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
 .heroi .acoes .botao.secundario:hover { background: rgba(255,255,255,.08); }
 .heroi .simbolo { justify-self: center; width: 11rem; opacity: .95; }
