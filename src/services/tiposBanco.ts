@@ -316,6 +316,137 @@ export type Database = {
           },
         ]
       }
+      campanha_destinatarios: {
+        Row: {
+          campanha_id: string
+          contato_id: string
+          conversa_id: string | null
+          enviado_em: string | null
+          id: number
+          mensagem_id: string | null
+          motivo: string | null
+          org_id: string
+          respondido_em: string | null
+          status: string
+        }
+        Insert: {
+          campanha_id: string
+          contato_id: string
+          conversa_id?: string | null
+          enviado_em?: string | null
+          id?: never
+          mensagem_id?: string | null
+          motivo?: string | null
+          org_id: string
+          respondido_em?: string | null
+          status?: string
+        }
+        Update: {
+          campanha_id?: string
+          contato_id?: string
+          conversa_id?: string | null
+          enviado_em?: string | null
+          id?: never
+          mensagem_id?: string | null
+          motivo?: string | null
+          org_id?: string
+          respondido_em?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campanha_destinatarios_campanha_id_org_id_fkey"
+            columns: ["campanha_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "campanha_destinatarios_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campanha_destinatarios_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campanha_destinatarios_mensagem_id_fkey"
+            columns: ["mensagem_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campanhas: {
+        Row: {
+          agendada_para: string
+          canal_id: string
+          concluida_em: string | null
+          criado_em: string
+          criado_por: string | null
+          filtros: Json
+          id: string
+          iniciada_em: string | null
+          limite_dia: number
+          modelo: Json
+          nome: string
+          org_id: string
+          status: string
+        }
+        Insert: {
+          agendada_para?: string
+          canal_id: string
+          concluida_em?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          filtros?: Json
+          id?: string
+          iniciada_em?: string | null
+          limite_dia?: number
+          modelo: Json
+          nome: string
+          org_id: string
+          status?: string
+        }
+        Update: {
+          agendada_para?: string
+          canal_id?: string
+          concluida_em?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          filtros?: Json
+          id?: string
+          iniciada_em?: string | null
+          limite_dia?: number
+          modelo?: Json
+          nome?: string
+          org_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campanhas_canal_id_org_id_fkey"
+            columns: ["canal_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "canais"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "campanhas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       canais: {
         Row: {
           alerta_queda_em: string | null
@@ -573,6 +704,7 @@ export type Database = {
           cliente_id: string | null
           criado_em: string
           dados: Json
+          descadastrado_em: string | null
           email: string | null
           empresa: string | null
           id: string
@@ -591,6 +723,7 @@ export type Database = {
           cliente_id?: string | null
           criado_em?: string
           dados?: Json
+          descadastrado_em?: string | null
           email?: string | null
           empresa?: string | null
           id?: string
@@ -609,6 +742,7 @@ export type Database = {
           cliente_id?: string | null
           criado_em?: string
           dados?: Json
+          descadastrado_em?: string | null
           email?: string | null
           empresa?: string | null
           id?: string
@@ -3354,6 +3488,45 @@ export type Database = {
       buscar_produtos_org: {
         Args: { p_busca: string; p_limite?: number; p_org: string }
         Returns: Json
+      }
+      campanha_acao: {
+        Args: { p_acao: string; p_campanha: string }
+        Returns: undefined
+      }
+      campanha_criar: {
+        Args: { p_dados: Json; p_org: string }
+        Returns: string
+      }
+      campanha_elegiveis: {
+        Args: { p_filtros: Json; p_org: string }
+        Returns: {
+          contato_id: string
+        }[]
+      }
+      campanha_etiquetas: { Args: { p_org: string }; Returns: string[] }
+      campanha_parametros: {
+        Args: { p_contato: string; p_modelo: Json }
+        Returns: string[]
+      }
+      campanha_publico: {
+        Args: { p_filtros: Json; p_org: string }
+        Returns: Json
+      }
+      campanhas_liberar: { Args: never; Returns: undefined }
+      campanhas_resumo: {
+        Args: { p_org: string }
+        Returns: {
+          campanha_id: string
+          entregues: number
+          enviadas: number
+          erros: number
+          lidas: number
+          orcamentos: number
+          pendentes: number
+          puladas: number
+          respostas: number
+          total: number
+        }[]
       }
       canal_atualizar_status: {
         Args: { p_canal: string; p_numero?: string; p_status: string }
