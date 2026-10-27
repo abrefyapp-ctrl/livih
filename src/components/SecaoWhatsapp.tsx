@@ -81,9 +81,11 @@ export function SecaoWhatsapp() {
   const { orgAtiva, sessao, adminPlataforma } = useSessao()
   const orgId = orgAtiva!.id
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
-  // API oficial: até a Meta aprovar a F7 (Provedor de Tecnologia), só na própria F7. Empresa cliente não vê, nem
-  // aberta pela plataforma no modo suporte (decisão de 20/10: novas empresas conectam pelo QR code).
-  const oficial = gerencia && adminPlataforma && !orgAtiva?.suporte
+  // API oficial: liberada para dono e admin de toda empresa desde a aprovação da Meta (26/10: whatsapp_business_messaging
+  // e whatsapp_business_management). Não no modo suporte: o cadastro da Meta abre com a conta de quem clica, e o
+  // portfólio tem de ser o da empresa. O número do portfólio da F7 continua só para a equipe da plataforma.
+  const oficial = gerencia && !orgAtiva?.suporte
+  const portfolioF7 = oficial && adminPlataforma
   const eu = sessao?.user.id
   const [numeros, setNumeros] = useState<{ orgId: string; lista: NumeroWhatsapp[] } | null>(null)
   const [equipe, setEquipe] = useState<MembroEquipe[]>([])
@@ -221,7 +223,7 @@ export function SecaoWhatsapp() {
                 Conectar pela API oficial
               </Botao>
             )}
-            {oficial && (
+            {portfolioF7 && (
               <Botao variante="secundario" onClick={() => setPortfolio({ nome: '', waba_id: '', phone_number_id: '' })}>
                 Número do portfólio da F7
               </Botao>

@@ -13,12 +13,12 @@ import { SecaoOrdensServico } from '../components/SecaoOrdensServico'
 import { SecaoUsoIa } from '../components/SecaoUsoIa'
 import { SecaoWhatsapp } from '../components/SecaoWhatsapp'
 
-const SECOES: { id: string; rotulo: string; icone: NomeIcone; soPlataforma?: boolean; modulo?: string }[] = [
+const SECOES: { id: string; rotulo: string; icone: NomeIcone; modulo?: string }[] = [
   { id: 'equipe', rotulo: 'Equipe', icone: 'equipe' },
   { id: 'empresa', rotulo: 'Empresa', icone: 'empresa' },
   { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone' },
-  // Modelos só existem na API oficial: até a Meta aprovar a F7, só na própria F7 (não no modo suporte das clientes).
-  { id: 'modelos', rotulo: 'Modelos', icone: 'arquivo', soPlataforma: true },
+  // Modelos só existem na API oficial (liberada para todas as empresas em 26/10).
+  { id: 'modelos', rotulo: 'Modelos', icone: 'arquivo' },
   { id: 'agente', rotulo: 'Agente', icone: 'agente' },
   { id: 'base', rotulo: 'Base de conhecimento', icone: 'livro' },
   { id: 'documentos', rotulo: 'Documentos', icone: 'arquivo' },
@@ -29,11 +29,9 @@ const SECOES: { id: string; rotulo: string; icone: NomeIcone; soPlataforma?: boo
 
 export function Configuracoes() {
   const { secao } = useParams()
-  const { orgAtiva, adminPlataforma, modulos } = useSessao()
+  const { orgAtiva, modulos } = useSessao()
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
-  const secoes = SECOES.filter(
-    (s) => (!s.soPlataforma || (adminPlataforma && !orgAtiva?.suporte)) && (!s.modulo || modulos?.has(s.modulo)),
-  )
+  const secoes = SECOES.filter((s) => !s.modulo || modulos?.has(s.modulo))
   // Seção de módulo: espera os módulos carregarem antes de mandar embora.
   if (!modulos && SECOES.some((s) => s.id === secao && s.modulo)) return null
   if (!secoes.some((s) => s.id === secao)) return <Navigate to="/configuracoes/equipe" replace />
