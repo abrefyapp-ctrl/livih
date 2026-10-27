@@ -3459,5 +3459,56 @@ do $$ begin
   insert into resultado (teste, ok) select 'segurança: gatilho fechado continua rodando (contato nasce na carteira do dono)',
     responsavel_id = '00000000-0000-0000-0000-0000000000a1' from public.contatos where telefone = '5541911100011';
 end $$;
+-- Desempenho: auth.uid() uma vez por consulta nas políticas e índices das notas fiscais (migration 20261027150000).
+reset role;
+insert into resultado (teste, ok) select 'desempenho: nenhuma política de public com auth.*() fora de (select ...)',
+  not exists (select 1 from pg_policies
+               where schemaname = 'public'
+                 and regexp_replace(coalesce(qual, '') || ' ' || coalesce(with_check, ''),
+                                    'SELECT auth\.\w+\(\)', '', 'g') ~ 'auth\.\w+\(');
+insert into resultado (teste, ok) select 'desempenho: notas fiscais com índice por pedido e por OS',
+  exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'notas_fiscais'
+                                      and indexname = 'notas_fiscais_pedido_idx')
+  and exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'notas_fiscais'
+                                          and indexname = 'notas_fiscais_os_idx');
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$ begin
+  insert into public.notas (org_id, conversa_id, autor_tipo, autor_id, texto)
+  values (current_setting('teste.f7')::uuid, current_setting('teste.conversa')::uuid, 'atendente',
+          '00000000-0000-0000-0000-0000000000a1', 'Nota do dono (desempenho)');
+  insert into public.push_inscricoes (user_id, endpoint, p256dh, auth)
+  values ('00000000-0000-0000-0000-0000000000a1', 'https://push.teste/desempenho', 'p', 'a');
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'desempenho: atendente vê o perfil da equipe e não o de outra empresa',
+  exists (select 1 from public.perfis where user_id = '00000000-0000-0000-0000-0000000000a1')
+  and not exists (select 1 from public.perfis where user_id = '00000000-0000-0000-0000-0000000000c1');
+delete from public.notas where texto = 'Nota do dono (desempenho)';
+insert into resultado (teste, ok) select 'desempenho: atendente não apaga a nota do dono nem vê a inscrição de push dele',
+  exists (select 1 from public.notas where texto = 'Nota do dono (desempenho)')
+  and not exists (select 1 from public.push_inscricoes where endpoint = 'https://push.teste/desempenho');
+do $$ begin
+  insert into public.notas (org_id, conversa_id, autor_tipo, autor_id, texto)
+  values (current_setting('teste.f7')::uuid, current_setting('teste.conversa')::uuid, 'atendente',
+          '00000000-0000-0000-0000-0000000000a1', 'Nota em nome do dono');
+  insert into resultado (teste, ok) values ('desempenho: atendente não cria nota em nome do dono', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('desempenho: atendente não cria nota em nome do dono', true);
+end $$;
+update public.perfis set nome = 'Trocado pela atendente' where user_id = '00000000-0000-0000-0000-0000000000a1';
+insert into resultado (teste, ok) select 'desempenho: atendente não vê a outra empresa nem os membros dela',
+  not exists (select 1 from public.organizacoes where id = current_setting('teste.cli')::uuid)
+  and not exists (select 1 from public.membros_org where org_id = current_setting('teste.cli')::uuid);
+reset role;
+insert into resultado (teste, ok) select 'desempenho: atendente não altera o perfil do dono',
+  not exists (select 1 from public.perfis where nome = 'Trocado pela atendente');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'desempenho: o dono vê a própria inscrição de push',
+  exists (select 1 from public.push_inscricoes where endpoint = 'https://push.teste/desempenho');
+delete from public.notas where texto = 'Nota do dono (desempenho)';
+insert into resultado (teste, ok) select 'desempenho: o autor apaga a própria nota',
+  not exists (select 1 from public.notas where texto = 'Nota do dono (desempenho)');
 reset role;
 select n, teste, ok from resultado order by n;
