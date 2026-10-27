@@ -37,6 +37,12 @@ CRM de atendimento e vendas pelo WhatsApp, multiempresa, com agente de IA. Produ
 `waha-webhook` e `importar-catalogo` não passam no `deno check` local (dependências npm `pdf-lib` e `xlsx`); o erro
 é antigo e não indica problema na mudança.
 
+## Automações do Claude Code (`.claude/`)
+
+- **`/migration <o que muda>`**: o roteiro abaixo, com os modelos de migration e de teste.
+- **Hooks**: antes de editar, recusam `tiposBanco.ts`, `.env`, `docs/roadmap.md` e migrations que já estão no
+  `origin/main`; depois de editar um `.ts`/`.tsx` em `src/`, rodam o ESLint no arquivo e devolvem o erro na hora.
+
 ## Mudança no banco (sempre nesta ordem)
 
 1. Migration nova em `supabase/migrations/AAAAMMDDHHMMSS_<assunto>.sql`, com um comentário no topo dizendo o porquê.
