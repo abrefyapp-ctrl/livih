@@ -48,9 +48,9 @@ Anotado ao fim da sessão de 25 a 27/10. Tirar cada item quando resolver.
 - **Ordens de serviço:** o aviso de "pronto" pelo WhatsApp precisa do texto da mensagem (o usuário define) e, na API
   oficial, de um modelo aprovado.
 - **Avisos do Supabase (segurança e desempenho):** os de função aberta ao anon foram corrigidos na migration
-  20261027140000 (aplicar com `db push`); o teste de catálogo no `teste_fase1.sql` acusa os próximos. Falta: no painel
-  (Authentication), validade do código por e-mail abaixo de 1 h e proteção contra senha vazada; analisar os avisos de
-  desempenho. Os de tabela sem política (só a chave de serviço acessa) e o `pg_net` em `public` ficam como estão.
+  20261027140000 (aplicada em 27/10) e a validade do código por e-mail baixou para 1 h; o teste de catálogo no
+  `teste_fase1.sql` acusa os próximos. Falta: ligar a proteção contra senha vazada (painel, Authentication; plano Pro) e
+  analisar os avisos de desempenho. Os de tabela sem política (só a chave de serviço acessa) e o `pg_net` em `public` ficam como estão.
 - **Empresa de demonstração "Cactos Solutions"** (criada em 26/10 com a planilha de motores, clientes inventados): falta
   conectar um WhatsApp nela para mostrar o agente; apagar quando não servir mais.
 - **Do mapeamento (Cartographer):** `waha-webhook` e `importar-catalogo` não passam no `deno check` local (dependências
