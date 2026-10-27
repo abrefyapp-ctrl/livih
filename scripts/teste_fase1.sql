@@ -3426,5 +3426,38 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 insert into resultado (teste, ok) select 'campanhas: a prévia conta quem está sem nome e sem empresa',
   (r ->> 'sem_nome')::int >= 1 and (r ->> 'sem_empresa')::int >= 1
   from (select public.campanha_publico(current_setting('teste.f7')::uuid, '{}') r) x;
+-- Funções fechadas para o anon e para a tela (migration 20261027140000).
+reset role;
+insert into resultado (teste, ok) select 'segurança: nenhuma função security definer de public executável pelo anon',
+  not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public' and p.prosecdef and has_function_privilege('anon', p.oid, 'execute'));
+insert into resultado (teste, ok) select 'segurança: nenhuma função de gatilho de public executável pela tela',
+  not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public' and p.prorettype = 'trigger'::regtype
+                and (has_function_privilege('anon', p.oid, 'execute')
+                     or has_function_privilege('authenticated', p.oid, 'execute')));
+insert into resultado (teste, ok) select 'segurança: pode_ver_canal/contato/conversa seguem com a tela (as políticas usam)',
+  has_function_privilege('authenticated', 'public.pode_ver_canal(uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.pode_ver_contato(uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.pode_ver_conversa(uuid)', 'execute');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$ begin
+  perform public.pedido_recalcular();
+  insert into resultado (teste, ok) values ('segurança: a tela não chama função de gatilho pela API', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('segurança: a tela não chama função de gatilho pela API', true);
+-- Com EXECUTE, o erro seria outro (0A000, só roda como gatilho): grava false em vez de parar a bateria.
+when others then
+  insert into resultado (teste, ok) values ('segurança: a tela não chama função de gatilho pela API', false);
+end $$;
+insert into resultado (teste, ok) select 'segurança: o dono ainda vê a conversa (pode_ver_conversa pela RLS)',
+  public.pode_ver_conversa(current_setting('teste.conversa')::uuid)
+  and exists (select 1 from public.conversas where id = current_setting('teste.conversa')::uuid);
+do $$ begin
+  insert into public.contatos (org_id, telefone, nome) values (current_setting('teste.f7')::uuid, '5541911100011', 'Gatilho fechado');
+  insert into resultado (teste, ok) select 'segurança: gatilho fechado continua rodando (contato nasce na carteira do dono)',
+    responsavel_id = '00000000-0000-0000-0000-0000000000a1' from public.contatos where telefone = '5541911100011';
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;
