@@ -42,6 +42,10 @@ CRM de atendimento e vendas pelo WhatsApp, multiempresa, com agente de IA. Produ
 - **`/migration <o que muda>`**: o roteiro abaixo, com os modelos de migration e de teste.
 - **Hooks**: antes de editar, recusam `tiposBanco.ts`, `.env`, `docs/roadmap.md` e migrations que já estão no
   `origin/main`; depois de editar um `.ts`/`.tsx` em `src/`, rodam o ESLint no arquivo e devolvem o erro na hora.
+- **Subagents** (só leem e apontam): `revisor-banco`, para migrations novas antes do `db push`, e `revisor-textos`,
+  para os textos que o usuário lê antes do commit.
+- **MCPs** (`.mcp.json`): `supabase` (só leitura: SQL, logs, avisos de segurança) e `playwright` (abre o app no Edge
+  para ver as telas; o login fica salvo no perfil do navegador, a senha não passa pelo Claude).
 
 ## Mudança no banco (sempre nesta ordem)
 
