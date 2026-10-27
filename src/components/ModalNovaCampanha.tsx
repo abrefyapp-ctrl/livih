@@ -25,6 +25,9 @@ const enviavel = (m: Modelo) => {
   return m.status === 'APPROVED' && m.category === 'MARKETING' && (!cab || (cab.format === 'TEXT' && !/\{\{/.test(cab.text ?? '')))
 }
 
+/** Texto que entra quando o contato não tem nome ou empresa, se a pessoa não escrever outro. */
+const PADRAO: Record<FonteVariavel, string> = { nome: 'cliente', empresa: 'sua empresa', fixo: '' }
+
 const alternar = (lista: string[], valor: string) => (lista.includes(valor) ? lista.filter((v) => v !== valor) : [...lista, valor])
 
 function Chip({ ativo, children, aoClicar }: { ativo: boolean; children: string; aoClicar: () => void }) {
@@ -61,7 +64,14 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
     com_cliente: null,
     inativos_dias: null,
   })
-  const [publico, setPublico] = useState<{ chave: string; total: number; descadastrados: number; amostra: string[] } | null>(null)
+  const [publico, setPublico] = useState<{
+    chave: string
+    total: number
+    sem_nome: number
+    sem_empresa: number
+    descadastrados: number
+    amostra: string[]
+  } | null>(null)
   const [modelos, setModelos] = useState<{ canalId: string; lista: Modelo[] } | null>(null)
   const [erroModelos, setErroModelos] = useState<string | null>(null)
   const [modeloId, setModeloId] = useState('')
@@ -128,7 +138,7 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
   const exemplo = publico?.amostra[0] ?? 'Maria'
   const valoresPrevia = numerosVar.map((_, i) => {
     const v = variaveis[i]
-    return !v ? '' : v.fonte === 'fixo' ? (v.valor ?? '') : v.fonte === 'nome' ? exemplo : `Empresa de ${exemplo}`
+    return !v ? '' : v.fonte === 'fixo' ? (v.valor ?? '') : v.fonte === 'nome' ? exemplo : v.padrao?.trim() || PADRAO.empresa
   })
   const variaveisOk = numerosVar.every((_, i) => variaveis[i] && (variaveis[i].fonte !== 'fixo' || variaveis[i].valor?.trim()))
   const pronto =
@@ -170,7 +180,9 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
           corpo: partes.corpo,
           rodape: partes.rodape,
           variaveis: numerosVar.map((_, i) =>
-            variaveis[i].fonte === 'fixo' ? { fonte: 'fixo', valor: variaveis[i].valor!.trim() } : { fonte: variaveis[i].fonte },
+            variaveis[i].fonte === 'fixo'
+              ? { fonte: 'fixo', valor: variaveis[i].valor!.trim() }
+              : { fonte: variaveis[i].fonte, padrao: variaveis[i].padrao?.trim() || PADRAO[variaveis[i].fonte] },
           ),
         },
         filtros,
@@ -324,10 +336,18 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
                         ))}
                       </select>
                     </Campo>
-                    {variaveis[i]?.fonte === 'fixo' && (
+                    {variaveis[i]?.fonte === 'fixo' ? (
                       <CampoTexto rotulo="Texto" value={variaveis[i].valor ?? ''} maxLength={200}
                         onChange={(ev) => setVariaveis((vs) => vs.map((v, j) => (j === i ? { ...v, valor: ev.target.value } : v)))} />
-                    )}
+                    ) : variaveis[i] ? (
+                      <CampoTexto rotulo={variaveis[i].fonte === 'nome' ? 'Se o contato não tiver nome' : 'Se não tiver empresa'}
+                        value={variaveis[i].padrao ?? ''} maxLength={200} placeholder={PADRAO[variaveis[i].fonte]}
+                        onChange={(ev) => setVariaveis((vs) => vs.map((v, j) => (j === i ? { ...v, padrao: ev.target.value } : v)))}
+                        ajuda={(() => {
+                          const n = variaveis[i].fonte === 'nome' ? publico?.sem_nome : publico?.sem_empresa
+                          return n ? `${n} ${n === 1 ? 'contato do público está' : 'contatos do público estão'} sem ${variaveis[i].fonte === 'nome' ? 'nome' : 'empresa'}.` : undefined
+                        })()} />
+                    ) : null}
                   </div>
                 ))}
                 {!numerosVar.length && <p className="text-pequeno text-texto-3">Este modelo não tem variáveis.</p>}

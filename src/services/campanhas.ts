@@ -10,7 +10,8 @@ export type Campanha = Tabelas['campanhas']['Row']
 export type StatusCampanha = 'agendada' | 'enviando' | 'pausada' | 'concluida' | 'cancelada'
 
 export type FonteVariavel = 'nome' | 'empresa' | 'fixo'
-export type VariavelCampanha = { fonte: FonteVariavel; valor?: string }
+/** valor: o texto fixo; padrao: o que entra quando falta o nome ou a empresa do contato. */
+export type VariavelCampanha = { fonte: FonteVariavel; valor?: string; padrao?: string }
 
 export type ModeloCampanha = {
   nome: string
@@ -88,7 +89,7 @@ export async function listarCampanhas(orgId: string): Promise<{ campanha: Campan
 export async function previaPublico(orgId: string, filtros: FiltrosCampanha) {
   const { data, error } = await supabase.rpc('campanha_publico', { p_org: orgId, p_filtros: filtros as Json })
   if (error) throw error
-  return data as { total: number; descadastrados: number; amostra: string[] }
+  return data as { total: number; sem_nome: number; sem_empresa: number; descadastrados: number; amostra: string[] }
 }
 
 export async function listarEtiquetas(orgId: string): Promise<string[]> {

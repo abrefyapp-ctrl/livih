@@ -3405,5 +3405,26 @@ begin
     (select status from public.campanhas where id = v_id) = 'cancelada'
     and (select count(*) from public.campanha_destinatarios where campanha_id = v_id and status = 'pulado') = 2);
 end $$;
+-- Campanhas: texto "se faltar" (migration 20261027130000).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_sem uuid; v_com uuid;
+  v_modelo jsonb := '{"variaveis":[{"fonte":"nome","padrao":"amigo"},{"fonte":"empresa","padrao":"sua loja"}]}';
+begin
+  insert into public.contatos (org_id, telefone) values (v_org, '5541911100009') returning id into v_sem;
+  insert into public.contatos (org_id, telefone, nome, empresa) values (v_org, '5541911100010', 'Davi', 'Davi Peças') returning id into v_com;
+  insert into resultado (teste, ok) values ('campanhas: sem nome e sem empresa, entra o texto "se faltar" (não o nome da pessoa)',
+    public.campanha_parametros(v_modelo, v_sem) = '{amigo,"sua loja"}'
+    and public.campanha_parametros(v_modelo, v_com) = '{Davi,"Davi Peças"}'
+    and public.campanha_parametros('{"variaveis":[{"fonte":"nome"}]}', v_sem) = '{cliente}');
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'campanhas: a prévia conta quem está sem nome e sem empresa',
+  (r ->> 'sem_nome')::int >= 1 and (r ->> 'sem_empresa')::int >= 1
+  from (select public.campanha_publico(current_setting('teste.f7')::uuid, '{}') r) x;
 reset role;
 select n, teste, ok from resultado order by n;
