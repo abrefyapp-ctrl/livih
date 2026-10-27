@@ -20,6 +20,11 @@ const FILTROS: { id: Filtro; rotulo: string }[] = [
   { id: 'todos', rotulo: 'Todos' },
 ]
 
+// Empresa do pedido: o cliente cadastrado; sem ele, o texto "empresa" do contato (pedidos antigos e contatos sem cliente).
+function empresaDoPedido(p: Pedido): string | null {
+  return p.cliente?.nome || p.contato?.empresa?.trim() || null
+}
+
 export function Pedidos() {
   const { orgAtiva, modulos } = useSessao()
   if (modulos && !modulos.has('erp')) {
@@ -55,7 +60,12 @@ function ListaPedidos({ orgId }: { orgId: string }) {
   const lista = useMemo(() => {
     const t = busca.trim().toLowerCase().replace(/^#/, '')
     if (!t) return todos ?? []
-    return (todos ?? []).filter((p) => String(p.numero) === t || nomeDoContato(p.contato).toLowerCase().includes(t))
+    return (todos ?? []).filter(
+      (p) =>
+        String(p.numero) === t ||
+        nomeDoContato(p.contato).toLowerCase().includes(t) ||
+        (empresaDoPedido(p) ?? '').toLowerCase().includes(t),
+    )
   }, [todos, busca])
 
   return (
@@ -91,7 +101,7 @@ function ListaPedidos({ orgId }: { orgId: string }) {
               type="search"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              placeholder="Cliente ou número"
+              placeholder="Cliente, empresa ou número"
               className="h-10 w-full rounded-md border border-borda bg-superficie pr-3 pl-9 placeholder:text-texto-3 focus:border-primaria focus:outline-none"
             />
           </label>
@@ -115,6 +125,7 @@ function ListaPedidos({ orgId }: { orgId: string }) {
                 <Link to={`/pedidos/${p.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-fundo">
                   <span className="w-14 font-semibold tabular-nums">#{p.numero}</span>
                   <span className="min-w-0 flex-1 truncate font-medium">{p.contato ? nomeDoContato(p.contato) : 'Sem cliente'}</span>
+                  <span className="min-w-0 flex-1 truncate text-texto-2">{empresaDoPedido(p) ?? '—'}</span>
                   <EtiquetaPedido status={p.status} />
                   <span className="w-28 text-right font-medium tabular-nums">{moeda(Number(p.total), true)}</span>
                   <span className="w-16 text-right text-legenda text-texto-3">{quandoCurto(p.criado_em)}</span>
