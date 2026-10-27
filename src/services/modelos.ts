@@ -104,3 +104,110 @@ export function textoEnviado(m: Modelo, valores: string[]) {
   const corpo = p.corpo.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => valores[Number(n) - 1]?.trim() ?? '')
   return [p.cabecalho && `*${p.cabecalho}*`, corpo, p.rodape && `_${p.rodape}_`].filter(Boolean).join('\n\n')
 }
+
+/** Modelos prontos para começar (Configurações → Modelos → Novo modelo): a pessoa escolhe e ajusta o texto. */
+export const EXEMPLOS: { titulo: string; quando: string; modelo: ModeloNovo }[] = [
+  {
+    titulo: 'Retomar a conversa',
+    quando: 'O cliente parou de responder há mais de 24 horas.',
+    modelo: {
+      nome: 'retomar_conversa',
+      categoria: 'UTILITY',
+      idioma: 'pt_BR',
+      cabecalho: '',
+      corpo: 'Olá, {{1}}! Aqui é da {{2}}. A nossa conversa ficou parada e queremos saber se ainda podemos ajudar. Quer continuar por aqui?',
+      exemplos: ['Maria', 'Loja Exemplo'],
+      rodape: '',
+      botoes: ['Sim, quero continuar', 'Agora não'],
+    },
+  },
+  {
+    titulo: 'Pedido ou serviço pronto',
+    quando: 'Avisar que o pedido ou o equipamento está pronto.',
+    modelo: {
+      nome: 'pedido_pronto',
+      categoria: 'UTILITY',
+      idioma: 'pt_BR',
+      cabecalho: 'Tudo pronto',
+      corpo: 'Olá, {{1}}! O seu pedido nº {{2}} está pronto. Quer combinar a retirada ou a entrega? É só responder esta mensagem.',
+      exemplos: ['Maria', '1234'],
+      rodape: '',
+      botoes: [],
+    },
+  },
+  {
+    titulo: 'Orçamento enviado',
+    quando: 'Perguntar se ficou alguma dúvida sobre o orçamento.',
+    modelo: {
+      nome: 'retorno_orcamento',
+      categoria: 'UTILITY',
+      idioma: 'pt_BR',
+      cabecalho: '',
+      corpo: 'Olá, {{1}}! Enviamos o orçamento nº {{2}} e queremos saber se ficou alguma dúvida. Podemos ajudar a fechar por aqui mesmo.',
+      exemplos: ['Maria', '1234'],
+      rodape: '',
+      botoes: ['Tenho uma dúvida', 'Quero fechar'],
+    },
+  },
+  {
+    titulo: 'Promoção',
+    quando: 'Campanha de produto ou condição especial.',
+    modelo: {
+      nome: 'promocao_semana',
+      categoria: 'MARKETING',
+      idioma: 'pt_BR',
+      cabecalho: 'Condição especial',
+      corpo: 'Olá, {{1}}! Esta semana temos {{2}} com condições especiais para clientes. Quer saber mais? Responda esta mensagem.',
+      exemplos: ['Maria', 'grampos para pinador'],
+      rodape: 'Responda SAIR para não receber mais',
+      botoes: ['Quero saber mais'],
+    },
+  },
+  {
+    titulo: 'Reativar cliente',
+    quando: 'Cliente que não compra há algum tempo.',
+    modelo: {
+      nome: 'novidades_cliente',
+      categoria: 'MARKETING',
+      idioma: 'pt_BR',
+      cabecalho: '',
+      corpo: 'Olá, {{1}}! Faz tempo que a gente não conversa. Chegaram novidades na {{2}} e lembramos de você. Posso te mostrar?',
+      exemplos: ['Maria', 'Loja Exemplo'],
+      rodape: 'Responda SAIR para não receber mais',
+      botoes: ['Quero ver', 'Agora não'],
+    },
+  },
+]
+
+/**
+ * Avisos antes de enviar para a Meta: o que costuma levar à recusa. Não impedem o envio (a Meta é quem decide),
+ * mas evitam esperar horas por uma recusa previsível.
+ */
+export function avisosDoModelo(m: ModeloNovo): string[] {
+  const avisos: string[] = []
+  const corpo = m.corpo.trim()
+  const vars = variaveisDe(corpo)
+  if (/^\{\{\s*\d+\s*\}\}/.test(corpo) || /\{\{\s*\d+\s*\}\}[.!?…\s]*$/.test(corpo)) {
+    avisos.push('A mensagem começa ou termina com uma variável. A Meta recusa: escreva texto antes e depois.')
+  }
+  if (vars.some((n, i) => n !== i + 1)) {
+    avisos.push('As variáveis precisam estar em sequência: {{1}}, {{2}}, {{3}}…')
+  }
+  const palavras = corpo.replace(/\{\{\s*\d+\s*\}\}/g, ' ').split(/\s+/).filter(Boolean).length
+  if (vars.length && palavras < vars.length * 3 + 2) {
+    avisos.push('Pouco texto para tantas variáveis. A Meta pede mais palavras fixas em volta delas.')
+  }
+  if (/\{\{\s*\d+\s*\}\}\s*\{\{\s*\d+\s*\}\}/.test(corpo)) {
+    avisos.push('Duas variáveis seguidas, sem texto entre elas. A Meta recusa.')
+  }
+  if (vars.some((n) => !m.exemplos[n - 1]?.trim())) {
+    avisos.push('Preencha o exemplo de cada variável: a Meta usa para entender a mensagem.')
+  }
+  if (m.categoria === 'MARKETING' && !/sair|parar|cancelar/i.test(`${m.rodape} ${m.botoes.join(' ')}`)) {
+    avisos.push('Em Marketing, ofereça um jeito de sair (ex.: rodapé "Responda SAIR para não receber mais"). Diminui bloqueios e denúncias.')
+  }
+  if (m.categoria === 'UTILITY' && /promo|desconto|oferta|novidade|aproveite|imperd/i.test(corpo)) {
+    avisos.push('O texto parece de venda. A Meta deve reclassificar como Marketing (e cobrar como Marketing).')
+  }
+  return avisos
+}

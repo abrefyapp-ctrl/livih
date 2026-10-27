@@ -3,15 +3,17 @@ import { useSessao } from '../hooks/useSessao'
 import { listarNumeros, type NumeroWhatsapp } from '../services/configuracoes'
 import {
   apagarModelo,
+  avisosDoModelo,
   criarModelo,
+  EXEMPLOS,
   listarModelos,
+  type Modelo,
+  type ModeloNovo,
   nomeTecnico,
   ROTULO_CATEGORIA,
   ROTULO_IDIOMA,
   ROTULO_STATUS,
   variaveisDe,
-  type Modelo,
-  type ModeloNovo,
 } from '../services/modelos'
 import { formatarTelefone } from '../services/formato'
 import { Aviso } from './Aviso'
@@ -168,6 +170,45 @@ export function SecaoModelos() {
             Na API oficial do WhatsApp, passadas 24 horas da última mensagem do cliente, só dá para escrever para ele com um
             modelo aprovado pela Meta. A análise leva de minutos a algumas horas.
           </p>
+          <details className="mt-2 max-w-2xl rounded-md border border-borda bg-superficie p-3 text-pequeno text-texto-2">
+            <summary className="cursor-pointer font-medium text-primaria">Primeira vez? Entenda como funcionam os modelos</summary>
+            <div className="mt-3 space-y-3">
+              <div>
+                <p className="font-medium text-texto">O que é</p>
+                <p>
+                  Um texto pronto, aprovado pela Meta, para começar ou retomar uma conversa. Dentro das 24 horas depois da última
+                  mensagem do cliente, a equipe e o agente escrevem livremente; depois disso, só com modelo. As campanhas também
+                  usam modelos.
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-texto">Qual categoria escolher</p>
+                <ul className="list-disc space-y-1 pl-5">
+                  <li><span className="font-medium">Utilidade:</span> continuação de algo que o cliente pediu: retomar o atendimento, pedido pronto, orçamento enviado, lembrete. Custa menos.</li>
+                  <li><span className="font-medium">Marketing:</span> promoção, novidade, convite, reativar cliente. É a categoria das campanhas.</li>
+                </ul>
+                <p className="mt-1">A Meta confere o texto: se um modelo de Utilidade tiver cara de venda, ela muda para Marketing (e cobra como Marketing). A Meta cobra os modelos direto na conta do WhatsApp da empresa.</p>
+              </div>
+              <div>
+                <p className="font-medium text-texto">Variáveis</p>
+                <p>
+                  {'{{1}}'}, {'{{2}}'}… são trocadas na hora do envio, por exemplo pelo nome do cliente ou o número do pedido. Para cada
+                  uma, escreva um exemplo: a Meta usa para entender a mensagem.
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-texto">Para ser aprovado de primeira</p>
+                <ul className="list-disc space-y-1 pl-5">
+                  <li>Diga quem está escrevendo e por quê, num tom de conversa.</li>
+                  <li>Não comece nem termine com uma variável, e não use duas seguidas.</li>
+                  <li>Escreva texto fixo suficiente em volta das variáveis.</li>
+                  <li>Evite letras maiúsculas em excesso, muitos emojis e promessas exageradas.</li>
+                  <li>Em Marketing, ofereça um jeito de sair, como "Responda SAIR para não receber mais".</li>
+                </ul>
+              </div>
+              <p>Se a Meta recusar, o motivo aparece no modelo. Ajuste o texto e crie de novo com outro nome (o nome recusado fica bloqueado por 30 dias depois de apagado).</p>
+            </div>
+          </details>
         </div>
         {gerencia && canalId && (
           <Botao
@@ -288,13 +329,29 @@ export function SecaoModelos() {
         {novo && (
           <form id="form-modelo" onSubmit={salvar} className="grid gap-6 md:grid-cols-[1fr_16rem]">
             <div className="space-y-4">
+              <div className="space-y-1.5 rounded-md bg-fundo p-3">
+                <p className="text-pequeno font-medium text-texto-2">Começar por um exemplo (dá para mudar tudo depois)</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {EXEMPLOS.map((ex) => (
+                    <button
+                      key={ex.titulo}
+                      type="button"
+                      title={ex.quando}
+                      onClick={() => setNovo({ ...ex.modelo, exemplos: [...ex.modelo.exemplos], botoes: [...ex.modelo.botoes] })}
+                      className="rounded-full border border-borda bg-superficie px-2.5 py-1 text-legenda text-texto-2 hover:border-primaria hover:text-primaria"
+                    >
+                      {ex.titulo}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <CampoTexto
                 rotulo="Nome"
                 required
                 value={novo.nome}
                 onChange={(e) => setNovo({ ...novo, nome: nomeTecnico(e.target.value) })}
                 placeholder="retorno_pedido"
-                ajuda="Só a equipe vê. Minúsculas, números e _."
+                ajuda="Só a equipe vê, para achar o modelo depois. Minúsculas, números e _ (ex.: pedido_pronto)."
               />
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
@@ -340,6 +397,7 @@ export function SecaoModelos() {
                 maxLength={60}
                 value={novo.cabecalho}
                 onChange={(e) => setNovo({ ...novo, cabecalho: e.target.value })}
+                ajuda="Aparece em negrito no topo da mensagem. Sem variáveis."
               />
 
               <div className="space-y-1.5">
@@ -396,10 +454,14 @@ export function SecaoModelos() {
                 value={novo.rodape}
                 onChange={(e) => setNovo({ ...novo, rodape: e.target.value })}
                 placeholder="Responda SAIR para não receber mais"
+                ajuda="Texto pequeno e cinza no fim da mensagem. Em Marketing, use para dizer como sair."
               />
 
               <div className="space-y-2">
                 <p className="text-pequeno font-medium text-texto-2">Botões de resposta (opcional)</p>
+                <p className="text-legenda text-texto-3">
+                  O cliente toca e a resposta chega como mensagem na conversa (ex.: "Quero saber mais"). Até 3, com até 25 letras.
+                </p>
                 {novo.botoes.map((b, i) => (
                   <div key={i} className="flex items-end gap-2">
                     <CampoTexto
@@ -434,6 +496,16 @@ export function SecaoModelos() {
                 )}
               </div>
 
+              {novo.corpo.trim() && avisosDoModelo(novo).length > 0 && (
+                <Aviso tom="atencao">
+                  <span className="font-medium">Antes de enviar, confira:</span>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                    {avisosDoModelo(novo).map((a) => (
+                      <li key={a}>{a}</li>
+                    ))}
+                  </ul>
+                </Aviso>
+              )}
               {erroNovo && <Aviso tom="erro">{erroNovo}</Aviso>}
             </div>
 
