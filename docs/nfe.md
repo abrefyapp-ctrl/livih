@@ -144,9 +144,11 @@ diverge do cadastrado".
   dela.
 - **O cliente faz uma vez por CNPJ** (vale para homologação e produção), normalmente o contador:
   1. no portal da Receita/PR, **UPD → Autorização de Uso → Cadastro de Autorização de Uso**;
-  2. o CNPJ da Focus e o sistema que aparecer para ele. Pela orientação da Aegro, que também emite pela Focus, é
-     **ACRAS, código 54078**; a confirmar com a Focus;
-  3. o CAD/ICMS da empresa, modelo 55, e concluir.
+  2. o CNPJ da Focus (no portal, **Acras**, a empresa da Focus) e o sistema **54078 (AC-NFE)**, o da NF-e. O 72962
+     (FNFCE) é o da NFC-e, que a Livih não emite;
+  3. a inscrição estadual e o CNPJ da empresa, confirmar os dados da loja, marcar todos os documentos fiscais que
+     aparecerem e concluir. Não precisa imprimir nem assinar (procedimento de credenciamento do Paraná, recebido em
+     28/10).
 
   Depois a Focus **aceita a vinculação**: o cliente avisa o suporte da Livih, e nós pedimos o aceite à Focus. A
   documentação da Focus confirma as duas etapas: "regiões como o Estado do Paraná (PR) exigem o registro e aceite de

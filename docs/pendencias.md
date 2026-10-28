@@ -24,10 +24,10 @@ Anotado ao fim da sessão de 25 a 27/10. Tirar cada item quando resolver.
 
 - **NF-e no Paraná (FIXOTEC/JoGrampo, CNPJ 43.147.741/0001-02):** rejeição 974, porque a Focus ainda não está
   autorizada como sistema emissor na Receita/PR ([nfe.md](nfe.md), seção do Paraná). Falta: o contador da FIXOTEC fazer
-  o registro (UPD → Autorização de Uso, CNPJ da Focus 07.504.505/0001-32), o usuário pedir o aceite à Focus e emitir de
-  novo. Chamado aberto na Focus perguntando: o código do sistema no portal (o artigo da Aegro diz "ACRAS, 54078", não
-  confirmado; a tela não cita), se o aceite é automático e quais outros estados exigem. Com a resposta, ajustar
-  `CredenciamentoSefaz.tsx` e `FOCUS_RESPONSAVEL_TECNICO` em `services/nfe.ts`.
+  o registro (UPD → Autorização de Uso, CNPJ da Focus 07.504.505/0001-32, sistema 54078 AC-NFE), o usuário pedir o
+  aceite à Focus e emitir de novo. Em 28/10: o procedimento do Paraná confirmou o código 54078 e que o aceite da Focus
+  continua necessário; a tela (`CredenciamentoSefaz.tsx`) já segue esse procedimento. Ainda em aberto: quais outros
+  estados exigem o mesmo cadastro.
 - **NFS-e da F7 (homologação):** a primeira nota foi autorizada (nº 1). Antes de produção, a contabilidade confirma os
   códigos usados no teste: cIndOp 100301, CST 000, cClassTrib 000001, NBS 115022000, regime de apuração do Simples 1
   e a alíquota efetiva do Simples.

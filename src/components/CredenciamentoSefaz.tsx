@@ -50,7 +50,7 @@ export function CredenciamentoSefaz({ uf }: { uf?: string | null }) {
         <>
           <p>
             {!uf && 'No Paraná: '}tenha em mãos o certificado digital da empresa (A1 ou A3), ou o acesso do contador ao portal,
-            e o CNPJ da Focus NFe: {cnpjFocus}.
+            a inscrição estadual e o CNPJ da empresa e o CNPJ da Focus NFe: {cnpjFocus}.
           </p>
           <ol className="list-decimal space-y-1 pl-5">
             <Passo titulo="Entre no portal da Receita/PR.">
@@ -62,20 +62,21 @@ export function CredenciamentoSefaz({ uf }: { uf?: string | null }) {
             </Passo>
             <Passo titulo="Abra o UPD.">No menu à esquerda (role a página, se precisar), clique em UPD.</Passo>
             <Passo titulo="Peça a autorização de uso.">Clique em Autorização de Uso e depois em Cadastro de Autorização de Uso.</Passo>
-            <Passo titulo="Informe o fornecedor.">Digite o CNPJ da Focus NFe e clique em Continuar.</Passo>
-            <Passo titulo="Escolha o sistema e informe a sua empresa.">
-              Selecione o sistema da Focus NFe que aparecer na lista, informe o CNPJ da sua empresa e clique em Continuar.
+            <Passo titulo="Informe o fornecedor.">
+              Digite o CNPJ da Focus NFe e clique em Continuar. No portal, ela aparece como Acras, a empresa da Focus NFe.
             </Passo>
-            <Passo titulo="Escolha o modelo de nota.">Marque o modelo 55 (NF-e) e clique em Continuar.</Passo>
-            <Passo titulo="Guarde o comprovante.">
-              Quando aparecer “Solicitação concluída com êxito”, clique em Visualizar Documento e salve o arquivo.
+            <Passo titulo="Escolha o sistema.">
+              Selecione o código <span className="font-medium text-texto">54078 (AC-NFE)</span>, o da NF-e.
             </Passo>
-            <Passo titulo="Avise a Livih.">
-              Mande o comprovante ao suporte da Livih. Nós pedimos à Focus NFe o aceite da vinculação, que ela faz no portal da
-              SEFAZ-PR.
+            <Passo titulo="Informe a sua empresa.">Digite a inscrição estadual e o CNPJ da empresa e clique em Continuar.</Passo>
+            <Passo titulo="Confira os dados.">Confirme os dados da loja que o portal mostrar.</Passo>
+            <Passo titulo="Marque os documentos.">
+              Marque todas as opções de documento fiscal que aparecerem e clique em Continuar.
             </Passo>
-            <Passo titulo="Emita de novo.">
-              Depois do aceite, a SEFAZ conclui a liberação e avisamos você. Aí é só abrir a nota e clicar em Emitir de novo.
+            <Passo titulo="Pronto.">O cadastro termina aí. Não precisa imprimir nem assinar nada.</Passo>
+            <Passo titulo="Avise a Livih e emita de novo.">
+              Avise o suporte da Livih que o cadastro foi feito. Nós pedimos à Focus NFe o aceite da autorização, que ela faz
+              no portal da Receita/PR, e avisamos você quando estiver liberado. Aí é só abrir a nota e clicar em Emitir de novo.
             </Passo>
           </ol>
           <p className="text-legenda text-texto-3">
