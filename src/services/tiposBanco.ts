@@ -1546,12 +1546,15 @@ export type Database = {
           grupo_id: string
           id: string
           motivo_cancelamento: string | null
+          nota_entrada_id: string | null
           observacao: string | null
           org_id: string
           origem: string
+          os_item_id: string | null
           pago_em: string | null
           parcela: number
           parcelas: number
+          pedido_id: string | null
           tipo: string
           valor: number
           valor_pago: number
@@ -1572,12 +1575,15 @@ export type Database = {
           grupo_id: string
           id?: string
           motivo_cancelamento?: string | null
+          nota_entrada_id?: string | null
           observacao?: string | null
           org_id: string
           origem?: string
+          os_item_id?: string | null
           pago_em?: string | null
           parcela?: number
           parcelas?: number
+          pedido_id?: string | null
           tipo: string
           valor: number
           valor_pago?: number
@@ -1598,12 +1604,15 @@ export type Database = {
           grupo_id?: string
           id?: string
           motivo_cancelamento?: string | null
+          nota_entrada_id?: string | null
           observacao?: string | null
           org_id?: string
           origem?: string
+          os_item_id?: string | null
           pago_em?: string | null
           parcela?: number
           parcelas?: number
+          pedido_id?: string | null
           tipo?: string
           valor?: number
           valor_pago?: number
@@ -1632,11 +1641,32 @@ export type Database = {
             referencedColumns: ["id", "org_id"]
           },
           {
+            foreignKeyName: "fin_lancamentos_nota_entrada_id_org_id_fkey"
+            columns: ["nota_entrada_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "notas_entrada"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
             foreignKeyName: "fin_lancamentos_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizacoes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_os_item_id_org_id_fkey"
+            columns: ["os_item_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "os_itens"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_pedido_id_org_id_fkey"
+            columns: ["pedido_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id", "org_id"]
           },
         ]
       }
@@ -2045,6 +2075,7 @@ export type Database = {
           autor_id: string | null
           chave: string | null
           criado_em: string
+          duplicatas: Json | null
           emissao: string | null
           emitente_cnpj: string | null
           emitente_nome: string | null
@@ -2060,6 +2091,7 @@ export type Database = {
           autor_id?: string | null
           chave?: string | null
           criado_em?: string
+          duplicatas?: Json | null
           emissao?: string | null
           emitente_cnpj?: string | null
           emitente_nome?: string | null
@@ -2075,6 +2107,7 @@ export type Database = {
           autor_id?: string | null
           chave?: string | null
           criado_em?: string
+          duplicatas?: Json | null
           emissao?: string | null
           emitente_cnpj?: string | null
           emitente_nome?: string | null
@@ -2982,6 +3015,8 @@ export type Database = {
           oportunidade_id: string | null
           org_id: string
           origem: string
+          pagamento_forma: string | null
+          pagamento_prazos: number[] | null
           prazo_entrega: string | null
           responsavel_id: string | null
           status: string
@@ -3007,6 +3042,8 @@ export type Database = {
           oportunidade_id?: string | null
           org_id: string
           origem?: string
+          pagamento_forma?: string | null
+          pagamento_prazos?: number[] | null
           prazo_entrega?: string | null
           responsavel_id?: string | null
           status?: string
@@ -3032,6 +3069,8 @@ export type Database = {
           oportunidade_id?: string | null
           org_id?: string
           origem?: string
+          pagamento_forma?: string | null
+          pagamento_prazos?: number[] | null
           prazo_entrega?: string | null
           responsavel_id?: string | null
           status?: string
@@ -3559,12 +3598,15 @@ export type Database = {
           grupo_id: string | null
           id: string | null
           motivo_cancelamento: string | null
+          nota_entrada_id: string | null
           observacao: string | null
           org_id: string | null
           origem: string | null
+          os_item_id: string | null
           pago_em: string | null
           parcela: number | null
           parcelas: number | null
+          pedido_id: string | null
           restante: number | null
           situacao: string | null
           tipo: string | null
@@ -3587,12 +3629,15 @@ export type Database = {
           grupo_id?: string | null
           id?: string | null
           motivo_cancelamento?: string | null
+          nota_entrada_id?: string | null
           observacao?: string | null
           org_id?: string | null
           origem?: string | null
+          os_item_id?: string | null
           pago_em?: string | null
           parcela?: number | null
           parcelas?: number | null
+          pedido_id?: string | null
           restante?: never
           situacao?: never
           tipo?: string | null
@@ -3615,12 +3660,15 @@ export type Database = {
           grupo_id?: string | null
           id?: string | null
           motivo_cancelamento?: string | null
+          nota_entrada_id?: string | null
           observacao?: string | null
           org_id?: string | null
           origem?: string | null
+          os_item_id?: string | null
           pago_em?: string | null
           parcela?: number | null
           parcelas?: number | null
+          pedido_id?: string | null
           restante?: never
           situacao?: never
           tipo?: string | null
@@ -3651,11 +3699,32 @@ export type Database = {
             referencedColumns: ["id", "org_id"]
           },
           {
+            foreignKeyName: "fin_lancamentos_nota_entrada_id_org_id_fkey"
+            columns: ["nota_entrada_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "notas_entrada"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
             foreignKeyName: "fin_lancamentos_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizacoes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_os_item_id_org_id_fkey"
+            columns: ["os_item_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "os_itens"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_pedido_id_org_id_fkey"
+            columns: ["pedido_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id", "org_id"]
           },
         ]
       }
@@ -3876,6 +3945,8 @@ export type Database = {
           oportunidade_id: string | null
           org_id: string
           origem: string
+          pagamento_forma: string | null
+          pagamento_prazos: number[] | null
           prazo_entrega: string | null
           responsavel_id: string | null
           status: string
@@ -4145,6 +4216,11 @@ export type Database = {
         Args: { p_id: string; p_motivo: string }
         Returns: undefined
       }
+      fin_categoria: {
+        Args: { p_nome: string; p_org: string; p_tipo: string }
+        Returns: string
+      }
+      fin_conta_padrao: { Args: { p_org: string }; Returns: string }
       fin_criar_lancamento: {
         Args: {
           p_categoria: string
@@ -4164,7 +4240,12 @@ export type Database = {
         Args: { p_baixa: string; p_motivo: string }
         Returns: undefined
       }
+      fin_desfazer_baixas: {
+        Args: { p_lancamento: string; p_motivo: string }
+        Returns: undefined
+      }
       fin_desfazer_transferencia: { Args: { p_id: string }; Returns: undefined }
+      fin_duplicatas_validas: { Args: { p: Json }; Returns: Json }
       fin_editar_lancamento: {
         Args: {
           p_categoria: string
@@ -4180,8 +4261,13 @@ export type Database = {
         Args: { p_gerente?: boolean; p_org: string }
         Returns: undefined
       }
+      fin_gerar_parcelas_pedido: {
+        Args: { p_pedido: string }
+        Returns: undefined
+      }
       fin_ligado: { Args: { p_org: string }; Returns: boolean }
       fin_preparar: { Args: { p_org: string }; Returns: undefined }
+      fin_preparar_org: { Args: { p_org: string }; Returns: undefined }
       fin_recalcular_pago: {
         Args: { p_lancamento: string }
         Returns: undefined
@@ -4219,6 +4305,7 @@ export type Database = {
         }
         Returns: string
       }
+      fin_sincronizar_os_item: { Args: { p_item: string }; Returns: undefined }
       fin_transferir: {
         Args: {
           p_data: string
@@ -4470,6 +4557,17 @@ export type Database = {
       pedido_mudar_status: {
         Args: { p_pedido: string; p_status: string }
         Returns: undefined
+      }
+      pedido_parcelas: {
+        Args: { p_pedido: string }
+        Returns: {
+          parcela: number
+          parcelas: number
+          situacao: string
+          valor: number
+          valor_pago: number
+          vencimento: string
+        }[]
       }
       plataforma_criar_empresa: { Args: { p_nome: string }; Returns: string }
       plataforma_definir_modulo: {
