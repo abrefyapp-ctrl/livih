@@ -70,7 +70,10 @@ dígitos, erros em `erros[]`; gatilhos `nfe` e `nfsen`), seção NFS-e na tela N
 (pedido com escolha NF-e/NFS-e, OS e notas do cliente com a avulsa). A numeração da DPS fica com a Focus (não vai
 `numero_dps`): conferir na primeira nota.
 
-## Precisa de você
+## A F7 fica fora da Focus (28/10)
 
-- **Código de tributação nacional do ISS** da F7 (com a contabilidade): é o que identifica o serviço na nota.
-- Confirmar com a contabilidade se a F7 é ME/EPP no Simples (sai do regime configurado) e se tem regime especial.
+A NFS-e de teste da F7 autorizada em homologação (nº 1) validou a emissão de ponta a ponta. A F7 não vai para produção
+pela Livih: emite as próprias notas por fora, e o CNPJ dela não ocupa vaga no plano da Focus
+([planos-modulos.md](planos-modulos.md)). Os códigos do teste (cIndOp 100301, CST 000, cClassTrib 000001, NBS
+115022000) e as perguntas à contabilidade da F7 (código de tributação do ISS, ME/EPP, regime especial) deixam de ser
+pendência. A configuração de nota da F7 na Livih pode ser desligada quando o plano da Focus for contratado.

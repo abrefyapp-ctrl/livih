@@ -33,8 +33,8 @@ Quem não quer IA desliga o agente no canal, como já é possível hoje, sem des
 Os módulos não são independentes, e é isso que impede vender tudo separado:
 
 - **O agente precisa do CRM.** Quando ele chama a equipe, alguém tem que ver a conversa e responder.
-- **A nota fiscal sai de um pedido (ERP) ou de uma OS**, com o cliente e os produtos cadastrados. Ainda não existe
-  nota avulsa.
+- **A NF-e sai de um pedido (ERP)**, com o cliente e os produtos cadastrados; a **NFS-e** sai de um pedido de
+  serviço, de uma OS ou avulsa (no cliente). Não existe NF-e avulsa.
 - **O ERP e as OS usam clientes e produtos**, que também servem ao CRM e ao agente.
 
 ## Núcleo e módulos
@@ -57,8 +57,8 @@ O que pesa no custo muda de parte para parte, e a cobrança deve seguir o custo:
 | Parte | Custo da Livih | Cobrar por |
 |---|---|---|
 | Núcleo | Fixo (servidor, suporte) e **variável no agente**: IA por resposta (~R$ 0,02; ~R$ 0,11 por atendimento na JoGrampo em outubro) | Mensalidade por plano, que varia pelos números de WhatsApp e pela franquia de atendimentos do agente |
-| ERP | Fixo, mais a Focus por CNPJ e por nota | Mensalidade, com franquia de notas |
-| OS | Fixo, mais a Focus por CNPJ e por nota | Mensalidade, com franquia de notas |
+| ERP | Fixo, mais a Focus por CNPJ e por nota | Mensalidade com 1 CNPJ e 100 notas; CNPJ e nota a mais à parte |
+| OS | Fixo, mais a Focus por CNPJ e por nota | Mensalidade com 1 CNPJ e 100 notas; CNPJ e nota a mais à parte |
 
 Usuários continuam **ilimitados** em todos os planos (decisão de 20/10). Os modelos das campanhas a Meta cobra direto
 da empresa cliente, por isso as campanhas cabem no núcleo sem custo para a Livih.
@@ -111,12 +111,33 @@ franquia) deixa bastante. Para atrair os primeiros, o desconto fica no Programa 
 
 ### Módulos
 
-| Módulo | Preço por mês | Inclui |
-|---|---|---|
-| ERP | **R$ 79** | Pedidos, estoque, entrada por nota e NF-e, com franquia de notas a definir |
-| Ordens de serviço | **R$ 79** | OS, etapas, PDF e NFS-e, com franquia de notas a definir |
+| Item | Preço ao cliente | Custo na Focus | Sobra antes do imposto |
+|---|---|---|---|
+| **ERP** (pedidos, estoque, entrada por nota, NF-e), com 1 CNPJ e 100 notas por mês | **R$ 99/mês** | ~R$ 39,90 | ~R$ 59 |
+| **Ordens de serviço** (OS, etapas, PDF, NFS-e), com 1 CNPJ e 100 notas por mês | **R$ 99/mês** | ~R$ 39,90 | ~R$ 59 |
+| CNPJ adicional | **R$ 49/mês** | R$ 39,90 | ~R$ 9 |
+| Nota além das 100 por CNPJ | **R$ 0,20** | R$ 0,11 | R$ 0,09 |
 
-Exemplo: a JoGrampo no Start com o ERP pagaria R$ 276.
+Exemplo: a JoGrampo (2 CNPJs) no Start com o ERP pagaria R$ 197 + 99 + 49 = R$ 345. Como é do Programa Fundadores,
+o ERP segue sem custo para ela.
+
+A primeira sugestão (ERP e OS a R$ 79 com a nota incluída) foi revista ao ver o custo da Focus: um cliente com 2 CNPJs
+custaria ~R$ 80 só de Focus. O CNPJ adicional só cobre a Focus, de propósito, para não espantar quem tem vários CNPJs.
+
+### Custo da Focus (plano Start, que o usuário pensa em contratar, 28/10)
+
+| Item | Custo |
+|---|---|
+| Mensalidade, com 3 CNPJs | R$ 119,90 |
+| CNPJ adicional | R$ 39,90/mês |
+| Documentos | 100 por CNPJ; R$ 0,11 cada um a mais |
+
+- Conta como documento cada nota **emitida ou recebida** pela Focus. A entrada por nota da Livih lê o arquivo enviado
+  pelo usuário, sem passar pela Focus, e não deve contar. Confirmar se cancelamento e carta de correção contam.
+- Inclui NF-e, NFS-e, NFC-e, CT-e, MDF-e, NFCom e DC-e.
+- **Vagas:** os 2 CNPJs da JoGrampo ocupam 2 das 3; a F7 fica fora da Focus ([nfse.md](nfse.md)). O próximo cliente
+  com 1 CNPJ entra sem custo extra; daí em diante, R$ 39,90 por CNPJ. A mensalidade dividida pelos 3 dá os mesmos
+  ~R$ 40 por CNPJ, por isso o preço do módulo não muda com as vagas.
 
 ### Comparação com o Bling (página de planos, 28/10)
 
@@ -156,7 +177,7 @@ entrada (números, usuários, IA inclusa ou à parte, taxas da Meta).
 
 - **Só CRM com o agente:** sim, é o núcleo.
 - **Só nota fiscal:** não por enquanto. Concorre com emissores baratos (Bling, a própria Focus, o emissor do Sebrae), o
-  suporte é pesado (credenciamento na SEFAZ, rejeições, contador) e exigiria uma tela de nota avulsa.
+  suporte é pesado (credenciamento na SEFAZ, rejeições, contador) e exigiria uma tela de NF-e avulsa (a NFS-e avulsa já existe).
 - **Só ERP:** não por enquanto. Concorre com Bling, Tiny e Omie, que já têm financeiro e cobrança. Reavaliar depois do
   financeiro.
 
@@ -188,14 +209,13 @@ Em ordem; cada passo é uma entrega com o seu arquivo em `docs/` quando for cons
 5. **Tela de plano para o dono da empresa**: o que está contratado, o consumo do mês e como pedir um módulo novo.
 6. **Cobrança da Livih**: assinatura recorrente por empresa, somando o plano do núcleo e os módulos ligados (Asaas, o
    mesmo que vai servir ao financeiro do ERP).
-7. **Depois, para abrir "só ERP" e "só nota fiscal"**: financeiro no ERP (contas a receber, cobrança), nota avulsa e
+7. **Depois, para abrir "só ERP" e "só nota fiscal"**: financeiro no ERP (contas a receber, cobrança), NF-e avulsa e
    o núcleo enxuto para quem não usa WhatsApp. Só com cliente real pedindo.
 
 ## Decisões em aberto
 
 - **Fechar os preços sugeridos** do núcleo e dos módulos.
-- **Custo da Focus** por CNPJ e por nota, para definir a franquia de notas do ERP e das OS (conferir no contrato de
-  revenda).
+- **Contratar o plano Start da Focus** e confirmar se cancelamento e carta de correção contam como documento.
 - **Integração com o Bling**: fazer ou não, e antes ou depois do financeiro próprio.
 - **Teste grátis**: por módulo, por plano ou nenhum (o Programa Fundadores já tem o piloto de 30 dias).
 - **Regime tributário** (Anexo III ou V), que afeta a margem de todos os preços (em aberto desde 20/10).

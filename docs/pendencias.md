@@ -28,9 +28,6 @@ Anotado ao fim da sessão de 25 a 27/10. Tirar cada item quando resolver.
   aceite à Focus e emitir de novo. Em 28/10: o procedimento do Paraná confirmou o código 54078 e que o aceite da Focus
   continua necessário; a tela (`CredenciamentoSefaz.tsx`) já segue esse procedimento. Ainda em aberto: quais outros
   estados exigem o mesmo cadastro.
-- **NFS-e da F7 (homologação):** a primeira nota foi autorizada (nº 1). Antes de produção, a contabilidade confirma os
-  códigos usados no teste: cIndOp 100301, CST 000, cClassTrib 000001, NBS 115022000, regime de apuração do Simples 1
-  e a alíquota efetiva do Simples.
 - **Termos de Uso e Privacidade (site):** atualizados em 27/10 (API oficial, campanhas, consentimento). Falta a revisão
   do advogado e o aviso às empresas clientes (seção 11 dos termos).
 - **Publicar as funções com textos no feminino** (commit 2863bec), se ainda não foi feito:
