@@ -155,6 +155,22 @@ nota ilimitada). A primeira sugestão (ERP a R$ 149 e nota a R$ 79, R$ 228 junto
 módulo está no pedido montado pelo agente na conversa, não em ter mais recursos. O núcleo não tem concorrente no
 Bling.
 
+### Comparação com a Omie (página de preços, 28/10)
+
+| Plano | Preço | O que tem |
+|---|---|---|
+| ERP Padrão | a partir de R$ 309/mês | Financeiro completo, fluxo de caixa, boleto e link de pagamento, notas fiscais, estoque, sugestão de compra, produção, oportunidades, prestação de serviços e contratos recorrentes, usuários ilimitados |
+| Omie Multivarejo | a partir de R$ 419/mês | Tudo do Padrão, mais e-commerce, marketplaces e frente de caixa |
+
+O preço sobe pela faixa de faturamento da empresa (a página não mostra o valor de cada faixa) e não informa limite
+de notas, de CNPJs nem custos extras. Cita "Omie no WhatsApp" e "Omie.IA Fiscal", sem dizer se estão nos planos; não
+há agente de atendimento com IA.
+
+Leitura: a Omie é o ERP completo e mais caro; o Bling, o barato. A Livih com ERP (Start + ERP = R$ 296) custa perto do
+Padrão da Omie, mas entrega outra coisa: o atendimento com IA e o CRM, com um ERP mais simples. Contra "Omie mais um
+agente de IA à parte" (R$ 309 + R$ 200 a 1.000), a Livih sai bem mais barata. O ponto fraco nas duas comparações é o
+mesmo: **o financeiro** (contas a receber, boleto, fluxo de caixa), que Bling e Omie têm e a Livih ainda não.
+
 ### Referência de mercado dos agentes de IA no WhatsApp
 
 Resumo de uma busca do usuário em 28/10 (números aproximados, não conferidos nas páginas de cada empresa):
