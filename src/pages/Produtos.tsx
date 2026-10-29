@@ -560,13 +560,40 @@ type Anexo =
 
 const IMAGENS = ['image/jpeg', 'image/png', 'image/webp']
 
+/**
+ * Abre a câmera do celular direto. O Chrome no Android novo abre só o seletor de fotos do sistema no "Adicionar foto",
+ * sem a câmera (29/10). Só aparece em tela de toque: no computador o capture é ignorado e repetiria o outro botão.
+ */
+function BotaoTirarFoto({ aoTirar, disabled }: { aoTirar: (arquivos: File[]) => void; disabled: boolean }) {
+  const camera = useRef<HTMLInputElement>(null)
+  return (
+    <span className="pointer-fine:hidden">
+      <input
+        ref={camera}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const arquivos = [...(e.target.files ?? [])]
+          e.target.value = ''
+          aoTirar(arquivos)
+        }}
+      />
+      <Botao tamanho="sm" variante="secundario" icone="camera" onClick={() => camera.current?.click()} disabled={disabled}>
+        Tirar foto
+      </Botao>
+    </span>
+  )
+}
+
 /** Produto novo: fotos e documentos escolhidos antes de salvar; sobem ligados ao produto quando ele é criado. */
 function AnexosNovoProduto({ anexos, aoMudar, desabilitado }: { anexos: Anexo[]; aoMudar: (a: Anexo[]) => void; desabilitado: boolean }) {
   const seletorFotos = useRef<HTMLInputElement>(null)
   const seletorDocs = useRef<HTMLInputElement>(null)
   const [erro, setErro] = useState<string | null>(null)
 
-  function escolher(lista: FileList | null, tipo: Anexo['tipo']) {
+  function escolher(lista: FileList | File[] | null, tipo: Anexo['tipo']) {
     const arquivos = [...(lista ?? [])]
     const recusados = arquivos.filter((f) =>
       tipo === 'foto' ? !IMAGENS.includes(f.type) : !TIPOS_ACEITOS.includes(f.type) || f.size > LIMITE_DOCUMENTO,
@@ -595,6 +622,7 @@ function AnexosNovoProduto({ anexos, aoMudar, desabilitado }: { anexos: Anexo[];
         <div className="flex flex-wrap gap-1">
           <input ref={seletorFotos} type="file" multiple accept={IMAGENS.join(',')} className="hidden" onChange={(e) => (escolher(e.target.files, 'foto'), (e.target.value = ''))} />
           <input ref={seletorDocs} type="file" multiple accept={TIPOS_ACEITOS.join(',')} className="hidden" onChange={(e) => (escolher(e.target.files, 'documento'), (e.target.value = ''))} />
+          <BotaoTirarFoto aoTirar={(arquivos) => escolher(arquivos, 'foto')} disabled={desabilitado} />
           <Botao tamanho="sm" variante="secundario" icone="mais" onClick={() => seletorFotos.current?.click()} disabled={desabilitado}>
             Adicionar foto
           </Botao>
@@ -735,6 +763,7 @@ function DocumentosDoProduto({ orgId, produto, gerencia }: { orgId: string; prod
                 void adicionarFotos(arquivos)
               }}
             />
+            <BotaoTirarFoto aoTirar={(arquivos) => void adicionarFotos(arquivos)} disabled={!!enviando} />
             <Botao tamanho="sm" variante="secundario" icone="mais" onClick={() => seletorFotos.current?.click()} carregando={!!enviando}>
               Adicionar foto
             </Botao>
