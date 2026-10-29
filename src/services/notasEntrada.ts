@@ -137,6 +137,8 @@ export async function lancarNota(orgId: string, nota: NotaLida, path: string, it
       valor_total: nota.valor_total,
       origem: nota.origem,
       arquivo_path: path,
+      // Viram o a pagar do fornecedor no financeiro (migration 20261029120000); sem elas, uma parcela com o total.
+      duplicatas: nota.duplicatas ?? [],
     },
     p_itens: corpo,
   })

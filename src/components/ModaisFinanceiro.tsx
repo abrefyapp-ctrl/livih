@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   ROTULO_FORMA,
   ROTULO_SITUACAO,
@@ -420,7 +421,7 @@ export function ModalDetalheLancamento({
               Editar
             </Botao>
           )}
-          {l.situacao !== 'cancelado' && !ativas.length && (
+          {l.situacao !== 'cancelado' && !ativas.length && l.origem !== 'pedido' && l.origem !== 'os' && (
             <Botao variante="fantasma" onClick={() => setJanela('cancelar')}>
               Cancelar lançamento
             </Botao>
@@ -469,6 +470,7 @@ export function ModalDetalheLancamento({
             </div>
           )}
         </dl>
+        <Origem l={l} />
         {l.observacao && <p className="rounded-md bg-fundo px-3 py-2 text-pequeno whitespace-pre-line">{l.observacao}</p>}
         {l.situacao === 'cancelado' && (
           <Aviso tom="atencao">Cancelado{l.motivo_cancelamento ? `: ${l.motivo_cancelamento}` : '.'}</Aviso>
@@ -504,6 +506,43 @@ export function ModalDetalheLancamento({
       </div>
     </Modal>
   )
+}
+
+/** De onde veio o lançamento; pedido e OS se cancelam lá, não aqui. */
+function Origem({ l }: { l: Lancamento }) {
+  const link = 'font-medium text-primaria underline'
+  if (l.origem === 'pedido') {
+    return (
+      <p className="text-pequeno text-texto-2">
+        Veio do{' '}
+        {l.pedido_id && l.pedido ? (
+          <Link to={`/pedidos/${l.pedido_id}`} className={link}>
+            pedido nº {l.pedido.numero}
+          </Link>
+        ) : (
+          'pedido'
+        )}
+        . Para cancelar, cancele o pedido ou volte ele para rascunho.
+      </p>
+    )
+  }
+  if (l.origem === 'os') {
+    return (
+      <p className="text-pequeno text-texto-2">
+        Veio da{' '}
+        {l.os_item ? (
+          <Link to={`/os/${l.os_item.os_id}`} className={link}>
+            ordem de serviço
+          </Link>
+        ) : (
+          'ordem de serviço'
+        )}
+        . Para tirar do a receber, desfaça o faturamento do item na OS.
+      </p>
+    )
+  }
+  if (l.origem === 'nota_entrada') return <p className="text-pequeno text-texto-2">Veio da nota de entrada do fornecedor.</p>
+  return null
 }
 
 /** Confirma uma ação com motivo opcional (cancelar, desfazer). */

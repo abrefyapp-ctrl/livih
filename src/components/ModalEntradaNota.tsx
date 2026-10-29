@@ -171,6 +171,21 @@ export function ModalEntradaNota({
                 .filter(Boolean)
                 .join(' · ')}
             </p>
+            {/* Financeiro (entrega 2): a nota vira o a pagar do fornecedor ao lançar. */}
+            {n!.duplicatas?.length ? (
+              <p className="mt-1 text-texto-2">
+                Vai para o a pagar em {n!.duplicatas.length} {n!.duplicatas.length === 1 ? 'parcela' : 'parcelas'}:{' '}
+                {n!.duplicatas.map((d) => `${dataBr(d.vencimento)} (${moeda(d.valor, true)})`).join(', ')}.
+              </p>
+            ) : (
+              n!.valor_total != null &&
+              n!.valor_total > 0 && (
+                <p className="mt-1 text-texto-2">
+                  A nota não traz as parcelas: vai para o a pagar uma conta de {moeda(n!.valor_total, true)}, vencendo na emissão.
+                  Ajuste o vencimento no Financeiro.
+                </p>
+              )
+            )}
           </div>
           {lida.jaLancada && <Aviso tom="erro">Esta nota já foi lançada em {dataBr(lida.jaLancada)}. Lançar de novo duplicaria o estoque.</Aviso>}
           {n!.origem !== 'xml' && (

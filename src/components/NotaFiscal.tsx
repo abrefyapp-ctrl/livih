@@ -7,6 +7,7 @@ import {
   emitirNotaServico,
   FaltaParaEmitir,
   FORMAS_PAGAMENTO,
+  FORMA_SEFAZ,
   NOME_MODELO,
   notaDaOs,
   notaDoPedido,
@@ -227,8 +228,10 @@ function ModalEmitirNota({ orgId, alvo, aoFechar, aoEmitir }: { orgId: string; a
   const [modelo, setModelo] = useState<'nfe' | 'nfse'>(alvo.tipo === 'pedido' ? 'nfe' : 'nfse')
   const [emissoras, setEmissoras] = useState<Emissora[] | null>(null)
   const [emissora, setEmissora] = useState('')
-  const [forma, setForma] = useState('15')
-  const [aPrazo, setAPrazo] = useState(false)
+  // A forma e o prazo vêm do pagamento combinado no pedido (financeiro); sem ele, boleto à vista.
+  const pagamentoPedido = alvo.tipo === 'pedido' ? alvo.pedido : null
+  const [forma, setForma] = useState((pagamentoPedido?.pagamento_forma && FORMA_SEFAZ[pagamentoPedido.pagamento_forma]) || '15')
+  const [aPrazo, setAPrazo] = useState(!!pagamentoPedido?.pagamento_prazos?.some((d) => d > 0))
   const [presenca, setPresenca] = useState(9)
   const [informacoes, setInformacoes] = useState('')
   // null = ainda não mexeu: na avulsa, vale a descrição padrão do CNPJ.

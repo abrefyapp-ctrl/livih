@@ -127,6 +127,20 @@ Contas, com extrato, transferência e categorias) e a caixa "Financeiro" em Conf
 Financeiro para dono e admin e para o atendente com a permissão. Abrir a tela pela primeira vez cria as categorias
 padrão e a conta Caixa.
 
+**Entrega 2 construída em 28/10:** migration `20261029120000_financeiro_ligacoes.sql` e 17 testes.
+- **Pedido:** `pedidos.pagamento_forma` e `pagamento_prazos` (dias depois da confirmação), no bloco Pagamento da tela
+  do pedido (só no rascunho). O gatilho `fin_pedido` gera as parcelas ao confirmar, cancela ao cancelar ou voltar para
+  rascunho e refaz quando muda o total ou os prazos; com pagamento registrado, recusa. Quem vê o pedido vê as parcelas
+  (`pedido_parcelas`). A NF-e já sai com a forma e o "a prazo" do pedido. **Pedidos confirmados antes de 28/10 não têm
+  parcelas** (os 17 entregues da JoGrampo provavelmente já foram pagos).
+- **OS:** gatilho `fin_os_item` em `os_itens` (cobre `os_faturar`, `os_registrar_pagamento` e a importação): um
+  lançamento por item faturado; o pagamento da OS vira baixa na primeira conta ativa (o Caixa) e a baixa feita no
+  financeiro volta para `os_itens.pago_em`. Os 54 itens faturados da Cactos foram migrados (39 pagos, R$ 8.150).
+- **Nota de entrada:** o XML traz as duplicatas (`cobr > dup`), guardadas em `notas_entrada.duplicatas`; o gatilho
+  `fin_nota_entrada` gera o a pagar do fornecedor (sem duplicata, uma parcela com o total, vencendo na emissão). A
+  prévia da entrada por nota mostra o que vai para o a pagar.
+- **Financeiro:** o lançamento mostra de onde veio, com link; os do pedido e da OS só se cancelam lá.
+
 **Entregas 1 a 4: 6 a 10 dias.** É o que fecha a comparação com o Bling Cobalto (contas a pagar e receber) com uma
 vantagem: a cobrança sai pelo WhatsApp, onde o cliente já conversa.
 

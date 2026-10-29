@@ -22,7 +22,11 @@ export type NotaLida = {
   emitente_nome: string | null
   valor_total: number | null
   itens: ItemNota[]
+  /** Parcelas da cobrança (cobr > dup); viram o a pagar do financeiro. Só o XML traz. */
+  duplicatas?: Duplicata[]
 }
+
+export type Duplicata = { numero: string | null; vencimento: string; valor: number }
 
 const ENTIDADES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }
 const decodificar = (t: string) =>
@@ -84,5 +88,8 @@ export function lerNotaXml(xml: string): NotaLida {
     emitente_nome: texto(emit, 'xNome'),
     valor_total: numero(bloco(xml, 'ICMSTot'), 'vNF'),
     itens,
+    duplicatas: todos(bloco(xml, 'cobr') ?? '', 'dup')
+      .map((d) => ({ numero: texto(d, 'nDup'), vencimento: texto(d, 'dVenc') ?? '', valor: numero(d, 'vDup') ?? 0 }))
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d.vencimento) && d.valor > 0),
   }
 }

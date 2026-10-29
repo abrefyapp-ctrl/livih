@@ -18,6 +18,9 @@ export type Lancamento = Tabelas['fin_lancamentos']['Row'] & {
   situacao: Situacao
   cliente: { nome: string } | null
   categoria: { nome: string } | null
+  // Origem (entrega 2); vem nula quando quem olha não vê o pedido (carteira de outro vendedor).
+  pedido: { numero: number } | null
+  os_item: { os_id: string } | null
 }
 export type Baixa = Tabelas['fin_baixas']['Row'] & { conta: { nome: string } | null }
 export type MovimentoExtrato = {
@@ -156,7 +159,7 @@ export type FiltroLancamentos = 'abertos' | 'vencido' | 'pago' | 'cancelado' | '
 export async function listarLancamentos(orgId: string, tipo: TipoLancamento, filtro: FiltroLancamentos): Promise<Lancamento[]> {
   let consulta = supabase
     .from('fin_lancamentos_situacao')
-    .select('*, cliente:clientes(nome), categoria:fin_categorias(nome)')
+    .select('*, cliente:clientes(nome), categoria:fin_categorias(nome), pedido:pedidos(numero), os_item:os_itens(os_id)')
     .eq('org_id', orgId)
     .eq('tipo', tipo)
   if (filtro === 'abertos') consulta = consulta.in('situacao', ['aberto', 'parcial', 'vencido'])
@@ -247,6 +250,40 @@ function somarMeses(iso: string, meses: number) {
   alvo.setUTCDate(Math.min(d, ultimo))
   return alvo.toISOString().slice(0, 10)
 }
+
+// ---- pedido ----
+
+export type ParcelaPedido = Database['public']['Functions']['pedido_parcelas']['Returns'][number]
+
+/** Parcelas do pedido confirmado; quem vê o pedido vê (sem a permissão Financeiro). */
+export async function listarParcelasPedido(pedidoId: string): Promise<ParcelaPedido[]> {
+  const { data, error } = await supabase.rpc('pedido_parcelas', { p_pedido: pedidoId })
+  if (error) throw error
+  return data ?? []
+}
+
+/** Prazos comuns, em dias depois da confirmação. */
+export const PRAZOS_PRONTOS: { rotulo: string; prazos: number[] }[] = [
+  { rotulo: 'À vista', prazos: [0] },
+  { rotulo: '30 dias', prazos: [30] },
+  { rotulo: '30/60 dias', prazos: [30, 60] },
+  { rotulo: '30/60/90 dias', prazos: [30, 60, 90] },
+  { rotulo: '28/56/84 dias', prazos: [28, 56, 84] },
+]
+
+/** "30/60/90" → [30, 60, 90]; inválido → null. Até 24 parcelas, de 0 a 720 dias, em ordem. */
+export function lerPrazos(texto: string): number[] | null {
+  const partes = texto.split(/[\s/;,]+/).filter(Boolean)
+  if (!partes.length || partes.length > 24) return null
+  const dias = partes.map(Number)
+  if (dias.some((d) => !Number.isInteger(d) || d < 0 || d > 720)) return null
+  return dias.every((d, i) => i === 0 || d >= dias[i - 1]) ? dias : null
+}
+
+export const rotuloPrazos = (prazos: number[] | null) =>
+  !prazos?.length || (prazos.length === 1 && prazos[0] === 0)
+    ? 'À vista'
+    : `${prazos.join('/')} dias`
 
 // ---- baixas ----
 

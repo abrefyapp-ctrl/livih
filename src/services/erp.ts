@@ -201,6 +201,8 @@ export async function atualizarPedido(
       | 'validade'
       | 'condicoes_pagamento'
       | 'prazo_entrega'
+      | 'pagamento_forma'
+      | 'pagamento_prazos'
     >>,
 ) {
   const { error } = await supabase.from('pedidos').update(dados).eq('id', id)

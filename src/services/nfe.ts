@@ -149,11 +149,24 @@ export const FORMAS_PAGAMENTO: { valor: string; rotulo: string }[] = [
   { valor: '01', rotulo: 'Dinheiro' },
   { valor: '03', rotulo: 'Cartão de crédito' },
   { valor: '04', rotulo: 'Cartão de débito' },
+  { valor: '02', rotulo: 'Cheque' },
   { valor: '16', rotulo: 'Depósito bancário' },
   { valor: '18', rotulo: 'Transferência bancária' },
   { valor: '90', rotulo: 'Sem pagamento (bonificação, remessa)' },
   { valor: '99', rotulo: 'Outros' },
 ]
+
+/** Forma de pagamento do pedido (financeiro) → código da SEFAZ (tPag), para a nota já sair com a forma combinada. */
+export const FORMA_SEFAZ: Record<string, string> = {
+  pix: '17',
+  boleto: '15',
+  dinheiro: '01',
+  cartao_credito: '03',
+  cartao_debito: '04',
+  transferencia: '18',
+  cheque: '02',
+  outro: '99',
+}
 
 export const PRESENCAS: { valor: number; rotulo: string }[] = [
   { valor: 1, rotulo: 'Presencial (no balcão)' },

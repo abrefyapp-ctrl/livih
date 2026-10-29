@@ -37,6 +37,7 @@ import { CampoTexto } from '../components/CampoTexto'
 import { DialogoConfirmacao } from '../components/DialogoConfirmacao'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { EtiquetaPedido } from '../components/EtiquetaPedido'
+import { PagamentoPedido } from '../components/PagamentoPedido'
 import { Icone } from '../components/Icone'
 import { VisualizadorPdf } from '../components/VisualizadorPdf'
 
@@ -304,6 +305,7 @@ export function PedidoDetalhe() {
 
         {/* Recria ao trocar a empresa: o banco recarrega validade, condições e prazo. */}
         <Orcamento key={pedido.emissora_id ?? 'sem'} orgId={orgId} pedido={pedido} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />
+        <PagamentoPedido pedido={pedido} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />
 
         <Observacao pedido={pedido} aoErro={setErro} />
       </div>
