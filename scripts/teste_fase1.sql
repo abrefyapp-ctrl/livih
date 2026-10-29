@@ -3718,5 +3718,146 @@ do $$ begin
 exception when others then
   insert into resultado (teste, ok) values ('financeiro: outra empresa não dá baixa', sqlerrm like 'o financeiro não está ligado%' or sqlerrm like 'você não tem acesso%');
 end $$;
+-- Financeiro, entrega 2: pedido, OS e nota de entrada geram os lançamentos (migration 20261029120000).
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_hoje date := public.fin_hoje_teste();
+  v_prod uuid;
+  v_ped uuid;
+  v_l uuid;
+  v_b uuid;
+begin
+  perform public.plataforma_definir_modulo(v_org, 'erp', true);
+  insert into public.produtos (org_id, nome, preco, controla_estoque) values (v_org, 'Serviço fin', 100.01, false) returning id into v_prod;
+  insert into public.pedidos (org_id, pagamento_forma, pagamento_prazos) values (v_org, 'boleto', '{30,60}') returning id into v_ped;
+  insert into public.pedido_itens (org_id, pedido_id, produto_id, descricao, quantidade, preco_unitario)
+  values (v_org, v_ped, v_prod, 'Serviço fin', 1, 100.01);
+  insert into resultado (teste, ok) select 'financeiro pedido: rascunho não gera lançamento',
+    not exists (select 1 from public.fin_lancamentos where pedido_id = v_ped);
+
+  perform public.pedido_mudar_status(v_ped, 'confirmado');
+  insert into resultado (teste, ok) select 'financeiro pedido: confirmar gera as parcelas pelos prazos, centavos na última',
+    (select count(*) from public.fin_lancamentos where pedido_id = v_ped and cancelado_em is null and origem = 'pedido'
+       and tipo = 'receber' and parcelas = 2) = 2
+    and (select valor = 50.00 and vencimento = v_hoje + 30 from public.fin_lancamentos where pedido_id = v_ped and parcela = 1)
+    and (select valor = 50.01 and vencimento = v_hoje + 60 from public.fin_lancamentos where pedido_id = v_ped and parcela = 2)
+    and (select count(*) from public.pedido_parcelas(v_ped)) = 2;
+
+  perform public.pedido_mudar_status(v_ped, 'separando');
+  insert into resultado (teste, ok) select 'financeiro pedido: avançar a entrega não refaz as parcelas',
+    (select count(*) from public.fin_lancamentos where pedido_id = v_ped) = 2;
+
+  update public.pedidos set pagamento_prazos = '{0}' where id = v_ped;
+  insert into resultado (teste, ok) select 'financeiro pedido: mudar os prazos refaz as parcelas e cancela as antigas',
+    (select count(*) from public.fin_lancamentos where pedido_id = v_ped and cancelado_em is null) = 1
+    and (select count(*) from public.fin_lancamentos where pedido_id = v_ped and motivo_cancelamento = 'pedido mudou: parcelas refeitas') = 2
+    and (select valor = 100.01 and vencimento = v_hoje from public.fin_lancamentos where pedido_id = v_ped and cancelado_em is null);
+
+  select id into v_l from public.fin_lancamentos where pedido_id = v_ped and cancelado_em is null;
+  v_b := public.fin_baixar(v_l, (select id from public.fin_contas where org_id = v_org and nome = 'Caixa'), v_hoje, 10, 'pix', null);
+  begin
+    perform public.pedido_mudar_status(v_ped, 'cancelado');
+    insert into resultado (teste, ok) values ('financeiro pedido: com pagamento, o pedido não é cancelado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro pedido: com pagamento, o pedido não é cancelado',
+      sqlerrm like 'o pedido já tem pagamento registrado%' and (select status from public.pedidos where id = v_ped) = 'separando');
+  end;
+  begin
+    perform public.fin_cancelar_lancamento(v_l, null);
+    insert into resultado (teste, ok) values ('financeiro pedido: a parcela do pedido não se cancela no financeiro', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro pedido: a parcela do pedido não se cancela no financeiro', sqlerrm like 'este lançamento vem do pedido%');
+  end;
+  perform public.fin_desfazer_baixa(v_b, null);
+  perform public.pedido_mudar_status(v_ped, 'cancelado');
+  insert into resultado (teste, ok) select 'financeiro pedido: cancelar o pedido cancela as parcelas',
+    not exists (select 1 from public.fin_lancamentos where pedido_id = v_ped and cancelado_em is null)
+    and (select motivo_cancelamento from public.fin_lancamentos where id = v_l) = 'pedido cancelado';
+end $$;
+
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_hoje date := public.fin_hoje_teste();
+  v_os uuid;
+  v_item uuid;
+  v_l uuid;
+begin
+  perform public.plataforma_definir_modulo(v_org, 'os', true);
+  perform public.os_preparar(v_org);
+  insert into public.ordens_servico (org_id, cliente_nome, recebida_em) values (v_org, 'Cliente fin', v_hoje - 5) returning id into v_os;
+  insert into public.os_itens (org_id, os_id, modelo, identificacao, valor) values (v_org, v_os, 'MOTOR FIN', 'X1', 150)
+  returning id into v_item;
+  insert into resultado (teste, ok) select 'financeiro OS: item não faturado não gera lançamento',
+    not exists (select 1 from public.fin_lancamentos where os_item_id = v_item);
+
+  perform public.os_faturar(array[v_item], v_hoje - 1, v_hoje + 29);
+  select id into v_l from public.fin_lancamentos where os_item_id = v_item and cancelado_em is null;
+  insert into resultado (teste, ok) select 'financeiro OS: faturar gera o a receber com o vencimento e o valor do item',
+    (select origem = 'os' and tipo = 'receber' and valor = 150 and vencimento = v_hoje + 29
+            and descricao like 'OS nº % · MOTOR FIN X1' from public.fin_lancamentos where id = v_l);
+
+  perform public.os_registrar_pagamento(array[v_item], v_hoje);
+  insert into resultado (teste, ok) select 'financeiro OS: pagamento na OS vira baixa no caixa',
+    (select valor_pago = 150 and pago_em = v_hoje from public.fin_lancamentos where id = v_l)
+    and exists (select 1 from public.fin_baixas b join public.fin_contas c on c.id = b.conta_id
+                 where b.lancamento_id = v_l and b.desfeita_em is null and c.nome = 'Caixa' and b.observacao = 'registrado na OS');
+
+  perform public.fin_desfazer_baixa((select id from public.fin_baixas where lancamento_id = v_l and desfeita_em is null), 'errado');
+  insert into resultado (teste, ok) select 'financeiro OS: desfazer no financeiro tira o pago da OS',
+    (select pago_em is null from public.os_itens where id = v_item);
+  perform public.fin_baixar(v_l, (select id from public.fin_contas where org_id = v_org and nome = 'Caixa'), v_hoje - 1, 150, 'boleto', null);
+  insert into resultado (teste, ok) select 'financeiro OS: receber no financeiro marca a OS como paga',
+    (select pago_em = v_hoje - 1 from public.os_itens where id = v_item);
+
+  perform public.os_faturar(array[v_item], null, null);
+  insert into resultado (teste, ok) select 'financeiro OS: desfazer o faturamento cancela o lançamento e desfaz a baixa',
+    (select cancelado_em is not null and valor_pago = 0 from public.fin_lancamentos where id = v_l)
+    and (select pago_em is null and faturado_em is null from public.os_itens where id = v_item);
+  perform public.os_faturar(array[v_item], v_hoje, null);
+  insert into resultado (teste, ok) select 'financeiro OS: faturar de novo cria outro lançamento (um ativo por item)',
+    (select count(*) from public.fin_lancamentos where os_item_id = v_item and cancelado_em is null) = 1
+    and (select count(*) from public.fin_lancamentos where os_item_id = v_item) = 2;
+  begin
+    perform public.fin_cancelar_lancamento((select id from public.fin_lancamentos where os_item_id = v_item and cancelado_em is null), null);
+    insert into resultado (teste, ok) values ('financeiro OS: o lançamento da OS não se cancela no financeiro', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro OS: o lançamento da OS não se cancela no financeiro', sqlerrm like 'este lançamento vem da OS%');
+  end;
+end $$;
+
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  r jsonb;
+  r2 jsonb;
+begin
+  r := public.nota_entrada_lancar(v_org,
+    '{"chave":"41201099888777000166550010000099991000099999","numero":"9999","serie":"1","emissao":"2026-10-01",
+      "emitente_cnpj":"99.888.777/0001-66","emitente_nome":"Fornecedor Fin","valor_total":"300.00","origem":"xml",
+      "duplicatas":[{"numero":"002","vencimento":"2026-12-01","valor":"150.00"},
+                    {"numero":"001","vencimento":"2026-11-01","valor":"150.00"},
+                    {"numero":"003","vencimento":"2026-13-45","valor":"10"}]}',
+    jsonb_build_array(jsonb_build_object('novo', jsonb_build_object('nome', 'Produto fin', 'codigo', 'FIN-NF'),
+                      'descricao', 'PRODUTO FIN', 'quantidade', 1, 'valor_unitario', 300, 'valor_total', 300)));
+  insert into resultado (teste, ok) select 'financeiro nota: as duplicatas válidas viram o a pagar do fornecedor, em ordem',
+    (select count(*) from public.fin_lancamentos where nota_entrada_id = (r ->> 'nota_id')::uuid) = 2
+    and (select vencimento = '2026-11-01' and parcela = 1 and parcelas = 2 and fornecedor_cnpj = '99888777000166'
+                and origem = 'nota_entrada' and tipo = 'pagar' and descricao = 'NF 9999 · Fornecedor Fin'
+           from public.fin_lancamentos where nota_entrada_id = (r ->> 'nota_id')::uuid and parcela = 1);
+
+  r2 := public.nota_entrada_lancar(v_org,
+    '{"numero":"555","serie":"1","emissao":"2026-10-15","emitente_cnpj":"99888777000166","emitente_nome":"Fornecedor Fin",
+      "valor_total":"80.00","origem":"imagem"}',
+    jsonb_build_array(jsonb_build_object('novo', jsonb_build_object('nome', 'Produto fin 2', 'codigo', 'FIN-NF2'),
+                      'descricao', 'PRODUTO FIN 2', 'quantidade', 1)));
+  insert into resultado (teste, ok) select 'financeiro nota: sem duplicatas, uma parcela com o valor da nota para conferir',
+    (select count(*) = 1 and min(valor) = 80 and min(vencimento) = '2026-10-15' and bool_and(observacao like 'A nota não trouxe as parcelas%')
+       from public.fin_lancamentos where nota_entrada_id = (r2 ->> 'nota_id')::uuid);
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;
