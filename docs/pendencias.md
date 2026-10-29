@@ -22,9 +22,8 @@ Coisas anotadas para corrigir depois. Tirar daqui quando entrar no commit.
 
 Anotado ao fim da sessão de 28/10, para continuar no dia seguinte. Tirar cada item quando resolver.
 
-- **Financeiro, entrega 2** ([financeiro.md](financeiro.md)): banco aplicado (migration 20261029120000) e telas no commit
-  2feae0b. Falta: `npm run publicar`, `npm run verificar` e `git push`, se ainda não foram feitos; depois, testar com
-  um pedido de verdade da JoGrampo (escolher forma e parcelas, confirmar, ver as parcelas no pedido e no Financeiro) e
+- **Financeiro, entrega 2** ([financeiro.md](financeiro.md)): banco aplicado (migration 20261029120000) e telas
+  publicadas em 28/10 (commit 2feae0b). Falta testar com um pedido de verdade da JoGrampo (escolher forma e parcelas, confirmar, ver as parcelas no pedido e no Financeiro) e
   conferir a entrada por nota com o primeiro XML de verdade que traga duplicatas (a leitura de `cobr > dup` no
   navegador não tem teste automático).
 - **Financeiro, próximo passo: entrega 3** (fluxo de caixa realizado e previsto, vencidos, totais por categoria, e o
