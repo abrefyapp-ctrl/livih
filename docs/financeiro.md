@@ -120,6 +120,13 @@ Em ordem. Cada uma com migration, testes no `teste_fase1.sql` e telas.
 7. **Agente:** "quanto eu devo?", "me manda o Pix do boleto que vence sexta" (consulta os lançamentos do contato e
    envia o Pix), com a mesma regra de carteira do resto.
 
+**Entrega 1 construída em 28/10:** migration `20261028120000_financeiro.sql` (tabelas `fin_*`, a visão
+`fin_lancamentos_situacao`, funções `fin_*` e a permissão `membros_org.financeiro`), 30 testes no `teste_fase1.sql`,
+serviço [financeiro.ts](../src/services/financeiro.ts), tela Financeiro (`/financeiro`, abas A receber, A pagar e
+Contas, com extrato, transferência e categorias) e a caixa "Financeiro" em Configurações → Equipe. O menu mostra o
+Financeiro para dono e admin e para o atendente com a permissão. Abrir a tela pela primeira vez cria as categorias
+padrão e a conta Caixa.
+
 **Entregas 1 a 4: 6 a 10 dias.** É o que fecha a comparação com o Bling Cobalto (contas a pagar e receber) com uma
 vantagem: a cobrança sai pelo WhatsApp, onde o cliente já conversa.
 

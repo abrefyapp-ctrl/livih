@@ -11,6 +11,7 @@ import {
 import { quandoCurto } from '../services/formato'
 import { definirVeTodosClientes, listarVeTodosClientes } from '../services/clientes'
 import { definirEmiteNotaFiscal, listarEmiteNotaFiscal } from '../services/nfe'
+import { definirFinanceiro, listarFinanceiro } from '../services/financeiro'
 import { Avatar } from './Avatar'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
@@ -35,7 +36,7 @@ function Situacao({ m }: { m: MembroEquipe }) {
 }
 
 export function SecaoEquipe() {
-  const { orgAtiva, sessao, equipe: perfis } = useSessao()
+  const { orgAtiva, sessao, equipe: perfis, modulos } = useSessao()
   const orgId = orgAtiva!.id
   const souDono = orgAtiva?.papel === 'dono'
   const eu = sessao?.user.id
@@ -53,6 +54,9 @@ export function SecaoEquipe() {
   const [veTodos, setVeTodos] = useState<Set<string>>(new Set())
   // "Emite nota fiscal" (docs/nfe.md): desligada por padrão; dono e admin ligam.
   const [emiteNota, setEmiteNota] = useState<Set<string>>(new Set())
+  // "Financeiro" (docs/financeiro.md): só aparece com o ERP ou as OS ligados, que é quando o financeiro existe.
+  const comFinanceiro = !!modulos && (modulos.has('erp') || modulos.has('os'))
+  const [financeiro, setFinanceiro] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let ativo = true
@@ -65,6 +69,9 @@ export function SecaoEquipe() {
     listarEmiteNotaFiscal(orgId)
       .then((s) => ativo && setEmiteNota(s))
       .catch(() => ativo && setEmiteNota(new Set()))
+    listarFinanceiro(orgId)
+      .then((s) => ativo && setFinanceiro(s))
+      .catch(() => ativo && setFinanceiro(new Set()))
     return () => {
       ativo = false
     }
@@ -75,6 +82,19 @@ export function SecaoEquipe() {
     setErroAcao(null)
     try {
       await definirEmiteNotaFiscal(orgId, m.user_id, !emiteNota.has(m.user_id))
+      recarregar()
+    } catch (e) {
+      setErroAcao((e as Error).message)
+    } finally {
+      setSalvando(null)
+    }
+  }
+
+  async function alternarFinanceiro(m: MembroEquipe) {
+    setSalvando(m.user_id)
+    setErroAcao(null)
+    try {
+      await definirFinanceiro(orgId, m.user_id, !financeiro.has(m.user_id))
       recarregar()
     } catch (e) {
       setErroAcao((e as Error).message)
@@ -212,6 +232,20 @@ export function SecaoEquipe() {
                       </label>
                     ) : (
                       emiteNota.has(m.user_id) && <p className="mt-1 text-legenda text-texto-3">Emite nota fiscal</p>
+                    ))}
+                    {comFinanceiro && m.papel === 'atendente' && m.ativo && (gerencia ? (
+                      <label className="mt-1 ml-4 inline-flex cursor-pointer items-center gap-2 text-legenda text-texto-2">
+                        <input
+                          type="checkbox"
+                          checked={financeiro.has(m.user_id)}
+                          disabled={salvando === m.user_id}
+                          onChange={() => void alternarFinanceiro(m)}
+                          className="size-3.5 accent-primaria"
+                        />
+                        Financeiro
+                      </label>
+                    ) : (
+                      financeiro.has(m.user_id) && <p className="mt-1 text-legenda text-texto-3">Financeiro</p>
                     ))}
                   </div>
                   <div className="flex items-center gap-2">

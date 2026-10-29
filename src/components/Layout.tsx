@@ -9,6 +9,7 @@ import { Icone, type NomeIcone } from './Icone'
 import { Logo } from './Logo'
 import { Modal } from './Modal'
 import { useInstalarApp } from '../pwa'
+import { podeFinanceiro } from '../services/financeiro'
 
 type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: number }
 /** Bloco do menu: rótulo pequeno em cima (no menu só de ícones vira uma linha); bloco vazio não aparece. */
@@ -27,6 +28,19 @@ export function Layout() {
   const [gaveta, setGaveta] = useState(false)
   const app = useInstalarApp()
   const [ajudaIos, setAjudaIos] = useState(false)
+  // Financeiro (docs/financeiro.md): vem com o ERP ou as OS; dono e admin sempre veem, o atendente só com a permissão.
+  const comFinanceiro = !!modulos && (modulos.has('erp') || modulos.has('os'))
+  const [financeiroAtendente, setFinanceiroAtendente] = useState<{ orgId: string; ok: boolean } | null>(null)
+  useEffect(() => {
+    const id = orgAtiva?.id
+    if (!id || gerencia || !comFinanceiro) return
+    let ativo = true
+    podeFinanceiro(id).then((ok) => ativo && setFinanceiroAtendente({ orgId: id, ok }))
+    return () => {
+      ativo = false
+    }
+  }, [orgAtiva?.id, gerencia, comFinanceiro])
+  const verFinanceiro = comFinanceiro && (gerencia || (financeiroAtendente?.orgId === orgAtiva?.id && financeiroAtendente?.ok))
 
   // Título da aba avisa quem está em outra aba.
   useEffect(() => {
@@ -62,6 +76,7 @@ export function Layout() {
             ]
           : []),
         ...(modulos?.has('os') ? [{ para: '/os', rotulo: 'Ordens de serviço', icone: 'ferramenta' as const }] : []),
+        ...(verFinanceiro ? [{ para: '/financeiro', rotulo: 'Financeiro', icone: 'grafico' as const }] : []),
       ],
     },
   ]

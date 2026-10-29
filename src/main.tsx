@@ -23,6 +23,7 @@ import { Pedidos } from './pages/Pedidos'
 import { Produtos } from './pages/Produtos'
 import { OrdensServico } from './pages/OrdensServico'
 import { OrdemServicoDetalhe } from './pages/OrdemServicoDetalhe'
+import { Financeiro } from './pages/Financeiro'
 import { Empresas } from './pages/Empresas'
 import { registrarServiceWorker } from './pwa'
 
@@ -71,6 +72,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="produtos" element={<Produtos />} />
             <Route path="os" element={<OrdensServico />} />
             <Route path="os/:id" element={<OrdemServicoDetalhe />} />
+            <Route path="financeiro/:aba?" element={<Financeiro />} />
             <Route path="configuracoes/:secao?" element={<Configuracoes />} />
             <Route path="empresas" element={<Empresas />} />
             <Route path="*" element={<NaoEncontrada />} />
