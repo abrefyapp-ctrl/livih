@@ -44,10 +44,11 @@ const COR_SITUACAO: Record<Situacao, string> = {
   cancelado: 'bg-slate-100 text-texto-3 line-through',
 }
 
-export function EtiquetaSituacao({ situacao }: { situacao: Situacao }) {
+/** `emParte`: vencido que já recebeu uma parte diz isso, para não parecer que nada foi pago. */
+export function EtiquetaSituacao({ situacao, emParte = false }: { situacao: Situacao; emParte?: boolean }) {
   return (
-    <span className={`inline-flex rounded-sm px-1.5 py-0.5 text-legenda font-medium ${COR_SITUACAO[situacao]}`}>
-      {ROTULO_SITUACAO[situacao]}
+    <span className={`inline-flex shrink-0 rounded-sm px-1.5 py-0.5 text-legenda font-medium whitespace-nowrap ${COR_SITUACAO[situacao]}`}>
+      {situacao === 'vencido' && emParte ? 'Vencido, pago em parte' : ROTULO_SITUACAO[situacao]}
     </span>
   )
 }
@@ -398,7 +399,7 @@ export function ModalDetalheLancamento({
     return (
       <ModalMotivo
         titulo={receber ? 'Desfazer recebimento' : 'Desfazer pagamento'}
-        texto={`${moeda(Number(b.valor), true)} em ${data(b.data)} (${b.conta?.nome ?? 'conta'}). O registro fica no histórico, marcado como desfeito.`}
+        texto={`${moeda(Number(b.valor), true)} em ${data(b.data)}, na conta ${b.conta?.nome ?? 'escolhida'}. O registro fica no histórico, marcado como desfeito.`}
         rotulo="Desfazer"
         aoFechar={() => setJanela(null)}
         aoConfirmar={(motivo) => desfazerBaixa(b.id, motivo).then(mudou)}
@@ -437,7 +438,7 @@ export function ModalDetalheLancamento({
           <div>
             <dt className="text-texto-3">Situação</dt>
             <dd className="mt-0.5">
-              <EtiquetaSituacao situacao={l.situacao} />
+              <EtiquetaSituacao situacao={l.situacao} emParte={Number(l.valor_pago) > 0} />
             </dd>
           </div>
           <div>
@@ -484,7 +485,7 @@ export function ModalDetalheLancamento({
               {baixas.map((b) => (
                 <li key={b.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 ${b.desfeita_em ? 'text-texto-3' : ''}`}>
                   <span className="w-20 tabular-nums">{data(b.data)}</span>
-                  <span className="min-w-0 flex-1 truncate">
+                  <span className="min-w-0 flex-1 break-words">
                     {ROTULO_FORMA[b.forma as FormaPagamento]} · {b.conta?.nome ?? 'conta'}
                     {b.desfeita_em && ` · desfeito${b.motivo_desfazer ? `: ${b.motivo_desfazer}` : ''}`}
                   </span>

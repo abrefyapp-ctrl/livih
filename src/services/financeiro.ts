@@ -24,6 +24,7 @@ export type MovimentoExtrato = {
   id: string
   tipo: 'baixa' | 'transferencia'
   data: string
+  criado_em: string
   descricao: string
   valor: number
   desfeito: boolean
@@ -305,26 +306,27 @@ export async function extratoConta(contaId: string, desde: string): Promise<Movi
   const [baixas, transf] = await Promise.all([
     supabase
       .from('fin_baixas')
-      .select('id, data, valor, desfeita_em, forma, lancamento:fin_lancamentos(tipo, descricao, parcela, parcelas)')
+      .select('id, data, criado_em, valor, desfeita_em, forma, lancamento:fin_lancamentos(tipo, descricao, parcela, parcelas)')
       .eq('conta_id', contaId)
       .gte('data', desde),
     supabase
       .from('fin_transferencias')
-      .select('id, data, valor, desfeita_em, observacao, conta_origem_id, conta_destino_id, origem:fin_contas!fin_transferencias_conta_origem_id_org_id_fkey(nome), destino:fin_contas!fin_transferencias_conta_destino_id_org_id_fkey(nome)')
+      .select('id, data, criado_em, valor, desfeita_em, observacao, conta_origem_id, conta_destino_id, origem:fin_contas!fin_transferencias_conta_origem_id_org_id_fkey(nome), destino:fin_contas!fin_transferencias_conta_destino_id_org_id_fkey(nome)')
       .or(`conta_origem_id.eq.${contaId},conta_destino_id.eq.${contaId}`)
       .gte('data', desde),
   ])
   if (baixas.error) throw baixas.error
   if (transf.error) throw transf.error
-  type LinhaBaixa = { id: string; data: string; valor: number; desfeita_em: string | null; forma: FormaPagamento
+  type LinhaBaixa = { id: string; data: string; criado_em: string; valor: number; desfeita_em: string | null; forma: FormaPagamento
     lancamento: { tipo: TipoLancamento; descricao: string; parcela: number; parcelas: number } | null }
-  type LinhaTransf = { id: string; data: string; valor: number; desfeita_em: string | null; observacao: string | null
+  type LinhaTransf = { id: string; data: string; criado_em: string; valor: number; desfeita_em: string | null; observacao: string | null
     conta_origem_id: string; origem: { nome: string } | null; destino: { nome: string } | null }
   const movimentos: MovimentoExtrato[] = [
     ...((baixas.data ?? []) as unknown as LinhaBaixa[]).map((b) => ({
       id: b.id,
       tipo: 'baixa' as const,
       data: b.data,
+      criado_em: b.criado_em,
       descricao: `${b.lancamento?.descricao ?? 'Lançamento'}${b.lancamento && b.lancamento.parcelas > 1 ? ` (${b.lancamento.parcela}/${b.lancamento.parcelas})` : ''} · ${ROTULO_FORMA[b.forma]}`,
       valor: b.lancamento?.tipo === 'pagar' ? -Number(b.valor) : Number(b.valor),
       desfeito: !!b.desfeita_em,
@@ -335,11 +337,13 @@ export async function extratoConta(contaId: string, desde: string): Promise<Movi
         id: t.id,
         tipo: 'transferencia' as const,
         data: t.data,
+        criado_em: t.criado_em,
         descricao: `${saiu ? `Transferência para ${t.destino?.nome ?? 'outra conta'}` : `Transferência de ${t.origem?.nome ?? 'outra conta'}`}${t.observacao ? ` · ${t.observacao}` : ''}`,
         valor: saiu ? -Number(t.valor) : Number(t.valor),
         desfeito: !!t.desfeita_em,
       }
     }),
   ]
-  return movimentos.sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0))
+  // No mesmo dia, o último lançado em cima.
+  return movimentos.sort((a, b) => b.data.localeCompare(a.data) || b.criado_em.localeCompare(a.criado_em))
 }

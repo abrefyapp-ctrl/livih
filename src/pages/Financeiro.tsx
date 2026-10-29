@@ -116,7 +116,7 @@ function TelaFinanceiro({ orgId, gerencia }: { orgId: string; gerencia: boolean 
           <h1 className="text-h1 font-semibold">Financeiro</h1>
           <p className="text-pequeno text-texto-3">Contas a receber, contas a pagar e o saldo de cada conta.</p>
         </div>
-        <div role="tablist" aria-label="Parte do financeiro" className="flex gap-1 overflow-x-auto border-b border-borda">
+        <div role="tablist" aria-label="Parte do financeiro" className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-borda">
           {ABAS.map((a) => (
             <button
               key={a.id}
@@ -251,16 +251,23 @@ function AbaLancamentos({ orgId, tipo, contas, categorias, aoMudar }: {
           <ul className="divide-y divide-borda rounded-lg border border-borda bg-superficie">
             {lista.map((l) => (
               <li key={l.id}>
-                <button onClick={() => setAberto(l.id)} className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-left hover:bg-fundo">
-                  <span className="w-20 text-pequeno tabular-nums">{data(l.vencimento)}</span>
-                  <span className="min-w-0 flex-[2] truncate font-medium">
-                    {l.descricao}
-                    <span className="font-normal text-texto-3">{rotuloParcela(l)}</span>
+                {/* Duas linhas (descrição; vencimento e quem) para caber no celular; no pago em parte, o valor é o que falta. */}
+                <button onClick={() => setAberto(l.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-fundo">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">
+                      {l.descricao}
+                      <span className="font-normal text-texto-3">{rotuloParcela(l)}</span>
+                    </span>
+                    <span className="block truncate text-legenda text-texto-3">
+                      vence {data(l.vencimento)}
+                      {quemDoLancamento(l) && ` · ${quemDoLancamento(l)}`}
+                    </span>
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-texto-2">{quemDoLancamento(l) ?? '—'}</span>
-                  <EtiquetaSituacao situacao={l.situacao} />
-                  <span className="w-28 text-right font-medium tabular-nums">
-                    {moeda(l.situacao === 'parcial' || (l.situacao === 'vencido' && Number(l.valor_pago) > 0) ? Number(l.restante) : Number(l.valor), true)}
+                  <span className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-4">
+                    <EtiquetaSituacao situacao={l.situacao} emParte={Number(l.valor_pago) > 0} />
+                    <span className="font-medium tabular-nums sm:w-28 sm:text-right">
+                      {moeda(Number(l.valor_pago) > 0 && l.situacao !== 'pago' && l.situacao !== 'cancelado' ? Number(l.restante) : Number(l.valor), true)}
+                    </span>
                   </span>
                 </button>
               </li>
