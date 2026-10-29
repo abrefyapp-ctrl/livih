@@ -1367,6 +1367,343 @@ export type Database = {
           },
         ]
       }
+      fin_baixas: {
+        Row: {
+          conta_id: string
+          criado_em: string
+          criado_por: string | null
+          data: string
+          desfeita_em: string | null
+          desfeita_por: string | null
+          forma: string
+          id: string
+          lancamento_id: string
+          motivo_desfazer: string | null
+          observacao: string | null
+          org_id: string
+          valor: number
+        }
+        Insert: {
+          conta_id: string
+          criado_em?: string
+          criado_por?: string | null
+          data: string
+          desfeita_em?: string | null
+          desfeita_por?: string | null
+          forma: string
+          id?: string
+          lancamento_id: string
+          motivo_desfazer?: string | null
+          observacao?: string | null
+          org_id: string
+          valor: number
+        }
+        Update: {
+          conta_id?: string
+          criado_em?: string
+          criado_por?: string | null
+          data?: string
+          desfeita_em?: string | null
+          desfeita_por?: string | null
+          forma?: string
+          id?: string
+          lancamento_id?: string
+          motivo_desfazer?: string | null
+          observacao?: string | null
+          org_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_baixas_conta_id_org_id_fkey"
+            columns: ["conta_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fin_contas"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_baixas_lancamento_id_org_id_fkey"
+            columns: ["lancamento_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fin_lancamentos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_baixas_lancamento_id_org_id_fkey"
+            columns: ["lancamento_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fin_lancamentos_situacao"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_baixas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_categorias: {
+        Row: {
+          ativa: boolean
+          criado_em: string
+          id: string
+          nome: string
+          org_id: string
+          tipo: string
+        }
+        Insert: {
+          ativa?: boolean
+          criado_em?: string
+          id?: string
+          nome: string
+          org_id: string
+          tipo: string
+        }
+        Update: {
+          ativa?: boolean
+          criado_em?: string
+          id?: string
+          nome?: string
+          org_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_categorias_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_contas: {
+        Row: {
+          ativa: boolean
+          criado_em: string
+          emissora_id: string | null
+          id: string
+          nome: string
+          org_id: string
+          saldo_inicial: number
+          saldo_inicial_em: string
+          tipo: string
+        }
+        Insert: {
+          ativa?: boolean
+          criado_em?: string
+          emissora_id?: string | null
+          id?: string
+          nome: string
+          org_id: string
+          saldo_inicial?: number
+          saldo_inicial_em?: string
+          tipo?: string
+        }
+        Update: {
+          ativa?: boolean
+          criado_em?: string
+          emissora_id?: string | null
+          id?: string
+          nome?: string
+          org_id?: string
+          saldo_inicial?: number
+          saldo_inicial_em?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_contas_emissora_id_org_id_fkey"
+            columns: ["emissora_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "emissoras"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_contas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_lancamentos: {
+        Row: {
+          atualizado_em: string
+          cancelado_em: string | null
+          cancelado_por: string | null
+          categoria_id: string | null
+          cliente_id: string | null
+          criado_em: string
+          criado_por: string | null
+          descricao: string
+          emissora_id: string | null
+          fornecedor_cnpj: string | null
+          fornecedor_nome: string | null
+          grupo_id: string
+          id: string
+          motivo_cancelamento: string | null
+          observacao: string | null
+          org_id: string
+          origem: string
+          pago_em: string | null
+          parcela: number
+          parcelas: number
+          tipo: string
+          valor: number
+          valor_pago: number
+          vencimento: string
+        }
+        Insert: {
+          atualizado_em?: string
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          categoria_id?: string | null
+          cliente_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          descricao: string
+          emissora_id?: string | null
+          fornecedor_cnpj?: string | null
+          fornecedor_nome?: string | null
+          grupo_id: string
+          id?: string
+          motivo_cancelamento?: string | null
+          observacao?: string | null
+          org_id: string
+          origem?: string
+          pago_em?: string | null
+          parcela?: number
+          parcelas?: number
+          tipo: string
+          valor: number
+          valor_pago?: number
+          vencimento: string
+        }
+        Update: {
+          atualizado_em?: string
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          categoria_id?: string | null
+          cliente_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string
+          emissora_id?: string | null
+          fornecedor_cnpj?: string | null
+          fornecedor_nome?: string | null
+          grupo_id?: string
+          id?: string
+          motivo_cancelamento?: string | null
+          observacao?: string | null
+          org_id?: string
+          origem?: string
+          pago_em?: string | null
+          parcela?: number
+          parcelas?: number
+          tipo?: string
+          valor?: number
+          valor_pago?: number
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_lancamentos_categoria_id_org_id_fkey"
+            columns: ["categoria_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fin_categorias"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_cliente_id_org_id_fkey"
+            columns: ["cliente_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_emissora_id_org_id_fkey"
+            columns: ["emissora_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "emissoras"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_transferencias: {
+        Row: {
+          conta_destino_id: string
+          conta_origem_id: string
+          criado_em: string
+          criado_por: string | null
+          data: string
+          desfeita_em: string | null
+          desfeita_por: string | null
+          id: string
+          observacao: string | null
+          org_id: string
+          valor: number
+        }
+        Insert: {
+          conta_destino_id: string
+          conta_origem_id: string
+          criado_em?: string
+          criado_por?: string | null
+          data: string
+          desfeita_em?: string | null
+          desfeita_por?: string | null
+          id?: string
+          observacao?: string | null
+          org_id: string
+          valor: number
+        }
+        Update: {
+          conta_destino_id?: string
+          conta_origem_id?: string
+          criado_em?: string
+          criado_por?: string | null
+          data?: string
+          desfeita_em?: string | null
+          desfeita_por?: string | null
+          id?: string
+          observacao?: string | null
+          org_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_transferencias_conta_destino_id_org_id_fkey"
+            columns: ["conta_destino_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fin_contas"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_transferencias_conta_origem_id_org_id_fkey"
+            columns: ["conta_origem_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fin_contas"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_transferencias_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fotos_indice: {
         Row: {
           atualizado_em: string
@@ -1482,6 +1819,7 @@ export type Database = {
           ativo: boolean
           criado_em: string
           emite_nota_fiscal: boolean
+          financeiro: boolean
           org_id: string
           papel: Database["public"]["Enums"]["papel_org"]
           user_id: string
@@ -1491,6 +1829,7 @@ export type Database = {
           ativo?: boolean
           criado_em?: string
           emite_nota_fiscal?: boolean
+          financeiro?: boolean
           org_id: string
           papel?: Database["public"]["Enums"]["papel_org"]
           user_id: string
@@ -1500,6 +1839,7 @@ export type Database = {
           ativo?: boolean
           criado_em?: string
           emite_nota_fiscal?: boolean
+          financeiro?: boolean
           org_id?: string
           papel?: Database["public"]["Enums"]["papel_org"]
           user_id?: string
@@ -3203,6 +3543,122 @@ export type Database = {
       }
     }
     Views: {
+      fin_lancamentos_situacao: {
+        Row: {
+          atualizado_em: string | null
+          cancelado_em: string | null
+          cancelado_por: string | null
+          categoria_id: string | null
+          cliente_id: string | null
+          criado_em: string | null
+          criado_por: string | null
+          descricao: string | null
+          emissora_id: string | null
+          fornecedor_cnpj: string | null
+          fornecedor_nome: string | null
+          grupo_id: string | null
+          id: string | null
+          motivo_cancelamento: string | null
+          observacao: string | null
+          org_id: string | null
+          origem: string | null
+          pago_em: string | null
+          parcela: number | null
+          parcelas: number | null
+          restante: number | null
+          situacao: string | null
+          tipo: string | null
+          valor: number | null
+          valor_pago: number | null
+          vencimento: string | null
+        }
+        Insert: {
+          atualizado_em?: string | null
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          categoria_id?: string | null
+          cliente_id?: string | null
+          criado_em?: string | null
+          criado_por?: string | null
+          descricao?: string | null
+          emissora_id?: string | null
+          fornecedor_cnpj?: string | null
+          fornecedor_nome?: string | null
+          grupo_id?: string | null
+          id?: string | null
+          motivo_cancelamento?: string | null
+          observacao?: string | null
+          org_id?: string | null
+          origem?: string | null
+          pago_em?: string | null
+          parcela?: number | null
+          parcelas?: number | null
+          restante?: never
+          situacao?: never
+          tipo?: string | null
+          valor?: number | null
+          valor_pago?: number | null
+          vencimento?: string | null
+        }
+        Update: {
+          atualizado_em?: string | null
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          categoria_id?: string | null
+          cliente_id?: string | null
+          criado_em?: string | null
+          criado_por?: string | null
+          descricao?: string | null
+          emissora_id?: string | null
+          fornecedor_cnpj?: string | null
+          fornecedor_nome?: string | null
+          grupo_id?: string | null
+          id?: string | null
+          motivo_cancelamento?: string | null
+          observacao?: string | null
+          org_id?: string | null
+          origem?: string | null
+          pago_em?: string | null
+          parcela?: number | null
+          parcelas?: number | null
+          restante?: never
+          situacao?: never
+          tipo?: string | null
+          valor?: number | null
+          valor_pago?: number | null
+          vencimento?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_lancamentos_categoria_id_org_id_fkey"
+            columns: ["categoria_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fin_categorias"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_cliente_id_org_id_fkey"
+            columns: ["cliente_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_emissora_id_org_id_fkey"
+            columns: ["emissora_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "emissoras"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produtos_saldo: {
         Row: {
           ativo: boolean | null
@@ -3674,6 +4130,106 @@ export type Database = {
         }
         Returns: undefined
       }
+      fin_baixar: {
+        Args: {
+          p_conta: string
+          p_data: string
+          p_forma: string
+          p_lancamento: string
+          p_observacao: string
+          p_valor: number
+        }
+        Returns: string
+      }
+      fin_cancelar_lancamento: {
+        Args: { p_id: string; p_motivo: string }
+        Returns: undefined
+      }
+      fin_criar_lancamento: {
+        Args: {
+          p_categoria: string
+          p_cliente: string
+          p_descricao: string
+          p_emissora: string
+          p_fornecedor_cnpj: string
+          p_fornecedor_nome: string
+          p_observacao: string
+          p_org: string
+          p_parcelas: Json
+          p_tipo: string
+        }
+        Returns: string
+      }
+      fin_desfazer_baixa: {
+        Args: { p_baixa: string; p_motivo: string }
+        Returns: undefined
+      }
+      fin_desfazer_transferencia: { Args: { p_id: string }; Returns: undefined }
+      fin_editar_lancamento: {
+        Args: {
+          p_categoria: string
+          p_descricao: string
+          p_id: string
+          p_observacao: string
+          p_valor: number
+          p_vencimento: string
+        }
+        Returns: undefined
+      }
+      fin_exigir: {
+        Args: { p_gerente?: boolean; p_org: string }
+        Returns: undefined
+      }
+      fin_ligado: { Args: { p_org: string }; Returns: boolean }
+      fin_preparar: { Args: { p_org: string }; Returns: undefined }
+      fin_recalcular_pago: {
+        Args: { p_lancamento: string }
+        Returns: undefined
+      }
+      fin_saldos: {
+        Args: { p_org: string }
+        Returns: {
+          ativa: boolean
+          conta_id: string
+          nome: string
+          saldo: number
+          tipo: string
+        }[]
+      }
+      fin_salvar_categoria: {
+        Args: {
+          p_ativa: boolean
+          p_id: string
+          p_nome: string
+          p_org: string
+          p_tipo: string
+        }
+        Returns: string
+      }
+      fin_salvar_conta: {
+        Args: {
+          p_ativa: boolean
+          p_emissora: string
+          p_id: string
+          p_nome: string
+          p_org: string
+          p_saldo_inicial: number
+          p_saldo_inicial_em: string
+          p_tipo: string
+        }
+        Returns: string
+      }
+      fin_transferir: {
+        Args: {
+          p_data: string
+          p_destino: string
+          p_observacao: string
+          p_org: string
+          p_origem: string
+          p_valor: number
+        }
+        Returns: string
+      }
       formatar_documento: { Args: { p: string }; Returns: string }
       fotos_candidatas: {
         Args: {
@@ -3735,6 +4291,10 @@ export type Database = {
         Returns: string
       }
       membro_definir_emite_nota_fiscal: {
+        Args: { p_org: string; p_usuario: string; p_valor: boolean }
+        Returns: undefined
+      }
+      membro_definir_financeiro: {
         Args: { p_org: string; p_usuario: string; p_valor: boolean }
         Returns: undefined
       }
@@ -3939,6 +4499,7 @@ export type Database = {
         }[]
       }
       pode_acessar_midia: { Args: { p_nome: string }; Returns: boolean }
+      pode_financeiro: { Args: { p_org: string }; Returns: boolean }
       pode_usar_contato: { Args: { p_contato: string }; Returns: boolean }
       pode_ver_canal: { Args: { p_canal: string }; Returns: boolean }
       pode_ver_cliente: { Args: { p_cliente: string }; Returns: boolean }
