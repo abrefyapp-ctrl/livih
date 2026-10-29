@@ -3510,5 +3510,213 @@ insert into resultado (teste, ok) select 'desempenho: o dono vê a própria insc
 delete from public.notas where texto = 'Nota do dono (desempenho)';
 insert into resultado (teste, ok) select 'desempenho: o autor apaga a própria nota',
   not exists (select 1 from public.notas where texto = 'Nota do dono (desempenho)');
+-- Data de Brasília, a mesma das funções do financeiro: depois das 21 h o dia do servidor (UTC) já é o seguinte.
+reset role;
+create function public.fin_hoje_teste() returns date language sql stable as $$ select (now() at time zone 'America/Sao_Paulo')::date $$;
+grant execute on function public.fin_hoje_teste() to authenticated;
+-- Financeiro, entrega 1 (migration 20261028120000; a1 é dono da F7 de teste e admin da plataforma, b1 atendente,
+-- c1 dono de outra empresa).
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  perform public.plataforma_definir_modulo(v_org, 'erp', false);
+  perform public.plataforma_definir_modulo(v_org, 'os', false);
+  begin
+    perform public.fin_preparar(v_org);
+    insert into resultado (teste, ok) values ('financeiro: sem ERP e sem OS não liga', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: sem ERP e sem OS não liga', sqlerrm like 'o financeiro não está ligado%');
+  end;
+  perform public.plataforma_definir_modulo(v_org, 'os', true);
+  insert into resultado (teste, ok) values ('financeiro: liga com as OS', public.fin_ligado(v_org));
+  perform public.plataforma_definir_modulo(v_org, 'os', false);
+  perform public.plataforma_definir_modulo(v_org, 'erp', true);
+  perform public.fin_preparar(v_org);
+  perform public.fin_preparar(v_org);
+  insert into resultado (teste, ok) select 'financeiro: preparar cria 7 categorias e o caixa (uma vez só)',
+    (select count(*) from public.fin_categorias where org_id = v_org) = 7
+    and (select count(*) from public.fin_contas where org_id = v_org) = 1
+    and exists (select 1 from public.fin_contas where org_id = v_org and nome = 'Caixa' and tipo = 'caixa');
+end $$;
+
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_caixa uuid := (select id from public.fin_contas where org_id = current_setting('teste.f7')::uuid and nome = 'Caixa');
+  v_banco uuid;
+  v_vendas uuid := (select id from public.fin_categorias where org_id = current_setting('teste.f7')::uuid and nome = 'Vendas');
+  v_aluguel uuid := (select id from public.fin_categorias where org_id = current_setting('teste.f7')::uuid and nome = 'Aluguel');
+  v_grupo uuid;
+  v_p1 uuid; v_p2 uuid;
+  v_b1 uuid; v_b2 uuid;
+  v_pagar uuid;
+begin
+  v_banco := public.fin_salvar_conta(v_org, null, 'Banco Teste', 'banco', null, 1000, public.fin_hoje_teste() - 30, true);
+  begin
+    perform public.fin_salvar_conta(v_org, null, ' banco teste ', 'banco', null, 0, null, true);
+    insert into resultado (teste, ok) values ('financeiro: nome de conta repetido é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: nome de conta repetido é recusado', sqlerrm like 'já existe uma conta%');
+  end;
+
+  v_grupo := public.fin_criar_lancamento(v_org, 'receber', 'Venda parcelada', v_vendas, null, null, null, null,
+    jsonb_build_array(jsonb_build_object('vencimento', public.fin_hoje_teste() - 5, 'valor', 100),
+                      jsonb_build_object('vencimento', public.fin_hoje_teste() + 25, 'valor', 200.004)), null);
+  select id into v_p1 from public.fin_lancamentos where grupo_id = v_grupo and parcela = 1;
+  select id into v_p2 from public.fin_lancamentos where grupo_id = v_grupo and parcela = 2;
+  insert into resultado (teste, ok) select 'financeiro: lançamento em 2 parcelas no mesmo grupo, valor em centavos',
+    (select count(*) from public.fin_lancamentos where grupo_id = v_grupo and parcelas = 2) = 2
+    and (select valor from public.fin_lancamentos where id = v_p2) = 200.00;
+  insert into resultado (teste, ok) select 'financeiro: parcela passada aparece vencida e a futura em aberto',
+    (select situacao from public.fin_lancamentos_situacao where id = v_p1) = 'vencido'
+    and (select situacao from public.fin_lancamentos_situacao where id = v_p2) = 'aberto';
+
+  begin
+    perform public.fin_criar_lancamento(v_org, 'receber', 'Errado', v_aluguel, null, null, null, null,
+      jsonb_build_array(jsonb_build_object('vencimento', public.fin_hoje_teste(), 'valor', 10)), null);
+    insert into resultado (teste, ok) values ('financeiro: categoria de despesa no a receber é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: categoria de despesa no a receber é recusada', sqlerrm like 'a categoria não é desta empresa%');
+  end;
+  begin
+    perform public.fin_criar_lancamento(v_org, 'pagar', 'Zero', null, null, null, null, null,
+      jsonb_build_array(jsonb_build_object('vencimento', public.fin_hoje_teste(), 'valor', 0)), null);
+    insert into resultado (teste, ok) values ('financeiro: parcela de valor zero é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: parcela de valor zero é recusada', sqlerrm like 'parcela 1: informe o vencimento%');
+  end;
+
+  v_b1 := public.fin_baixar(v_p2, v_caixa, public.fin_hoje_teste(), 40, 'pix', null);
+  insert into resultado (teste, ok) select 'financeiro: baixa em parte deixa a parcela parcial com o que falta',
+    (select situacao = 'parcial' and restante = 160 and pago_em is null from public.fin_lancamentos_situacao where id = v_p2);
+  begin
+    perform public.fin_baixar(v_p2, v_caixa, public.fin_hoje_teste(), 160.01, 'pix', null);
+    insert into resultado (teste, ok) values ('financeiro: baixa acima do que falta é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: baixa acima do que falta é recusada', sqlerrm like 'o valor passa do que falta%');
+  end;
+  begin
+    perform public.fin_baixar(v_p2, v_caixa, public.fin_hoje_teste() + 1, 10, 'pix', null);
+    insert into resultado (teste, ok) values ('financeiro: baixa com data no futuro é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: baixa com data no futuro é recusada', sqlerrm like 'a data do pagamento não pode ser no futuro%');
+  end;
+  v_b2 := public.fin_baixar(v_p2, v_caixa, public.fin_hoje_teste() - 1, 160, 'dinheiro', null);
+  insert into resultado (teste, ok) select 'financeiro: a segunda baixa quita a parcela com a data da última',
+    (select situacao = 'pago' and restante = 0 and pago_em = public.fin_hoje_teste() from public.fin_lancamentos_situacao where id = v_p2);
+
+  perform public.fin_desfazer_baixa(v_b2, 'lançado errado');
+  insert into resultado (teste, ok) select 'financeiro: desfazer a baixa volta a parcial e mantém o registro',
+    (select situacao = 'parcial' and valor_pago = 40 and pago_em is null from public.fin_lancamentos_situacao where id = v_p2)
+    and (select desfeita_em is not null and motivo_desfazer = 'lançado errado' from public.fin_baixas where id = v_b2)
+    and exists (select 1 from public.auditoria where entidade = 'fin_baixas' and entidade_id = v_b2::text and acao = 'desfazer_baixa');
+  begin
+    perform public.fin_desfazer_baixa(v_b2, null);
+    insert into resultado (teste, ok) values ('financeiro: baixa desfeita não se desfaz de novo', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: baixa desfeita não se desfaz de novo', sqlerrm like 'a baixa já foi desfeita%');
+  end;
+  begin
+    perform public.fin_editar_lancamento(v_p2, null, v_vendas, null, 30, null);
+    insert into resultado (teste, ok) values ('financeiro: valor menor que o já pago é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: valor menor que o já pago é recusado', sqlerrm like 'o valor não pode ser menor que o já pago%');
+  end;
+  begin
+    perform public.fin_cancelar_lancamento(v_p2, null);
+    insert into resultado (teste, ok) values ('financeiro: lançamento com baixa não é cancelado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: lançamento com baixa não é cancelado', sqlerrm like 'desfaça as baixas%');
+  end;
+  perform public.fin_editar_lancamento(v_p1, 'Venda parcelada (1ª)', v_vendas, public.fin_hoje_teste() + 3, 120, 'combinado');
+  insert into resultado (teste, ok) select 'financeiro: editar muda valor e vencimento da parcela',
+    (select valor = 120 and vencimento = public.fin_hoje_teste() + 3 and situacao = 'aberto' from public.fin_lancamentos_situacao where id = v_p1);
+  perform public.fin_cancelar_lancamento(v_p1, 'cliente desistiu');
+  insert into resultado (teste, ok) select 'financeiro: cancelar sem baixa marca cancelado',
+    (select situacao from public.fin_lancamentos_situacao where id = v_p1) = 'cancelado';
+  begin
+    perform public.fin_baixar(v_p1, v_caixa, public.fin_hoje_teste(), 10, 'pix', null);
+    insert into resultado (teste, ok) values ('financeiro: lançamento cancelado não recebe baixa', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: lançamento cancelado não recebe baixa', sqlerrm like 'lançamento cancelado%');
+  end;
+
+  v_grupo := public.fin_criar_lancamento(v_org, 'pagar', 'Aluguel de outubro', v_aluguel, null, null,
+    '12.345.678/0001-95', 'Imobiliária Teste', jsonb_build_array(jsonb_build_object('vencimento', public.fin_hoje_teste(), 'valor', 300)), null);
+  select id into v_pagar from public.fin_lancamentos where grupo_id = v_grupo;
+  insert into resultado (teste, ok) select 'financeiro: a pagar guarda o fornecedor só com números',
+    (select fornecedor_cnpj = '12345678000195' and fornecedor_nome = 'Imobiliária Teste' from public.fin_lancamentos where id = v_pagar);
+  perform public.fin_baixar(v_pagar, v_banco, public.fin_hoje_teste(), 300, 'boleto', null);
+  perform public.fin_transferir(v_org, v_caixa, v_banco, public.fin_hoje_teste(), 50, 'depósito');
+  begin
+    perform public.fin_transferir(v_org, v_banco, v_banco, public.fin_hoje_teste(), 10, null);
+    insert into resultado (teste, ok) values ('financeiro: transferência para a mesma conta é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: transferência para a mesma conta é recusada', sqlerrm like 'escolha duas contas diferentes%');
+  end;
+  -- Caixa: 40 recebidos − 50 transferidos = −10. Banco: 1000 − 300 pagos + 50 recebidos da transferência = 750.
+  insert into resultado (teste, ok) select 'financeiro: saldo soma baixas e transferências (desfeitas ficam fora)',
+    (select saldo from public.fin_saldos(v_org) where conta_id = v_caixa) = -10
+    and (select saldo from public.fin_saldos(v_org) where conta_id = v_banco) = 750;
+
+  begin
+    insert into public.fin_lancamentos (org_id, tipo, descricao, grupo_id, vencimento, valor)
+    values (v_org, 'receber', 'direto', gen_random_uuid(), public.fin_hoje_teste(), 10);
+    insert into resultado (teste, ok) values ('financeiro: a tela não grava lançamento direto na tabela', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('financeiro: a tela não grava lançamento direto na tabela', true);
+  end;
+  perform set_config('teste.fin_p2', v_p2::text, true);
+  perform set_config('teste.fin_caixa', v_caixa::text, true);
+end $$;
+
+-- Atendente sem a permissão Financeiro: não vê nem dá baixa.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'financeiro: atendente sem a permissão não vê os lançamentos',
+  count(*) = 0 from public.fin_lancamentos;
+do $$ begin
+  perform public.fin_baixar(current_setting('teste.fin_p2')::uuid, current_setting('teste.fin_caixa')::uuid, public.fin_hoje_teste(), 1, 'pix', null);
+  insert into resultado (teste, ok) values ('financeiro: atendente sem a permissão não dá baixa', false);
+exception when others then
+  insert into resultado (teste, ok) values ('financeiro: atendente sem a permissão não dá baixa', sqlerrm like 'você não tem acesso ao financeiro%');
+end $$;
+do $$ begin
+  perform public.membro_definir_financeiro(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000b1', true);
+  insert into resultado (teste, ok) values ('financeiro: atendente não dá a permissão a si mesmo', false);
+exception when others then
+  insert into resultado (teste, ok) values ('financeiro: atendente não dá a permissão a si mesmo', sqlerrm like 'só dono e admin mudam%');
+end $$;
+
+-- O dono dá a permissão: o atendente passa a ver e dar baixa, mas não configura contas.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+select public.membro_definir_financeiro(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000b1', true);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.fin_baixar(current_setting('teste.fin_p2')::uuid, current_setting('teste.fin_caixa')::uuid, public.fin_hoje_teste(), 10, 'pix', null);
+  insert into resultado (teste, ok) select 'financeiro: com a permissão, o atendente vê e dá baixa',
+    (select count(*) from public.fin_lancamentos) > 0
+    and (select valor_pago from public.fin_lancamentos where id = current_setting('teste.fin_p2')::uuid) = 50;
+end $$;
+do $$ begin
+  perform public.fin_salvar_conta(current_setting('teste.f7')::uuid, null, 'Conta do atendente', 'banco', null, 0, null, true);
+  insert into resultado (teste, ok) values ('financeiro: atendente com a permissão não cria conta', false);
+exception when others then
+  insert into resultado (teste, ok) values ('financeiro: atendente com a permissão não cria conta', sqlerrm like 'só dono e admin configuram%');
+end $$;
+
+-- Outra empresa: não vê nem mexe.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'financeiro: outra empresa não vê os lançamentos nem as contas',
+  (select count(*) from public.fin_lancamentos) = 0 and (select count(*) from public.fin_contas) = 0;
+do $$ begin
+  perform public.fin_baixar(current_setting('teste.fin_p2')::uuid, current_setting('teste.fin_caixa')::uuid, public.fin_hoje_teste(), 1, 'pix', null);
+  insert into resultado (teste, ok) values ('financeiro: outra empresa não dá baixa', false);
+exception when others then
+  insert into resultado (teste, ok) values ('financeiro: outra empresa não dá baixa', sqlerrm like 'o financeiro não está ligado%' or sqlerrm like 'você não tem acesso%');
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;
