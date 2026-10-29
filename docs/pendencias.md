@@ -18,6 +18,29 @@ Coisas anotadas para corrigir depois. Tirar daqui quando entrar no commit.
   no plano, liberação por organização (feature flag) e integração com ERPs que o cliente já usa (ex.: Bling).
   **Piloto: JoGrampo** (decidido em 10/10) — a Liv já anota pedidos lá (ex.: 5 caixinhas do pino F15).
 
+## Em aberto em 28/10 (passagem de sessão)
+
+Anotado ao fim da sessão de 28/10, para continuar no dia seguinte. Tirar cada item quando resolver.
+
+- **Financeiro, entrega 2** ([financeiro.md](financeiro.md)): banco aplicado (migration 20261029120000) e telas no commit
+  2feae0b. Falta: `npm run publicar`, `npm run verificar` e `git push`, se ainda não foram feitos; depois, testar com
+  um pedido de verdade da JoGrampo (escolher forma e parcelas, confirmar, ver as parcelas no pedido e no Financeiro) e
+  conferir a entrada por nota com o primeiro XML de verdade que traga duplicatas (a leitura de `cobr > dup` no
+  navegador não tem teste automático).
+- **Financeiro, próximo passo: entrega 3** (fluxo de caixa realizado e previsto, vencidos, totais por categoria, e o
+  painel e a previsão das OS lendo os lançamentos). Depois: entrega 4 (Pix copia e cola com a chave da empresa e
+  cobrança pelo WhatsApp). Em aberto no fim do [financeiro.md](financeiro.md): categorias padrão, juros e multa,
+  lembrete de vencimento, taxa do cartão.
+- **Dados de teste em produção:** na Cactos (demonstração) ficaram a conta "Banco Teste (demonstração)", as 3 parcelas
+  de "Conserto de motores (teste)", baixas e uma transferência; somem quando a Cactos for apagada. Na F7 Tech, abrir o
+  Financeiro criou as 7 categorias padrão e a conta Caixa (sem lançamentos).
+- **Planos** ([planos-modulos.md](planos-modulos.md)): preços sugeridos (núcleo R$ 197/397/697 com 1.000/2.000/3.000
+  atendimentos de 24 h; ERP e OS a R$ 99 com 1 CNPJ e 100 notas). Falta: aprovar os preços, contratar o plano Start da
+  Focus (perguntar se cancelamento e carta de correção contam como documento), decidir a integração com o Bling e o
+  anexo do Simples. Depois, construir os planos no banco (contagem de atendimentos e aviso à Livih em 80 %).
+- **F7 fora da Focus:** decidir se desliga a configuração de nota da F7 na Livih ([nfse.md](nfse.md)); o usuário vai
+  verificar.
+
 ## Em aberto em 27/10 (passagem de sessão)
 
 Anotado ao fim da sessão de 25 a 27/10. Tirar cada item quando resolver.
