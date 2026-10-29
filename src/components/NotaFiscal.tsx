@@ -67,6 +67,17 @@ function Situacao({ nota }: { nota: NotaFiscal }) {
       </Aviso>
     )
   }
+  // 656: a SEFAZ bloqueia o CNPJ por cerca de 1 hora depois de várias notas recusadas pelo mesmo motivo (FIXOTEC,
+  // 29/10, depois de seis 974 no dia). Emitir de novo nesse intervalo só prolonga o bloqueio.
+  if (nota.status === 'rejeitada' && /^\s*656\b/.test(nota.mensagem ?? '')) {
+    return (
+      <Aviso tom="erro">
+        <span className="font-medium">A SEFAZ bloqueou este CNPJ por cerca de 1 hora</span>, porque recebeu várias notas
+        recusadas pelo mesmo motivo. Espere esse tempo e resolva o motivo da recusa anterior antes de emitir de novo.{' '}
+        <span className="text-legenda">({nota.mensagem})</span>
+      </Aviso>
+    )
+  }
   if (nota.status === 'rejeitada') {
     return (
       <Aviso tom="erro">
