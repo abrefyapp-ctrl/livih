@@ -14,10 +14,20 @@ cada um com a sua nota fiscal incluída).
 - **o agente entra no núcleo**, em todo plano: é a essência da Livih. O que muda de um plano para outro é a franquia
   de atendimentos do agente, não ter ou não o agente;
 - **Agenda e Campanhas entram no núcleo**;
-- **franquia do agente:** o modelo de IA não muda (segue o gpt-5-mini); as franquias dos planos aumentam para não
-  faltar, e em 80 % **a Livih é avisada** e acrescenta créditos se for preciso (seção própria abaixo);
+- **franquia do agente:** o modelo de IA não muda (segue o gpt-5-mini); as franquias e o que acontece ao passar delas
+  foram revistos em 29/10 (abaixo);
 - **nota fiscal não é módulo à parte:** vem incluída no ERP (NF-e) e nas OS (NFS-e). Com isso, os pacotes saíram: o
   cliente paga o núcleo mais cada módulo (depois de comparar com o Bling, seção de preços).
+
+**Decidido em 29/10:**
+- **quatro planos em escada**, cada um custando o dobro do anterior: Essencial, Start, Pro e Business (seção de
+  preços). O salto de R$ 49,90 para R$ 197 era grande demais: o cliente do Essencial só ganharia com o Start depois de
+  ~520 atendimentos;
+- **ao passar da franquia, o cliente escolhe**, como no Bubble com as WUs: parar o agente ou continuar pagando o
+  excedente; e pode comprar pacotes de atendimentos. Vale para todos os planos e substitui "o agente nunca para e só a
+  Livih é avisada" de 28/10;
+- **franquias menores**: as de 28/10 eram grandes para o agente nunca parar sem susto; com a escolha do cliente, isso
+  deixou de ser preciso. Com R$ 0,20 por atendimento, o Start de 1.000 daria prejuízo com a franquia cheia.
 
 Por que o agente não é módulo:
 - **É o diferencial.** Sem ele, a Livih é mais um CRM de WhatsApp contra concorrentes com anos de mercado. O
@@ -63,15 +73,15 @@ O que pesa no custo muda de parte para parte, e a cobrança deve seguir o custo:
 Usuários continuam **ilimitados** em todos os planos (decisão de 20/10). Os modelos das campanhas a Meta cobra direto
 da empresa cliente, por isso as campanhas cabem no núcleo sem custo para a Livih.
 
-## Franquia do agente (decidido em 28/10)
+## Franquia do agente (28/10, revista em 29/10)
 
-Com o agente em todo plano, a franquia é o que segura o custo. No começo a prioridade é atrair clientes, então o
-agente **não para** e o cliente **não leva cobrança surpresa**.
+Com o agente em todo plano, a franquia é o que segura o custo. O cliente **não leva cobrança surpresa**: ao passar
+dela, acontece o que ele escolheu.
 
 - **O modelo de IA não muda:** segue o gpt-5-mini em todo plano. Trocar por um modelo mais barato ao passar da
   franquia foi pensado e deixado de lado por enquanto (um modelo menor erra mais nas ferramentas).
-- **Franquias: 1.000, 2.000 e 3.000 atendimentos por mês** (Start, Pro e Business), acima das de 20/10 (500, 1.200
-  e 3.000), para a maioria dos clientes nunca chegar perto do limite.
+- **Franquias: 150, 350, 750 e 1.500 atendimentos por mês** (Essencial, Start, Pro e Business; 29/10). As de 28/10
+  (1.000, 2.000 e 3.000) foram feitas para o agente nunca parar; com a escolha do cliente, ficaram grandes demais.
 - **O que conta: o atendimento de 24 h.** Um atendimento começa quando o agente responde numa conversa em que não
   respondia havia mais de 24 h; tudo o que ele responde nas 24 h seguintes é o mesmo atendimento. Para o cliente: "cada
   vez que alguém puxa assunto e o agente atende, conta um atendimento". Escolhido no lugar de "conversa no mês" porque
@@ -84,30 +94,59 @@ agente **não para** e o cliente **não leva cobrança surpresa**.
   | JoGrampo | 413 | 59 | 78 | 5,3 |
   | F7 Tech | 44 | 8 | 13 | 3,4 |
 
-  A JoGrampo usaria ~8 % da franquia do Start. Com ~R$ 0,02 por resposta, o atendimento sai por ~R$ 0,11, e as
-  franquias cheias custariam ~R$ 110, ~R$ 220 e ~R$ 330 de IA por mês. Conferir o custo por resposta em `uso_ia`
-  antes de fechar os preços.
-- **Aviso para a Livih em 80 %:** quando uma empresa usa 80 % da franquia do mês, a equipe da plataforma recebe um
-  aviso (notificação e WhatsApp, como os lembretes da agenda) com a empresa, o consumo e o custo do mês. O dono da
-  empresa não recebe esse aviso.
-- **Créditos extras:** a plataforma acrescenta atendimentos ao mês daquela empresa, na tela Empresas, se for preciso.
-  Cobrar ou não pelos créditos é decisão comercial de cada caso (oferecer subir de plano, dar de cortesia).
-- **Ao passar de 100 %** sem crédito novo, o agente **continua atendendo**; a plataforma recebe um segundo aviso. Parar
-  o agente fica fora, porque o cliente ficaria sem atendimento.
+  A JoGrampo usaria ~52 % da franquia do Essencial (ou ~22 % da do Start).
+- **Custo por atendimento (conferido em 29/10):** pelos tokens do `uso_ia` e a taxa de cache de 65 % do painel da
+  OpenAI, ~R$ 0,11; pela cobrança real da chave do agente no n8n (US$ 3,46 em outubro, ~490 respostas), ~R$ 0,21. As
+  contas de preço usam **R$ 0,20**, o conservador. O total da organização na OpenAI em outubro (US$ 5,44) bateu com a
+  estimativa pelos tokens (~US$ 5,10): o raciocínio do gpt-5-mini não esconde custo.
+- **Ao chegar em 80 %**, o **cliente** é avisado (notificação e WhatsApp, como os lembretes da agenda) com o consumo e
+  as opções; a equipe da plataforma também.
+- **Ao chegar em 100 %, acontece o que o cliente escolheu** na tela de plano:
+  - **parar:** o agente para, e as conversas seguem para a equipe, como com o agente desligado;
+  - **continuar:** o agente segue, e cada atendimento a mais entra na fatura seguinte a **R$ 0,40**.
+- **Pacote de 100 atendimentos a R$ 29,90** (R$ 0,30 cada), comprado antes, em qualquer plano. O avulso fica mais caro
+  de propósito, para levar ao pacote ou ao plano de cima. Excedente e pacote entram na mensalidade seguinte, sem
+  cobrança separada (sem uma segunda taxa de cobrança).
+- **Créditos de cortesia:** a plataforma ainda pode acrescentar atendimentos ao mês de uma empresa na tela Empresas.
 
-## Preços sugeridos (28/10, a decidir)
+## Preços (núcleo em escada decidido em 29/10; módulos sugeridos em 28/10)
 
 ### Núcleo
 
-| Plano | Preço por mês | Números de WhatsApp | Atendimentos do agente | IA com a franquia cheia |
-|---|---|---|---|---|
-| Start | **R$ 197** | até 3 | 1.000 | ~R$ 110 |
-| Pro | **R$ 397** | até 5 | 2.000 | ~R$ 220 |
-| Business | **R$ 697** | até 10 | 3.000 | ~R$ 330 |
+| Plano | Preço por mês | Números de WhatsApp | Atendimentos do agente | IA com a franquia cheia | Sobra no pior caso | Vale subir a partir de |
+|---|---|---|---|---|---|---|
+| **Essencial** | **R$ 49,90** | 1 | 150 | R$ 30 | ~R$ 10 | — |
+| **Start** | **R$ 99,90** | 2 | 350 | R$ 70 | ~R$ 12 | ~275 atendimentos no Essencial |
+| **Pro** | **R$ 197** | 3 | 750 | R$ 150 | ~R$ 14 | ~590 no Start |
+| **Business** | **R$ 397** | 5 | 1.500 | R$ 300 | ~R$ 33 | ~1.250 no Pro |
+| Acima disso | sob consulta | 10 ou mais | a combinar | | | |
 
-Sobe em relação a 20/10 (R$ 149, 299 e 599) porque a franquia mais que dobrou: a R$ 149, um Start com a franquia
-cheia não deixaria margem depois da IA e do imposto. O pior caso ainda deixa margem, e o uso comum (10 % a 30 % da
-franquia) deixa bastante. Para atrair os primeiros, o desconto fica no Programa Fundadores (R$ 149 e R$ 249 travados).
+- **Pior caso:** franquia inteira usada, R$ 0,20 por atendimento, Anexo V (15,5 %) e ~R$ 2 de taxa de cobrança. No
+  uso comum (30 % da franquia) a sobra é bem maior (no Essencial, ~R$ 31); com o custo de R$ 0,11, quase dobra.
+- **Cada plano custa o dobro do anterior**, e o cliente passa a ganhar com o de cima quando o excedente (R$ 0,40)
+  alcança a diferença de preço.
+- **Essencial:** sem ERP nem OS; implantação feita pelo próprio cliente (conectar o WhatsApp, importar o catálogo,
+  orientador) ou cobrada à parte. Com ~R$ 31 de sobra por mês no uso comum, duas horas de suporte comem meses de
+  margem.
+- **Histórico:** 20/10 era Start, Pro e Business a R$ 149, 299 e 599 (500, 1.200 e 3.000 conversas); 28/10, a
+  R$ 197, 397 e 697 (1.000, 2.000 e 3.000 atendimentos). O plano de entrada foi pensado a R$ 39,90 com 100
+  atendimentos; R$ 49,90 com 150 deixa a mesma folga no pior caso e 50 % a mais de franquia.
+- **Programa Fundadores** (R$ 149 com o que é do Pro e R$ 249 com o que é do Business) continua com desconto sobre a
+  escada.
+
+### Custos fixos (29/10)
+
+| Item | Por mês |
+|---|---|
+| VPS Hostinger KVM 2 (2 vCPU, 8 GB), migrando do KVM 1 | R$ 42,99 no contrato de 24 meses (R$ 1.031,76); renova a R$ 77,99 |
+| Supabase Pro | US$ 25 (~R$ 140) |
+| WAHA | grátis |
+| **Total** | **~R$ 183** |
+
+Ponto de equilíbrio: **6 clientes Essencial** no uso comum (18 se todos usarem a franquia inteira). A Focus
+(R$ 119,90) entra quando houver ERP ou OS além da JoGrampo. **Conferir o WAHA:** o Core grátis roda uma sessão só
+("default"), e a Livih tem 3 ativas com nomes próprios; se um cliente novo exigir o Plus pago, cada número passa a
+ter custo.
 
 ### Módulos
 
@@ -118,7 +157,7 @@ franquia) deixa bastante. Para atrair os primeiros, o desconto fica no Programa 
 | CNPJ adicional | **R$ 49/mês** | R$ 39,90 | ~R$ 9 |
 | Nota além das 100 por CNPJ | **R$ 0,20** | R$ 0,11 | R$ 0,09 |
 
-Exemplo: a JoGrampo (2 CNPJs) no Start com o ERP pagaria R$ 197 + 99 + 49 = R$ 345. Como é do Programa Fundadores,
+Exemplo: a JoGrampo (2 CNPJs) no Start com o ERP pagaria R$ 99,90 + 99 + 49 = R$ 247,90. Como é do Programa Fundadores,
 o ERP segue sem custo para ela.
 
 A primeira sugestão (ERP e OS a R$ 79 com a nota incluída) foi revista ao ver o custo da Focus: um cliente com 2 CNPJs
@@ -166,8 +205,8 @@ O preço sobe pela faixa de faturamento da empresa (a página não mostra o valo
 de notas, de CNPJs nem custos extras. Cita "Omie no WhatsApp" e "Omie.IA Fiscal", sem dizer se estão nos planos; não
 há agente de atendimento com IA.
 
-Leitura: a Omie é o ERP completo e mais caro; o Bling, o barato. A Livih com ERP (Start + ERP = R$ 296) custa perto do
-Padrão da Omie, mas entrega outra coisa: o atendimento com IA e o CRM, com um ERP mais simples. Contra "Omie mais um
+Leitura: a Omie é o ERP completo e mais caro; o Bling, o barato. A Livih com ERP (Start + ERP = R$ 198,90, na escada
+de 29/10) custa menos que o Padrão da Omie e entrega outra coisa: o atendimento com IA e o CRM, com um ERP mais simples. Contra "Omie mais um
 agente de IA à parte" (R$ 309 + R$ 200 a 1.000), a Livih sai bem mais barata. O ponto fraco nas duas comparações é o
 mesmo: **o financeiro** (contas a receber, boleto, fluxo de caixa), que Bling e Omie têm e a Livih ainda não.
 
@@ -184,9 +223,9 @@ Resumo de uma busca do usuário em 28/10 (números aproximados, não conferidos 
 Exemplos citados: Chat Inteligente/Clint ~R$ 149, Wati ~R$ 369 (US$ 69), SleekFlow ~R$ 589.
 
 O agente da Livih já faz o que a faixa intermediária promete (áudio, base, PDF, status de pedido e de OS) e vai além
-(monta e envia o orçamento, identifica produto por foto, CRM e funil próprios). Os preços sugeridos do núcleo ficam
-no começo dessa faixa: o Start a R$ 197 compete com o básico entregando o intermediário, e o Business a R$ 697 ainda
-fica abaixo do meio da faixa. Antes de anunciar, conferir nas páginas de cada concorrente o que entra no plano de
+(monta e envia o orçamento, identifica produto por foto, CRM e funil próprios). Na escada de 29/10, o Essencial
+(R$ 49,90) e o Start (R$ 99,90) ficam abaixo da faixa básica entregando o intermediário, e o Business (R$ 397) fica no
+começo da intermediária. Antes de anunciar, conferir nas páginas de cada concorrente o que entra no plano de
 entrada (números, usuários, IA inclusa ou à parte, taxas da Meta).
 
 ## Vender uma parte sozinha
@@ -206,8 +245,8 @@ já estava no radar das [pendências](pendencias.md) desde 10/10.
 
 ## O que muda nos planos de 20/10
 
-- Os planos Start, Pro e Business já variam por números de WhatsApp e atendimentos do agente, e isso continua: **viram
-  os níveis do núcleo**. ERP e OS passam a ser somados por cima.
+- Os planos já variam por números de WhatsApp e atendimentos do agente, e isso continua: **viram os níveis do
+  núcleo**, agora com o Essencial embaixo (29/10). ERP e OS passam a ser somados por cima.
 - **Programa Fundadores:** o preço travado por 12 meses e o ERP sem custo continuam valendo para quem já entrou. O
   modelo novo vale para os próximos clientes.
 
@@ -217,20 +256,25 @@ Em ordem; cada passo é uma entrega com o seu arquivo em `docs/` quando for cons
 
 1. **Decidir o modelo** (sem código): fechar as decisões em aberto abaixo e os preços.
 2. **Planos e franquia no banco**: o plano de cada empresa (nível do núcleo, números de WhatsApp e franquia de
-   atendimentos), a contagem de atendimentos do agente no mês, os créditos extras e o aviso para a plataforma em 80 %
-   e 100 %. Na tela Empresas, a plataforma escolhe o plano, vê o consumo e acrescenta créditos. O agente não muda.
+   atendimentos), a contagem de atendimentos do agente no mês, os pacotes e créditos, a escolha do cliente ao passar
+   (parar ou continuar), o excedente do mês e os avisos ao cliente e à plataforma em 80 % e 100 %. Na tela Empresas, a
+   plataforma escolhe o plano, vê o consumo e acrescenta créditos de cortesia. O agente só muda para parar quando o
+   cliente escolheu parar.
 3. **Nota fiscal dentro do ERP e das OS**: políticas e Edge Functions de nota (`nfe-config`, `nfe-emitir`,
    `nfse-emitir`) exigem o ERP ou as OS ligados; o botão de nota some sem eles. Quem já emite tem os módulos ligados.
 4. **Limite de números de WhatsApp** ao conectar um número, e franquia de notas fiscais.
-5. **Tela de plano para o dono da empresa**: o que está contratado, o consumo do mês e como pedir um módulo novo.
-6. **Cobrança da Livih**: assinatura recorrente por empresa, somando o plano do núcleo e os módulos ligados (Asaas, o
-   mesmo que vai servir ao financeiro do ERP).
+5. **Tela de plano para o dono da empresa**: o que está contratado, o consumo do mês, a escolha de parar ou
+   continuar ao passar da franquia, a compra de pacote e como pedir um módulo novo.
+6. **Cobrança da Livih**: assinatura recorrente por empresa, somando o plano do núcleo, os módulos ligados, os pacotes
+   e o excedente do mês anterior (Asaas, o mesmo que vai servir ao financeiro do ERP).
 7. **Depois, para abrir "só ERP" e "só nota fiscal"**: financeiro no ERP (contas a receber, cobrança), NF-e avulsa e
    o núcleo enxuto para quem não usa WhatsApp. Só com cliente real pedindo.
 
 ## Decisões em aberto
 
-- **Fechar os preços sugeridos** do núcleo e dos módulos.
+- **Fechar os preços dos módulos** (ERP e OS a R$ 99); o núcleo foi fechado em 29/10.
+- **Usuários no Essencial:** ilimitados, como nos outros planos, ou limitados (2 ou 3) para marcar a diferença.
+- **WAHA:** confirmar a versão e a licença que rodam na VPS (seção de custos fixos).
 - **Contratar o plano Start da Focus** e confirmar se cancelamento e carta de correção contam como documento.
 - **Integração com o Bling**: fazer ou não, e antes ou depois do financeiro próprio.
 - **Teste grátis**: por módulo, por plano ou nenhum (o Programa Fundadores já tem o piloto de 30 dias).

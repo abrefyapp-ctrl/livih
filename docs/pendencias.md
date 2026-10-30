@@ -33,10 +33,15 @@ Anotado ao fim da sessão de 28/10, para continuar no dia seguinte. Tirar cada i
 - **Dados de teste em produção:** na Cactos (demonstração) ficaram a conta "Banco Teste (demonstração)", as 3 parcelas
   de "Conserto de motores (teste)", baixas e uma transferência; somem quando a Cactos for apagada. Na F7 Tech, abrir o
   Financeiro criou as 7 categorias padrão e a conta Caixa (sem lançamentos).
-- **Planos** ([planos-modulos.md](planos-modulos.md)): preços sugeridos (núcleo R$ 197/397/697 com 1.000/2.000/3.000
-  atendimentos de 24 h; ERP e OS a R$ 99 com 1 CNPJ e 100 notas). Falta: aprovar os preços, contratar o plano Start da
-  Focus (perguntar se cancelamento e carta de correção contam como documento), decidir a integração com o Bling e o
-  anexo do Simples. Depois, construir os planos no banco (contagem de atendimentos e aviso à Livih em 80 %).
+- **Planos** ([planos-modulos.md](planos-modulos.md)): núcleo fechado em 29/10, em escada (Essencial R$ 49,90, Start
+  R$ 99,90, Pro R$ 197 e Business R$ 397, com 150/350/750/1.500 atendimentos de 24 h); ao passar da franquia o cliente
+  escolhe parar ou pagar o excedente (R$ 0,40), e há pacote de 100 a R$ 29,90. ERP e OS sugeridos a R$ 99 com 1 CNPJ e
+  100 notas. Falta: fechar o preço dos módulos, usuários no Essencial, conferir a licença do WAHA, contratar o plano
+  Start da Focus (perguntar se cancelamento e carta de correção contam como documento), decidir a integração com o
+  Bling e o anexo do Simples. Depois, construir os planos no banco (contagem, escolha do cliente, pacotes e avisos).
+- **OpenAI pré-paga:** saldo de US$ 3,11 em 29/10 (dá ~5 a 7 semanas no ritmo atual); ligar a recarga automática e
+  subir o orçamento de alerta de US$ 5. O agente (n8n, credencial "OpenAI account") e as Edge Functions (chave
+  "livih") usam chaves diferentes; criar uma chave só para o agente.
 - **F7 fora da Focus:** decidir se desliga a configuração de nota da F7 na Livih ([nfse.md](nfse.md)); o usuário vai
   verificar.
 
