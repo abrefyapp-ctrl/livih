@@ -11,8 +11,9 @@ O preço publicado é promessa. Ainda não existem:
 - a cobrança mensal e anual pelo Asaas (passo 6);
 - as decisões em aberto: preço dos módulos e usuários no Essencial.
 
-O site também diz que "nossa equipe conecta os números e configura o agente com você", mas no Essencial a
-implantação é feita pelo próprio cliente ou cobrada à parte.
+O site dizia que "nossa equipe conecta os números e configura o agente com você", mas no Essencial a implantação é
+feita pelo próprio cliente ou cobrada à parte. **Resolvido em 01/11:** a página inicial e as de solução falam da ajuda
+da equipe "no teste" (que é no Start), e a página de planos ganhou a pergunta "Quem faz a implantação?".
 
 ## Onde entra
 

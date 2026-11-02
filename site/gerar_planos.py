@@ -80,6 +80,7 @@ def brl_centavos(v: float) -> str:
 PERGUNTAS = [
     ("O que conta como um atendimento?", "Cada vez que alguém puxa assunto e o agente de IA atende, conta um atendimento. Tudo o que o agente responde nas 24 horas seguintes, naquela conversa, é o mesmo atendimento. As conversas que a sua equipe atende sem o agente não contam."),
     ("O que acontece quando acabam os atendimentos do mês?", f"Você escolhe antes, na tela do plano: parar o agente, e as conversas seguem para a equipe, ou continuar, pagando {brl_centavos(EXCEDENTE)} por atendimento a mais na fatura seguinte. Aos 80 % você recebe um aviso. Também dá para comprar um pacote de {PACOTE[0]} atendimentos por {brl_centavos(PACOTE[1])}."),
+    ("Quem faz a implantação?", "No teste e nos planos Start, Pro e Business, a nossa equipe ajuda a conectar os números e configurar o agente. No Essencial, você mesmo faz, com o passo a passo da Livih, e a ajuda da equipe pode ser contratada à parte."),
     ("Posso trocar de plano?", "Sim. Você sobe de plano quando quiser. No plano anual, paga só a diferença dos meses que faltam. Para descer de plano, a mudança vale a partir da renovação."),
     ("Dá para usar sem o agente de IA?", "Sim. Você desliga o agente em cada número e a equipe atende tudo. O preço do plano é o mesmo."),
     ("As mensagens das campanhas estão incluídas?", "Não. As mensagens de divulgação pela API oficial do WhatsApp a Meta cobra direto da sua empresa, pela tabela dela. A Livih não cobra nada a mais por elas."),
