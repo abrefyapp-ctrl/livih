@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSessao } from '../hooks/useSessao'
 import { buscarUsoIaDaEmpresa, mesAtual, nomeDoMes, type UsoIaMes } from '../services/usoIa'
 import { Aviso } from './Aviso'
+import { DadosCobranca } from './DadosCobranca'
 import { EstadoVazio } from './EstadoVazio'
 import { PlanoDaEmpresa } from './PlanoDaEmpresa'
 
@@ -41,6 +42,10 @@ export function SecaoUsoIa() {
   return (
     <div className="space-y-6">
       <PlanoDaEmpresa />
+
+      <section className="rounded-lg border border-borda bg-superficie p-4">
+        <DadosCobranca orgId={orgId} podeEditar={orgAtiva?.papel === 'dono'} />
+      </section>
 
       <div>
         <h2 className="text-h2 font-semibold">Uso da IA em {nomeDoMes(mesAtual())}</h2>

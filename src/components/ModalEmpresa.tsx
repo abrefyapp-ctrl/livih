@@ -1,8 +1,16 @@
 import { useState, type FormEvent } from 'react'
+import {
+  DADOS_COBRANCA_VAZIOS,
+  dadosCobrancaCompletos,
+  dadosCobrancaVazios,
+  salvarDadosCobranca,
+  type DadosCobranca,
+} from '../services/cobranca'
 import { convidarDono } from '../services/configuracoes'
 import { criarEmpresa, type Empresa, type PedidoAcesso } from '../services/plataforma'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
+import { CamposCobranca } from './CamposCobranca'
 import { CampoTexto } from './CampoTexto'
 import { LinkConvite } from './LinkConvite'
 import { Modal } from './Modal'
@@ -31,13 +39,17 @@ export function ModalEmpresa({
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [resultado, setResultado] = useState<{ link: string | null; aviso?: string | null } | null>(null)
+  // Dados de cobrança no cadastro (01/11): opcionais aqui, mas, se começar, precisam estar completos.
+  const [cobranca, setCobranca] = useState<DadosCobranca>(DADOS_COBRANCA_VAZIOS)
+  const [cobrancaSalva, setCobrancaSalva] = useState(false)
+  const cobrancaIncompleta = modo.tipo === 'nova' && !dadosCobrancaVazios(cobranca) && !dadosCobrancaCompletos(cobranca)
 
   const emailInvalido = !!email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
   const criada = !!orgId && modo.tipo === 'nova'
 
   async function enviar(e: FormEvent) {
     e.preventDefault()
-    if (emailInvalido) return
+    if (emailInvalido || cobrancaIncompleta) return
     setEnviando(true)
     setErro(null)
     let id = orgId
@@ -46,6 +58,15 @@ export function ModalEmpresa({
         id = await criarEmpresa(nomeEmpresa.trim())
         setOrgId(id)
         aoCriada(id)
+      }
+      if (modo.tipo === 'nova' && !cobrancaSalva && !dadosCobrancaVazios(cobranca)) {
+        try {
+          await salvarDadosCobranca(id, cobranca)
+          setCobrancaSalva(true)
+        } catch (err) {
+          setErro(`A empresa foi criada, mas os dados de cobrança não foram salvos. ${(err as Error).message} Se preferir, apague os campos de cobrança para preencher depois.`)
+          return
+        }
       }
       setResultado(await convidarDono(id, { email: email.trim(), nome: nomeDono.trim() }))
     } catch (err) {
@@ -78,6 +99,7 @@ export function ModalEmpresa({
       aberto
       titulo={modo.tipo === 'nova' ? 'Nova empresa' : `Dono da ${modo.empresa.nome}`}
       aoFechar={aoFechar}
+      largura={modo.tipo === 'nova' ? 'max-w-xl' : 'max-w-md'}
       rodape={
         <>
           <Botao variante="secundario" onClick={aoFechar} disabled={enviando}>
@@ -87,9 +109,9 @@ export function ModalEmpresa({
             type="submit"
             form="form-empresa"
             carregando={enviando}
-            disabled={!nomeEmpresa.trim() || !email.trim() || emailInvalido}
+            disabled={!nomeEmpresa.trim() || !email.trim() || emailInvalido || cobrancaIncompleta}
           >
-            {criada ? 'Tentar o acesso de novo' : modo.tipo === 'nova' ? 'Criar empresa' : 'Gerar acesso'}
+            {criada ? (!cobrancaSalva && !dadosCobrancaVazios(cobranca) ? 'Salvar cobrança e gerar o acesso' : 'Tentar o acesso de novo') : modo.tipo === 'nova' ? 'Criar empresa' : 'Gerar acesso'}
           </Botao>
         </>
       }
@@ -124,6 +146,18 @@ export function ModalEmpresa({
             erro={emailInvalido ? 'Confira o e-mail.' : undefined}
           />
         </fieldset>
+        {modo.tipo === 'nova' && (
+          <fieldset className="space-y-4 border-t border-borda pt-4">
+            <legend className="float-left mb-1 w-full font-semibold">Dados de cobrança</legend>
+            <p className="clear-left -mt-2 text-pequeno text-texto-3">
+              Quem paga a Livih. Se não tiver agora, deixe em branco: dá para preencher depois no botão Plano, e o dono também pode em Configurações → Plano e consumo.
+            </p>
+            <CamposCobranca dados={cobranca} mudar={setCobranca} desabilitado={cobrancaSalva} prefixo="nova-cobranca" />
+            {cobrancaIncompleta && (
+              <p className="text-legenda text-atencao">Faltam campos nos dados de cobrança (só telefone e complemento são opcionais). Complete ou deixe tudo em branco para preencher depois.</p>
+            )}
+          </fieldset>
+        )}
       </form>
     </Modal>
   )

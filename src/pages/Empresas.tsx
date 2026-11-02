@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { empresasComDadosCobranca } from '../services/cobranca'
 import { convidarDono, linkNovaSenha } from '../services/configuracoes'
 import { haQuanto } from '../services/formato'
 import {
@@ -52,6 +53,8 @@ export function Empresas() {
     pedidos: PedidoAcesso[]
     uso: Map<string, UsoIaMes>
     planos: Map<string, ConsumoEmpresa>
+    /** null = não deu para conferir (a lista aparece sem o aviso). */
+    comCobranca: Set<string> | null
   } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
@@ -73,10 +76,11 @@ export function Empresas() {
       listarPedidosPendentes(),
       buscarUsoIaDoMes().catch(() => new Map<string, UsoIaMes>()),
       buscarConsumoDasEmpresas().catch(() => new Map<string, ConsumoEmpresa>()),
+      empresasComDadosCobranca().catch(() => null),
     ])
-      .then(([empresas, pedidos, uso, planos]) => {
+      .then(([empresas, pedidos, uso, planos, comCobranca]) => {
         if (!ativo) return
-        setDados({ empresas, pedidos, uso, planos })
+        setDados({ empresas, pedidos, uso, planos, comCobranca })
         setErro(null)
       })
       .catch(() => ativo && setErro('Não foi possível carregar as empresas.'))
@@ -269,6 +273,9 @@ export function Empresas() {
                     </p>
                     <UsoIaEmpresa uso={dados?.uso.get(e.id)} />
                     <PlanoEmpresa consumo={dados?.planos.get(e.id)} />
+                    {dados?.comCobranca && !dados.comCobranca.has(e.id) && (
+                      <p className="text-legenda font-medium text-atencao">Faltam os dados de cobrança (botão Plano)</p>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-2 lg:max-w-80 lg:justify-end">

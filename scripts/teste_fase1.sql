@@ -4097,5 +4097,168 @@ begin
     (select limite = 500 from public.plano_consumo(v_org))
     and exists (select 1 from public.auditoria where org_id = v_org and acao = 'definir_plano');
 end $$;
+
+-- Dados de cobrança (migration 20261101140000).
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_cli uuid := current_setting('teste.cli')::uuid;
+  d record;
+  e record;
+begin
+  -- Sem dados salvos: a emissora padrão (se houver) vem como sugestão.
+  select * into e from public.emissoras where org_id = v_org order by padrao desc, criado_em limit 1;
+  select * into d from public.cobranca_dados(v_org);
+  insert into resultado (teste, ok) select 'cobrança: sem dados, a emissora padrão vira sugestão',
+    case when e.id is null then d.nome is null else d.sugerido and d.documento = e.cnpj and d.nome = e.razao_social end;
+
+  perform public.cobranca_salvar_dados(v_org, '{"nome":"F7 Teste Ltda","documento":"11.222.333/0001-81",
+    "email":" Financeiro@F7.teste ","telefone":"(41) 99999-0000","cep":"80420-210","logradouro":"Rua Visconde do Rio Branco",
+    "numero":"1488","complemento":"","bairro":"Centro","cidade":"Curitiba","uf":"pr"}');
+  select * into d from public.cobranca_dados(v_org);
+  insert into resultado (teste, ok) select 'cobrança: dono salva e os dados voltam limpos (só dígitos, e-mail e UF)',
+    not d.sugerido and d.documento = '11222333000181' and d.email = 'financeiro@f7.teste' and d.telefone = '41999990000'
+    and d.cep = '80420210' and d.uf = 'PR' and d.complemento is null
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'salvar_dados_cobranca');
+
+  perform public.cobranca_salvar_dados(v_org, '{"nome":"Fulano de Tal","documento":"529.982.247-25","email":"fulano@teste.com",
+    "cep":"80420210","logradouro":"Rua A","numero":"1","bairro":"Centro","cidade":"Curitiba","uf":"PR"}');
+  insert into resultado (teste, ok) select 'cobrança: aceita CPF e atualiza o que já existia',
+    (select documento = '52998224725' and telefone is null from public.dados_cobranca where org_id = v_org);
+
+  begin
+    perform public.cobranca_salvar_dados(v_org, '{"nome":"X Ltda","documento":"11222333000182","email":"a@b.com",
+      "cep":"80420210","logradouro":"Rua A","numero":"1","bairro":"Centro","cidade":"Curitiba","uf":"PR"}');
+    insert into resultado (teste, ok) values ('cobrança: documento inválido é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('cobrança: documento inválido é recusado', sqlerrm like 'CNPJ ou CPF inválido%');
+  end;
+  begin
+    perform public.cobranca_salvar_dados(v_org, '{"nome":"X Ltda","documento":"11222333000181","email":"sem-arroba",
+      "cep":"80420210","logradouro":"Rua A","numero":"1","bairro":"Centro","cidade":"Curitiba","uf":"PR"}');
+    insert into resultado (teste, ok) values ('cobrança: e-mail inválido é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('cobrança: e-mail inválido é recusado', sqlerrm like 'Informe um e-mail%');
+  end;
+  begin
+    perform public.cobranca_salvar_dados(v_org, '{"nome":"X Ltda","documento":"11222333000181","email":"a@b.com",
+      "cep":"80420210","logradouro":"Rua A","numero":"","bairro":"Centro","cidade":"Curitiba","uf":"PR"}');
+    insert into resultado (teste, ok) values ('cobrança: endereço incompleto é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('cobrança: endereço incompleto é recusado', sqlerrm like 'Preencha o endereço%');
+  end;
+
+  -- A plataforma preenche no cadastro de uma empresa de que não é dona.
+  perform public.cobranca_salvar_dados(v_cli, '{"nome":"Cliente X Ltda","documento":"11222333000181","email":"x@cliente.teste",
+    "cep":"80420210","logradouro":"Rua B","numero":"2","bairro":"Centro","cidade":"Curitiba","uf":"PR"}');
+  insert into resultado (teste, ok) select 'cobrança: a plataforma preenche os dados de outra empresa',
+    exists (select 1 from public.dados_cobranca where org_id = v_cli);
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.cobranca_dados(current_setting('teste.f7')::uuid);
+  insert into resultado (teste, ok) values ('cobrança: atendente não vê os dados', false);
+exception when others then
+  insert into resultado (teste, ok) values ('cobrança: atendente não vê os dados', sqlerrm like 'Só o dono e os administradores%');
+end $$;
+insert into resultado (teste, ok) select 'cobrança: atendente não lê a tabela', not exists (select 1 from public.dados_cobranca);
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f9a1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'cobrança: administrador vê os dados',
+  (select documento = '52998224725' from public.cobranca_dados(current_setting('teste.f7')::uuid));
+do $$ begin
+  perform public.cobranca_salvar_dados(current_setting('teste.f7')::uuid, '{"nome":"Outro"}');
+  insert into resultado (teste, ok) values ('cobrança: administrador não muda os dados', false);
+exception when others then
+  insert into resultado (teste, ok) values ('cobrança: administrador não muda os dados', sqlerrm like 'Só o dono da empresa muda%');
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'cobrança: outra empresa não lê os dados da F7',
+  not exists (select 1 from public.dados_cobranca where org_id = current_setting('teste.f7')::uuid);
+do $$ begin
+  perform public.cobranca_salvar_dados(current_setting('teste.f7')::uuid, '{"nome":"Invasor"}');
+  insert into resultado (teste, ok) values ('cobrança: outra empresa não muda os dados da F7', false);
+exception when others then
+  insert into resultado (teste, ok) values ('cobrança: outra empresa não muda os dados da F7', sqlerrm like 'Só o dono%');
+end $$;
+
+-- Dados de cobrança: dono comum (não é da plataforma), empresa suspensa e limites (revisão de 01/11).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare v_org uuid;
+begin
+  insert into auth.users (id, email, raw_user_meta_data)
+  values ('00000000-0000-0000-0000-00000000f9b1', 'dono@cobranca.teste', '{"nome":"Dono Comum"}');
+  insert into public.organizacoes (nome, slug) values ('Empresa Cobrança', 'teste-cobranca') returning id into v_org;
+  insert into public.membros_org (org_id, user_id, papel) values (v_org, '00000000-0000-0000-0000-00000000f9b1', 'dono');
+  perform set_config('teste.cobranca', v_org::text, true);
+  insert into resultado (teste, ok) select 'cobrança: visitante sem login não chama as funções',
+    not has_function_privilege('anon', 'public.cobranca_dados(uuid)', 'execute')
+    and not has_function_privilege('anon', 'public.cobranca_salvar_dados(uuid, jsonb)', 'execute');
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f9b1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.cobranca')::uuid;
+begin
+  perform public.cobranca_salvar_dados(v_org, '{"nome":"Empresa Cobrança Ltda","documento":"11222333000181","email":"pagar@cobranca.teste",
+    "telefone":"+55 (41) 98888-7777","cep":"80420210","logradouro":"Rua C","numero":"3","bairro":"Centro","cidade":"Curitiba","uf":"PR"}');
+  insert into resultado (teste, ok) select 'cobrança: dono comum salva e lê os dados da própria empresa, telefone sem o 55',
+    (select telefone = '41988887777' and not sugerido from public.cobranca_dados(v_org))
+    and (select depois -> 'campos' ? 'documento' and not (depois::text like '%11222333000181%')
+           from public.auditoria where org_id = v_org and acao = 'salvar_dados_cobranca' order by criado_em desc limit 1);
+end $$;
+do $$ begin
+  perform public.cobranca_dados(current_setting('teste.f7')::uuid);
+  insert into resultado (teste, ok) values ('cobrança: dono de outra empresa ativa não lê os dados da F7 pela função', false);
+exception when others then
+  insert into resultado (teste, ok) values ('cobrança: dono de outra empresa ativa não lê os dados da F7 pela função', sqlerrm like 'Só o dono e os administradores%');
+end $$;
+insert into resultado (teste, ok) select 'cobrança: dono de outra empresa ativa não lê a tabela da F7',
+  not exists (select 1 from public.dados_cobranca where org_id = current_setting('teste.f7')::uuid);
+do $$ begin
+  perform public.cobranca_salvar_dados(current_setting('teste.f7')::uuid, '{"nome":"Invasor Ltda"}');
+  insert into resultado (teste, ok) values ('cobrança: dono de outra empresa ativa não muda os dados da F7', false);
+exception when others then
+  insert into resultado (teste, ok) values ('cobrança: dono de outra empresa ativa não muda os dados da F7', sqlerrm like 'Só o dono%');
+end $$;
+do $$ begin
+  perform public.cobranca_salvar_dados(current_setting('teste.cobranca')::uuid, '{"nome":"Empresa Cobrança Ltda","documento":"11222333000181",
+    "email":"pagar@cobranca.teste","cep":"80420210","logradouro":"Rua C","numero":"S/N, bloco B, apto 1203","bairro":"Centro",
+    "cidade":"Curitiba","uf":"PR"}');
+  insert into resultado (teste, ok) values ('cobrança: campo acima do limite tem mensagem própria', false);
+exception when others then
+  insert into resultado (teste, ok) values ('cobrança: campo acima do limite tem mensagem própria', sqlerrm like 'O número tem até 20%');
+end $$;
+do $$ begin
+  perform public.cobranca_salvar_dados(current_setting('teste.cobranca')::uuid, '{"nome":"Empresa Cobrança Ltda","documento":"11222333000181",
+    "email":"pagar@cobranca.teste","cep":"80420210","logradouro":"Rua C","numero":"3","bairro":"Centro","cidade":"Curitiba","uf":"XX"}');
+  insert into resultado (teste, ok) values ('cobrança: UF que não existe é recusada', false);
+exception when others then
+  insert into resultado (teste, ok) values ('cobrança: UF que não existe é recusada', sqlerrm like 'Informe a UF%');
+end $$;
+
+-- Empresa suspensa (atraso, na entrega 3): o dono continua vendo e corrigindo para poder pagar.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+update public.organizacoes set status = 'suspensa' where id = current_setting('teste.cobranca')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f9b1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.cobranca')::uuid;
+begin
+  perform public.cobranca_salvar_dados(v_org, '{"nome":"Empresa Cobrança Ltda","documento":"11222333000181","email":"novo@cobranca.teste",
+    "cep":"80420210","logradouro":"Rua C","numero":"3","bairro":"Centro","cidade":"Curitiba","uf":"PR"}');
+  insert into resultado (teste, ok) select 'cobrança: dono de empresa suspensa vê e corrige os dados',
+    (select email = 'novo@cobranca.teste' from public.cobranca_dados(v_org))
+    and exists (select 1 from public.dados_cobranca where org_id = v_org);
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;
