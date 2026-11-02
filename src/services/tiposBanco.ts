@@ -186,6 +186,41 @@ export type Database = {
           },
         ]
       }
+      asaas_eventos: {
+        Row: {
+          evento: string
+          fatura_id: string | null
+          id: string
+          pagamento_id: string | null
+          recebido_em: string
+          resultado: string | null
+        }
+        Insert: {
+          evento: string
+          fatura_id?: string | null
+          id: string
+          pagamento_id?: string | null
+          recebido_em?: string
+          resultado?: string | null
+        }
+        Update: {
+          evento?: string
+          fatura_id?: string | null
+          id?: string
+          pagamento_id?: string | null
+          recebido_em?: string
+          resultado?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asaas_eventos_fatura_id_fkey"
+            columns: ["fatura_id"]
+            isOneToOne: false
+            referencedRelation: "faturas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assistente_sessoes: {
         Row: {
           anterior: Json | null
@@ -1539,6 +1574,7 @@ export type Database = {
           ambiente: string | null
           asaas_id: string | null
           atualizado_em: string
+          aviso_atraso_em: string | null
           competencia: string
           criado_em: string
           enviada_em: string | null
@@ -1549,6 +1585,7 @@ export type Database = {
           org_id: string
           paga_em: string | null
           status: string
+          suspensao_em: string | null
           tentativas: number
           valor: number
           vencimento: string
@@ -1557,6 +1594,7 @@ export type Database = {
           ambiente?: string | null
           asaas_id?: string | null
           atualizado_em?: string
+          aviso_atraso_em?: string | null
           competencia: string
           criado_em?: string
           enviada_em?: string | null
@@ -1567,6 +1605,7 @@ export type Database = {
           org_id: string
           paga_em?: string | null
           status?: string
+          suspensao_em?: string | null
           tentativas?: number
           valor: number
           vencimento: string
@@ -1575,6 +1614,7 @@ export type Database = {
           ambiente?: string | null
           asaas_id?: string | null
           atualizado_em?: string
+          aviso_atraso_em?: string | null
           competencia?: string
           criado_em?: string
           enviada_em?: string | null
@@ -1585,6 +1625,7 @@ export type Database = {
           org_id?: string
           paga_em?: string | null
           status?: string
+          suspensao_em?: string | null
           tentativas?: number
           valor?: number
           vencimento?: string
@@ -2845,6 +2886,7 @@ export type Database = {
           ao_passar_franquia: string
           criado_em: string
           id: string
+          motivo_suspensao: string | null
           nome: string
           plano: string
           slug: string
@@ -2854,6 +2896,7 @@ export type Database = {
           ao_passar_franquia?: string
           criado_em?: string
           id?: string
+          motivo_suspensao?: string | null
           nome: string
           plano?: string
           slug: string
@@ -2863,6 +2906,7 @@ export type Database = {
           ao_passar_franquia?: string
           criado_em?: string
           id?: string
+          motivo_suspensao?: string | null
           nome?: string
           plano?: string
           slug?: string
@@ -4429,6 +4473,23 @@ export type Database = {
         Returns: Json
       }
       cnpj_valido: { Args: { p: string }; Returns: boolean }
+      cobranca_atrasos: { Args: never; Returns: undefined }
+      cobranca_avisar: {
+        Args: {
+          p_corpo: string
+          p_icone: string
+          p_link: string
+          p_org: string
+          p_plataforma: string
+          p_titulo: string
+          p_url: string
+        }
+        Returns: undefined
+      }
+      cobranca_avisar_plataforma: {
+        Args: { p_org: string; p_texto: string }
+        Returns: undefined
+      }
       cobranca_criar_fatura: {
         Args: { p_competencia: string; p_org: string }
         Returns: string
@@ -4451,6 +4512,19 @@ export type Database = {
           uf: string
         }[]
       }
+      cobranca_evento_asaas: {
+        Args: {
+          p_ambiente: string
+          p_evento: string
+          p_evento_id: string
+          p_pagamento: Json
+        }
+        Returns: string
+      }
+      cobranca_fatura_mes_pulado: {
+        Args: { p_org: string }
+        Returns: undefined
+      }
       cobranca_fechar_mes: { Args: never; Returns: number }
       cobranca_itens: {
         Args: { p_competencia: string; p_org: string }
@@ -4463,6 +4537,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      cobranca_reativar: { Args: { p_org: string }; Returns: undefined }
       cobranca_reenviar: { Args: never; Returns: undefined }
       cobranca_salvar_dados: {
         Args: { p_dados: Json; p_org: string }
@@ -5038,6 +5113,7 @@ export type Database = {
           dono_senha_definida: boolean
           id: string
           membros: number
+          motivo_suspensao: string
           nome: string
           numeros: number
           numeros_conectados: number
