@@ -847,6 +847,50 @@ export type Database = {
           },
         ]
       }
+      contratos_cobranca: {
+        Row: {
+          asaas_ambiente: string | null
+          asaas_cliente_id: string | null
+          ativo: boolean
+          atualizado_em: string
+          atualizado_por: string | null
+          inicio: string
+          motivo_valor: string | null
+          org_id: string
+          valor_fixo: number | null
+        }
+        Insert: {
+          asaas_ambiente?: string | null
+          asaas_cliente_id?: string | null
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          inicio: string
+          motivo_valor?: string | null
+          org_id: string
+          valor_fixo?: number | null
+        }
+        Update: {
+          asaas_ambiente?: string | null
+          asaas_cliente_id?: string | null
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          inicio?: string
+          motivo_valor?: string | null
+          org_id?: string
+          valor_fixo?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_cobranca_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversas: {
         Row: {
           atribuida_a: string | null
@@ -1486,6 +1530,71 @@ export type Database = {
             columns: ["canal_id"]
             isOneToOne: false
             referencedRelation: "canais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      faturas: {
+        Row: {
+          ambiente: string | null
+          asaas_id: string | null
+          atualizado_em: string
+          competencia: string
+          criado_em: string
+          enviada_em: string | null
+          erro: string | null
+          id: string
+          itens: Json
+          link: string | null
+          org_id: string
+          paga_em: string | null
+          status: string
+          tentativas: number
+          valor: number
+          vencimento: string
+        }
+        Insert: {
+          ambiente?: string | null
+          asaas_id?: string | null
+          atualizado_em?: string
+          competencia: string
+          criado_em?: string
+          enviada_em?: string | null
+          erro?: string | null
+          id?: string
+          itens: Json
+          link?: string | null
+          org_id: string
+          paga_em?: string | null
+          status?: string
+          tentativas?: number
+          valor: number
+          vencimento: string
+        }
+        Update: {
+          ambiente?: string | null
+          asaas_id?: string | null
+          atualizado_em?: string
+          competencia?: string
+          criado_em?: string
+          enviada_em?: string | null
+          erro?: string | null
+          id?: string
+          itens?: Json
+          link?: string | null
+          org_id?: string
+          paga_em?: string | null
+          status?: string
+          tentativas?: number
+          valor?: number
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faturas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
             referencedColumns: ["id"]
           },
         ]
@@ -2179,6 +2288,7 @@ export type Database = {
           nome: string
           ordem: number
           padrao: boolean
+          preco_mensal: number | null
         }
         Insert: {
           adicional?: boolean
@@ -2187,6 +2297,7 @@ export type Database = {
           nome: string
           ordem?: number
           padrao?: boolean
+          preco_mensal?: number | null
         }
         Update: {
           adicional?: boolean
@@ -2195,6 +2306,7 @@ export type Database = {
           nome?: string
           ordem?: number
           padrao?: boolean
+          preco_mensal?: number | null
         }
         Relationships: []
       }
@@ -4317,6 +4429,10 @@ export type Database = {
         Returns: Json
       }
       cnpj_valido: { Args: { p: string }; Returns: boolean }
+      cobranca_criar_fatura: {
+        Args: { p_competencia: string; p_org: string }
+        Returns: string
+      }
       cobranca_dados: {
         Args: { p_org: string }
         Returns: {
@@ -4335,6 +4451,11 @@ export type Database = {
           uf: string
         }[]
       }
+      cobranca_fechar_mes: { Args: never; Returns: number }
+      cobranca_itens: {
+        Args: { p_competencia: string; p_org: string }
+        Returns: Json
+      }
       cobranca_pode: {
         Args: {
           p_org: string
@@ -4342,10 +4463,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      cobranca_reenviar: { Args: never; Returns: undefined }
       cobranca_salvar_dados: {
         Args: { p_dados: Json; p_org: string }
         Returns: undefined
       }
+      cobranca_vencimento: { Args: { p_base: string }; Returns: string }
       contato_por_whatsapp: {
         Args: {
           p_lid: string
@@ -4874,9 +4997,23 @@ export type Database = {
         Args: { p_escolha: string; p_org: string }
         Returns: undefined
       }
+      plataforma_cancelar_fatura: {
+        Args: { p_fatura: string }
+        Returns: undefined
+      }
       plataforma_criar_empresa: { Args: { p_nome: string }; Returns: string }
       plataforma_dar_cortesia: {
         Args: { p_motivo: string; p_org: string; p_quantidade: number }
+        Returns: undefined
+      }
+      plataforma_definir_contrato: {
+        Args: {
+          p_ativo: boolean
+          p_inicio: string
+          p_motivo: string
+          p_org: string
+          p_valor_fixo: number
+        }
         Returns: undefined
       }
       plataforma_definir_modulo: {
@@ -4909,6 +5046,7 @@ export type Database = {
           ultima_mensagem_em: string
         }[]
       }
+      plataforma_gerar_fatura: { Args: { p_org: string }; Returns: string }
       plataforma_planos_consumo: {
         Args: never
         Returns: {
@@ -4921,6 +5059,10 @@ export type Database = {
           plano_nome: string
           usados: number
         }[]
+      }
+      plataforma_reenviar_fatura: {
+        Args: { p_fatura: string }
+        Returns: undefined
       }
       pode_acessar_midia: { Args: { p_nome: string }; Returns: boolean }
       pode_financeiro: { Args: { p_org: string }; Returns: boolean }
