@@ -951,6 +951,65 @@ export type Database = {
           },
         ]
       }
+      dados_cobranca: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string | null
+          bairro: string
+          cep: string
+          cidade: string
+          complemento: string | null
+          documento: string
+          email: string
+          logradouro: string
+          nome: string
+          numero: string
+          org_id: string
+          telefone: string | null
+          uf: string
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          bairro: string
+          cep: string
+          cidade: string
+          complemento?: string | null
+          documento: string
+          email: string
+          logradouro: string
+          nome: string
+          numero: string
+          org_id: string
+          telefone?: string | null
+          uf: string
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          bairro?: string
+          cep?: string
+          cidade?: string
+          complemento?: string | null
+          documento?: string
+          email?: string
+          logradouro?: string
+          nome?: string
+          numero?: string
+          org_id?: string
+          telefone?: string | null
+          uf?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dados_cobranca_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documentos: {
         Row: {
           ativo: boolean
@@ -4258,6 +4317,35 @@ export type Database = {
         Returns: Json
       }
       cnpj_valido: { Args: { p: string }; Returns: boolean }
+      cobranca_dados: {
+        Args: { p_org: string }
+        Returns: {
+          atualizado_em: string
+          bairro: string
+          cep: string
+          cidade: string
+          complemento: string
+          documento: string
+          email: string
+          logradouro: string
+          nome: string
+          numero: string
+          sugerido: boolean
+          telefone: string
+          uf: string
+        }[]
+      }
+      cobranca_pode: {
+        Args: {
+          p_org: string
+          p_papeis: Database["public"]["Enums"]["papel_org"][]
+        }
+        Returns: boolean
+      }
+      cobranca_salvar_dados: {
+        Args: { p_dados: Json; p_org: string }
+        Returns: undefined
+      }
       contato_por_whatsapp: {
         Args: {
           p_lid: string
