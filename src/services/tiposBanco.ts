@@ -4608,6 +4608,7 @@ export type Database = {
         Args: { p_itens: Json; p_nota: Json; p_org: string }
         Returns: Json
       }
+      numero_br: { Args: { p: number }; Returns: string }
       org_do_caminho: { Args: { p_nome: string }; Returns: string }
       org_modulos: {
         Args: { p_org: string }
