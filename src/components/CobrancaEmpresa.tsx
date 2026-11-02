@@ -83,7 +83,8 @@ export function CobrancaEmpresa({ orgId, aoMudar }: { orgId: string; aoMudar: ()
     void executar(() => definirContrato(orgId, { ativo, inicio: `${inicio}-01`, valorFixo: fixo ?? null, motivo }), ok)
   }
 
-  const faturaDoMes = dados?.faturas.some((f) => f.competencia === mesAtual())
+  // Cancelada não conta: o banco libera o mês para outra fatura (faturas_uma_por_mes).
+  const faturaDoMes = dados?.faturas.some((f) => f.competencia === mesAtual() && f.status !== 'cancelada')
 
   return (
     <div className="space-y-3">
