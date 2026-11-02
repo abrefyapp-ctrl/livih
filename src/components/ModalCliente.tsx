@@ -5,6 +5,7 @@ import {
   documentoValido,
   formatarCep,
   formatarDocumento,
+  limparDocumento,
   salvarCliente,
   type Cliente,
   type DadosBusca,
@@ -91,7 +92,8 @@ export function ModalCliente({
   const [avisoBusca, setAvisoBusca] = useState<string | null>(null)
 
   const muda = (campos: Partial<Campos>) => setC((v) => ({ ...v, ...campos }))
-  const docDigitos = c.documento.replace(/\D/g, '')
+  // CNPJ pode ter letras (Receita, desde 07/2026): só a pontuação sai.
+  const docDigitos = limparDocumento(c.documento)
   const docInvalido = !!docDigitos && !documentoValido(c.tipo, docDigitos)
   const cepInvalido = !!c.cep.trim() && c.cep.replace(/\D/g, '').length !== 8
   const ufInvalida = !!c.uf.trim() && !/^[A-Za-z]{2}$/.test(c.uf.trim())
@@ -200,12 +202,13 @@ export function ModalCliente({
         <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
           <CampoTexto
             rotulo={pj ? 'CNPJ (opcional)' : 'CPF (opcional)'}
-            inputMode="numeric"
+            inputMode={pj ? 'text' : 'numeric'}
+            autoCapitalize={pj ? 'characters' : undefined}
             value={c.documento}
             onChange={(e) => muda({ documento: e.target.value })}
             onBlur={() => !docInvalido && docDigitos && muda({ documento: formatarDocumento(docDigitos) })}
             placeholder={pj ? '00.000.000/0000-00' : '000.000.000-00'}
-            erro={docInvalido ? `${pj ? 'CNPJ' : 'CPF'} inválido: confira os números.` : undefined}
+            erro={docInvalido ? (pj ? 'CNPJ inválido: confira as letras e os números.' : 'CPF inválido: confira os números.') : undefined}
           />
           {pj && (
             <Botao

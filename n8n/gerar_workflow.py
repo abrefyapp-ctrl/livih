@@ -346,7 +346,9 @@ return JSON.stringify({ enviado: !!e?.enviado, titulo: e?.titulo || p.titulo, av
 IDENTIFICAR_CLIENTE = r"""
 // Consulta o CNPJ na Receita (BrasilAPI, gratuita, a mesma da tela de clientes). Fora do ar: null.
 const receitaCnpj = async (doc) => {
-  const cnpj = String(doc || '').replace(/\D/g, '');
+  // CNPJ pode ter letras (Receita, desde 07/2026). Frase inteira ("meu CNPJ é …") não fecha 14: vale só os números.
+  const limpo = String(doc || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+  const cnpj = limpo.length === 14 ? limpo : String(doc || '').replace(/\D/g, '');
   if (cnpj.length !== 14) return null;
   try {
     const r = await this.helpers.httpRequest({
@@ -391,7 +393,9 @@ return JSON.stringify(r);
 CADASTRAR_CLIENTE = r"""
 // Consulta o CNPJ na Receita (BrasilAPI, gratuita, a mesma da tela de clientes). Fora do ar: null.
 const receitaCnpj = async (doc) => {
-  const cnpj = String(doc || '').replace(/\D/g, '');
+  // CNPJ pode ter letras (Receita, desde 07/2026). Frase inteira ("meu CNPJ é …") não fecha 14: vale só os números.
+  const limpo = String(doc || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+  const cnpj = limpo.length === 14 ? limpo : String(doc || '').replace(/\D/g, '');
   if (cnpj.length !== 14) return null;
   try {
     const r = await this.helpers.httpRequest({

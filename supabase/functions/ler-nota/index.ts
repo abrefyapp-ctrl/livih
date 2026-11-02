@@ -59,9 +59,9 @@ const ESQUEMA_NOTA = {
 const INSTRUCAO = `Você lê uma nota fiscal de compra brasileira (DANFE da NF-e, em PDF ou foto) recebida de um fornecedor.
 Devolva:
 - eh_nota: false se o arquivo não for uma nota fiscal (aí o resto pode ficar vazio).
-- chave: a chave de acesso (44 dígitos, só números); null se não estiver legível por inteiro.
+- chave: a chave de acesso (44 caracteres, sem espaços; desde 2026 pode ter letras maiúsculas, que vêm do CNPJ); null se não estiver legível por inteiro.
 - numero e serie da nota (só os números, sem zeros à esquerda); emissao no formato AAAA-MM-DD.
-- emitente_cnpj (só números) e emitente_nome: quem EMITIU a nota (o fornecedor, no topo), não o destinatário.
+- emitente_cnpj (sem pontuação; desde 2026 o CNPJ pode ter letras maiúsculas, como 12ABC34501DE35) e emitente_nome: quem EMITIU a nota (o fornecedor, no topo), não o destinatário.
 - valor_total: o valor total da nota.
 - itens: TODOS os produtos do quadro "Dados dos produtos/serviços", na ordem, um por linha da nota:
   codigo (código do produto como escrito), descricao, ncm (8 dígitos), unidade (UN, CX, PC, KG...),
@@ -75,6 +75,8 @@ type Item = {
 };
 
 const digitos = (t: string | null) => (t ?? "").replace(/\D/g, "");
+// CNPJ e chave de acesso podem ter letras (CNPJ alfanumérico da Receita, desde 07/2026): só a pontuação sai.
+const documento = (t: string | null) => (t ?? "").replace(/[^0-9A-Za-z]/g, "").toUpperCase();
 const semZeros = (t: string | null) => digitos(t).replace(/^0+(?=\d)/, "") || null;
 
 Deno.serve(async (req) => {
@@ -130,8 +132,8 @@ Deno.serve(async (req) => {
   if (erroUso) console.error("uso_ia nota", erroUso.message);
 
   if (!dados?.eh_nota) return json(422, { erro: "Não parece uma nota fiscal. Confira o arquivo." });
-  const chave = digitos(dados.chave);
-  const cnpj = digitos(dados.emitente_cnpj);
+  const chave = documento(dados.chave);
+  const cnpj = documento(dados.emitente_cnpj);
   const itens = ((dados.itens ?? []) as Item[]).filter((i) => i.descricao?.trim());
   return json(200, {
     nota: {
@@ -140,7 +142,7 @@ Deno.serve(async (req) => {
       numero: semZeros(dados.numero),
       serie: semZeros(dados.serie),
       emissao: /^\d{4}-\d{2}-\d{2}$/.test(dados.emissao ?? "") ? dados.emissao : null,
-      emitente_cnpj: cnpj.length === 14 || cnpj.length === 11 ? cnpj : null,
+      emitente_cnpj: /^[0-9A-Z]{12}\d{2}$/.test(cnpj) || /^\d{11}$/.test(cnpj) ? cnpj : null,
       emitente_nome: dados.emitente_nome?.trim() || null,
       valor_total: dados.valor_total,
       itens: itens.map((i) => ({

@@ -2,6 +2,8 @@
 // gerado por sistema e tem estrutura fixa (nfeProc > NFe > infNFe > ide, emit, det*, total). Ignora prefixo de
 // namespace (ns:tag) e decodifica as entidades.
 
+import { limparDocumento } from './formato'
+
 export type ItemNota = {
   codigo: string | null
   descricao: string
@@ -60,7 +62,8 @@ const semZeros = (t: string | null) => (t ? t.replace(/\D/g, '').replace(/^0+(?=
 export function lerNotaXml(xml: string): NotaLida {
   const inf = /<(?:[\w-]+:)?infNFe\b([^>]*)>/.exec(xml)
   if (!inf) throw new Error('Este XML não é de uma NF-e (não achei a tag infNFe).')
-  const chave = /Id\s*=\s*"NFe(\d{44})"/.exec(inf[1])?.[1] ?? (texto(xml, 'chNFe')?.replace(/\D/g, '') || null)
+  // Chave e CNPJ do emitente podem ter letras (CNPJ alfanumérico da Receita, desde 07/2026).
+  const chave = /Id\s*=\s*"NFe([0-9A-Z]{44})"/.exec(inf[1])?.[1] ?? (limparDocumento(texto(xml, 'chNFe')) || null)
   const ide = bloco(xml, 'ide')
   const emit = bloco(xml, 'emit')
   const emissao = (texto(ide, 'dhEmi') ?? texto(ide, 'dEmi'))?.slice(0, 10) ?? null
@@ -84,7 +87,7 @@ export function lerNotaXml(xml: string): NotaLida {
     numero: semZeros(texto(ide, 'nNF')),
     serie: semZeros(texto(ide, 'serie')),
     emissao: emissao && /^\d{4}-\d{2}-\d{2}$/.test(emissao) ? emissao : null,
-    emitente_cnpj: (texto(emit, 'CNPJ') ?? texto(emit, 'CPF'))?.replace(/\D/g, '') || null,
+    emitente_cnpj: limparDocumento(texto(emit, 'CNPJ') ?? texto(emit, 'CPF')) || null,
     emitente_nome: texto(emit, 'xNome'),
     valor_total: numero(bloco(xml, 'ICMSTot'), 'vNF'),
     itens,

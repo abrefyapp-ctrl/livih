@@ -42,7 +42,8 @@ export function CamposCobranca({ dados, mudar, desabilitado = false, prefixo }: 
       </div>
       <div className="sm:col-span-3">
         <Campo rotulo="CNPJ ou CPF" id={`${prefixo}-documento`}>
-          <input {...campo('documento')} maxLength={18} inputMode="numeric" />
+          {/* CNPJ pode ter letras (Receita, desde 07/2026): teclado de texto, em maiúsculas. */}
+          <input {...campo('documento')} maxLength={18} autoCapitalize="characters" />
         </Campo>
       </div>
       <div className="sm:col-span-3">

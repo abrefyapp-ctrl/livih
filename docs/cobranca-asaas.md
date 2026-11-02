@@ -60,8 +60,8 @@ módulos, os pacotes e o excedente de atendimentos. Sem isso, a página de plano
 
 - Preço dos módulos (ERP e OS a R$ 99) ainda não está fechado ([planos-modulos.md](planos-modulos.md#decisões-em-aberto)).
 - Preço combinado da JoGrampo (terça, 03/11).
-- **CNPJ alfanumérico** (a Receita emite para inscrições novas desde 07/2026): `cnpj_valido`, a tela e as emissoras
-  só aceitam números. Corrigir em migration à parte, antes de cobrar clientes novos.
+- **CNPJ alfanumérico**: feito em 02/11 ([cnpj-alfanumerico.md](cnpj-alfanumerico.md)); os dados de cobrança aceitam
+  o CNPJ com letras.
 - **Mês inteiro suspenso não é cobrado** (decidido na entrega 3, a confirmar): ao reativar, só a fatura do mês corrente
   que o fechamento pulou é criada; o mês do meio, em que a empresa ficou suspensa o tempo todo, fica sem fatura (e os
   atendimentos a mais e os pacotes do mês anterior a ele não são cobrados).

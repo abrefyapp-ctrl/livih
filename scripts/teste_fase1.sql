@@ -4708,5 +4708,78 @@ insert into resultado (teste, ok) select 'pagamento e atraso: funções internas
   and not has_function_privilege('authenticated', 'public.cobranca_avisar_plataforma(uuid, text)', 'execute')
   and not has_table_privilege('authenticated', 'public.asaas_eventos', 'select')
   and not has_column_privilege('authenticated', 'public.organizacoes', 'motivo_suspensao', 'update');
+
+-- CNPJ alfanumérico (migration 20261102130000). Exemplo oficial da Receita: 12.ABC.345/01DE-35.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.cobranca')::uuid;
+  v_cli uuid;
+  r record;
+begin
+  insert into resultado (teste, ok) select 'cnpj alfanumérico: o exemplo da Receita é válido e o numérico continua valendo',
+    public.cnpj_valido('12ABC34501DE35') and public.cnpj_valido('11222333000181');
+  insert into resultado (teste, ok) select 'cnpj alfanumérico: dígito errado, minúscula e repetido são recusados',
+    not public.cnpj_valido('12ABC34501DE36') and not public.cnpj_valido('12abc34501de35')
+    and not public.cnpj_valido('AAAAAAAAAAAA00') and not public.cnpj_valido('00000000000000')
+    and not public.cnpj_valido('12ABC34501DEX5');
+  insert into resultado (teste, ok) select 'cnpj alfanumérico: a limpeza tira a pontuação e põe em maiúsculas',
+    public.limpar_documento(' 12.abc.345/01de-35 ') = '12ABC34501DE35' and public.limpar_documento('  ') is null
+    and public.limpar_documento('123.456.789-09') = '12345678909';
+
+  insert into public.clientes (org_id, tipo, nome, documento)
+  values (v_org, 'pj', 'Cliente Alfanumérico', '12.abc.345/01de-35') returning id into v_cli;
+  insert into resultado (teste, ok) select 'cnpj alfanumérico: cliente salva com letras, sem pontuação',
+    (select documento = '12ABC34501DE35' from public.clientes where id = v_cli);
+
+  select * into r from public.documento_cliente('12.ABC.345/01DE-35');
+  insert into resultado (teste, ok) select 'cnpj alfanumérico: o agente reconhece o CNPJ com letras',
+    r.tipo = 'pj' and r.documento = '12ABC34501DE35';
+  select * into r from public.documento_cliente('meu CNPJ é 11.222.333/0001-81');
+  insert into resultado (teste, ok) select 'cnpj alfanumérico: frase com o CNPJ numérico continua funcionando no agente',
+    r.tipo = 'pj' and r.documento = '11222333000181';
+
+  begin
+    insert into public.notas_entrada (org_id, origem, chave, emitente_cnpj)
+    -- UF, ano e mês, CNPJ do emitente, modelo, série, número, tipo de emissão, código e dígito: 44 caracteres.
+    values (v_org, 'xml', '41' || '2611' || '12ABC34501DE35' || '55' || '001' || '000000001' || '1' || '00000001' || '0',
+            '12ABC34501DE35');
+    insert into resultado (teste, ok) values ('cnpj alfanumérico: nota de entrada aceita chave e emitente com letras', true);
+  exception when others then
+    insert into resultado (teste, ok) values ('cnpj alfanumérico: nota de entrada aceita chave e emitente com letras: ' || sqlerrm, false);
+  end;
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f9b1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.cobranca')::uuid;
+begin
+  perform public.cobranca_salvar_dados(v_org, '{"nome":"Empresa Alfa Ltda","documento":"12.abc.345/01de-35","email":"alfa@cobranca.teste",
+    "cep":"80420210","logradouro":"Rua A","numero":"1","bairro":"Centro","cidade":"Curitiba","uf":"PR"}');
+  insert into resultado (teste, ok) select 'cnpj alfanumérico: dados de cobrança salvam com letras',
+    (select documento = '12ABC34501DE35' from public.dados_cobranca where org_id = v_org);
+  begin
+    perform public.cobranca_salvar_dados(v_org, '{"nome":"Empresa Alfa Ltda","documento":"12.ABC.345/01DE-36","email":"alfa@cobranca.teste",
+      "cep":"80420210","logradouro":"Rua A","numero":"1","bairro":"Centro","cidade":"Curitiba","uf":"PR"}');
+    insert into resultado (teste, ok) values ('cnpj alfanumérico: dígito errado nos dados de cobrança é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('cnpj alfanumérico: dígito errado nos dados de cobrança é recusado', sqlerrm like 'CNPJ ou CPF inválido%');
+  end;
+end $$;
+-- Importação de clientes (pela equipe da plataforma, que passa no tem_papel): acha e grava com letras.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_res jsonb;
+begin
+  v_res := public.clientes_importar(current_setting('teste.cli')::uuid,
+    '[{"documento":"12.abc.345/01de-35","nome":"Cliente Alfanumérico"},{"documento":"12.ABC.345/01DE-35","nome":"Mesmo cliente"}]'::jsonb);
+  insert into resultado (teste, ok) select 'cnpj alfanumérico: importação de clientes grava com letras e acha o mesmo cliente',
+    (select count(*) = 1 from public.clientes where org_id = current_setting('teste.cli')::uuid and documento = '12ABC34501DE35');
+end $$;
+reset role;
+insert into resultado (teste, ok) select 'cnpj alfanumérico: limpeza fechada para o anon',
+  not has_function_privilege('anon', 'public.limpar_documento(text)', 'execute');
 reset role;
 select n, teste, ok from resultado order by n;

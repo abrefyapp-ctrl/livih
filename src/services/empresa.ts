@@ -14,27 +14,16 @@ export type DadosEmissora = Omit<
   | 'nfse_regime_especial' | 'ibs_cbs_cst' | 'ibs_cbs_classificacao' | 'nfse_codigo_indicador_operacao' | 'aliquota_simples'
 >
 
-// Em formato.ts (sem Supabase) para o PDF do orçamento rodar também no servidor (serviço livih-pdf).
-export { formatarCnpj } from './formato'
-
-/** Mesma conta do banco (cnpj_valido): a tela avisa antes de tentar salvar. */
-export function cnpjValido(v: string): boolean {
-  const d = v.replace(/\D/g, '')
-  if (!/^\d{14}$/.test(d) || /^(\d)\1{13}$/.test(d)) return false
-  const dv = (n: number) => {
-    const pesos = n === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-    const s = pesos.reduce((t, p, i) => t + p * Number(d[i]), 0)
-    return s % 11 < 2 ? 0 : 11 - (s % 11)
-  }
-  return dv(12) === Number(d[12]) && dv(13) === Number(d[13])
-}
+// Em formato.ts (sem Supabase) para o PDF do orçamento rodar também no servidor (serviço livih-pdf). O cnpjValido
+// (mesma conta do banco, com o CNPJ de letras) fica lá também, para clientes e dados de cobrança usarem a mesma.
+export { cnpjValido, formatarCnpj, limparDocumento } from './formato'
 
 const erroAmigavel = (e: { message: string; code?: string }) =>
   new Error(
     e.code === '23505'
       ? 'Esse CNPJ já está cadastrado nesta conta.'
       : e.message.includes('cnpj')
-        ? 'CNPJ inválido. Confira os números.'
+        ? 'CNPJ inválido. Confira o que foi digitado.'
         : 'Não foi possível salvar. Confira os campos e tente de novo.',
   )
 

@@ -28,8 +28,8 @@ atendimentos (contagem, parar ou continuar, pacotes, avisos), dados de cobrança
    combinado e cobrança ligada (primeira fatura em novembro ou dezembro). Fica no sandbox até o passo 6.
 2. **Cobrança, entrega 3 (pagamento e atraso):** feita em 02/11 ([cobranca-asaas.md](cobranca-asaas.md#andamento)).
    Publicada e testada no sandbox em 02/11 (fatura da Teste paga com cartão de teste, marcada como paga pelo webhook).
-3. **CNPJ alfanumérico** (Receita, desde 07/2026): migration à parte para cobrança, emissoras e telas, antes de
-   cadastrar cliente novo.
+3. **CNPJ alfanumérico** (Receita, desde 07/2026): feito em 02/11 ([cnpj-alfanumerico.md](cnpj-alfanumerico.md)).
+   Falta publicar: db push, `functions deploy ler-nota`, app e o workflow do agente no n8n.
 4. **Cobrança, entrega 4, e regras dos planos:** escolha mensal ou anual, cobrança anual (cartão parcelado) com o
    excedente mensal, troca de plano no meio do ciclo, cancelamento do anual com devolução proporcional; limite de
    números de WhatsApp por plano ao conectar (passo 4 de planos-modulos); nota fiscal só com ERP ou OS ligados (passo 3).

@@ -30,7 +30,7 @@ import {
   type TipoLancamento,
 } from '../services/financeiro'
 import { listarClientes, type ClienteLista } from '../services/clientes'
-import { formatarCnpj, lerNumero, moeda } from '../services/formato'
+import { formatarCnpj, lerNumero, limparDocumento, moeda } from '../services/formato'
 import { data, hojeIso, somarDias } from '../services/os'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
@@ -150,12 +150,15 @@ export function ModalLancamento({
   const total = valorValido(valor)
   const n = modo === 'unica' ? 1 : Math.min(120, Math.max(2, Number(quantas) || 0))
   const parcelas = total && !editando ? montarParcelas(total, n, vencimento, modo === 'repetir' ? 'repetir' : 'parcelar') : []
-  const cnpjDigitos = fornecedorCnpj.replace(/\D/g, '')
+  // CNPJ pode ter letras (Receita, desde 07/2026); o CPF segue só com números.
+  const cnpjDigitos = limparDocumento(fornecedorCnpj)
 
   function salvar() {
     if (!descricao.trim()) return setErro('Informe a descrição.')
     if (!total) return setErro('Informe um valor maior que zero.')
-    if (cnpjDigitos && cnpjDigitos.length !== 11 && cnpjDigitos.length !== 14) return setErro('O CNPJ ou CPF do fornecedor precisa ter 14 ou 11 números.')
+    if (cnpjDigitos && !/^\d{11}$/.test(cnpjDigitos) && !/^[0-9A-Z]{12}\d{2}$/.test(cnpjDigitos)) {
+      return setErro('Confira o CNPJ (14 letras ou números) ou o CPF (11 números) do fornecedor.')
+    }
     if (editando) {
       void executar(() =>
         editarLancamento(lancamento.id, {
@@ -244,7 +247,7 @@ export function ModalLancamento({
               <input id="lanc-fornecedor" value={fornecedorNome} maxLength={200} onChange={(e) => setFornecedorNome(e.target.value)} className={CLASSE_CAMPO} />
             </Campo>
             <Campo rotulo="CNPJ ou CPF do fornecedor" id="lanc-fornecedor-cnpj">
-              <input id="lanc-fornecedor-cnpj" inputMode="numeric" value={fornecedorCnpj} onChange={(e) => setFornecedorCnpj(e.target.value)} className={CLASSE_CAMPO} />
+              <input id="lanc-fornecedor-cnpj" autoCapitalize="characters" value={fornecedorCnpj} onChange={(e) => setFornecedorCnpj(e.target.value)} className={CLASSE_CAMPO} />
             </Campo>
           </div>
         )}

@@ -7,6 +7,7 @@ import {
   cnpjValido,
   definirPadrao,
   formatarCnpj,
+  limparDocumento,
   listarEmissoras,
   removerEmissora,
   salvarEmissora,
@@ -224,8 +225,8 @@ export function SecaoEmpresa() {
   async function salvar(e: FormEvent) {
     e.preventDefault()
     if (!form) return
-    const cnpj = form.cnpj.replace(/\D/g, '')
-    if (!cnpjValido(cnpj)) return setErroForm('CNPJ inválido. Confira os números.')
+    const cnpj = limparDocumento(form.cnpj)
+    if (!cnpjValido(cnpj)) return setErroForm('CNPJ inválido. Confira as letras e os números.')
     const telefone = normalizarTelefone(form.telefone)
     if (telefone === undefined) return setErroForm('Telefone inválido. Use DDD e número.')
     const cep = form.cep.replace(/\D/g, '')
@@ -457,11 +458,11 @@ export function SecaoEmpresa() {
                 <CampoTexto
                   rotulo="CNPJ"
                   required
-                  inputMode="numeric"
+                  autoCapitalize="characters"
                   placeholder="00.000.000/0000-00"
                   {...campo('cnpj')}
-                  onBlur={() => setForm((f) => f && { ...f, cnpj: formatarCnpj(f.cnpj.replace(/\D/g, '')) })}
-                  erro={form.cnpj.replace(/\D/g, '').length === 14 && !cnpjValido(form.cnpj) ? 'CNPJ inválido' : undefined}
+                  onBlur={() => setForm((f) => f && { ...f, cnpj: formatarCnpj(f.cnpj) })}
+                  erro={limparDocumento(form.cnpj).length === 14 && !cnpjValido(form.cnpj) ? 'CNPJ inválido' : undefined}
                 />
                 <CampoTexto rotulo="Inscrição estadual" maxLength={30} {...campo('inscricao_estadual')} />
               </div>

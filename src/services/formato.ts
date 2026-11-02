@@ -74,18 +74,39 @@ export function moeda(valor: number | null, centavos = false): string {
   )
 }
 
-/** 11222333000181 → 11.222.333/0001-81 */
+/**
+ * CNPJ, CPF ou chave de acesso sem pontuação e em maiúsculas, a mesma limpeza do banco (limpar_documento). Desde 07/2026
+ * a Receita dá CNPJ com letras (12.ABC.345/01DE-35): tirar tudo o que não é número trocaria o CNPJ por outro.
+ */
+export const limparDocumento = (v: string | null | undefined) => (v ?? '').replace(/[^0-9A-Za-z]/g, '').toUpperCase()
+
+/**
+ * Mesma conta do banco (cnpj_valido): 12 letras ou números e 2 dígitos verificadores. Cada caractere vale o código
+ * menos 48 (0–9 = 0–9, A = 17 … Z = 42); pesos e módulo 11 iguais aos do CNPJ só de números.
+ */
+export function cnpjValido(v: string): boolean {
+  const d = limparDocumento(v)
+  if (!/^[0-9A-Z]{12}\d{2}$/.test(d) || /^(.)\1{13}$/.test(d)) return false
+  const dv = (n: number) => {
+    const pesos = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2].slice(13 - n)
+    const s = pesos.reduce((t, p, i) => t + p * (d.charCodeAt(i) - 48), 0)
+    return s % 11 < 2 ? 0 : 11 - (s % 11)
+  }
+  return dv(12) === Number(d[12]) && dv(13) === Number(d[13])
+}
+
+/** 11222333000181 → 11.222.333/0001-81; 12ABC34501DE35 → 12.ABC.345/01DE-35 */
 export function formatarCnpj(cnpj: string | null | undefined): string {
-  const d = (cnpj ?? '').replace(/\D/g, '')
+  const d = limparDocumento(cnpj)
   if (d.length !== 14) return cnpj ?? ''
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
 }
 
 /** CNPJ (14) ou CPF (11) com pontuação; o resto volta como veio. */
 export function formatarDocumento(v: string | null | undefined): string {
-  const d = (v ?? '').replace(/\D/g, '')
+  const d = limparDocumento(v)
   if (d.length === 14) return formatarCnpj(d)
-  if (d.length === 11) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+  if (/^\d{11}$/.test(d)) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
   return v ?? ''
 }
 
