@@ -18,6 +18,34 @@ Coisas anotadas para corrigir depois. Tirar daqui quando entrar no commit.
   no plano, liberação por organização (feature flag) e integração com ERPs que o cliente já usa (ex.: Bling).
   **Piloto: JoGrampo** (decidido em 10/10) — a Liv já anota pedidos lá (ex.: 5 caixinhas do pino F15).
 
+## Próximos passos de 01/11: planos, cobrança e preços no site
+
+Em sequência: cada passo destrava o seguinte. Detalhes em [cobranca-asaas.md](cobranca-asaas.md),
+[planos-modulos.md](planos-modulos.md) e [site-planos.md](site-planos.md). Já publicado em 01/11: franquia de
+atendimentos (contagem, parar ou continuar, pacotes, avisos), dados de cobrança e faturas no Asaas sandbox (testado).
+
+1. **Terça (03/11): preço da JoGrampo.** O usuário confirma com o Eduardo; na janela Plano da JoGrampo, valor
+   combinado e cobrança ligada (primeira fatura em novembro ou dezembro). Fica no sandbox até o passo 6.
+2. **Cobrança, entrega 3 (pagamento e atraso):** webhook do Asaas (paga, vencida, estornada), aviso ao dono aos 3 dias,
+   suspensão aos 10 e reativação ao pagar; o dono de empresa suspensa chega aos dados de cobrança e ao link; tirar o
+   aviso "Já pagou? Aqui ainda aparece em aberto". O usuário cadastra a URL do webhook e o token no Asaas sandbox.
+3. **CNPJ alfanumérico** (Receita, desde 07/2026): migration à parte para cobrança, emissoras e telas, antes de
+   cadastrar cliente novo.
+4. **Cobrança, entrega 4, e regras dos planos:** escolha mensal ou anual, cobrança anual (cartão parcelado) com o
+   excedente mensal, troca de plano no meio do ciclo, cancelamento do anual com devolução proporcional; limite de
+   números de WhatsApp por plano ao conectar (passo 4 de planos-modulos); nota fiscal só com ERP ou OS ligados (passo 3).
+5. **Site com os preços:** seção curta de planos na página inicial e "Planos" no menu de todas as páginas; corrigir a
+   página "Orçamentos e pedidos" (diz que a nota "ainda não" existe e que orçamento é pacote à parte); seção de
+   cobrança nos Termos (mensal e anual, excedente, reajuste, suspensão, devolução do anual), com revisão do advogado ou
+   contador pelo usuário; sitemap, revisor-textos e conferência no celular.
+6. **Produção do Asaas e publicação:** o usuário consegue a aprovação da conta de produção (documentos; vale enviar
+   já); cancelar as faturas de sandbox, ligar `ASAAS_AMBIENTE=producao` (com aprovação), primeira cobrança real
+   (JoGrampo) e publicar a página de planos.
+
+**Decisões em aberto, em paralelo (antes do passo 5):** preço dos módulos (ERP e OS a R$ 99, juntos R$ 149, já no
+sistema); usuários no Essencial (ilimitados ou 2 a 3); licença do WAHA (o grátis roda uma sessão, há 3); integração
+com o Bling; regime tributário (Anexo III ou V); recarga automática da OpenAI (saldo de US$ 3,11 em 29/10).
+
 ## Em aberto em 28/10 (passagem de sessão)
 
 Anotado ao fim da sessão de 28/10, para continuar no dia seguinte. Tirar cada item quando resolver.
