@@ -151,3 +151,33 @@ footer.rodape a { color: var(--texto-2); }
 footer.rodape .solucoes-rodape { width: 100%; display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; padding-top: 1rem; border-top: 1px solid var(--borda); }
 /* Âncoras do menu (#solucoes, #como-funciona…) não ficam escondidas sob o cabeçalho fixo. */
 section[id] { scroll-margin-top: 4.5rem; }
+
+/* ---------- Página de planos (01/11) ---------- */
+/* Sem a chave (sem JavaScript) fica o mensal, com o anual na linha de baixo; a chave troca pela classe .anual. */
+.planos .anual-v { display: none; }
+.planos.anual .anual-v { display: inline; }
+.planos.anual p.anual-v { display: block; }
+.planos.anual .mensal-v { display: none; }
+.alternar { display: inline-flex; gap: .25rem; padding: .25rem; margin: 0 0 2rem; background: #fff; border: 1px solid var(--borda); border-radius: 999px; }
+.alternar[hidden] { display: none; }
+.alternar button { font: inherit; font-weight: 600; font-size: .95rem; color: var(--texto-2); background: transparent; border: 0; border-radius: 999px; min-height: 2.5rem; padding: 0 1.1rem; cursor: pointer; }
+.alternar button span { color: var(--primaria); font-weight: 500; font-size: .85rem; margin-left: .25rem; }
+.alternar button[aria-pressed="true"] { background: var(--primaria); color: #fff; }
+.alternar button[aria-pressed="true"] span { color: #d1fae5; }
+.grade-planos { display: grid; gap: 1rem; }
+@media (min-width: 40rem) { .grade-planos { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 64rem) { .grade-planos { grid-template-columns: repeat(4, 1fr); } }
+.plano { position: relative; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--borda); border-radius: .75rem; padding: 1.5rem; }
+.plano.destaque { border: 2px solid var(--primaria); box-shadow: 0 4px 18px rgba(15, 118, 110, .12); }
+.plano .selo-plano { position: absolute; top: -.8rem; left: 1.5rem; background: var(--primaria); color: #fff; font-size: .8rem; font-weight: 700; padding: .15rem .7rem; border-radius: 999px; }
+.plano h3 { font-size: 1.25rem; margin: 0 0 .25rem; }
+.plano .para { color: var(--texto-3); font-size: .95rem; margin: 0 0 1.25rem; min-height: 3em; }
+.plano .preco { margin: 0; color: var(--texto-3); }
+.plano .preco strong { font-size: 2rem; color: var(--texto); letter-spacing: -.02em; }
+.plano .preco-nota { margin: .25rem 0 1.25rem; font-size: .9rem; color: var(--primaria); font-weight: 500; min-height: 2.8em; }
+.plano ul { list-style: none; padding: 0; margin: 0 0 1.5rem; display: grid; gap: .55rem; flex: 1; }
+.plano li { position: relative; padding-left: 1.5rem; color: var(--texto-2); font-size: .95rem; }
+.plano li::before { content: "✓"; position: absolute; left: 0; color: var(--destaque); font-weight: 700; }
+.plano .botao { width: 100%; }
+.mais-numeros { margin: 1.5rem 0 0; color: var(--texto-2); }
+.preco-modulo { font-weight: 700; color: var(--texto) !important; margin: 0 0 .5rem !important; }
