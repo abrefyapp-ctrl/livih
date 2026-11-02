@@ -4849,6 +4849,7 @@ export type Database = {
         }
         Returns: string
       }
+      limpar_documento: { Args: { p: string }; Returns: string }
       membro_definir_emite_nota_fiscal: {
         Args: { p_org: string; p_usuario: string; p_valor: boolean }
         Returns: undefined
