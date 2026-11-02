@@ -30,7 +30,7 @@ export function ListaFaturas({ faturas, acoes }: {
         return (
           <li key={f.id} className="space-y-1 p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium capitalize">{mesAno(f.competencia)}</span>
+              <span className="inline-block font-medium first-letter:uppercase">{mesAno(f.competencia)}</span>
               <span className={`rounded-sm px-1.5 py-0.5 text-legenda font-medium ${TONS[s.tom]}`}>{s.rotulo}</span>
               {f.ambiente === 'sandbox' && (
                 <span className="rounded-sm bg-slate-100 px-1.5 py-0.5 text-legenda text-texto-3">Teste</span>

@@ -76,4 +76,8 @@ módulos, os pacotes e o excedente de atendimentos. Sem isso, a página de plano
   combinado com motivo), faturas com os itens, fechamento no dia 1 às 06:00 e reenvio diário dos erros (cron), cliente
   e cobrança no Asaas sandbox (multa 2 %, juros 1 % ao mês, o cliente escolhe Pix, boleto ou cartão), bloco Cobrança
   na janela Plano (com "Gerar a fatura deste mês agora") e Faturas em Plano e consumo. Falta: webhook de pagamento
-  (entrega 3); hoje a fatura fica "A pagar" mesmo depois de paga.
+  (entrega 3); até lá a fatura fica "Em aberto" mesmo depois de paga.
+- 01/11: entrega 2 publicada e testada no sandbox com a empresa Teste (dados fictícios): plano Start, cobrança ligada,
+  "Gerar a fatura deste mês agora" → cliente e cobrança criados no Asaas, fatura "Em aberto" de R$ 99,90 com vencimento
+  em 10/11 e link que abre; "Cancelar fatura" apagou a cobrança no Asaas. A Teste voltou ao plano interno com a cobrança
+  desligada (para não gerar fatura de sandbox no dia 1).

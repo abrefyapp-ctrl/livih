@@ -89,7 +89,7 @@ export function SecaoUsoIa() {
                   <tbody className="divide-y divide-borda">
                     {anteriores.map((m) => (
                       <tr key={m.mes}>
-                        <th scope="row" className="px-4 py-2 text-left font-medium capitalize">{nomeDoMes(m.mes!)}</th>
+                        <th scope="row" className="px-4 py-2 text-left font-medium first-letter:uppercase">{nomeDoMes(m.mes!)}</th>
                         <td className="px-4 py-2 text-right tabular-nums">{numero.format(m.conversas_com_agente ?? 0)}</td>
                         <td className="px-4 py-2 text-right tabular-nums">{numero.format(m.respostas_agente ?? 0)}</td>
                         <td className="px-4 py-2 text-right tabular-nums">{numero.format(m.audios_transcritos ?? 0)}</td>
