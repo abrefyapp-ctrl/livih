@@ -135,16 +135,24 @@ async function enviar(f: Fatura) {
         interest: { value: 1 },
       });
     }
+    const agora = new Date().toISOString();
     const { error } = await admin.from("faturas").update({
-      status: "aberta", asaas_id: cobranca.id, link: cobranca.invoiceUrl, ambiente: AMBIENTE, erro: null,
-      enviada_em: new Date().toISOString(), atualizado_em: new Date().toISOString(), tentativas: f.tentativas + 1,
+      asaas_id: cobranca.id, link: cobranca.invoiceUrl, ambiente: AMBIENTE, erro: null,
+      enviada_em: agora, atualizado_em: agora, tentativas: f.tentativas + 1,
     }).eq("id", f.id);
     if (error) console.error("gravar fatura enviada", f.id, error.message);
+    // A situação só muda se ainda está 'enviando': o webhook pode ter marcado a fatura como paga nesse meio-tempo.
+    // Cobrança achada pela referência (tentativa anterior que caiu) já pode estar paga ou vencida no Asaas.
+    const situacao = ["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"].includes(cobranca.status)
+      ? { status: "paga", paga_em: agora }
+      : { status: cobranca.status === "OVERDUE" ? "vencida" : "aberta" };
+    const { error: erroSituacao } = await admin.from("faturas").update(situacao).eq("id", f.id).eq("status", "enviando");
+    if (erroSituacao) console.error("gravar situação da fatura", f.id, erroSituacao.message);
   } catch (e) {
     const { error } = await admin.from("faturas").update({
       status: "erro", erro: mensagemDeErro(e), atualizado_em: new Date().toISOString(),
       tentativas: f.tentativas + 1,
-    }).eq("id", f.id);
+    }).eq("id", f.id).eq("status", "enviando");
     if (error) console.error("gravar erro da fatura", f.id, error.message);
   }
 }

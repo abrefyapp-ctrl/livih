@@ -10,10 +10,11 @@ export type ItemFatura = { descricao: string; quantidade: number; valor: number 
 export const SITUACAO_FATURA: Record<string, { rotulo: string; tom: 'neutro' | 'atencao' | 'ok' | 'erro' }> = {
   a_enviar: { rotulo: 'Gerando a cobrança', tom: 'neutro' },
   enviando: { rotulo: 'Gerando a cobrança', tom: 'neutro' },
-  // "Em aberto" e não "A pagar": até o aviso de pagamento do Asaas (entrega 3), a fatura paga continua assim.
-  aberta: { rotulo: 'Em aberto', tom: 'atencao' },
+  // A situação acompanha o webhook do Asaas (asaas-webhook, entrega 3): paga, vencida e estornada chegam sozinhas.
+  aberta: { rotulo: 'A pagar', tom: 'atencao' },
   paga: { rotulo: 'Paga', tom: 'ok' },
   vencida: { rotulo: 'Vencida', tom: 'erro' },
+  estornada: { rotulo: 'Estornada', tom: 'neutro' },
   a_cancelar: { rotulo: 'Cancelando', tom: 'neutro' },
   cancelada: { rotulo: 'Cancelada', tom: 'neutro' },
   erro: { rotulo: 'Sem link de pagamento', tom: 'erro' },

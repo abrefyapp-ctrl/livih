@@ -483,3 +483,7 @@ verify_jwt = false
 # asaas-cobranca: envia as faturas da Livih ao Asaas; chamada só pelo banco (x-livih-segredo).
 [functions.asaas-cobranca]
 verify_jwt = false
+
+# asaas-webhook: chamado pelo Asaas (sem login); confere o token asaas-access-token (secrets ASAAS_WEBHOOK_TOKEN e ASAAS_WEBHOOK_TOKEN_SANDBOX) dentro da função.
+[functions.asaas-webhook]
+verify_jwt = false

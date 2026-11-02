@@ -237,7 +237,9 @@ export function Empresas() {
                       <p className="flex items-center gap-2 font-medium">
                         <span className="truncate">{e.nome}</span>
                         {suspensa && (
-                          <span className="rounded-sm bg-erro-suave px-1.5 py-0.5 text-legenda font-medium text-erro">Suspensa</span>
+                          <span className="rounded-sm bg-erro-suave px-1.5 py-0.5 text-legenda font-medium text-erro">
+                            {e.motivo_suspensao === 'inadimplencia' ? 'Suspensa por atraso' : 'Suspensa'}
+                          </span>
                         )}
                       </p>
                       <p className="text-legenda text-texto-3">Desde {desde(e.criado_em)}</p>

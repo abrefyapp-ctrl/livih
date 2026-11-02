@@ -62,8 +62,9 @@ módulos, os pacotes e o excedente de atendimentos. Sem isso, a página de plano
 - Preço combinado da JoGrampo (terça, 03/11).
 - **CNPJ alfanumérico** (a Receita emite para inscrições novas desde 07/2026): `cnpj_valido`, a tela e as emissoras
   só aceitam números. Corrigir em migration à parte, antes de cobrar clientes novos.
-- **Empresa suspensa por atraso** (entrega 3): o banco já deixa o dono ver e corrigir os dados de cobrança mesmo com a
-  empresa suspensa; falta a tela deixar o dono suspenso chegar até eles e até o link de pagamento.
+- **Mês inteiro suspenso não é cobrado** (decidido na entrega 3, a confirmar): ao reativar, só a fatura do mês corrente
+  que o fechamento pulou é criada; o mês do meio, em que a empresa ficou suspensa o tempo todo, fica sem fatura (e os
+  atendimentos a mais e os pacotes do mês anterior a ele não são cobrados).
 
 ## Andamento
 
@@ -81,3 +82,14 @@ módulos, os pacotes e o excedente de atendimentos. Sem isso, a página de plano
   "Gerar a fatura deste mês agora" → cliente e cobrança criados no Asaas, fatura "Em aberto" de R$ 99,90 com vencimento
   em 10/11 e link que abre; "Cancelar fatura" apagou a cobrança no Asaas. A Teste voltou ao plano interno com a cobrança
   desligada (para não gerar fatura de sandbox no dia 1).
+- 02/11: entrega 3 feita (migration `20261102120000_cobranca_pagamento_atraso`, Edge Function `asaas-webhook`):
+  webhook do Asaas (token por conta: `ASAAS_WEBHOOK_TOKEN` e `ASAAS_WEBHOOK_TOKEN_SANDBOX`) marca a fatura como paga,
+  vencida, estornada ou cancelada, acompanha o vencimento mudado no painel do Asaas e acha a fatura pela referência
+  quando o pagamento chega antes de a cobrança ser gravada; evento repetido é ignorado (`asaas_eventos`). Rotina diária
+  às 09:15 (`cobranca_atrasos`): aviso aos 3 dias e suspensão aos 10 (`motivo_suspensao = 'inadimplencia'`), pelo
+  número de avisos da Livih, ao dono e aos administradores (celular e WhatsApp) e à plataforma (celular). **Só para
+  fatura de produção**: no sandbox ninguém paga de verdade. Pagamento, cancelamento ou vencimento novo reativam só o que
+  foi suspenso por atraso, quando não sobra outra fatura com 10 dias, e criam a fatura do mês pulado; empresa suspensa
+  pela plataforma não reativa sozinha. Dono e administradores de empresa suspensa por atraso veem as faturas e os dados
+  de cobrança na tela de acesso suspenso; a tela Empresas mostra "Suspensa por atraso". Revisado pelo revisor-banco e
+  pelo revisor-textos; 627/627 na bateria de testes.

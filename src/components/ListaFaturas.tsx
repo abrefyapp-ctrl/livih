@@ -26,7 +26,7 @@ export function ListaFaturas({ faturas, acoes }: {
         const s = SITUACAO_FATURA[f.status] ?? { rotulo: f.status, tom: 'neutro' as const }
         const itens = (f.itens ?? []) as ItemFatura[]
         const abrir = (f.status === 'aberta' || f.status === 'vencida') && f.link
-        const cancelavel = !['paga', 'cancelada', 'a_cancelar', 'enviando'].includes(f.status)
+        const cancelavel = !['paga', 'estornada', 'cancelada', 'a_cancelar', 'enviando'].includes(f.status)
         return (
           <li key={f.id} className="space-y-1 p-3">
             <div className="flex flex-wrap items-center gap-2">

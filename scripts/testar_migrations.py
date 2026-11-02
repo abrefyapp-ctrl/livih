@@ -1,6 +1,6 @@
 """Aplica as migrations pendentes + scripts/teste_fase1.sql no banco linkado dentro de begin … rollback.
 
-Nada fica gravado. Uso (na raiz do repo): python scripts/testar_migrations.py
+Nada fica gravado (por isso o --yes: a CLI 3 pede confirmação para SQL no banco remoto). Uso (na raiz do repo): python scripts/testar_migrations.py
 """
 import glob
 import json
@@ -11,7 +11,7 @@ import tempfile
 
 def consultar(sql):
     saida = subprocess.run(
-        ["npx", "-y", "supabase", "db", "query", "--linked", "-o", "json", sql],
+        ["npx", "-y", "supabase", "db", "query", "--linked", "--yes", "-o", "json", sql],
         capture_output=True, text=True, encoding="utf-8", shell=sys.platform == "win32",
     ).stdout
     return json.loads(saida[saida.index("{"):saida.rindex("}") + 1])["rows"]
@@ -31,7 +31,7 @@ arquivo_tmp = os.path.join(tempfile.gettempdir(), "livih_teste_migrations.sql")
 open(arquivo_tmp, "w", encoding="utf-8").write("\n".join(partes))
 
 saida = subprocess.run(
-    ["npx", "-y", "supabase", "db", "query", "--linked", "-o", "json", "-f", arquivo_tmp],
+    ["npx", "-y", "supabase", "db", "query", "--linked", "--yes", "-o", "json", "-f", arquivo_tmp],
     capture_output=True, text=True, encoding="utf-8", shell=sys.platform == "win32",
 )
 texto = saida.stdout + saida.stderr

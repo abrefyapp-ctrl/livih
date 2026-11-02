@@ -30,8 +30,8 @@ export function FaturasDaEmpresa({ orgId }: { orgId: string }) {
         </h2>
         <p className="text-pequeno text-texto-3">
           Vencem no dia 10 (a primeira pode vencer em outra data; confira em cada fatura). O pagamento é feito na página do Asaas,
-          que faz a cobrança da Livih, por Pix, boleto ou cartão. Depois do vencimento, há multa de 2 % e juros de 1 % ao mês. Já
-          pagou? Aqui a fatura ainda aparece em aberto; abra a fatura para conferir que está paga.
+          que faz a cobrança da Livih, por Pix, boleto ou cartão. Depois do vencimento, há multa de 2 % e juros de 1 % ao mês. O
+          pagamento aparece aqui assim que é confirmado (atualize a página): Pix e cartão na hora, boleto em até 3 dias úteis.
         </p>
       </div>
       <ListaFaturas faturas={lista} />

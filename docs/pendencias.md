@@ -26,9 +26,9 @@ atendimentos (contagem, parar ou continuar, pacotes, avisos), dados de cobrança
 
 1. **Terça (03/11): preço da JoGrampo.** O usuário confirma com o Eduardo; na janela Plano da JoGrampo, valor
    combinado e cobrança ligada (primeira fatura em novembro ou dezembro). Fica no sandbox até o passo 6.
-2. **Cobrança, entrega 3 (pagamento e atraso):** webhook do Asaas (paga, vencida, estornada), aviso ao dono aos 3 dias,
-   suspensão aos 10 e reativação ao pagar; o dono de empresa suspensa chega aos dados de cobrança e ao link; tirar o
-   aviso "Já pagou? Aqui ainda aparece em aberto". O usuário cadastra a URL do webhook e o token no Asaas sandbox.
+2. **Cobrança, entrega 3 (pagamento e atraso):** feita em 02/11 ([cobranca-asaas.md](cobranca-asaas.md#andamento)).
+   Falta publicar (db push, tipos, `functions deploy asaas-webhook asaas-cobranca`, app), cadastrar o webhook e o
+   token no Asaas sandbox e testar pagando uma fatura da empresa Teste com o cartão de teste.
 3. **CNPJ alfanumérico** (Receita, desde 07/2026): migration à parte para cobrança, emissoras e telas, antes de
    cadastrar cliente novo.
 4. **Cobrança, entrega 4, e regras dos planos:** escolha mensal ou anual, cobrança anual (cartão parcelado) com o

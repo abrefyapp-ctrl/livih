@@ -4477,5 +4477,236 @@ reset role;
 insert into resultado (teste, ok) select 'faturas: reenvio e vencimento fechados para o login',
   not has_function_privilege('authenticated', 'public.cobranca_reenviar()', 'execute')
   and not has_function_privilege('authenticated', 'public.cobranca_vencimento(date)', 'execute');
+
+-- Pagamento e atraso: webhook do Asaas, aviso aos 3 dias, suspensão aos 10 e reativação (migration 20261102120000).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.cobranca')::uuid;
+  v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+  v_comp date := date_trunc('month', now() at time zone 'America/Sao_Paulo')::date;
+  v_fat uuid;
+  v_sb uuid;
+  v_res text;
+begin
+  -- Avisos pelo número de teste da F7 (nada sai: tudo é desfeito no rollback).
+  update public.plataforma_config set canal_alertas = (select id from public.canais where instance_id = 'INST-F7') where id = 1;
+  update public.perfis set telefone = '5541999998888' where user_id = '00000000-0000-0000-0000-00000000f9b1';
+  update public.organizacoes set status = 'ativa', motivo_suspensao = null where id = v_org;
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, asaas_id, ambiente, link)
+  values (v_org, '2030-01-01', v_hoje - 3, '[]', 99.90, 'aberta', 'pay_teste_1', 'producao', 'https://asaas.teste/i/1')
+  returning id into v_fat;
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, asaas_id, ambiente, link)
+  values (v_org, '2030-02-01', v_hoje - 15, '[]', 99.90, 'aberta', 'pay_teste_sb', 'sandbox', 'https://asaas.teste/i/sb')
+  returning id into v_sb;
+
+  perform public.cobranca_atrasos();
+  insert into resultado (teste, ok) select 'atraso: aos 3 dias a fatura vence e o dono recebe o aviso com o link pelo número da Livih',
+    (select status = 'vencida' and aviso_atraso_em is not null and suspensao_em is null from public.faturas where id = v_fat)
+    and (select count(*) = 1 from public.alertas a
+          where a.telefone = '5541999998888' and a.texto like '%Fatura da Livih em atraso%'
+            and a.texto like '%https://asaas.teste/i/1%'
+            and a.canal_id = (select canal_alertas from public.plataforma_config where id = 1))
+    and (select status = 'ativa' from public.organizacoes where id = v_org);
+  perform public.cobranca_atrasos();
+  insert into resultado (teste, ok) select 'atraso: o aviso de 3 dias sai uma vez só',
+    (select count(*) = 1 from public.alertas a where a.telefone = '5541999998888' and a.texto like '%Fatura da Livih em atraso%');
+  insert into resultado (teste, ok) select 'atraso: fatura do sandbox não avisa nem suspende',
+    (select status = 'aberta' and aviso_atraso_em is null and suspensao_em is null from public.faturas where id = v_sb);
+
+  update public.faturas set vencimento = v_hoje - 10 where id = v_fat;
+  perform public.cobranca_atrasos();
+  insert into resultado (teste, ok) select 'atraso: aos 10 dias a empresa é suspensa por inadimplência, com auditoria e aviso',
+    (select status = 'suspensa' and motivo_suspensao = 'inadimplencia' from public.organizacoes where id = v_org)
+    and (select suspensao_em is not null from public.faturas where id = v_fat)
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'suspender_por_atraso')
+    and exists (select 1 from public.alertas where telefone = '5541999998888' and texto like '%Acesso à Livih suspenso%');
+
+  v_res := public.cobranca_evento_asaas('evt_t1', 'PAYMENT_RECEIVED', '{"id":"pay_teste_1"}', 'producao');
+  insert into resultado (teste, ok) select 'webhook: pagamento marca a fatura como paga e reativa a empresa suspensa por atraso',
+    v_res = 'paga'
+    and (select status = 'paga' and paga_em is not null from public.faturas where id = v_fat)
+    and (select status = 'ativa' and motivo_suspensao is null from public.organizacoes where id = v_org)
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'reativar_apos_pagamento')
+    and exists (select 1 from public.alertas where telefone = '5541999998888' and texto like '%Acesso à Livih liberado%');
+  insert into resultado (teste, ok) select 'webhook: a reativação não recria a fatura do mês que foi cancelada',
+    not exists (select 1 from public.faturas where org_id = v_org and competencia = v_comp and status <> 'cancelada');
+  insert into resultado (teste, ok) select 'webhook: evento repetido não faz nada',
+    public.cobranca_evento_asaas('evt_t1', 'PAYMENT_RECEIVED', '{"id":"pay_teste_1"}', 'producao') = 'repetido';
+  -- Em comando separado: a consulta que chama a função não enxerga o que ela gravou.
+  v_res := public.cobranca_evento_asaas('evt_t2', 'PAYMENT_RECEIVED', '{"id":"pay_outro"}', 'producao');
+  insert into resultado (teste, ok) select 'webhook: pagamento que não é de fatura da Livih só é registrado',
+    v_res = 'desconhecido'
+    and exists (select 1 from public.asaas_eventos where id = 'producao:evt_t2' and fatura_id is null);
+  insert into resultado (teste, ok) select 'webhook: aviso de vencida atrasado não desfaz a fatura paga',
+    public.cobranca_evento_asaas('evt_t3', 'PAYMENT_OVERDUE', '{"id":"pay_teste_1"}', 'producao') = 'sem mudança'
+    and (select status = 'paga' from public.faturas where id = v_fat);
+  insert into resultado (teste, ok) select 'webhook: estorno marca a fatura como estornada',
+    public.cobranca_evento_asaas('evt_t4', 'PAYMENT_REFUNDED', '{"id":"pay_teste_1"}', 'producao') = 'estornada';
+  insert into resultado (teste, ok) select 'webhook: vale também no sandbox',
+    public.cobranca_evento_asaas('evt_t5', 'PAYMENT_OVERDUE', '{"id":"pay_teste_sb"}', 'sandbox') = 'vencida';
+
+  -- Suspensa no dia 1, o fechamento pulou o mês: o vencimento novo dado no Asaas reativa e cria a fatura do mês.
+  delete from public.faturas where org_id = v_org and competencia = v_comp;
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, asaas_id, ambiente, link)
+  values (v_org, '2030-03-01', v_hoje - 12, '[]', 99.90, 'aberta', 'pay_teste_3', 'producao', 'https://asaas.teste/i/3')
+  returning id into v_fat;
+  perform public.cobranca_atrasos();
+  insert into resultado (teste, ok) select 'atraso: com o cron atrasado, a fatura passada dos 10 dias suspende direto',
+    (select status = 'suspensa' from public.organizacoes where id = v_org)
+    and (select aviso_atraso_em is not null and suspensao_em is not null from public.faturas where id = v_fat);
+  v_res := public.cobranca_evento_asaas('evt_t6', 'PAYMENT_UPDATED',
+    jsonb_build_object('id', 'pay_teste_3', 'dueDate', to_char(v_hoje + 5, 'YYYY-MM-DD')), 'producao');
+  insert into resultado (teste, ok) select 'webhook: vencimento novo no Asaas zera o atraso, reativa e cria a fatura do mês pulado',
+    (select status = 'aberta' and vencimento = v_hoje + 5 and aviso_atraso_em is null and suspensao_em is null
+       from public.faturas where id = v_fat)
+    and (select status = 'ativa' from public.organizacoes where id = v_org)
+    and exists (select 1 from public.faturas where org_id = v_org and competencia = v_comp and status = 'a_enviar');
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.cobranca')::uuid;
+begin
+  perform public.plataforma_definir_status(v_org, 'suspensa');
+  insert into resultado (teste, ok) select 'plataforma: suspensão pela tela fica com o motivo e aparece na lista',
+    (select status = 'suspensa' and motivo_suspensao = 'plataforma' from public.plataforma_empresas() where id = v_org);
+  begin
+    perform public.plataforma_cancelar_fatura((select id from public.faturas where asaas_id = 'pay_teste_1'));
+    insert into resultado (teste, ok) values ('faturas: fatura estornada não se cancela', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('faturas: fatura estornada não se cancela', sqlerrm like 'Esta fatura não pode ser cancelada%');
+  end;
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.cobranca')::uuid;
+  v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+begin
+  insert into resultado (teste, ok) select 'webhook: pagamento não reativa o que a plataforma suspendeu',
+    public.cobranca_evento_asaas('evt_t7', 'PAYMENT_RECEIVED', '{"id":"pay_teste_3"}', 'producao') = 'paga'
+    and (select status = 'suspensa' and motivo_suspensao = 'plataforma' from public.organizacoes where id = v_org);
+
+  -- Suspensa por atraso e reativada à mão pela plataforma: a mesma fatura não suspende de novo.
+  update public.organizacoes set status = 'ativa', motivo_suspensao = null where id = v_org;
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, asaas_id, ambiente, link)
+  values (v_org, '2030-04-01', v_hoje - 11, '[]', 99.90, 'vencida', 'pay_teste_4', 'producao', 'https://asaas.teste/i/4');
+  perform public.cobranca_atrasos();
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+  perform public.plataforma_definir_status(v_org, 'ativa');
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  perform public.cobranca_atrasos();
+  insert into resultado (teste, ok) select 'atraso: reativada pela plataforma, a mesma fatura não suspende de novo',
+    (select status = 'ativa' and motivo_suspensao is null from public.organizacoes where id = v_org)
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'suspender_por_atraso'
+                  and depois ->> 'fatura' = (select id::text from public.faturas where asaas_id = 'pay_teste_4'));
+end $$;
+
+-- Revisão de 02/11: pagamento antes de a cobrança ser gravada, ambiente, suspensão pela plataforma, eventos menos
+-- comuns e destinatários dos avisos.
+do $$
+declare
+  v_org uuid := current_setting('teste.cobranca')::uuid;
+  v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+  v_fat uuid;
+  v_res text;
+begin
+  -- A fatura em atraso do bloco anterior (reativada à mão) sai do caminho: senão ela segura a suspensão.
+  update public.faturas set status = 'cancelada' where asaas_id = 'pay_teste_4';
+  update public.organizacoes set status = 'ativa', motivo_suspensao = null where id = v_org;
+
+  -- Pago antes de a asaas-cobranca gravar o id da cobrança: acha a fatura pela referência.
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status)
+  values (v_org, '2030-05-01', v_hoje + 5, '[]', 99.90, 'enviando') returning id into v_fat;
+  v_res := public.cobranca_evento_asaas('evt_t8', 'PAYMENT_CONFIRMED',
+    jsonb_build_object('id', 'pay_teste_5', 'externalReference', v_fat::text), 'producao');
+  insert into resultado (teste, ok) select 'webhook: pago antes de a Livih gravar a cobrança, acha a fatura pela referência',
+    v_res = 'paga'
+    and (select status = 'paga' and asaas_id = 'pay_teste_5' and ambiente = 'producao' from public.faturas where id = v_fat);
+  insert into resultado (teste, ok) select 'webhook: cartão confirmado e depois recebido conta uma vez só',
+    public.cobranca_evento_asaas('evt_t9', 'PAYMENT_RECEIVED', '{"id":"pay_teste_5"}', 'producao') = 'sem mudança';
+  v_res := public.cobranca_evento_asaas('evt_t10', 'PAYMENT_REFUNDED', '{"id":"pay_teste_5"}', 'sandbox');
+  insert into resultado (teste, ok) select 'webhook: evento do sandbox não mexe em fatura de produção',
+    v_res = 'desconhecido' and (select status = 'paga' from public.faturas where id = v_fat);
+  insert into resultado (teste, ok) select 'webhook: referência que não é de fatura (outra cobrança da F7) só é registrada',
+    public.cobranca_evento_asaas('evt_t11', 'PAYMENT_RECEIVED', '{"id":"pay_x","externalReference":"pedido-123"}', 'producao') = 'desconhecido';
+  update public.faturas set status = 'cancelada' where id = v_fat;
+  insert into resultado (teste, ok) select 'webhook: pagamento de fatura cancelada não muda a fatura e avisa a plataforma',
+    public.cobranca_evento_asaas('evt_t12', 'PAYMENT_RECEIVED', '{"id":"pay_teste_5"}', 'producao') = 'pagamento de fatura cancelada';
+
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, asaas_id, ambiente, link)
+  values (v_org, '2030-06-01', v_hoje + 5, '[]', 99.90, 'a_cancelar', 'pay_teste_6', 'producao', 'https://asaas.teste/i/6');
+  insert into resultado (teste, ok) select 'webhook: pago antes de a cobrança ser apagada fica paga',
+    public.cobranca_evento_asaas('evt_t13', 'PAYMENT_RECEIVED', '{"id":"pay_teste_6"}', 'producao') = 'paga';
+
+  -- Suspensa pela plataforma quando a fatura chega a 10 dias: fica sem a marca; reativada à mão, suspende por atraso.
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, asaas_id, ambiente, link)
+  values (v_org, '2030-07-01', v_hoje - 10, '[]', 99.90, 'vencida', 'pay_teste_7', 'producao', 'https://asaas.teste/i/7')
+  returning id into v_fat;
+  update public.organizacoes set status = 'suspensa', motivo_suspensao = 'plataforma' where id = v_org;
+  perform public.cobranca_atrasos();
+  insert into resultado (teste, ok) select 'atraso: empresa suspensa pela plataforma não marca a fatura',
+    (select suspensao_em is null from public.faturas where id = v_fat)
+    and (select motivo_suspensao = 'plataforma' from public.organizacoes where id = v_org);
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+  perform public.plataforma_definir_status(v_org, 'ativa');
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  perform public.cobranca_atrasos();
+  insert into resultado (teste, ok) select 'atraso: reativada à mão, a fatura em atraso suspende por inadimplência',
+    (select status = 'suspensa' and motivo_suspensao = 'inadimplencia' from public.organizacoes where id = v_org)
+    and (select suspensao_em is not null from public.faturas where id = v_fat);
+
+  -- Duas faturas com 10 dias: pagar uma não reativa; apagar a outra no Asaas reativa.
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, asaas_id, ambiente, link)
+  values (v_org, '2030-08-01', v_hoje - 10, '[]', 99.90, 'vencida', 'pay_teste_8', 'producao', 'https://asaas.teste/i/8');
+  perform public.cobranca_atrasos();
+  v_res := public.cobranca_evento_asaas('evt_t14', 'PAYMENT_RECEIVED', '{"id":"pay_teste_7"}', 'producao');
+  insert into resultado (teste, ok) select 'webhook: com duas faturas em atraso, pagar uma não reativa',
+    v_res = 'paga' and (select status = 'suspensa' from public.organizacoes where id = v_org);
+  v_res := public.cobranca_evento_asaas('evt_t15', 'PAYMENT_DELETED', '{"id":"pay_teste_8"}', 'producao');
+  insert into resultado (teste, ok) select 'webhook: cobrança apagada no Asaas cancela a fatura e reativa a empresa',
+    v_res = 'cancelada' and (select status = 'ativa' from public.organizacoes where id = v_org);
+
+  -- Pagamento desfeito no Asaas: volta a dever e o atraso conta de novo.
+  v_res := public.cobranca_evento_asaas('evt_t16', 'PAYMENT_RECEIVED_IN_CASH_UNDONE', '{"id":"pay_teste_7"}', 'producao');
+  insert into resultado (teste, ok) select 'webhook: pagamento desfeito volta a dever e zera o atraso',
+    v_res = 'pagamento desfeito'
+    and (select status = 'vencida' and paga_em is null and aviso_atraso_em is null and suspensao_em is null
+           from public.faturas where id = v_fat);
+
+  -- Restaurar a cobrança apagada com outra fatura no mês: não restaura e avisa a plataforma.
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, asaas_id, ambiente, link)
+  values (v_org, '2030-08-01', v_hoje + 5, '[]', 99.90, 'aberta', 'pay_teste_9', 'producao', 'https://asaas.teste/i/9');
+  insert into resultado (teste, ok) select 'webhook: cobrança restaurada com outra fatura no mês não volta',
+    public.cobranca_evento_asaas('evt_t17', 'PAYMENT_RESTORED', '{"id":"pay_teste_8"}', 'producao')
+      = 'não restaurada: o mês já tem outra fatura';
+
+  -- Destinatários: o atendente da empresa não recebe o aviso; o alerta fica na empresa cobrada, não na F7.
+  insert into public.membros_org (org_id, user_id, papel) values (v_org, '00000000-0000-0000-0000-0000000000b1', 'atendente')
+  on conflict do nothing;
+  update public.perfis set telefone = '5541977776666' where user_id = '00000000-0000-0000-0000-0000000000b1';
+  perform public.cobranca_atrasos();
+  insert into resultado (teste, ok) select 'atraso: aviso só ao dono e aos administradores, gravado na empresa cobrada',
+    (select status = 'suspensa' from public.organizacoes where id = v_org)
+    and not exists (select 1 from public.alertas where telefone = '5541977776666')
+    and not exists (select 1 from public.alertas where texto like '%Livih · Cobrança%' and org_id <> v_org);
+end $$;
+
+insert into resultado (teste, ok) select 'pagamento e atraso: funções internas e eventos fechados para o login',
+  not has_function_privilege('authenticated', 'public.cobranca_evento_asaas(text, text, jsonb, text)', 'execute')
+  and not has_function_privilege('anon', 'public.cobranca_evento_asaas(text, text, jsonb, text)', 'execute')
+  and has_function_privilege('service_role', 'public.cobranca_evento_asaas(text, text, jsonb, text)', 'execute')
+  and not has_function_privilege('authenticated', 'public.cobranca_atrasos()', 'execute')
+  and not has_function_privilege('authenticated', 'public.cobranca_reativar(uuid)', 'execute')
+  and not has_function_privilege('authenticated', 'public.cobranca_fatura_mes_pulado(uuid)', 'execute')
+  and not has_function_privilege('authenticated', 'public.cobranca_avisar(uuid, text, text, text, text, text, text)', 'execute')
+  and not has_function_privilege('authenticated', 'public.cobranca_avisar_plataforma(uuid, text)', 'execute')
+  and not has_table_privilege('authenticated', 'public.asaas_eventos', 'select')
+  and not has_column_privilege('authenticated', 'public.organizacoes', 'motivo_suspensao', 'update');
 reset role;
 select n, teste, ok from resultado order by n;

@@ -20,6 +20,8 @@ export type Organizacao = {
   id: string
   nome: string
   status: string
+  /** Suspensa por 'inadimplencia' (fatura com 10 dias de atraso) ou pela 'plataforma'. */
+  motivo_suspensao?: string | null
   papel: Database['public']['Enums']['papel_org']
   /** Equipe da plataforma dentro de uma empresa da qual não é membro (modo suporte). */
   suporte?: boolean
@@ -35,13 +37,19 @@ const CAMPOS_CONVERSA =
 export async function listarOrganizacoes(userId: string): Promise<Organizacao[]> {
   const { data, error } = await supabase
     .from('membros_org')
-    .select('papel, organizacoes(id, nome, status)')
+    .select('papel, organizacoes(id, nome, status, motivo_suspensao)')
     .eq('user_id', userId)
     .eq('ativo', true)
   if (error) throw error
   return (data ?? [])
     .filter((m) => m.organizacoes)
-    .map((m) => ({ id: m.organizacoes!.id, nome: m.organizacoes!.nome, status: m.organizacoes!.status, papel: m.papel }))
+    .map((m) => ({
+      id: m.organizacoes!.id,
+      nome: m.organizacoes!.nome,
+      status: m.organizacoes!.status,
+      motivo_suspensao: m.organizacoes!.motivo_suspensao,
+      papel: m.papel,
+    }))
     .sort((a, b) => a.nome.localeCompare(b.nome))
 }
 
