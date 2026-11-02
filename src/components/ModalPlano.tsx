@@ -3,6 +3,7 @@ import { moeda } from '../services/formato'
 import { darCortesia, definirPlano, listarPlanos, type ConsumoEmpresa, type Plano } from '../services/plano'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
+import { CobrancaEmpresa } from './CobrancaEmpresa'
 import { DadosCobranca } from './DadosCobranca'
 import { CLASSE_CAMPO, Campo } from './ModaisOs'
 import { Modal } from './Modal'
@@ -152,6 +153,10 @@ export function ModalPlano({ empresa, consumo, aoFechar }: {
 
         <div className="border-t border-borda pt-4">
           <DadosCobranca orgId={empresa.id} podeEditar aoSalvar={() => setMudou(true)} />
+        </div>
+
+        <div className="border-t border-borda pt-4">
+          <CobrancaEmpresa orgId={empresa.id} aoMudar={() => setMudou(true)} />
         </div>
       </div>
     </Modal>

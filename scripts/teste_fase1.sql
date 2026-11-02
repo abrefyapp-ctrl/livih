@@ -4260,5 +4260,222 @@ begin
     (select email = 'novo@cobranca.teste' from public.cobranca_dados(v_org))
     and exists (select 1 from public.dados_cobranca where org_id = v_org);
 end $$;
+
+-- Faturas (migration 20261101150000).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.cobranca')::uuid;
+  v_ant date := (date_trunc('month', now() at time zone 'America/Sao_Paulo')::date - interval '1 month')::date;
+begin
+  update public.organizacoes set plano = 'start', status = 'ativa' where id = v_org;
+  insert into public.organizacao_modulos (org_id, modulo, ativo) values (v_org, 'erp', true);
+  insert into public.atendimentos_agente (org_id, mes, excedente) select v_org, v_ant, true from generate_series(1, 3);
+  insert into public.atendimentos_agente (org_id, mes, excedente) select v_org, v_ant, false from generate_series(1, 10);
+  insert into public.creditos_atendimentos (org_id, mes, tipo, quantidade, valor) values (v_org, v_ant, 'pacote', 100, 29.90);
+
+  insert into public.organizacao_modulos (org_id, modulo, ativo) values (v_org, 'os', true);
+  insert into resultado (teste, ok) select 'faturas: ERP e OS juntos saem por R$ 149',
+    (select count(*) = 1 and min((i ->> 'valor')::numeric) = 149
+       from jsonb_array_elements(public.cobranca_itens(v_org, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date)) i where i ->> 'descricao' like 'Módulo%');
+  delete from public.organizacao_modulos where org_id = v_org and modulo = 'os';
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.cobranca')::uuid;
+  v_fat uuid;
+  f public.faturas;
+begin
+  begin
+    perform public.plataforma_definir_contrato(current_setting('teste.semplano')::uuid, true, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date, null, null);
+    insert into resultado (teste, ok) values ('faturas: sem dados de cobrança não liga a cobrança', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('faturas: sem dados de cobrança não liga a cobrança', sqlerrm like 'Salve os dados de cobrança%');
+  end;
+  begin
+    perform public.plataforma_definir_contrato(v_org, true, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date, 50, ' ');
+    insert into resultado (teste, ok) values ('faturas: valor combinado exige o motivo', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('faturas: valor combinado exige o motivo', sqlerrm like 'Informe o valor combinado%');
+  end;
+
+  perform public.plataforma_definir_contrato(v_org, true, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date + 14, null, null);
+  v_fat := public.plataforma_gerar_fatura(v_org);
+  select * into f from public.faturas where id = v_fat;
+  insert into resultado (teste, ok) select 'faturas: plano, módulo, excedente e pacote do mês anterior numa fatura só',
+    f.valor = 99.90 + 99 + 1.20 + 29.90 and f.status = 'a_enviar' and jsonb_array_length(f.itens) = 4
+    and f.vencimento >= f.competencia + 9 and f.competencia = date_trunc('month', now() at time zone 'America/Sao_Paulo')::date
+    and (select inicio = date_trunc('month', now() at time zone 'America/Sao_Paulo')::date from public.contratos_cobranca where org_id = v_org);
+
+  begin
+    perform public.plataforma_gerar_fatura(v_org);
+    insert into resultado (teste, ok) values ('faturas: uma fatura por mês', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('faturas: uma fatura por mês', sqlerrm like 'A fatura deste mês já existe%');
+  end;
+
+  -- Valor combinado no lugar de plano e módulos (conferido no bloco seguinte); excedente e pacote continuam.
+  perform public.plataforma_definir_contrato(v_org, true, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date, 50, 'Programa Fundadores');
+end $$;
+
+-- Fechamento do mês (cron): F7, sem contrato, nunca é cobrada; quem já tem a fatura do mês não ganha outra;
+-- contrato sem dados de cobrança gera a fatura em erro, para a plataforma ver.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare v_total integer;
+begin
+  insert into resultado (teste, ok) select 'faturas: valor combinado substitui plano e módulos',
+    (select sum((i ->> 'valor')::numeric) = 50 + 1.20 + 29.90
+            and bool_or(i ->> 'descricao' = 'Plano e módulos (valor combinado)')
+            and not bool_or(i ->> 'descricao' = 'Plano Start')
+       from jsonb_array_elements(public.cobranca_itens(current_setting('teste.cobranca')::uuid, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date)) i)
+    and exists (select 1 from public.auditoria where org_id = current_setting('teste.cobranca')::uuid
+                  and acao = 'definir_contrato_cobranca');
+  insert into public.contratos_cobranca (org_id, ativo, inicio) values (current_setting('teste.semplano')::uuid, true, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date);
+  update public.organizacoes set plano = 'essencial' where id = current_setting('teste.semplano')::uuid;
+  v_total := public.cobranca_fechar_mes();
+  insert into resultado (teste, ok) select 'faturas: fechamento cobra só contrato ativo, uma vez por mês',
+    v_total = 1
+    and not exists (select 1 from public.faturas where org_id = current_setting('teste.f7')::uuid)
+    and (select count(*) = 1 from public.faturas where org_id = current_setting('teste.cobranca')::uuid);
+  insert into resultado (teste, ok) select 'faturas: sem dados de cobrança a fatura fica em erro com o motivo',
+    (select status = 'erro' and erro like 'Faltam os dados de cobrança%' from public.faturas
+      where org_id = current_setting('teste.semplano')::uuid);
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f9b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'faturas: dono vê as faturas e o contrato da própria empresa',
+  exists (select 1 from public.faturas where org_id = current_setting('teste.cobranca')::uuid)
+  and exists (select 1 from public.contratos_cobranca where org_id = current_setting('teste.cobranca')::uuid)
+  and not exists (select 1 from public.faturas where org_id <> current_setting('teste.cobranca')::uuid);
+do $$ begin
+  perform public.plataforma_gerar_fatura(current_setting('teste.cobranca')::uuid);
+  insert into resultado (teste, ok) values ('faturas: cliente não gera fatura', false);
+exception when others then
+  insert into resultado (teste, ok) values ('faturas: cliente não gera fatura', sqlerrm like 'Só a equipe da plataforma%');
+end $$;
+do $$ begin
+  perform public.plataforma_definir_contrato(current_setting('teste.cobranca')::uuid, false, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date, 0, 'de graça');
+  insert into resultado (teste, ok) values ('faturas: cliente não muda o contrato', false);
+exception when others then
+  insert into resultado (teste, ok) values ('faturas: cliente não muda o contrato', sqlerrm like 'Só a equipe da plataforma%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'faturas: atendente não vê faturas', not exists (select 1 from public.faturas);
+reset role;
+insert into resultado (teste, ok) select 'faturas: funções internas fechadas para o login',
+  not has_function_privilege('authenticated', 'public.cobranca_fechar_mes()', 'execute')
+  and not has_function_privilege('authenticated', 'public.cobranca_itens(uuid, date)', 'execute')
+  and not has_function_privilege('authenticated', 'public.cobranca_criar_fatura(uuid, date)', 'execute');
+
+-- Faturas: cancelar, tentar de novo, reenvio diário, mínimo, início futuro e virada de ano (revisão de 01/11).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.cobranca')::uuid;
+  v_fat uuid := (select id from public.faturas where org_id = current_setting('teste.cobranca')::uuid and status <> 'cancelada');
+begin
+  perform public.plataforma_cancelar_fatura(v_fat);
+  insert into resultado (teste, ok) select 'faturas: cancelar libera o mês para uma fatura nova',
+    (select status = 'cancelada' from public.faturas where id = v_fat)
+    and public.plataforma_gerar_fatura(v_org) is not null
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'cancelar_fatura');
+  begin
+    perform public.plataforma_cancelar_fatura(v_fat);
+    insert into resultado (teste, ok) values ('faturas: fatura já cancelada não se cancela de novo', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('faturas: fatura já cancelada não se cancela de novo', sqlerrm like 'Esta fatura não pode ser cancelada%');
+  end;
+  begin
+    perform public.plataforma_reenviar_fatura((select id from public.faturas where org_id = v_org and status = 'a_enviar'));
+    insert into resultado (teste, ok) values ('faturas: só tenta de novo a fatura sem link', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('faturas: só tenta de novo a fatura sem link', sqlerrm like 'Só dá para tentar de novo%');
+  end;
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_sem uuid := current_setting('teste.semplano')::uuid;
+  v_cob uuid := current_setting('teste.cobranca')::uuid;
+  v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+  v_fat uuid;
+begin
+  -- Tentar de novo pela plataforma: vencimento acertado e tentativas zeradas.
+  select id into v_fat from public.faturas where org_id = v_sem and status = 'erro';
+  update public.faturas set vencimento = v_hoje - 5, tentativas = 5 where id = v_fat;
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+  perform public.plataforma_reenviar_fatura(v_fat);
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  insert into resultado (teste, ok) select 'faturas: tentar de novo acerta o vencimento e zera as tentativas',
+    (select status = 'a_enviar' and tentativas = 0 and vencimento >= v_hoje + 3 from public.faturas where id = v_fat);
+
+  -- Reenvio diário: presa em "enviando" volta; erro com contrato desligado ou 5 tentativas fica.
+  update public.faturas set status = 'enviando', atualizado_em = now() - interval '2 hours' where id = v_fat;
+  update public.faturas set status = 'erro', tentativas = 1, vencimento = v_hoje - 1
+   where org_id = v_cob and status = 'a_enviar';
+  update public.contratos_cobranca set ativo = false where org_id = v_cob;
+  perform public.cobranca_reenviar();
+  insert into resultado (teste, ok) select 'faturas: reenvio diário solta a presa em "enviando" e respeita o contrato desligado',
+    (select status = 'a_enviar' from public.faturas where id = v_fat)
+    and (select status = 'erro' from public.faturas where org_id = v_cob and status <> 'cancelada');
+  update public.contratos_cobranca set ativo = true where org_id = v_cob;
+  perform public.cobranca_reenviar();
+  insert into resultado (teste, ok) select 'faturas: reenvio diário manda de novo com o vencimento no futuro',
+    (select status = 'a_enviar' and vencimento >= v_hoje + 3 from public.faturas where org_id = v_cob and status <> 'cancelada');
+  update public.faturas set status = 'erro', tentativas = 5 where org_id = v_cob and status = 'a_enviar';
+  perform public.cobranca_reenviar();
+  insert into resultado (teste, ok) select 'faturas: depois de 5 tentativas o reenvio diário para',
+    (select status = 'erro' from public.faturas where org_id = v_cob and status <> 'cancelada');
+
+  -- Virada de ano: a fatura de janeiro leva os atendimentos a mais de dezembro.
+  insert into public.atendimentos_agente (org_id, mes, excedente) values (v_cob, '2026-12-01', true);
+  insert into resultado (teste, ok) select 'faturas: janeiro cobra os atendimentos a mais de dezembro',
+    exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_cob, '2027-01-01')) i
+             where i ->> 'descricao' = 'Atendimentos a mais do agente em 12/2026');
+
+  -- Mínimo do Asaas: valor combinado zero e nada a mais não gera fatura.
+  update public.contratos_cobranca set valor_fixo = 0, motivo_valor = 'cortesia total' where org_id = v_cob;
+  insert into resultado (teste, ok) select 'faturas: valor combinado zero sem extras fica abaixo do mínimo',
+    public.cobranca_criar_fatura(v_cob, '2031-06-01') is null;
+
+  -- Início no mês seguinte: a geração manual recusa.
+  update public.contratos_cobranca set inicio = (date_trunc('month', v_hoje) + interval '1 month')::date where org_id = v_sem;
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+  begin
+    perform public.plataforma_gerar_fatura(v_sem);
+    insert into resultado (teste, ok) values ('faturas: não gera fatura antes do mês de início', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('faturas: não gera fatura antes do mês de início', sqlerrm like 'A primeira fatura desta empresa%');
+  end;
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+
+  -- Empresa suspensa não entra no fechamento.
+  update public.organizacoes set status = 'suspensa' where id = v_cob;
+  update public.faturas set status = 'cancelada' where org_id = v_cob;
+  update public.contratos_cobranca set valor_fixo = null, motivo_valor = null where org_id = v_cob;
+  perform public.cobranca_fechar_mes();
+  insert into resultado (teste, ok) select 'faturas: empresa suspensa não recebe fatura nova',
+    not exists (select 1 from public.faturas where org_id = v_cob and status <> 'cancelada');
+end $$;
+
+-- Dono de empresa suspensa continua vendo as faturas (para conferir e pagar).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f9b1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'faturas: dono de empresa suspensa vê as faturas',
+  exists (select 1 from public.faturas where org_id = current_setting('teste.cobranca')::uuid);
+reset role;
+insert into resultado (teste, ok) select 'faturas: reenvio e vencimento fechados para o login',
+  not has_function_privilege('authenticated', 'public.cobranca_reenviar()', 'execute')
+  and not has_function_privilege('authenticated', 'public.cobranca_vencimento(date)', 'execute');
 reset role;
 select n, teste, ok from resultado order by n;

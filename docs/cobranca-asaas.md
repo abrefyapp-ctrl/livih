@@ -17,6 +17,14 @@ módulos, os pacotes e o excedente de atendimentos. Sem isso, a página de plano
 - **Chaves do Asaas** nos secrets do Supabase: `ASAAS_KEY_SANDBOX` (testes) e `ASAAS_KEY` (produção). Tudo começa no
   sandbox.
 - O pedido de acesso pelo site continua curto: CNPJ e endereço entram quando a empresa é criada.
+- **Multa de 2 % e juros de 1 % ao mês** no atraso, o padrão do mercado.
+
+## Empresas atuais (decidido em 01/11)
+
+- **F7 Tech não é cobrada:** é a dona da Livih. Fica no plano interno, sem fatura.
+- **JoGrampo:** vencimento no dia 10, acesso a todas as funções (ERP e OS ligados), **preço combinado a confirmar pelo
+  usuário na terça (03/11)**, depois de alinhar com o Eduardo.
+- **Programa Fundadores em pausa.** Quem já entrou segue com o combinado; ninguém novo entra por enquanto.
 
 ## Como funciona
 
@@ -51,8 +59,7 @@ módulos, os pacotes e o excedente de atendimentos. Sem isso, a página de plano
 ## Em aberto
 
 - Preço dos módulos (ERP e OS a R$ 99) ainda não está fechado ([planos-modulos.md](planos-modulos.md#decisões-em-aberto)).
-- Quando a cobrança começa para as empresas atuais (JoGrampo e F7), e com que preço combinado.
-- Multa e juros de atraso no Asaas (o padrão do mercado é 2 % de multa e 1 % ao mês).
+- Preço combinado da JoGrampo (terça, 03/11).
 - **CNPJ alfanumérico** (a Receita emite para inscrições novas desde 07/2026): `cnpj_valido`, a tela e as emissoras
   só aceitam números. Corrigir em migration à parte, antes de cobrar clientes novos.
 - **Empresa suspensa por atraso** (entrega 3): o banco já deixa o dono ver e corrigir os dados de cobrança mesmo com a
@@ -64,3 +71,9 @@ módulos, os pacotes e o excedente de atendimentos. Sem isso, a página de plano
   `cobranca_dados` (com a sugestão da emissora) e `cobranca_salvar_dados` (dono ou plataforma), campos no cadastro da
   empresa (opcionais, mas completos se começar), bloco na janela Plano e em Plano e consumo, e o aviso "Faltam os
   dados de cobrança" na tela Empresas.
+- 01/11: entrega 2 feita (migration `20261101150000_faturas`, Edge Function `asaas-cobranca`): preço dos módulos no
+  catálogo (ERP e OS a R$ 99, juntos R$ 149), contrato de cobrança por empresa (ligado, mês da primeira fatura, valor
+  combinado com motivo), faturas com os itens, fechamento no dia 1 às 06:00 e reenvio diário dos erros (cron), cliente
+  e cobrança no Asaas sandbox (multa 2 %, juros 1 % ao mês, o cliente escolhe Pix, boleto ou cartão), bloco Cobrança
+  na janela Plano (com "Gerar a fatura deste mês agora") e Faturas em Plano e consumo. Falta: webhook de pagamento
+  (entrega 3); hoje a fatura fica "A pagar" mesmo depois de paga.

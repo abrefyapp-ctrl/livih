@@ -479,3 +479,7 @@ verify_jwt = false
 # nfse-emitir: nota de serviço (pedido, OS ou avulsa); login, origem visível e "Emite nota fiscal" conferidos dentro.
 [functions.nfse-emitir]
 verify_jwt = false
+
+# asaas-cobranca: envia as faturas da Livih ao Asaas; chamada só pelo banco (x-livih-segredo).
+[functions.asaas-cobranca]
+verify_jwt = false

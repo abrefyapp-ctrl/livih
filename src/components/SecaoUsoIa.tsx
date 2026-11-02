@@ -4,6 +4,7 @@ import { buscarUsoIaDaEmpresa, mesAtual, nomeDoMes, type UsoIaMes } from '../ser
 import { Aviso } from './Aviso'
 import { DadosCobranca } from './DadosCobranca'
 import { EstadoVazio } from './EstadoVazio'
+import { FaturasDaEmpresa } from './FaturasDaEmpresa'
 import { PlanoDaEmpresa } from './PlanoDaEmpresa'
 
 const numero = new Intl.NumberFormat('pt-BR')
@@ -42,6 +43,8 @@ export function SecaoUsoIa() {
   return (
     <div className="space-y-6">
       <PlanoDaEmpresa />
+
+      <FaturasDaEmpresa orgId={orgId} />
 
       <section className="rounded-lg border border-borda bg-superficie p-4">
         <DadosCobranca orgId={orgId} podeEditar={orgAtiva?.papel === 'dono'} />
