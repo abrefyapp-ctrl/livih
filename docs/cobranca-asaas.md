@@ -93,3 +93,6 @@ módulos, os pacotes e o excedente de atendimentos. Sem isso, a página de plano
   pela plataforma não reativa sozinha. Dono e administradores de empresa suspensa por atraso veem as faturas e os dados
   de cobrança na tela de acesso suspenso; a tela Empresas mostra "Suspensa por atraso". Revisado pelo revisor-banco e
   pelo revisor-textos; 627/627 na bateria de testes.
+- 02/11: entrega 3 publicada e testada no sandbox com a empresa Teste: fatura de R$ 49,90 gerada pela janela Plano e
+  paga com o cartão de teste; o `PAYMENT_CONFIRMED` chegou, a fatura virou "Paga" no mesmo segundo e a plataforma
+  recebeu a notificação. Aviso aos 3 dias e suspensão aos 10 só valem em produção (conferidos na bateria de testes).
