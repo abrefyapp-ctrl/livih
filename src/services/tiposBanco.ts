@@ -239,6 +239,48 @@ export type Database = {
           },
         ]
       }
+      atendimentos_agente: {
+        Row: {
+          conversa_id: string | null
+          excedente: boolean
+          id: number
+          iniciado_em: string
+          mes: string
+          org_id: string
+        }
+        Insert: {
+          conversa_id?: string | null
+          excedente?: boolean
+          id?: never
+          iniciado_em?: string
+          mes: string
+          org_id: string
+        }
+        Update: {
+          conversa_id?: string | null
+          excedente?: boolean
+          id?: never
+          iniciado_em?: string
+          mes?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atendimentos_agente_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_agente_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auditoria: {
         Row: {
           acao: string
@@ -277,6 +319,38 @@ export type Database = {
           org_id?: string | null
         }
         Relationships: []
+      }
+      avisos_franquia: {
+        Row: {
+          enviado_em: string
+          limite: number
+          mes: string
+          nivel: number
+          org_id: string
+        }
+        Insert: {
+          enviado_em?: string
+          limite: number
+          mes: string
+          nivel: number
+          org_id: string
+        }
+        Update: {
+          enviado_em?: string
+          limite?: number
+          mes?: string
+          nivel?: number
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avisos_franquia_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       base_conhecimento: {
         Row: {
@@ -830,6 +904,50 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contatos"
             referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      creditos_atendimentos: {
+        Row: {
+          criado_em: string
+          criado_por: string | null
+          id: number
+          mes: string
+          motivo: string | null
+          org_id: string
+          quantidade: number
+          tipo: string
+          valor: number | null
+        }
+        Insert: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: never
+          mes: string
+          motivo?: string | null
+          org_id: string
+          quantidade: number
+          tipo: string
+          valor?: number | null
+        }
+        Update: {
+          criado_em?: string
+          criado_por?: string | null
+          id?: never
+          mes?: string
+          motivo?: string | null
+          org_id?: string
+          quantidade?: number
+          tipo?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creditos_atendimentos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2553,6 +2671,7 @@ export type Database = {
       }
       organizacoes: {
         Row: {
+          ao_passar_franquia: string
           criado_em: string
           id: string
           nome: string
@@ -2561,6 +2680,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          ao_passar_franquia?: string
           criado_em?: string
           id?: string
           nome: string
@@ -2569,6 +2689,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          ao_passar_franquia?: string
           criado_em?: string
           id?: string
           nome?: string
@@ -2576,7 +2697,15 @@ export type Database = {
           slug?: string
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "organizacoes_plano_fkey"
+            columns: ["plano"]
+            isOneToOne: false
+            referencedRelation: "planos"
+            referencedColumns: ["codigo"]
+          },
+        ]
       }
       os_config: {
         Row: {
@@ -3187,6 +3316,45 @@ export type Database = {
           nome?: string | null
           telefone?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      planos: {
+        Row: {
+          atendimentos: number | null
+          codigo: string
+          excedente_preco: number
+          nome: string
+          numeros_whatsapp: number | null
+          ordem: number
+          pacote_atendimentos: number
+          pacote_preco: number
+          preco_anual: number | null
+          preco_mensal: number | null
+        }
+        Insert: {
+          atendimentos?: number | null
+          codigo: string
+          excedente_preco?: number
+          nome: string
+          numeros_whatsapp?: number | null
+          ordem?: number
+          pacote_atendimentos?: number
+          pacote_preco?: number
+          preco_anual?: number | null
+          preco_mensal?: number | null
+        }
+        Update: {
+          atendimentos?: number | null
+          codigo?: string
+          excedente_preco?: number
+          nome?: string
+          numeros_whatsapp?: number | null
+          ordem?: number
+          pacote_atendimentos?: number
+          pacote_preco?: number
+          preco_anual?: number | null
+          preco_mensal?: number | null
         }
         Relationships: []
       }
@@ -3887,6 +4055,10 @@ export type Database = {
         Args: { p_conversa: string; p_documento: string; p_path: string }
         Returns: Json
       }
+      agente_franquia_esgotada: {
+        Args: { p_conversa: string }
+        Returns: boolean
+      }
       agente_horario_valido: { Args: { p: Json }; Returns: boolean }
       agente_identificar_cliente: {
         Args: { p_conversa: string; p_documento: string; p_nome?: string }
@@ -4004,6 +4176,7 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["autor_tipo"]
       }
+      avisar_franquia: { Args: { p_org: string }; Returns: undefined }
       aviso_sistema: {
         Args: { p_conversa: string; p_texto: string }
         Returns: undefined
@@ -4347,6 +4520,19 @@ export type Database = {
           path: string
         }[]
       }
+      franquia_do_mes: {
+        Args: { p_org: string }
+        Returns: {
+          creditos: number
+          escolha: string
+          excedentes: number
+          franquia: number
+          limite: number
+          plano: string
+          plano_nome: string
+          usados: number
+        }[]
+      }
       funil_salvar: {
         Args: {
           p_abertas: Json
@@ -4389,6 +4575,7 @@ export type Database = {
         Args: { p_org: string; p_usuario: string; p_valor: boolean }
         Returns: undefined
       }
+      mes_brasilia: { Args: never; Returns: string }
       meta_guardar_pin: {
         Args: { p_canal: string; p_pin: string }
         Returns: undefined
@@ -4569,9 +4756,46 @@ export type Database = {
           vencimento: string
         }[]
       }
+      plano_comprar_pacote: {
+        Args: { p_limite_atual: number; p_org: string }
+        Returns: number
+      }
+      plano_consumo: {
+        Args: { p_org: string }
+        Returns: {
+          creditos: number
+          escolha: string
+          excedente_preco: number
+          excedentes: number
+          franquia: number
+          limite: number
+          mes: string
+          numeros_whatsapp: number
+          pacote_atendimentos: number
+          pacote_preco: number
+          pacotes_mes: number
+          plano: string
+          plano_nome: string
+          preco_mensal: number
+          usados: number
+          valor_pacotes_mes: number
+        }[]
+      }
+      plano_definir_escolha: {
+        Args: { p_escolha: string; p_org: string }
+        Returns: undefined
+      }
       plataforma_criar_empresa: { Args: { p_nome: string }; Returns: string }
+      plataforma_dar_cortesia: {
+        Args: { p_motivo: string; p_org: string; p_quantidade: number }
+        Returns: undefined
+      }
       plataforma_definir_modulo: {
         Args: { p_ativo: boolean; p_modulo: string; p_org: string }
+        Returns: undefined
+      }
+      plataforma_definir_plano: {
+        Args: { p_org: string; p_plano: string }
         Returns: undefined
       }
       plataforma_definir_status: {
@@ -4594,6 +4818,19 @@ export type Database = {
           slug: string
           status: string
           ultima_mensagem_em: string
+        }[]
+      }
+      plataforma_planos_consumo: {
+        Args: never
+        Returns: {
+          creditos: number
+          escolha: string
+          excedentes: number
+          limite: number
+          org_id: string
+          plano: string
+          plano_nome: string
+          usados: number
         }[]
       }
       pode_acessar_midia: { Args: { p_nome: string }; Returns: boolean }

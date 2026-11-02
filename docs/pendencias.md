@@ -34,7 +34,7 @@ Anotado ao fim da sessão de 28/10, para continuar no dia seguinte. Tirar cada i
   de "Conserto de motores (teste)", baixas e uma transferência; somem quando a Cactos for apagada. Na F7 Tech, abrir o
   Financeiro criou as 7 categorias padrão e a conta Caixa (sem lançamentos).
 - **Planos** ([planos-modulos.md](planos-modulos.md)): núcleo fechado em 29/10, em escada (Essencial R$ 49,90, Start
-  R$ 99,90, Pro R$ 197 e Business R$ 397, com 150/350/750/1.500 atendimentos de 24 h); ao passar da franquia o cliente
+  R$ 99,90, Pro R$ 149,90 e Business R$ 199,90 desde 01/11, com 150/350/500/800 atendimentos de 24 h; anual em "pague 10 e use 12": R$ 499, 999, 1.499 e 1.999); ao passar da franquia o cliente
   escolhe parar ou pagar o excedente (R$ 0,40), e há pacote de 100 a R$ 29,90. ERP e OS sugeridos a R$ 99 com 1 CNPJ e
   100 notas. Falta: fechar o preço dos módulos, usuários no Essencial, conferir a licença do WAHA, contratar o plano
   Start da Focus (perguntar se cancelamento e carta de correção contam como documento), decidir a integração com o

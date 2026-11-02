@@ -10,6 +10,7 @@ import {
   type Empresa,
   type PedidoAcesso,
 } from '../services/plataforma'
+import { buscarConsumoDasEmpresas, type ConsumoEmpresa } from '../services/plano'
 import { buscarUsoIaDoMes, dolar, mesAtual, nomeDoMes, type UsoIaMes } from '../services/usoIa'
 import { useSessao } from '../hooks/useSessao'
 import { Avatar } from '../components/Avatar'
@@ -22,12 +23,14 @@ import { LinkConvite } from '../components/LinkConvite'
 import { Modal } from '../components/Modal'
 import { ModalEmpresa, type ModoEmpresa } from '../components/ModalEmpresa'
 import { ModalModulos } from '../components/ModalModulos'
+import { ModalPlano } from '../components/ModalPlano'
 import { NaoEncontrada } from './NaoEncontrada'
 
 type LinkGerado = { link: string; nome: string; nomeOrg: string; tipo: 'dono' | 'senha' }
 
 const desde = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
+const milhar = new Intl.NumberFormat('pt-BR')
 
 /** Painel da equipe F7: empresas clientes, acesso do dono, suspender/reativar e pedidos vindos do site. */
 export function Empresas() {
@@ -44,13 +47,19 @@ export function Empresas() {
     }
     navegar('/conversas')
   }
-  const [dados, setDados] = useState<{ empresas: Empresa[]; pedidos: PedidoAcesso[]; uso: Map<string, UsoIaMes> } | null>(null)
+  const [dados, setDados] = useState<{
+    empresas: Empresa[]
+    pedidos: PedidoAcesso[]
+    uso: Map<string, UsoIaMes>
+    planos: Map<string, ConsumoEmpresa>
+  } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
   const [busca, setBusca] = useState('')
   const [modal, setModal] = useState<ModoEmpresa | null>(null)
   const [suspender, setSuspender] = useState<Empresa | null>(null)
   const [modulosDe, setModulosDe] = useState<Empresa | null>(null)
+  const [planoDe, setPlanoDe] = useState<Empresa | null>(null)
   const [recusar, setRecusar] = useState<PedidoAcesso | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [linkGerado, setLinkGerado] = useState<LinkGerado | null>(null)
@@ -58,11 +67,16 @@ export function Empresas() {
   useEffect(() => {
     if (!adminPlataforma) return
     let ativo = true
-    // O uso de IA é complementar: se falhar, a lista de empresas aparece mesmo assim.
-    Promise.all([listarEmpresas(), listarPedidosPendentes(), buscarUsoIaDoMes().catch(() => new Map<string, UsoIaMes>())])
-      .then(([empresas, pedidos, uso]) => {
+    // O uso de IA e o consumo do plano são complementares: se falharem, a lista de empresas aparece mesmo assim.
+    Promise.all([
+      listarEmpresas(),
+      listarPedidosPendentes(),
+      buscarUsoIaDoMes().catch(() => new Map<string, UsoIaMes>()),
+      buscarConsumoDasEmpresas().catch(() => new Map<string, ConsumoEmpresa>()),
+    ])
+      .then(([empresas, pedidos, uso, planos]) => {
         if (!ativo) return
-        setDados({ empresas, pedidos, uso })
+        setDados({ empresas, pedidos, uso, planos })
         setErro(null)
       })
       .catch(() => ativo && setErro('Não foi possível carregar as empresas.'))
@@ -254,9 +268,10 @@ export function Empresas() {
                       {e.ultima_mensagem_em && ` · última ${haQuanto(e.ultima_mensagem_em)}`}
                     </p>
                     <UsoIaEmpresa uso={dados?.uso.get(e.id)} />
+                    <PlanoEmpresa consumo={dados?.planos.get(e.id)} />
                   </div>
 
-                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <div className="flex flex-wrap gap-2 lg:max-w-80 lg:justify-end">
                     <Botao tamanho="sm" icone="olho" onClick={() => acessar(e)} title="Abrir a empresa em modo suporte">
                       Acessar
                     </Botao>
@@ -265,6 +280,9 @@ export function Empresas() {
                     </Botao>
                     <Botao tamanho="sm" variante="secundario" icone="painel" onClick={() => setModulosDe(e)}>
                       Módulos
+                    </Botao>
+                    <Botao tamanho="sm" variante="secundario" onClick={() => setPlanoDe(e)}>
+                      Plano
                     </Botao>
                     {suspensa ? (
                       <Botao tamanho="sm" variante="secundario" onClick={() => void mudarStatus(e, 'ativa')} disabled={ocupado === e.id}>
@@ -284,6 +302,17 @@ export function Empresas() {
       </div>
 
       {modulosDe && <ModalModulos empresa={modulosDe} aoFechar={() => setModulosDe(null)} />}
+
+      {planoDe && (
+        <ModalPlano
+          empresa={planoDe}
+          consumo={dados?.planos.get(planoDe.id)}
+          aoFechar={(mudou) => {
+            setPlanoDe(null)
+            if (mudou) recarregar()
+          }}
+        />
+      )}
 
       {modal && (
         <ModalEmpresa
@@ -333,6 +362,21 @@ export function Empresas() {
         O pedido da {recusar?.empresa} sai da lista. Ninguém é avisado automaticamente.
       </DialogoConfirmacao>
     </div>
+  )
+}
+
+// Plano e atendimentos do agente no mês, na linha da empresa (destaque a partir de 80 %).
+function PlanoEmpresa({ consumo }: { consumo: ConsumoEmpresa | undefined }) {
+  if (!consumo) return null
+  if (consumo.limite == null) return <p className="text-legenda text-texto-3">Sem plano (sem limite)</p>
+  const usados = consumo.usados ?? 0
+  const cor = usados >= consumo.limite ? 'text-erro' : usados * 100 >= consumo.limite * 80 ? 'text-atencao' : 'text-texto-3'
+  return (
+    <p className={`text-legenda ${cor}`}>
+      Plano {consumo.plano_nome}: {milhar.format(usados)} de {milhar.format(consumo.limite)} atendimentos
+      {!!consumo.excedentes && ` · ${milhar.format(consumo.excedentes)} a mais`}
+      {usados >= consumo.limite && (consumo.escolha === 'parar' ? ' · conversas novas com a equipe' : ' · excedente a cobrar')}
+    </p>
   )
 }
 

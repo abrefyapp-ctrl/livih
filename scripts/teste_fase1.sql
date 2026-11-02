@@ -3859,5 +3859,243 @@ begin
     (select count(*) = 1 and min(valor) = 80 and min(vencimento) = '2026-10-15' and bool_and(observacao like 'A nota não trouxe as parcelas%')
        from public.fin_lancamentos where nota_entrada_id = (r2 ->> 'nota_id')::uuid);
 end $$;
+
+-- Planos e franquia de atendimentos do agente (migration 20261101120000).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_a1 uuid := '00000000-0000-0000-0000-0000000000a1';
+  v_canal uuid;
+  r jsonb;
+  v_conv1 uuid;
+  v_msg uuid;
+  v_alertas integer;
+  v_ok boolean;
+begin
+  insert into resultado (teste, ok) select 'franquia: empresa existente fica no plano interno, sem limite',
+    (select limite is null and plano = 'interno' from public.franquia_do_mes(current_setting('teste.cli')::uuid));
+
+  -- Canal e agente próprios, para não depender do estado deixado pelos blocos anteriores.
+  insert into public.canais (org_id, nome, telefone, instance_id) values (v_org, 'WhatsApp franquia', '5541999997777', 'INST-FRANQUIA')
+  returning id into v_canal;
+  insert into public.agentes (org_id, canal_id, ativo, prompt) values (v_org, v_canal, true, 'prompt');
+  update public.perfis set telefone = '5541999990001' where user_id = v_a1;
+  update public.organizacoes set plano = 'essencial', ao_passar_franquia = 'parar' where id = v_org;
+  delete from public.atendimentos_agente where org_id = v_org;
+  delete from public.creditos_atendimentos where org_id = v_org;
+  insert into public.atendimentos_agente (org_id, mes) select v_org, public.mes_brasilia() from generate_series(1, 119);
+
+  -- Primeira resposta numa conversa: um atendimento; a segunda, na mesma conversa, não conta de novo.
+  r := public.registrar_entrada(v_canal, 'FRANQ-1', '5541977770001', null, 'Cliente Franquia 1', 'texto', 'Oi', '{}');
+  v_conv1 := (r ->> 'conversa_id')::uuid;
+  v_msg := (r ->> 'mensagem_id')::uuid;
+  select count(*) into v_alertas from public.alertas where org_id = v_org;
+  insert into resultado (teste, ok) select 'franquia: abaixo do limite o agente responde', public.agente_deve_responder(v_conv1, v_msg);
+  perform public.agente_responder(v_conv1, 'Olá!', v_msg);
+  perform public.agente_responder(v_conv1, 'Em que posso ajudar?', v_msg);
+  insert into resultado (teste, ok) select 'franquia: duas mensagens do agente na mesma conversa contam 1 atendimento',
+    (select usados = 120 and limite = 150 from public.franquia_do_mes(v_org))
+    and (select count(*) = 1 from public.atendimentos_agente where conversa_id = v_conv1);
+  insert into resultado (teste, ok) select 'franquia: aos 80 % o dono é avisado no WhatsApp, uma vez só',
+    (select count(*) = 1 from public.avisos_franquia where org_id = v_org and nivel = 80 and limite = 150)
+    and (select count(*) from public.alertas where org_id = v_org) > v_alertas
+    and exists (select 1 from public.alertas where org_id = v_org and texto like '%80 \% usados%' and texto like '%120 de 150%');
+
+  -- Chega a 100 %: aviso e, na conversa seguinte, o agente passa para a equipe.
+  insert into public.atendimentos_agente (org_id, mes) select v_org, public.mes_brasilia() from generate_series(1, 29);
+  r := public.registrar_entrada(v_canal, 'FRANQ-2', '5541977770002', null, 'Cliente Franquia 2', 'texto', 'Oi', '{}');
+  perform public.agente_responder((r ->> 'conversa_id')::uuid, 'Olá!', (r ->> 'mensagem_id')::uuid);
+  insert into resultado (teste, ok) select 'franquia: aos 100 % sai o aviso de que acabaram',
+    (select usados = 150 from public.franquia_do_mes(v_org))
+    and exists (select 1 from public.alertas where org_id = v_org and texto like '%acabaram%' and texto like '%conversas novas vão para a equipe%');
+
+  r := public.registrar_entrada(v_canal, 'FRANQ-3', '5541977770003', null, 'Cliente Franquia 3', 'texto', 'Oi', '{}');
+  v_ok := not public.agente_deve_responder((r ->> 'conversa_id')::uuid, (r ->> 'mensagem_id')::uuid);
+  insert into resultado (teste, ok) select 'franquia: no limite com "parar", conversa nova vai para a equipe com o motivo',
+    v_ok
+    and exists (select 1 from public.conversas where id = (r ->> 'conversa_id')::uuid
+                  and estado = 'aguardando_humano' and motivo_humano like 'Os atendimentos do agente deste mês acabaram%')
+    and (select usados = 150 from public.franquia_do_mes(v_org));
+
+  r := public.registrar_entrada(v_canal, 'FRANQ-1B', '5541977770001', null, 'Cliente Franquia 1', 'texto', 'E o preço?', '{}');
+  insert into resultado (teste, ok) select 'franquia: atendimento já começado segue nas 24 h, mesmo no limite',
+    public.agente_deve_responder(v_conv1, (r ->> 'mensagem_id')::uuid);
+
+  -- Atendimento de mais de 24 h atrás: a próxima resposta é um atendimento novo.
+  update public.atendimentos_agente set iniciado_em = now() - interval '25 hours' where conversa_id = v_conv1;
+  insert into resultado (teste, ok) select 'franquia: depois de 24 h a mesma conversa começa outro atendimento',
+    not public.agente_deve_responder(v_conv1, (r ->> 'mensagem_id')::uuid);
+
+  -- "Continuar": o agente segue e o atendimento entra como excedente.
+  update public.organizacoes set ao_passar_franquia = 'continuar' where id = v_org;
+  r := public.registrar_entrada(v_canal, 'FRANQ-4', '5541977770004', null, 'Cliente Franquia 4', 'texto', 'Oi', '{}');
+  insert into resultado (teste, ok) select 'franquia: com "continuar" o agente segue no limite',
+    public.agente_deve_responder((r ->> 'conversa_id')::uuid, (r ->> 'mensagem_id')::uuid);
+  perform public.agente_responder((r ->> 'conversa_id')::uuid, 'Olá!', (r ->> 'mensagem_id')::uuid);
+  insert into resultado (teste, ok) select 'franquia: atendimento além do limite com "continuar" é excedente',
+    (select usados = 151 and excedentes = 1 from public.franquia_do_mes(v_org));
+
+  r := public.registrar_entrada(v_canal, 'FRANQ-5', '5541977770005', null, 'Cliente Franquia 5', 'texto', 'Oi', '{}');
+  perform public.enfileirar_saida((r ->> 'conversa_id')::uuid, 'Resposta da equipe', 'atendente', '00000000-0000-0000-0000-0000000000b1');
+  insert into resultado (teste, ok) select 'franquia: mensagem da equipe não conta atendimento',
+    not exists (select 1 from public.atendimentos_agente where conversa_id = (r ->> 'conversa_id')::uuid);
+
+  -- Troca de plano no meio do mês com o consumo já acima do limite: o aviso de 100 % sai na troca.
+  delete from public.atendimentos_agente where org_id = v_org;
+  delete from public.avisos_franquia where org_id = v_org;
+  update public.organizacoes set plano = 'interno', ao_passar_franquia = 'parar' where id = v_org;
+  insert into public.atendimentos_agente (org_id, mes) select v_org, public.mes_brasilia() from generate_series(1, 160);
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+  perform public.plataforma_definir_plano(v_org, 'essencial');
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  insert into resultado (teste, ok) select 'franquia: trocar para um plano já estourado avisa o dono na hora',
+    exists (select 1 from public.avisos_franquia where org_id = v_org and nivel = 100 and limite = 150)
+    and exists (select 1 from public.alertas where org_id = v_org and texto like '%Sua empresa usou os 150 atendimentos%');
+
+  -- Administrador que não é dono (d1): vê o plano, não escolhe nem compra.
+  insert into auth.users (id, email, raw_user_meta_data)
+  values ('00000000-0000-0000-0000-00000000f9a1', 'admin-plano@f7.teste', '{"nome":"Dora"}');
+  insert into public.membros_org (org_id, user_id, papel) values (v_org, '00000000-0000-0000-0000-00000000f9a1', 'admin');
+
+  insert into resultado (teste, ok) select 'franquia: números dos avisos com ponto de milhar',
+    public.numero_br(1500) = '1.500' and public.numero_br(150) = '150' and public.numero_br(0) = '0';
+
+  insert into resultado (teste, ok) select 'franquia: usuário logado não chama as funções internas',
+    not has_function_privilege('authenticated', 'public.franquia_do_mes(uuid)', 'execute')
+    and not has_function_privilege('authenticated', 'public.agente_franquia_esgotada(uuid)', 'execute')
+    and not has_function_privilege('authenticated', 'public.avisar_franquia(uuid)', 'execute');
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.plano_consumo(current_setting('teste.f7')::uuid);
+  insert into resultado (teste, ok) values ('franquia: atendente não vê o plano', false);
+exception when others then
+  insert into resultado (teste, ok) values ('franquia: atendente não vê o plano', sqlerrm like 'Só o dono e os administradores%');
+end $$;
+do $$ begin
+  perform public.plano_definir_escolha(current_setting('teste.f7')::uuid, 'continuar');
+  insert into resultado (teste, ok) values ('franquia: atendente não escolhe parar ou continuar', false);
+exception when others then
+  insert into resultado (teste, ok) values ('franquia: atendente não escolhe parar ou continuar', sqlerrm like 'Só o dono%');
+end $$;
+insert into resultado (teste, ok) select 'franquia: atendente não lê atendimentos nem créditos',
+  not exists (select 1 from public.atendimentos_agente) and not exists (select 1 from public.creditos_atendimentos);
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'franquia: outra empresa não lê atendimentos nem créditos da F7',
+  not exists (select 1 from public.atendimentos_agente where org_id = current_setting('teste.f7')::uuid)
+  and not exists (select 1 from public.creditos_atendimentos where org_id = current_setting('teste.f7')::uuid);
+do $$ begin
+  perform public.plataforma_planos_consumo();
+  insert into resultado (teste, ok) values ('franquia: cliente não vê o consumo das empresas', false);
+exception when others then
+  insert into resultado (teste, ok) values ('franquia: cliente não vê o consumo das empresas', sqlerrm like 'só a equipe da plataforma%');
+end $$;
+do $$ begin
+  perform public.plataforma_dar_cortesia(current_setting('teste.cli')::uuid, 100, 'para mim');
+  insert into resultado (teste, ok) values ('franquia: cliente não dá cortesia a si mesmo', false);
+exception when others then
+  insert into resultado (teste, ok) values ('franquia: cliente não dá cortesia a si mesmo', sqlerrm like 'só a equipe da plataforma%');
+end $$;
+do $$ begin
+  perform public.plano_comprar_pacote(current_setting('teste.f7')::uuid, 150);
+  insert into resultado (teste, ok) values ('franquia: dono de outra empresa não compra pacote', false);
+exception when others then
+  insert into resultado (teste, ok) values ('franquia: dono de outra empresa não compra pacote', sqlerrm like 'Só o dono%');
+end $$;
+do $$ begin
+  perform public.plataforma_definir_plano(current_setting('teste.f7')::uuid, 'business');
+  insert into resultado (teste, ok) values ('franquia: só a plataforma define o plano', false);
+exception when others then
+  insert into resultado (teste, ok) values ('franquia: só a plataforma define o plano', sqlerrm like 'só a equipe da plataforma%');
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000f9a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  insert into resultado (teste, ok) select 'franquia: administrador vê o plano',
+    (select limite = 150 from public.plano_consumo(v_org));
+  begin
+    perform public.plano_definir_escolha(v_org, 'continuar');
+    insert into resultado (teste, ok) values ('franquia: administrador não muda a escolha', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('franquia: administrador não muda a escolha', sqlerrm like 'Só o dono%');
+  end;
+  begin
+    perform public.plano_comprar_pacote(v_org, 150);
+    insert into resultado (teste, ok) values ('franquia: administrador não compra pacote', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('franquia: administrador não compra pacote', sqlerrm like 'Só o dono%');
+  end;
+end $$;
+
+-- Dono da F7 de teste (a1, também da plataforma).
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_limite integer;
+  c record;
+begin
+  perform public.plano_definir_escolha(v_org, 'continuar');
+  select * into c from public.plano_consumo(v_org);
+  insert into resultado (teste, ok) select 'franquia: dono vê o plano e muda a escolha',
+    c.plano_nome = 'Essencial' and c.limite = 150 and c.usados = 160 and c.escolha = 'continuar' and c.pacote_preco = 29.90
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'definir_escolha_franquia');
+
+  v_limite := public.plano_comprar_pacote(v_org, 150);
+  insert into resultado (teste, ok) select 'franquia: pacote soma 100 ao limite do mês e entra para cobrar',
+    v_limite = 250
+    and (select pacotes_mes = 1 and valor_pacotes_mes = 29.90 from public.plano_consumo(v_org));
+  begin
+    perform public.plano_comprar_pacote(v_org, 150);
+    insert into resultado (teste, ok) values ('franquia: clique duplo não compra o segundo pacote', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('franquia: clique duplo não compra o segundo pacote', sqlerrm like 'O limite do mês mudou%');
+  end;
+  begin
+    perform public.plano_definir_escolha(v_org, 'talvez');
+    insert into resultado (teste, ok) values ('franquia: escolha inválida é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('franquia: escolha inválida é recusada', sqlerrm like 'Escolha parar ou continuar%');
+  end;
+  begin
+    perform public.plataforma_definir_plano(v_org, 'diamante');
+    insert into resultado (teste, ok) values ('franquia: plano inexistente é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('franquia: plano inexistente é recusado', sqlerrm like 'plano inexistente%');
+  end;
+
+  perform public.plataforma_dar_cortesia(v_org, 50, 'Teste de cortesia');
+  insert into resultado (teste, ok) select 'franquia: cortesia da plataforma soma no limite e aparece na lista',
+    (select limite = 300 and creditos = 150 and plano = 'essencial' from public.plataforma_planos_consumo() where org_id = v_org);
+
+  -- Empresa nova (a1 dono), ainda no plano interno.
+  perform set_config('teste.semplano', public.criar_organizacao('Sem Plano', 'teste-sem-plano')::text, true);
+  begin
+    perform public.plano_comprar_pacote(current_setting('teste.semplano')::uuid, null);
+    insert into resultado (teste, ok) values ('franquia: sem plano com franquia não há pacote', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('franquia: sem plano com franquia não há pacote', sqlerrm like 'A sua empresa ainda não tem um plano%');
+  end;
+
+  begin
+    perform public.plataforma_dar_cortesia(v_org, 10, '  ');
+    insert into resultado (teste, ok) values ('franquia: cortesia sem motivo é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('franquia: cortesia sem motivo é recusada', sqlerrm like 'Informe o motivo%');
+  end;
+
+  perform public.plataforma_definir_plano(v_org, 'start');
+  insert into resultado (teste, ok) select 'franquia: plataforma troca o plano e fica registrado',
+    (select limite = 500 from public.plano_consumo(v_org))
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'definir_plano');
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

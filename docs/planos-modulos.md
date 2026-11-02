@@ -29,6 +29,23 @@ cada um com a sua nota fiscal incluída).
 - **franquias menores**: as de 28/10 eram grandes para o agente nunca parar sem susto; com a escolha do cliente, isso
   deixou de ser preciso. Com R$ 0,20 por atendimento, o Start de 1.000 daria prejuízo com a franquia cheia.
 
+**Decidido em 01/11:**
+- **Pro a R$ 149,90 e Business a R$ 199,90** (eram R$ 197 e R$ 397). A escada deixa de dobrar: do Start para cima,
+  cada plano custa R$ 50 a mais.
+- **Franquias do Pro e do Business menores: 500 e 800 atendimentos** (eram 750 e 1.500). Com as antigas e os preços
+  novos, a franquia cheia a R$ 0,20 dava prejuízo (~R$ 25 no Pro e ~R$ 133 no Business); com as novas, nenhum plano
+  dá prejuízo.
+- **Nenhum plano inclui ERP ou OS.** Incluir um módulo no Start foi pensado e descartado: a Focus custa ~R$ 40 por
+  CNPJ, use o cliente ou não, e quem não emite nota pagaria por quem emite. Os módulos seguem à parte, do Start para
+  cima, e os dois juntos no mesmo CNPJ saem com desconto (seção de preços).
+- **Programa Fundadores:** deixa de ter preço próprio; fica o preço de tabela travado por 12 meses, com o ERP sem
+  custo.
+- **Plano anual: pague 10 meses e use 12**, no núcleo e nos módulos (seção de preços).
+- **Teste grátis de 30 dias no Start**, com o ERP e as OS liberados para testar.
+- **Cancelamento do anual:** devolução integral até 7 dias depois do primeiro pagamento; depois, devolve o pago menos
+  os meses usados a preço mensal ([site-planos.md](site-planos.md)).
+- **Preços no site só depois da cobrança pronta** (passo 6).
+
 Por que o agente não é módulo:
 - **É o diferencial.** Sem ele, a Livih é mais um CRM de WhatsApp contra concorrentes com anos de mercado. O
   posicionamento de 20/10 é "controle comercial", e é o agente que entrega esse controle sem a equipe trabalhar a mais
@@ -80,8 +97,9 @@ dela, acontece o que ele escolheu.
 
 - **O modelo de IA não muda:** segue o gpt-5-mini em todo plano. Trocar por um modelo mais barato ao passar da
   franquia foi pensado e deixado de lado por enquanto (um modelo menor erra mais nas ferramentas).
-- **Franquias: 150, 350, 750 e 1.500 atendimentos por mês** (Essencial, Start, Pro e Business; 29/10). As de 28/10
-  (1.000, 2.000 e 3.000) foram feitas para o agente nunca parar; com a escolha do cliente, ficaram grandes demais.
+- **Franquias: 150, 350, 500 e 800 atendimentos por mês** (Essencial, Start, Pro e Business; 29/10, com o Pro e o
+  Business revistos em 01/11). As de 28/10 (1.000, 2.000 e 3.000) foram feitas para o agente nunca parar; com a
+  escolha do cliente, ficaram grandes demais.
 - **O que conta: o atendimento de 24 h.** Um atendimento começa quando o agente responde numa conversa em que não
   respondia havia mais de 24 h; tudo o que ele responde nas 24 h seguintes é o mesmo atendimento. Para o cliente: "cada
   vez que alguém puxa assunto e o agente atende, conta um atendimento". Escolhido no lugar de "conversa no mês" porque
@@ -109,7 +127,7 @@ dela, acontece o que ele escolheu.
   cobrança separada (sem uma segunda taxa de cobrança).
 - **Créditos de cortesia:** a plataforma ainda pode acrescentar atendimentos ao mês de uma empresa na tela Empresas.
 
-## Preços (núcleo em escada decidido em 29/10; módulos sugeridos em 28/10)
+## Preços (núcleo em escada decidido em 29/10 e revisto em 01/11; módulos sugeridos em 28/10)
 
 ### Núcleo
 
@@ -117,22 +135,24 @@ dela, acontece o que ele escolheu.
 |---|---|---|---|---|---|---|
 | **Essencial** | **R$ 49,90** | 1 | 150 | R$ 30 | ~R$ 10 | — |
 | **Start** | **R$ 99,90** | 2 | 350 | R$ 70 | ~R$ 12 | ~275 atendimentos no Essencial |
-| **Pro** | **R$ 197** | 3 | 750 | R$ 150 | ~R$ 14 | ~590 no Start |
-| **Business** | **R$ 397** | 5 | 1.500 | R$ 300 | ~R$ 33 | ~1.250 no Pro |
+| **Pro** | **R$ 149,90** | 3 | 500 | R$ 100 | ~R$ 25 | ~475 no Start |
+| **Business** | **R$ 199,90** | 5 | 800 | R$ 160 | ~R$ 7 | ~625 no Pro |
 | Acima disso | sob consulta | 10 ou mais | a combinar | | | |
 
 - **Pior caso:** franquia inteira usada, R$ 0,20 por atendimento, Anexo V (15,5 %) e ~R$ 2 de taxa de cobrança. No
-  uso comum (30 % da franquia) a sobra é bem maior (no Essencial, ~R$ 31); com o custo de R$ 0,11, quase dobra.
-- **Cada plano custa o dobro do anterior**, e o cliente passa a ganhar com o de cima quando o excedente (R$ 0,40)
-  alcança a diferença de preço.
+  uso comum (30 % da franquia) a sobra é bem maior (Essencial ~R$ 31, Start ~R$ 61, Pro ~R$ 95 e Business ~R$ 119);
+  com o custo de R$ 0,11, quase dobra.
+- **Do Essencial para o Start o preço dobra; do Start para cima, sobe R$ 50 por plano** (01/11). O cliente passa a
+  ganhar com o de cima quando o excedente (R$ 0,40) alcança a diferença de preço.
 - **Essencial:** sem ERP nem OS; implantação feita pelo próprio cliente (conectar o WhatsApp, importar o catálogo,
   orientador) ou cobrada à parte. Com ~R$ 31 de sobra por mês no uso comum, duas horas de suporte comem meses de
   margem.
 - **Histórico:** 20/10 era Start, Pro e Business a R$ 149, 299 e 599 (500, 1.200 e 3.000 conversas); 28/10, a
-  R$ 197, 397 e 697 (1.000, 2.000 e 3.000 atendimentos). O plano de entrada foi pensado a R$ 39,90 com 100
+  R$ 197, 397 e 697 (1.000, 2.000 e 3.000 atendimentos); 29/10, Pro a R$ 197 e Business a R$ 397. O plano de entrada foi pensado a R$ 39,90 com 100
   atendimentos; R$ 49,90 com 150 deixa a mesma folga no pior caso e 50 % a mais de franquia.
-- **Programa Fundadores** (R$ 149 com o que é do Pro e R$ 249 com o que é do Business) continua com desconto sobre a
-  escada.
+- **Programa Fundadores:** era R$ 149 com o que é do Pro e R$ 249 com o que é do Business; com os preços de 01/11,
+  deixou de ter desconto (o Business de tabela ficou mais barato). Passa a ser o preço de tabela travado por 12 meses,
+  com o ERP sem custo.
 
 ### Custos fixos (29/10)
 
@@ -154,14 +174,49 @@ ter custo.
 |---|---|---|---|
 | **ERP** (pedidos, estoque, entrada por nota, NF-e), com 1 CNPJ e 100 notas por mês | **R$ 99/mês** | ~R$ 39,90 | ~R$ 59 |
 | **Ordens de serviço** (OS, etapas, PDF, NFS-e), com 1 CNPJ e 100 notas por mês | **R$ 99/mês** | ~R$ 39,90 | ~R$ 59 |
+| **ERP e OS juntos** no mesmo CNPJ, com 100 notas por mês (01/11) | **R$ 149/mês** | ~R$ 39,90 | ~R$ 109 |
 | CNPJ adicional | **R$ 49/mês** | R$ 39,90 | ~R$ 9 |
 | Nota além das 100 por CNPJ | **R$ 0,20** | R$ 0,11 | R$ 0,09 |
+
+Os módulos podem ser contratados do Start para cima; o Essencial não tem ERP nem OS. Os dois juntos têm desconto
+porque a Focus cobra o CNPJ uma vez só, emita ele NF-e, NFS-e ou as duas.
 
 Exemplo: a JoGrampo (2 CNPJs) no Start com o ERP pagaria R$ 99,90 + 99 + 49 = R$ 247,90. Como é do Programa Fundadores,
 o ERP segue sem custo para ela.
 
 A primeira sugestão (ERP e OS a R$ 79 com a nota incluída) foi revista ao ver o custo da Focus: um cliente com 2 CNPJs
 custaria ~R$ 80 só de Focus. O CNPJ adicional só cobre a Focus, de propósito, para não espantar quem tem vários CNPJs.
+
+### Mensal e anual (01/11)
+
+O anual é **"pague 10 meses e use 12"** (~17 % de desconto): o formato mais comum nos sistemas por assinatura, fácil
+de explicar e com valores redondos.
+
+| Plano | Mensal | Anual | Por mês no anual | Economia no ano |
+|---|---|---|---|---|
+| Essencial | R$ 49,90 | **R$ 499** | R$ 41,58 | R$ 99,80 |
+| Start | R$ 99,90 | **R$ 999** | R$ 83,25 | R$ 199,80 |
+| Pro | R$ 149,90 | **R$ 1.499** | R$ 124,92 | R$ 299,80 |
+| Business | R$ 199,90 | **R$ 1.999** | R$ 166,58 | R$ 399,80 |
+
+| Módulo | Mensal | Anual |
+|---|---|---|
+| ERP ou OS | R$ 99 | **R$ 990** |
+| ERP e OS juntos | R$ 149 | **R$ 1.490** |
+| CNPJ adicional | R$ 49 | **R$ 490** |
+
+- **Pior caso no anual** (franquia cheia todo mês, R$ 0,20 por atendimento, Anexo V e uma taxa de cobrança só no ano):
+  sobram ~R$ 5 no Essencial, ~R$ 0 no Start e ~R$ 5 no Pro; o **Business fica ~R$ 19 negativo** por mês. Com o custo
+  real de outubro (~R$ 0,11), sobram ~R$ 50 no Business. Risco aceito: um desconto menor não resolve (o Business
+  mensal já sobra só ~R$ 7 no pior caso), e usar os 800 atendimentos todo mês é raro (a JoGrampo fez 78 em outubro).
+- **O excedente e os pacotes seguem mensais** também no anual: o cliente que pagou o ano não espera 12 meses para
+  pagar o que passou da franquia. Cobrar num Pix ou boleto à parte no mês, ou deixar o cliente anual só com pacotes
+  comprados antes (em aberto).
+- **Formas de pagamento (Asaas):** mensal no cartão recorrente (menos inadimplência) ou Pix/boleto todo mês; anual
+  no Pix ou boleto à vista, ou no cartão parcelado. Antes de oferecer parcelado sem juros, conferir a taxa do Asaas
+  para parcelamento e antecipação, que sai do desconto.
+- **Troca de plano no anual:** subir pode a qualquer momento, pagando a diferença dos meses que faltam; descer, só na
+  renovação.
 
 ### Custo da Focus (plano Start, que o usuário pensa em contratar, 28/10)
 
@@ -224,8 +279,8 @@ Exemplos citados: Chat Inteligente/Clint ~R$ 149, Wati ~R$ 369 (US$ 69), SleekFl
 
 O agente da Livih já faz o que a faixa intermediária promete (áudio, base, PDF, status de pedido e de OS) e vai além
 (monta e envia o orçamento, identifica produto por foto, CRM e funil próprios). Na escada de 29/10, o Essencial
-(R$ 49,90) e o Start (R$ 99,90) ficam abaixo da faixa básica entregando o intermediário, e o Business (R$ 397) fica no
-começo da intermediária. Antes de anunciar, conferir nas páginas de cada concorrente o que entra no plano de
+(R$ 49,90) e o Start (R$ 99,90) ficam abaixo da faixa básica entregando o intermediário; o Pro (R$ 149,90) e o
+Business (R$ 199,90) ficam na faixa básica (01/11). Antes de anunciar, conferir nas páginas de cada concorrente o que entra no plano de
 entrada (números, usuários, IA inclusa ou à parte, taxas da Meta).
 
 ## Vender uma parte sozinha
@@ -255,7 +310,8 @@ já estava no radar das [pendências](pendencias.md) desde 10/10.
 Em ordem; cada passo é uma entrega com o seu arquivo em `docs/` quando for construído.
 
 1. **Decidir o modelo** (sem código): fechar as decisões em aberto abaixo e os preços.
-2. **Planos e franquia no banco**: o plano de cada empresa (nível do núcleo, números de WhatsApp e franquia de
+2. **Feito em 01/11 (com o passo 5), migration `20261101120000_planos_franquia`; ver "Franquia construída" abaixo.**
+   **Planos e franquia no banco**: o plano de cada empresa (nível do núcleo, números de WhatsApp e franquia de
    atendimentos), a contagem de atendimentos do agente no mês, os pacotes e créditos, a escolha do cliente ao passar
    (parar ou continuar), o excedente do mês e os avisos ao cliente e à plataforma em 80 % e 100 %. Na tela Empresas, a
    plataforma escolhe o plano, vê o consumo e acrescenta créditos de cortesia. O agente só muda para parar quando o
@@ -263,19 +319,56 @@ Em ordem; cada passo é uma entrega com o seu arquivo em `docs/` quando for cons
 3. **Nota fiscal dentro do ERP e das OS**: políticas e Edge Functions de nota (`nfe-config`, `nfe-emitir`,
    `nfse-emitir`) exigem o ERP ou as OS ligados; o botão de nota some sem eles. Quem já emite tem os módulos ligados.
 4. **Limite de números de WhatsApp** ao conectar um número, e franquia de notas fiscais.
-5. **Tela de plano para o dono da empresa**: o que está contratado, o consumo do mês, a escolha de parar ou
+5. **Feito em 01/11 (falta pedir módulo novo pela tela).** **Tela de plano para o dono da empresa**: o que está contratado, o consumo do mês, a escolha de parar ou
    continuar ao passar da franquia, a compra de pacote e como pedir um módulo novo.
-6. **Cobrança da Livih**: assinatura recorrente por empresa, somando o plano do núcleo, os módulos ligados, os pacotes
-   e o excedente do mês anterior (Asaas, o mesmo que vai servir ao financeiro do ERP).
+6. **Cobrança da Livih**: assinatura recorrente por empresa, mensal ou anual, somando o plano do núcleo, os módulos
+   ligados, os pacotes e o excedente do mês anterior (Asaas, o mesmo que vai servir ao financeiro do ERP). No anual,
+   o excedente e os pacotes saem numa cobrança mensal à parte. Cancelamento do anual com devolução proporcional
+   (meses usados a preço mensal). Com a cobrança pronta, publicar a página de planos do site
+   ([site-planos.md](site-planos.md)).
 7. **Depois, para abrir "só ERP" e "só nota fiscal"**: financeiro no ERP (contas a receber, cobrança), NF-e avulsa e
    o núcleo enxuto para quem não usa WhatsApp. Só com cliente real pedindo.
 
+## Franquia construída (01/11)
+
+Migration `20261101120000_planos_franquia.sql`, testes no fim de `scripts/teste_fase1.sql`.
+
+- **Catálogo `planos`** com os preços, números e franquias de 01/11, mais o `interno` (sem limite). A coluna
+  `organizacoes.plano`, que já existia, aponta para ele; todas as empresas continuam no `interno` até a plataforma
+  escolher o plano na tela Empresas.
+- **Contagem na hora:** um gatilho em toda mensagem do agente (texto, arquivo, documento) grava o atendimento em
+  `atendimentos_agente`. O `uso_ia` não serve para isso: chega minutos depois, pelo coletor da VPS. O simulador não
+  conta.
+- **Janela de 24 h a partir do início:** o atendimento começa na primeira mensagem do agente numa conversa sem
+  atendimento iniciado nas últimas 24 h e conta no mês em que começou (horário de Brasília).
+- **Parar:** quando a próxima resposta começaria um atendimento novo e o limite acabou, o `agente_deve_responder`
+  passa a conversa para a equipe com o motivo "Os atendimentos do agente deste mês acabaram…" e o aviso de sempre.
+  Atendimento já começado segue até fechar as 24 h. Nada muda no n8n.
+- **Continuar:** o agente segue e o atendimento fica marcado como excedente, para a cobrança do passo 6.
+- **Escolha padrão: parar** (sem cobrança surpresa). Só o **dono** muda a escolha e compra pacote; administradores
+  veem o consumo. A equipe da plataforma não compra pacote em nome do cliente (para isso há a cortesia). Clique duplo
+  não compra dois pacotes: a compra leva o limite que a tela mostrou e é recusada se ele já mudou.
+- **O consumo do mês conta desde o dia 1, também no plano interno.** Trocar de plano no meio do mês leva em conta o
+  que já foi usado, e o dono recebe o aviso na hora se o novo limite já estiver perto ou acabado. Conferir o consumo
+  na tela Empresas antes de trocar.
+- **A conversa que passou para a equipe fica com a equipe.** Quando o mês vira ou o dono compra pacote, o agente
+  volta a atender as conversas novas; as que já estavam com a equipe voltam como hoje (devolver ao agente ou encerrar).
+- **Caso aceito:** se o limite acaba enquanto o agente pensa, a resposta dele ainda sai e conta um atendimento além do
+  limite, sem cobrança.
+- **Pacote** (100 por R$ 29,90) vale até o fim do mês da compra; o que sobrar não passa para o mês seguinte. A
+  cortesia da plataforma também vale no mês e exige motivo.
+- **Avisos aos 80 % e aos 100 %**, uma vez por limite no mês (com pacote novo, valem de novo): dono e administradores
+  no celular e no WhatsApp cadastrado em Seus dados; equipe da plataforma no celular.
+- **Telas:** Configurações → Plano e consumo (antes "Uso da IA") para o dono; botão Plano e a linha de consumo na
+  tela Empresas para a plataforma.
+
 ## Decisões em aberto
 
-- **Fechar os preços dos módulos** (ERP e OS a R$ 99); o núcleo foi fechado em 29/10.
+- **Fechar os preços dos módulos** (ERP e OS a R$ 99); o núcleo foi fechado em 29/10 e revisto em 01/11.
+- **Excedente no plano anual:** cobrança mensal à parte (Pix ou boleto) ou só pacotes comprados antes.
+- **Taxa do Asaas** no cartão parcelado e na antecipação, antes de oferecer o anual parcelado sem juros.
 - **Usuários no Essencial:** ilimitados, como nos outros planos, ou limitados (2 ou 3) para marcar a diferença.
 - **WAHA:** confirmar a versão e a licença que rodam na VPS (seção de custos fixos).
 - **Contratar o plano Start da Focus** e confirmar se cancelamento e carta de correção contam como documento.
 - **Integração com o Bling**: fazer ou não, e antes ou depois do financeiro próprio.
-- **Teste grátis**: por módulo, por plano ou nenhum (o Programa Fundadores já tem o piloto de 30 dias).
 - **Regime tributário** (Anexo III ou V), que afeta a margem de todos os preços (em aberto desde 20/10).

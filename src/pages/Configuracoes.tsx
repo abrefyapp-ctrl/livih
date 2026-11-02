@@ -21,13 +21,14 @@ const SECOES: { id: string; rotulo: string; icone: NomeIcone; grupo: Grupo; modu
   { id: 'equipe', rotulo: 'Equipe', icone: 'equipe', grupo: 'Empresa' },
   { id: 'empresa', rotulo: 'Empresa', icone: 'empresa', grupo: 'Empresa' },
   { id: 'notificacoes', rotulo: 'Notificações', icone: 'sino', grupo: 'Empresa' },
+  // O plano mora na mesma seção do uso da IA (id 'uso' mantido: os avisos de franquia apontam para /configuracoes/uso).
+  { id: 'uso', rotulo: 'Plano e consumo', icone: 'painel', grupo: 'Empresa' },
   { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone', grupo: 'WhatsApp' },
   // Modelos só existem na API oficial (liberada para todas as empresas em 26/10).
   { id: 'modelos', rotulo: 'Modelos', icone: 'arquivo', grupo: 'WhatsApp' },
   { id: 'agente', rotulo: 'Agente', icone: 'agente', grupo: 'Agente' },
   { id: 'base', rotulo: 'Base de conhecimento', icone: 'livro', grupo: 'Agente' },
   { id: 'documentos', rotulo: 'Documentos', icone: 'arquivo', grupo: 'Agente' },
-  { id: 'uso', rotulo: 'Uso da IA', icone: 'painel', grupo: 'Agente' },
   { id: 'os', rotulo: 'Ordens de serviço', icone: 'ferramenta', grupo: 'Módulos', modulo: 'os' },
 ]
 const GRUPOS: Grupo[] = ['Empresa', 'WhatsApp', 'Agente', 'Módulos']

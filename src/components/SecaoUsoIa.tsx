@@ -3,6 +3,7 @@ import { useSessao } from '../hooks/useSessao'
 import { buscarUsoIaDaEmpresa, mesAtual, nomeDoMes, type UsoIaMes } from '../services/usoIa'
 import { Aviso } from './Aviso'
 import { EstadoVazio } from './EstadoVazio'
+import { PlanoDaEmpresa } from './PlanoDaEmpresa'
 
 const numero = new Intl.NumberFormat('pt-BR')
 const minutos = (s: number | null) => {
@@ -10,7 +11,7 @@ const minutos = (s: number | null) => {
   return m < 1 && Number(s ?? 0) > 0 ? 'menos de 1 min' : `${numero.format(m)} min`
 }
 
-/** Configurações → Uso da IA: quanto o agente atendeu e quantos áudios foram transcritos, por mês. */
+/** Configurações → Plano e consumo: o plano com a franquia do agente e, embaixo, o uso da IA por mês. */
 export function SecaoUsoIa() {
   const { orgAtiva } = useSessao()
   const orgId = orgAtiva!.id
@@ -30,7 +31,7 @@ export function SecaoUsoIa() {
   }, [orgId, gerencia])
 
   if (!gerencia) {
-    return <Aviso>Só o dono e os administradores da empresa veem o uso da IA.</Aviso>
+    return <Aviso>Só o dono e os administradores da empresa veem o plano e o uso da IA.</Aviso>
   }
 
   const meses = uso?.orgId === orgId ? uso.meses : null
@@ -39,6 +40,8 @@ export function SecaoUsoIa() {
 
   return (
     <div className="space-y-6">
+      <PlanoDaEmpresa />
+
       <div>
         <h2 className="text-h2 font-semibold">Uso da IA em {nomeDoMes(mesAtual())}</h2>
         <p className="mt-1 text-pequeno text-texto-2">
