@@ -922,33 +922,51 @@ export type Database = {
       }
       contratos_cobranca: {
         Row: {
+          anual_inicio: string | null
+          anual_parcelas: number
           asaas_ambiente: string | null
           asaas_cliente_id: string | null
           ativo: boolean
           atualizado_em: string
           atualizado_por: string | null
+          aviso_renovacao_em: string | null
+          ciclo: string
+          ciclo_proximo: string | null
+          ciclo_proximo_em: string | null
           inicio: string
           motivo_valor: string | null
           org_id: string
           valor_fixo: number | null
         }
         Insert: {
+          anual_inicio?: string | null
+          anual_parcelas?: number
           asaas_ambiente?: string | null
           asaas_cliente_id?: string | null
           ativo?: boolean
           atualizado_em?: string
           atualizado_por?: string | null
+          aviso_renovacao_em?: string | null
+          ciclo?: string
+          ciclo_proximo?: string | null
+          ciclo_proximo_em?: string | null
           inicio: string
           motivo_valor?: string | null
           org_id: string
           valor_fixo?: number | null
         }
         Update: {
+          anual_inicio?: string | null
+          anual_parcelas?: number
           asaas_ambiente?: string | null
           asaas_cliente_id?: string | null
           ativo?: boolean
           atualizado_em?: string
           atualizado_por?: string | null
+          aviso_renovacao_em?: string | null
+          ciclo?: string
+          ciclo_proximo?: string | null
+          ciclo_proximo_em?: string | null
           inicio?: string
           motivo_valor?: string | null
           org_id?: string
@@ -1611,6 +1629,7 @@ export type Database = {
         Row: {
           ambiente: string | null
           asaas_id: string | null
+          asaas_parcelamento: string | null
           atualizado_em: string
           aviso_atraso_em: string | null
           competencia: string
@@ -1622,15 +1641,18 @@ export type Database = {
           link: string | null
           org_id: string
           paga_em: string | null
+          parcelas: number
           status: string
           suspensao_em: string | null
           tentativas: number
+          tipo: string
           valor: number
           vencimento: string
         }
         Insert: {
           ambiente?: string | null
           asaas_id?: string | null
+          asaas_parcelamento?: string | null
           atualizado_em?: string
           aviso_atraso_em?: string | null
           competencia: string
@@ -1642,15 +1664,18 @@ export type Database = {
           link?: string | null
           org_id: string
           paga_em?: string | null
+          parcelas?: number
           status?: string
           suspensao_em?: string | null
           tentativas?: number
+          tipo?: string
           valor: number
           vencimento: string
         }
         Update: {
           ambiente?: string | null
           asaas_id?: string | null
+          asaas_parcelamento?: string | null
           atualizado_em?: string
           aviso_atraso_em?: string | null
           competencia?: string
@@ -1662,9 +1687,11 @@ export type Database = {
           link?: string | null
           org_id?: string
           paga_em?: string | null
+          parcelas?: number
           status?: string
           suspensao_em?: string | null
           tentativas?: number
+          tipo?: string
           valor?: number
           vencimento?: string
         }
@@ -2367,6 +2394,7 @@ export type Database = {
           nome: string
           ordem: number
           padrao: boolean
+          preco_anual: number | null
           preco_mensal: number | null
         }
         Insert: {
@@ -2376,6 +2404,7 @@ export type Database = {
           nome: string
           ordem?: number
           padrao?: boolean
+          preco_anual?: number | null
           preco_mensal?: number | null
         }
         Update: {
@@ -2385,6 +2414,7 @@ export type Database = {
           nome?: string
           ordem?: number
           padrao?: boolean
+          preco_anual?: number | null
           preco_mensal?: number | null
         }
         Relationships: []
@@ -2885,6 +2915,7 @@ export type Database = {
           ativo: boolean
           atualizado_em: string
           atualizado_por: string | null
+          desliga_em: string | null
           modulo: string
           org_id: string
         }
@@ -2892,6 +2923,7 @@ export type Database = {
           ativo: boolean
           atualizado_em?: string
           atualizado_por?: string | null
+          desliga_em?: string | null
           modulo: string
           org_id: string
         }
@@ -2899,6 +2931,7 @@ export type Database = {
           ativo?: boolean
           atualizado_em?: string
           atualizado_por?: string | null
+          desliga_em?: string | null
           modulo?: string
           org_id?: string
         }
@@ -3595,6 +3628,7 @@ export type Database = {
           ordem: number
           pacote_atendimentos: number
           pacote_preco: number
+          permite_modulos: boolean
           preco_anual: number | null
           preco_mensal: number | null
         }
@@ -3607,6 +3641,7 @@ export type Database = {
           ordem?: number
           pacote_atendimentos?: number
           pacote_preco?: number
+          permite_modulos?: boolean
           preco_anual?: number | null
           preco_mensal?: number | null
         }
@@ -3619,6 +3654,7 @@ export type Database = {
           ordem?: number
           pacote_atendimentos?: number
           pacote_preco?: number
+          permite_modulos?: boolean
           preco_anual?: number | null
           preco_mensal?: number | null
         }
@@ -4545,6 +4581,11 @@ export type Database = {
         Args: { p_org: string; p_texto: string }
         Returns: undefined
       }
+      cobranca_avisar_renovacoes: { Args: never; Returns: number }
+      cobranca_criar_avulsa: {
+        Args: { p_itens: Json; p_org: string }
+        Returns: string
+      }
       cobranca_criar_fatura: {
         Args: { p_competencia: string; p_org: string }
         Returns: string
@@ -4919,6 +4960,7 @@ export type Database = {
         Returns: undefined
       }
       mes_brasilia: { Args: never; Returns: string }
+      meses_entre: { Args: { p_ate: string; p_de: string }; Returns: number }
       meta_guardar_pin: {
         Args: { p_canal: string; p_pin: string }
         Returns: undefined
@@ -4935,6 +4977,24 @@ export type Database = {
       modulo_ativo: {
         Args: { p_modulo: string; p_org: string }
         Returns: boolean
+      }
+      modulo_contratar: {
+        Args: {
+          p_confirmar?: boolean
+          p_ligar: boolean
+          p_modulo: string
+          p_org: string
+        }
+        Returns: Json
+      }
+      modulos_itens: {
+        Args: { p_anual: boolean; p_modulos: string[]; p_sufixo?: string }
+        Returns: Json
+      }
+      modulos_pagos: { Args: { p_org: string }; Returns: string[] }
+      modulos_valor: {
+        Args: { p_anual: boolean; p_modulos: string[] }
+        Returns: number
       }
       nfe_manutencao: { Args: never; Returns: undefined }
       nfe_salvar_tokens: {
@@ -5101,6 +5161,15 @@ export type Database = {
           vencimento: string
         }[]
       }
+      plano_ciclo: {
+        Args: {
+          p_ciclo: string
+          p_confirmar?: boolean
+          p_org: string
+          p_parcelas?: number
+        }
+        Returns: Json
+      }
       plano_comprar_pacote: {
         Args: { p_limite_atual: number; p_org: string }
         Returns: number
@@ -5186,6 +5255,10 @@ export type Database = {
           status: string
           ultima_mensagem_em: string
         }[]
+      }
+      plataforma_encerrar_anual: {
+        Args: { p_confirmar?: boolean; p_org: string }
+        Returns: Json
       }
       plataforma_gerar_fatura: { Args: { p_org: string }; Returns: string }
       plataforma_planos_consumo: {
