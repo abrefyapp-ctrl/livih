@@ -98,5 +98,6 @@ pagamento (já está) e o cancelamento do anual.
   uma vez a cada 12 meses, com 30 dias de aviso (no anual, na renovação).
 - 03/11: o CNPJ adicional e as notas além das 100 passaram a ser cobrados na fatura (migration
   `20261103120000_cobranca_cnpj_notas.sql`, no `main`).
-- **Antes de juntar ao `main`:** o advogado ou o contador revisa a seção 8 dos Termos, e o Asaas de produção fica
-  pronto (passo 6).
+- **Publicado em 03/11** por decisão do usuário, antes do Asaas de produção e da revisão do advogado (muda a decisão
+  de 01/11). Falta: o advogado ou o contador revisar a seção 8 dos Termos; o Asaas de produção pronto antes do fim
+  do primeiro teste de 30 dias que vier pelo site.

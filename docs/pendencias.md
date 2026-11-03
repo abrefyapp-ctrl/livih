@@ -39,14 +39,12 @@ atendimentos (contagem, parar ou continuar, pacotes, avisos), dados de cobrança
      e o app) e testar no sandbox um anual parcelado no cartão. Mensal ou anual pelo dono, fatura anual em até 12x sem
      juros, subir no anual com cobrança avulsa, renovação automática com aviso 15 dias antes, "Encerrar o anual" pela
      plataforma (devolução feita à mão no Asaas) e ERP e OS contratados e desligados pelo dono.
-5. **Site com os preços:** preços novos dos módulos no `site/gerar_planos.py` (ainda R$ 99 e R$ 149); seção curta de
-   planos na página inicial e "Planos" no menu de todas as páginas; corrigir a
-   página "Orçamentos e pedidos" (diz que a nota "ainda não" existe e que orçamento é pacote à parte); seção de
-   cobrança nos Termos (mensal e anual, excedente, reajuste, suspensão, devolução do anual), com revisão do advogado ou
-   contador pelo usuário; sitemap, revisor-textos e conferência no celular.
-6. **Produção do Asaas e publicação:** o usuário consegue a aprovação da conta de produção (documentos; vale enviar
-   já); cancelar as faturas de sandbox, ligar `ASAAS_AMBIENTE=producao` (com aprovação), primeira cobrança real
-   (JoGrampo) e publicar a página de planos.
+5. **Site com os preços:** publicado em 03/11, antes do Asaas de produção, por decisão do usuário
+   ([site-planos.md](site-planos.md)). Falta a revisão da seção 8 dos Termos pelo advogado ou contador. A fatura
+   passou a cobrar o CNPJ adicional e as notas além das 100 (migration `20261103120000`).
+6. **Produção do Asaas:** o usuário consegue a aprovação da conta de produção (documentos; vale enviar já); cancelar
+   as faturas de sandbox, ligar `ASAAS_AMBIENTE=producao` (com aprovação) e a primeira cobrança real (JoGrampo). Tem
+   que estar pronto antes de a primeira empresa que pedir acesso pelo site terminar os 30 dias de teste.
 
 **Decisões em aberto, em paralelo (antes do passo 5):** licença do WAHA (o grátis roda uma sessão, há 3); integração
 com o Bling; regime tributário (Anexo III ou V); recarga automática da OpenAI (saldo de US$ 3,11 em 29/10).
