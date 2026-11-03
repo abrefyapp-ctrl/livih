@@ -193,14 +193,15 @@ PAGINAS = [
             ("PDF com a sua marca", "Logo, CNPJ, endereço e o vendedor responsável. Empresa com mais de um CNPJ escolhe de qual sai cada orçamento."),
             ("Enviar num clique", "Você vê a prévia na tela e envia o PDF na conversa do cliente. Ele fica no histórico."),
             ("O agente monta o orçamento", "O cliente pede pelo WhatsApp, o agente busca os produtos, monta o orçamento com o preço do cadastro e envia o PDF."),
-            ("Do orçamento ao pedido", "Confirmado, o pedido baixa o estoque e segue as etapas: separando, enviado e entregue."),
+            ("Pedido, estoque e nota fiscal", "Com o módulo ERP, o pedido confirmado baixa o estoque, entra nas contas a receber e sai com a NF-e. Depois segue as etapas: separando, enviado e entregue."),
         ],
         "exemplo": "Uma empresa de grampos e ferramentas tem 277 produtos e anotava os pedidos no papel. Hoje o cliente escreve: \"quero 10 caixas do 14/19 e 2 do prego anelado 2,30x35\". O agente monta o orçamento com os preços do catálogo, R$ 1.981,40 sem frete, e envia o PDF com a logo da empresa. A equipe confere o frete e confirma o pedido.",
-        "aviso": "Orçamentos e pedidos é um pacote adicional da Livih. Fale com a gente para ativar na sua empresa.",
+        # Desde os planos de 01/11, o catálogo e o orçamento são do núcleo; pedido, estoque, financeiro e nota, do ERP.
+        "aviso": "O catálogo e o orçamento em PDF vêm com a Livih. Pedidos, estoque, financeiro e nota fiscal são do módulo ERP, contratado à parte. Fale com a gente para ativar na sua empresa.",
         "perguntas": [
             ("Preciso cadastrar os produtos um a um?", "Não. Você importa uma planilha (CSV) com os produtos e ajusta o que precisar na Livih."),
             ("O agente pode dar desconto?", "Não. Ele usa o preço cadastrado. Desconto e frete ficam com a equipe."),
-            ("A Livih emite nota fiscal?", "Ainda não. Hoje a Livih cuida do orçamento, do pedido e do estoque."),
+            ("A Livih emite nota fiscal?", "Sim, com o módulo ERP. A NF-e sai do próprio pedido, com os dados do cliente e dos produtos que já estão na Livih."),
         ],
         "relacionadas": ["agente-ia-whatsapp", "whatsapp-equipe-de-vendas", "crm-whatsapp"],
     },
