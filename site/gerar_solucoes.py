@@ -9,7 +9,7 @@ import json
 import os
 
 SITE = "https://livih.com.br"
-WHATSAPP = "https://wa.me/5541999148944?text=Ol%C3%A1!%20Quero%20conhecer%20o%20Livih."
+WHATSAPP = "https://wa.me/5541999148944?text=Ol%C3%A1!%20Quero%20conhecer%20a%20Livih."
 BEACON = """    <!-- Cloudflare Web Analytics (sem cookies): acessos por página no painel da Cloudflare -->
     <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "b8905c3ec2e947d8b5cf194ff6abcc68"}'></script>
 """
