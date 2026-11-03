@@ -447,6 +447,27 @@ Migration `20261102150000_planos_anual_modulos.sql`, Edge Function `asaas-cobran
   - **A confirmar com o usuário:** a fatura anual parcelada também parcela o resto do mês anterior (atendimentos a
     mais, pacotes e ajustes), com a taxa paga pela Livih.
 
+## CNPJ adicional e notas a mais na fatura (03/11)
+
+Migration `20261103120000_cobranca_cnpj_notas.sql`, testes no fim de `scripts/teste_fase1.sql`. Pedido do usuário
+em 03/11, para a fatura cobrar o que o site mostra.
+
+- **CNPJ que conta:** emissora cadastrada na Focus e em produção no fechamento, ou que emitiu nota em produção no mês
+  anterior (`cnpjs_cobrados`). Homologação é teste e não paga. A segunda condição fecha a brecha de passar a emissora
+  para homologação na véspera do fechamento e voltar depois (o dono muda o ambiente; apontado pelo revisor-banco).
+  O módulo inclui 1 CNPJ; paga-se a partir do segundo, e só com ERP ou OS pago ligado (`cnpjs_adicionais`).
+- **Mensal:** R$ 49 por CNPJ a mais na fatura do mês, pelo que estiver em produção no fechamento (CNPJ ligado no meio
+  do mês começa a pagar no mês seguinte).
+- **Anual:** R$ 490 por CNPJ a mais na fatura do ano (item com `cnpj_adicional`). CNPJ que entra depois da fatura do
+  ano paga R$ 49 por mês até a renovação (`cnpjs_no_anual`), quando passa para o anual. Encerrar o anual desconta os
+  CNPJs do ano a R$ 49 por mês usado.
+- **Notas:** por CNPJ, as autorizadas em produção no mês anterior (horário de Brasília) além de 100, a R$ 0,20
+  (`notas_excedentes`). Nota cancelada depois conta, porque a Focus cobra a emissão. Entram como os atendimentos a
+  mais: também no anual e no valor combinado.
+- **Valor combinado** cobre o CNPJ adicional, como cobre plano e módulos.
+- **Ficou para depois:** os preços (49, 490 e 0,20) estão escritos na função, não num catálogo; a prévia de troca de
+  plano e do anual (`plano_ciclo`) ainda não soma o CNPJ adicional.
+
 ## Decisões em aberto
 
 - Fechados em 02/11 (seção "Decidido em 02/11"): preço dos módulos, usuários no Essencial e anual parcelado sem

@@ -5444,5 +5444,160 @@ reset role;
 insert into resultado (teste, ok) select 'anual: funções novas fechadas para o login',
   not has_function_privilege('authenticated', 'public.anual_a_cobrar(uuid, date)', 'execute')
   and not has_function_privilege('authenticated', 'public.planos_aplicar_da_empresa(uuid, date)', 'execute');
+
+-- CNPJ adicional e notas além das 100 na fatura (migration 20261103120000).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_org uuid;
+begin
+  v_org := public.criar_organizacao('CNPJ Teste', 'teste-cnpj');
+  perform set_config('teste.cnpj', v_org::text, true);
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.cnpj')::uuid;
+  v_mes date := date_trunc('month', now() at time zone 'America/Sao_Paulo')::date;
+  v_ant date := (date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '1 month')::date;
+  v_e1 uuid; v_e2 uuid; v_e4 uuid;
+  v_itens jsonb;
+begin
+  update public.organizacoes set plano = 'start' where id = v_org;
+  insert into public.contratos_cobranca (org_id, ativo, inicio) values (v_org, true, v_mes);
+  insert into public.organizacao_modulos (org_id, modulo, ativo) values (v_org, 'erp', true);
+  -- 3 CNPJs na Focus em produção, 1 em homologação e 1 fora da Focus: contam 3, pagam-se 2.
+  insert into public.emissoras (org_id, razao_social, cnpj, focus_empresa_id, nfe_ambiente)
+  values (v_org, 'Matriz', '12345678000195', 9001, 'producao') returning id into v_e1;
+  insert into public.emissoras (org_id, razao_social, cnpj, focus_empresa_id, nfe_ambiente)
+  values (v_org, 'Filial 1', '98765432000198', 9002, 'producao') returning id into v_e2;
+  insert into public.emissoras (org_id, razao_social, cnpj, focus_empresa_id, nfe_ambiente)
+  values (v_org, 'Filial 2', '45678912000155', 9003, 'producao');
+  insert into public.emissoras (org_id, razao_social, cnpj, focus_empresa_id, nfe_ambiente)
+  values (v_org, 'Teste', '32165498000139', 9004, 'homologacao') returning id into v_e4;
+  insert into public.emissoras (org_id, razao_social, cnpj, nfe_ambiente)
+  values (v_org, 'Sem Focus', '74185296000107', 'producao');
+  -- Mês anterior: 105 notas na matriz (uma cancelada depois), 100 na filial 1, 150 em homologação; uma deste mês.
+  insert into public.notas_fiscais (org_id, emissora_id, ref, ambiente, status, autorizada_em)
+  select v_org, v_e1, 'lvhcnpj1-' || g, 'producao', case when g = 1 then 'cancelada' else 'autorizada' end,
+         (v_ant::timestamp at time zone 'America/Sao_Paulo') + interval '2 days'
+    from generate_series(1, 105) g;
+  insert into public.notas_fiscais (org_id, emissora_id, ref, ambiente, status, autorizada_em)
+  select v_org, v_e2, 'lvhcnpj2-' || g, 'producao', 'autorizada', (v_ant::timestamp at time zone 'America/Sao_Paulo') + interval '3 days'
+    from generate_series(1, 100) g;
+  insert into public.notas_fiscais (org_id, emissora_id, ref, ambiente, status, autorizada_em)
+  select v_org, v_e4, 'lvhcnpj4-' || g, 'homologacao', 'autorizada', (v_ant::timestamp at time zone 'America/Sao_Paulo') + interval '3 days'
+    from generate_series(1, 150) g;
+  insert into public.notas_fiscais (org_id, emissora_id, ref, ambiente, status, autorizada_em)
+  values (v_org, v_e1, 'lvhcnpj1-mes', 'producao', 'autorizada', now());
+
+  insert into resultado (teste, ok) select 'cnpj: contam só os CNPJs na Focus em produção',
+    public.cnpjs_cobrados(v_org, v_mes) = 3 and public.cnpjs_adicionais(v_org, v_mes) = 2;
+  insert into resultado (teste, ok) select 'cnpj: notas além das 100 por CNPJ, em produção, do mês, contando a cancelada',
+    public.notas_excedentes(v_org, v_ant) = 5 and public.notas_excedentes(v_org, v_mes) = 0;
+  v_itens := public.cobranca_itens(v_org, v_mes);
+  insert into resultado (teste, ok) select 'cnpj: no mensal, R$ 49 por CNPJ a mais na fatura do mês',
+    exists (select 1 from jsonb_array_elements(v_itens) i
+             where (i ->> 'cnpj_adicional')::boolean and (i ->> 'quantidade')::int = 2 and (i ->> 'valor')::numeric = 98
+               and i ->> 'anual' is null);
+  insert into resultado (teste, ok) select 'cnpj: notas a mais do mês anterior a R$ 0,20',
+    exists (select 1 from jsonb_array_elements(v_itens) i
+             where i ->> 'descricao' like 'Notas fiscais além das 100 por CNPJ em %'
+               and (i ->> 'quantidade')::int = 5 and (i ->> 'valor')::numeric = 1.00);
+
+  -- Valor combinado cobre o CNPJ, mas não as notas a mais.
+  update public.contratos_cobranca set valor_fixo = 300, motivo_valor = 'Teste' where org_id = v_org;
+  v_itens := public.cobranca_itens(v_org, v_mes);
+  insert into resultado (teste, ok) select 'cnpj: valor combinado cobre o CNPJ adicional e cobra as notas a mais',
+    not exists (select 1 from jsonb_array_elements(v_itens) i where (i ->> 'cnpj_adicional')::boolean)
+    and exists (select 1 from jsonb_array_elements(v_itens) i where i ->> 'descricao' like 'Notas fiscais além%');
+  update public.contratos_cobranca set valor_fixo = null, motivo_valor = null where org_id = v_org;
+
+  -- Sem módulo pago, nenhum CNPJ é cobrado.
+  update public.organizacao_modulos set ativo = false where org_id = v_org and modulo = 'erp';
+  insert into resultado (teste, ok) select 'cnpj: sem ERP nem OS pagos não há CNPJ adicional',
+    public.cnpjs_adicionais(v_org, v_mes) = 0
+    and not exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, v_mes)) i
+                     where (i ->> 'cnpj_adicional')::boolean);
+  update public.organizacao_modulos set ativo = true where org_id = v_org and modulo = 'erp';
+
+  -- Anual: R$ 490 por CNPJ a mais na fatura do ano; o que entra depois paga R$ 49 por mês até a renovação.
+  update public.contratos_cobranca set ciclo = 'anual', anual_inicio = v_mes where org_id = v_org;
+  v_itens := public.cobranca_itens(v_org, v_mes);
+  insert into resultado (teste, ok) select 'cnpj: no anual, R$ 490 por CNPJ a mais na fatura do ano',
+    exists (select 1 from jsonb_array_elements(v_itens) i
+             where (i ->> 'cnpj_adicional')::boolean and (i ->> 'anual')::boolean
+               and (i ->> 'quantidade')::int = 2 and (i ->> 'valor')::numeric = 980
+               and i ->> 'descricao' like 'CNPJ adicional para nota fiscal anual (%');
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, ambiente)
+  values (v_org, v_mes, v_mes + 9, v_itens, 2778, 'aberta', 'sandbox');
+  insert into resultado (teste, ok) select 'cnpj: depois da fatura do ano, o mês seguinte não cobra os CNPJs de novo',
+    public.cnpjs_no_anual(v_org, v_mes) = 2
+    and not exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, (v_mes + interval '1 month')::date)) i
+                     where (i ->> 'cnpj_adicional')::boolean);
+  update public.emissoras set nfe_ambiente = 'producao' where id = v_e4;
+  insert into resultado (teste, ok) select 'cnpj: CNPJ que entra no meio do anual paga R$ 49 por mês',
+    exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, (v_mes + interval '1 month')::date)) i
+             where (i ->> 'cnpj_adicional')::boolean and i ->> 'anual' is null
+               and (i ->> 'quantidade')::int = 1 and (i ->> 'valor')::numeric = 49);
+  update public.emissoras set nfe_ambiente = 'homologacao' where id = v_e4;
+  update public.emissoras set nfe_ambiente = 'homologacao' where org_id = v_org and razao_social in ('Filial 1', 'Filial 2');
+  insert into resultado (teste, ok) select 'cnpj: CNPJ que sai de produção no meio do anual não gera item nem devolução',
+    not exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, (v_mes + interval '2 months')::date)) i
+                 where (i ->> 'cnpj_adicional')::boolean);
+  update public.emissoras set nfe_ambiente = 'producao' where org_id = v_org and razao_social in ('Filial 1', 'Filial 2');
+
+  -- Brecha: passar a filial para homologação na véspera do fechamento não tira a cobrança, porque ela emitiu em
+  -- produção no mês anterior; no mês seguinte, sem nota em produção, ela deixa de contar.
+  update public.emissoras set nfe_ambiente = 'homologacao' where id = v_e2;
+  insert into resultado (teste, ok) select 'cnpj: em homologação no fechamento, mas com nota em produção no mês anterior, conta',
+    public.cnpjs_cobrados(v_org, v_mes) = 3 and public.cnpjs_cobrados(v_org, (v_mes + interval '1 month')::date) = 2;
+  update public.emissoras set nfe_ambiente = 'producao' where id = v_e2;
+
+  -- Virada do mês no horário de Brasília: 23:30 do último dia é do mês anterior; 00:30 do dia 1, do mês novo.
+  insert into public.notas_fiscais (org_id, emissora_id, ref, ambiente, status, autorizada_em)
+  select v_org, (select id from public.emissoras where org_id = v_org and razao_social = 'Filial 2'), 'lvhcnpj3a-' || g,
+         'producao', 'autorizada', (v_mes::timestamp at time zone 'America/Sao_Paulo') - interval '30 minutes'
+    from generate_series(1, 101) g;
+  insert into public.notas_fiscais (org_id, emissora_id, ref, ambiente, status, autorizada_em)
+  select v_org, (select id from public.emissoras where org_id = v_org and razao_social = 'Filial 2'), 'lvhcnpj3b-' || g,
+         'producao', 'autorizada', (v_mes::timestamp at time zone 'America/Sao_Paulo') + interval '30 minutes'
+    from generate_series(1, 101) g;
+  insert into resultado (teste, ok) select 'cnpj: notas contadas pelo mês de Brasília, na virada do dia 1',
+    public.notas_excedentes(v_org, v_ant) = 6 and public.notas_excedentes(v_org, v_mes) = 1;
+  insert into resultado (teste, ok) select 'cnpj: notas e CNPJs de outra empresa não entram na conta',
+    public.notas_excedentes(current_setting('teste.f7')::uuid, v_ant) = 0
+    and public.cnpjs_cobrados(current_setting('teste.f7')::uuid, v_mes) = 0;
+
+  -- Para o encerrar: o ano começou há 5 meses e a fatura dele foi paga (plano, ERP e 2 CNPJs).
+  update public.faturas set status = 'cancelada' where org_id = v_org;
+  update public.contratos_cobranca set anual_inicio = (v_mes - interval '5 months')::date where org_id = v_org;
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, ambiente, paga_em)
+  values (v_org, (v_mes - interval '5 months')::date, (v_mes - interval '5 months')::date + 9,
+          '[{"descricao": "Plano Start anual", "quantidade": 1, "valor": 999, "anual": true},
+            {"descricao": "Módulo ERP anual", "quantidade": 1, "valor": 799, "anual": true},
+            {"descricao": "CNPJ adicional anual", "quantidade": 2, "valor": 980, "anual": true, "cnpj_adicional": true}]',
+          2778, 'paga', 'sandbox', now() - interval '150 days');
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare r jsonb;
+begin
+  r := public.plataforma_encerrar_anual(current_setting('teste.cnpj')::uuid);
+  -- Mensal de hoje: 99,90 + 79,90 + 2 × 49 = 277,80; 6 meses usados: 2.778 − 1.666,80 = 1.111,20.
+  insert into resultado (teste, ok) select 'cnpj: encerrar o anual desconta os CNPJs a preço mensal',
+    (r ->> 'mensal')::numeric = 277.80 and (r ->> 'pago')::numeric = 2778 and (r ->> 'devolver')::numeric = 1111.20;
+end $$;
+reset role;
+insert into resultado (teste, ok) select 'cnpj: funções novas fechadas para o login',
+  not has_function_privilege('authenticated', 'public.cnpjs_cobrados(uuid, date)', 'execute')
+  and not has_function_privilege('authenticated', 'public.cnpjs_adicionais(uuid, date)', 'execute')
+  and not has_function_privilege('authenticated', 'public.cnpjs_no_anual(uuid, date, boolean)', 'execute')
+  and not has_function_privilege('authenticated', 'public.notas_excedentes(uuid, date)', 'execute')
+  and not has_function_privilege('anon', 'public.notas_excedentes(uuid, date)', 'execute');
 reset role;
 select n, teste, ok from resultado order by n;
