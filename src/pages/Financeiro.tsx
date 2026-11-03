@@ -23,6 +23,7 @@ import { data } from '../services/os'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
+import { CalendarioFinanceiro } from '../components/CalendarioFinanceiro'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { Icone } from '../components/Icone'
 import {
@@ -35,10 +36,11 @@ import {
   ModalTransferencia,
 } from '../components/ModaisFinanceiro'
 
-type Aba = 'receber' | 'pagar' | 'contas'
+type Aba = 'receber' | 'pagar' | 'calendario' | 'contas'
 const ABAS: { id: Aba; rotulo: string }[] = [
   { id: 'receber', rotulo: 'A receber' },
   { id: 'pagar', rotulo: 'A pagar' },
+  { id: 'calendario', rotulo: 'Calendário' },
   { id: 'contas', rotulo: 'Contas' },
 ]
 const FILTROS: { id: FiltroLancamentos; rotulo: string }[] = [
@@ -92,7 +94,7 @@ export function Financeiro() {
 function TelaFinanceiro({ orgId, gerencia }: { orgId: string; gerencia: boolean }) {
   const navegar = useNavigate()
   const { aba: abaUrl } = useParams()
-  const aba: Aba = abaUrl === 'pagar' || abaUrl === 'contas' ? abaUrl : 'receber'
+  const aba: Aba = abaUrl === 'pagar' || abaUrl === 'calendario' || abaUrl === 'contas' ? abaUrl : 'receber'
   const [contas, setContas] = useState<Conta[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [versao, setVersao] = useState(0)
@@ -114,7 +116,7 @@ function TelaFinanceiro({ orgId, gerencia }: { orgId: string; gerencia: boolean 
       <div className="space-y-3 px-4 pt-6 pb-3 lg:px-8">
         <div>
           <h1 className="text-h1 font-semibold">Financeiro</h1>
-          <p className="text-pequeno text-texto-3">Contas a receber, contas a pagar e o saldo de cada conta.</p>
+          <p className="text-pequeno text-texto-3">Contas a receber, contas a pagar, o calendário dos vencimentos e o saldo de cada conta.</p>
         </div>
         <div role="tablist" aria-label="Parte do financeiro" className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-borda">
           {ABAS.map((a) => (
@@ -134,6 +136,8 @@ function TelaFinanceiro({ orgId, gerencia }: { orgId: string; gerencia: boolean 
       </div>
       {aba === 'contas' ? (
         <AbaContas orgId={orgId} gerencia={gerencia} contas={contas} categorias={categorias} versao={versao} aoMudar={recarregar} />
+      ) : aba === 'calendario' ? (
+        <CalendarioFinanceiro orgId={orgId} contas={contas} categorias={categorias} aoMudar={recarregar} />
       ) : (
         <AbaLancamentos key={aba} orgId={orgId} tipo={aba} contas={contas} categorias={categorias} aoMudar={recarregar} />
       )}

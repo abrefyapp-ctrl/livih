@@ -141,6 +141,12 @@ padrão e a conta Caixa.
   prévia da entrada por nota mostra o que vai para o a pagar.
 - **Financeiro:** o lançamento mostra de onde veio, com link; os do pedido e da OS só se cancelam lá.
 
+**Calendário, construído em 03/11** (pedido da JoGrampo): aba Calendário (`/financeiro/calendario`) com o mês em
+grade; cada dia mostra o total a receber e a pagar pelo vencimento (pagos ou não, menos os cancelados) e marca o dia
+com vencido em aberto. Clicar no dia lista os lançamentos dele, que abrem o detalhe de sempre (baixa, edição). No topo,
+os totais do mês e um aviso com o que ficou vencido antes do mês. Só front ([CalendarioFinanceiro.tsx](../src/components/CalendarioFinanceiro.tsx),
+`listarCalendario` e `vencidosAntes` em `financeiro.ts`); a RLS de sempre decide o que cada um vê.
+
 **Entregas 1 a 4: 6 a 10 dias.** É o que fecha a comparação com o Bling Cobalto (contas a pagar e receber) com uma
 vantagem: a cobrança sai pelo WhatsApp, onde o cliente já conversa.
 

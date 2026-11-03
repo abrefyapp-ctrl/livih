@@ -156,10 +156,12 @@ export async function salvarCategoria(
 
 export type FiltroLancamentos = 'abertos' | 'vencido' | 'pago' | 'cancelado' | 'todos'
 
+const COLUNAS_LANCAMENTO = '*, cliente:clientes(nome), categoria:fin_categorias(nome), pedido:pedidos(numero), os_item:os_itens(os_id)'
+
 export async function listarLancamentos(orgId: string, tipo: TipoLancamento, filtro: FiltroLancamentos): Promise<Lancamento[]> {
   let consulta = supabase
     .from('fin_lancamentos_situacao')
-    .select('*, cliente:clientes(nome), categoria:fin_categorias(nome), pedido:pedidos(numero), os_item:os_itens(os_id)')
+    .select(COLUNAS_LANCAMENTO)
     .eq('org_id', orgId)
     .eq('tipo', tipo)
   if (filtro === 'abertos') consulta = consulta.in('situacao', ['aberto', 'parcial', 'vencido'])
@@ -169,6 +171,37 @@ export async function listarLancamentos(orgId: string, tipo: TipoLancamento, fil
   const { data, error } = await consulta.order('vencimento', { ascending: crescente }).order('parcela').limit(1000)
   if (error) throw error
   return (data ?? []) as unknown as Lancamento[]
+}
+
+/** Calendário: o que vence entre as duas datas, a receber e a pagar, menos os cancelados. */
+export async function listarCalendario(orgId: string, inicio: string, fim: string): Promise<Lancamento[]> {
+  const { data, error } = await supabase
+    .from('fin_lancamentos_situacao')
+    .select(COLUNAS_LANCAMENTO)
+    .eq('org_id', orgId)
+    .neq('situacao', 'cancelado')
+    .gte('vencimento', inicio)
+    .lte('vencimento', fim)
+    .order('vencimento')
+    .order('parcela')
+    .limit(3000)
+  if (error) throw error
+  return (data ?? []) as unknown as Lancamento[]
+}
+
+/** O que ficou vencido antes de uma data (o calendário avisa, para não sumir ao trocar de mês). */
+export async function vencidosAntes(orgId: string, antes: string): Promise<{ receber: number; pagar: number }> {
+  const { data, error } = await supabase
+    .from('fin_lancamentos_situacao')
+    .select('tipo, restante')
+    .eq('org_id', orgId)
+    .eq('situacao', 'vencido')
+    .lt('vencimento', antes)
+    .limit(5000)
+  if (error) throw error
+  const total = { receber: 0, pagar: 0 }
+  for (const l of data ?? []) total[l.tipo as TipoLancamento] += Number(l.restante)
+  return total
 }
 
 export type NovaParcela = { vencimento: string; valor: number }
