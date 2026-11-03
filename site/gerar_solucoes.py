@@ -197,7 +197,7 @@ PAGINAS = [
         ],
         "exemplo": "Uma empresa de grampos e ferramentas tem 277 produtos e anotava os pedidos no papel. Hoje o cliente escreve: \"quero 10 caixas do 14/19 e 2 do prego anelado 2,30x35\". O agente monta o orçamento com os preços do catálogo, R$ 1.981,40 sem frete, e envia o PDF com a logo da empresa. A equipe confere o frete e confirma o pedido.",
         # Desde os planos de 01/11, o catálogo e o orçamento são do núcleo; pedido, estoque, financeiro e nota, do ERP.
-        "aviso": "O catálogo e o orçamento em PDF vêm com a Livih. Pedidos, estoque, financeiro e nota fiscal são do módulo ERP, contratado à parte. Fale com a gente para ativar na sua empresa.",
+        "aviso": 'O catálogo e o orçamento em PDF vêm em todos os planos. Pedidos, estoque, financeiro e nota fiscal são do módulo ERP, que você soma ao plano a partir do Start. <a href="/planos/">Veja os planos e os preços</a>.',
         "perguntas": [
             ("Preciso cadastrar os produtos um a um?", "Não. Você importa uma planilha (CSV) com os produtos e ajusta o que precisar na Livih."),
             ("O agente pode dar desconto?", "Não. Ele usa o preço cadastrado. Desconto e frete ficam com a equipe."),
@@ -250,7 +250,8 @@ def pagina(p: dict) -> str:
           </details>""" for q, r in p["perguntas"])
     relacionadas = "\n".join(
         f'          <li><a href="/{s}/">{e(POR_SLUG[s]["curto"])}</a></li>' for s in p["relacionadas"])
-    aviso = f'\n        <p class="aviso-pacote">{e(p["aviso"])}</p>' if p.get("aviso") else ""
+    # O aviso é HTML escrito aqui (pode ter link), por isso não passa pelo e().
+    aviso = f'\n        <p class="aviso-pacote">{p["aviso"]}</p>' if p.get("aviso") else ""
     return f"""<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -292,6 +293,7 @@ def pagina(p: dict) -> str:
       <nav aria-label="Principal">
         <a class="secao" href="/#solucoes">Soluções</a>
         <a class="secao" href="/#como-funciona">Como funciona</a>
+        <a class="secao sempre" href="/planos/">Planos</a>
         <a class="botao secundario pequeno" href="https://app.livih.com.br/">Entrar</a>
       </nav>
     </div>
@@ -376,6 +378,7 @@ def pagina(p: dict) -> str:
     <div class="container">
       <span>Livih é um produto da F7 Tech — CNPJ 62.213.016/0001-30</span>
       <nav aria-label="Rodapé" class="links-rodape">
+        <a href="/planos/">Planos</a>
         <a href="/privacidade/">Política de Privacidade</a>
         <a href="/termos/">Termos de Uso</a>
         <a href="https://app.livih.com.br/">Entrar na plataforma</a>

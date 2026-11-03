@@ -53,10 +53,11 @@ TODOS_TEM = [
     "Usuários ilimitados",
 ]
 
+# Preços dos módulos de 02/11 (docs/planos-modulos.md): R$ 79,90 cada e R$ 109,80 os dois; anual = 10 meses.
 MODULOS = [
-    ("ERP", 99, 990, "Pedidos, estoque, entrada de mercadoria pela nota e emissão de NF-e. Com 1 CNPJ e 100 notas por mês."),
-    ("Ordens de serviço", 99, 990, "Equipamento para conserto, etapas, PDF da OS e emissão de NFS-e. Com 1 CNPJ e 100 notas por mês."),
-    ("ERP e Ordens de serviço juntos", 149, 1490, "Os dois módulos no mesmo CNPJ, com 100 notas por mês."),
+    ("ERP", 79.90, 799, "Pedidos, estoque, entrada de mercadoria pela nota, contas a pagar e a receber e emissão de NF-e. Com 1 CNPJ e 100 notas por mês."),
+    ("Ordens de serviço", 79.90, 799, "Equipamento para conserto, etapas, PDF da OS, contas a pagar e a receber e emissão de NFS-e. Com 1 CNPJ e 100 notas por mês."),
+    ("ERP e Ordens de serviço juntos", 109.80, 1098, "Os dois módulos no mesmo CNPJ, com 100 notas por mês."),
 ]
 CNPJ_ADICIONAL = (49, 490)
 NOTA_ADICIONAL = 0.20
@@ -79,12 +80,16 @@ def brl_centavos(v: float) -> str:
 
 PERGUNTAS = [
     ("O que conta como um atendimento?", "Cada vez que alguém puxa assunto e o agente de IA atende, conta um atendimento. Tudo o que o agente responde nas 24 horas seguintes, naquela conversa, é o mesmo atendimento. As conversas que a sua equipe atende sem o agente não contam."),
-    ("O que acontece quando acabam os atendimentos do mês?", f"Você escolhe antes, na tela do plano: parar o agente, e as conversas seguem para a equipe, ou continuar, pagando {brl_centavos(EXCEDENTE)} por atendimento a mais na fatura seguinte. Aos 80 % você recebe um aviso. Também dá para comprar um pacote de {PACOTE[0]} atendimentos por {brl_centavos(PACOTE[1])}."),
+    ("O que acontece quando acabam os atendimentos do mês?", f"Você escolhe antes, na tela Plano e consumo: parar o agente, e as conversas seguem para a equipe, ou continuar, pagando {brl_centavos(EXCEDENTE)} por atendimento a mais na fatura seguinte. Aos 80 % você recebe um aviso. Também dá para comprar um pacote de {PACOTE[0]} atendimentos por {brl_centavos(PACOTE[1])}."),
     ("Quem faz a implantação?", "No teste e nos planos Start, Pro e Business, a nossa equipe ajuda a conectar os números e configurar o agente. No Essencial, você mesmo faz, com o passo a passo da Livih, e a ajuda da equipe pode ser contratada à parte."),
-    ("Posso trocar de plano?", "Sim. Você sobe de plano quando quiser. No plano anual, paga só a diferença dos meses que faltam. Para descer de plano, a mudança vale a partir da renovação."),
+    # Regras da entrega 4a e 4b (02/11): subir na hora, descer no dia 1 seguinte (mensal) ou na renovação (anual).
+    ("Posso trocar de plano?", "Sim, o dono da empresa troca na Livih. Subir vale na hora: no mensal, a diferença dos dias que faltam vem na fatura seguinte, e os atendimentos a mais vêm na mesma proporção; no anual, sai uma cobrança da diferença dos meses que faltam. Descer vale no dia 1 do mês seguinte, no mensal, ou na renovação, no anual. Para descer para um plano com menos números, remova antes os números a mais."),
+    ("Como funciona o plano anual?", "Você paga 10 meses e usa 12. O anual começa no dia 1 do mês seguinte à escolha. Dá para pagar à vista, por Pix, boleto ou cartão, ou no cartão em até 12 vezes sem juros. A renovação é automática, com aviso 15 dias antes. Os atendimentos a mais e os pacotes continuam cobrados todo mês, na fatura do mês seguinte."),
+    ("E se eu cancelar o plano anual?", "Fale com a gente. Até 7 dias depois do pagamento, você recebe tudo de volta. Depois disso, devolvemos o que foi pago menos os meses usados, contando o mês do pedido, pelo preço mensal. A partir do 10º mês, não há devolução."),
+    ("Posso ligar e desligar os módulos?", "Sim, do plano Start para cima, e você mesmo faz isso na Livih. Ligar vale na hora: no mensal, a diferença dos dias que faltam vem na fatura seguinte; no anual, sai uma cobrança da diferença dos meses que faltam. Desligar vale no dia 1 do mês seguinte, no mensal, ou na renovação, no anual."),
     ("Dá para usar sem o agente de IA?", "Sim. Você desliga o agente em cada número e a equipe atende tudo. O preço do plano é o mesmo."),
     ("As mensagens das campanhas estão incluídas?", "Não. As mensagens de divulgação pela API oficial do WhatsApp a Meta cobra direto da sua empresa, pela tabela dela. A Livih não cobra nada a mais por elas."),
-    ("Quais são as formas de pagamento?", "No mensal, cartão de crédito, Pix ou boleto. No anual, Pix ou boleto à vista, ou cartão de crédito."),
+    ("Quais são as formas de pagamento?", "No mensal, cartão de crédito, Pix ou boleto. No anual, Pix, boleto ou cartão à vista, ou cartão em até 12 vezes sem juros."),
     ("Como funciona o teste grátis?", "Você usa a Livih por 30 dias, sem pagar e sem cadastrar cartão, com tudo o que tem o plano Start e com o ERP e as Ordens de serviço liberados para testar. No fim do teste, escolhe o plano ou para por ali."),
 ]
 
@@ -113,6 +118,55 @@ def cartao_plano(p: dict) -> str:
             </ul>
             <a class="botao {'primario' if p.get('destaque') else 'secundario'}" href="/#solicitar">Testar 30 dias grátis</a>
           </article>"""
+
+
+def resumo_inicial() -> str:
+    """Seção curta da página inicial: os 4 planos com o principal de cada um e o link para /planos/."""
+    cartoes = []
+    for p in PLANOS:
+        atendimentos = f"{p['atendimentos']:,}".replace(",", ".")
+        numeros = "1 número de WhatsApp" if p["numeros"] == 1 else f"{p['numeros']} números de WhatsApp"
+        selo = f'\n            <span class="selo-plano">{e(p["destaque"])}</span>' if p.get("destaque") else ""
+        cartoes.append(f"""          <article class="{'plano destaque' if p.get('destaque') else 'plano'}">{selo}
+            <h3>{e(p["nome"])}</h3>
+            <p class="preco"><strong>{brl(p["mensal"])}</strong> <span>por mês</span></p>
+            <p class="preco-nota">ou {brl(p["anual"])} no anual</p>
+            <ul>
+              <li><strong>{atendimentos}</strong> atendimentos do agente por mês</li>
+              <li>{numeros}</li>
+              <li>{e(p["implantacao"])}</li>
+            </ul>
+          </article>""")
+    linhas = "\n".join(cartoes)
+    return f"""    {MARCA_INICIO}
+    <section class="bloco planos-resumo" id="planos" aria-labelledby="titulo-planos">
+      <div class="container">
+        <h2 id="titulo-planos">Planos</h2>
+        <p class="intro">Todos com o agente de IA e usuários ilimitados. Você escolhe pela quantidade de números de WhatsApp e de atendimentos do agente. Teste 30 dias grátis, sem cartão.</p>
+        <div class="grade-planos">
+{linhas}
+        </div>
+        <p class="mais-numeros"><a href="/planos/">Veja tudo o que vem em cada plano, os módulos e o plano anual</a>.</p>
+      </div>
+    </section>
+    {MARCA_FIM}"""
+
+
+MARCA_INICIO = "<!-- planos:inicio (gerado por site/gerar_planos.py; mude os preços lá) -->"
+MARCA_FIM = "<!-- planos:fim -->"
+
+
+def atualizar_inicial():
+    caminho = os.path.join("site", "public", "index.html")
+    with open(caminho, encoding="utf-8", newline="") as f:
+        texto = f.read()
+    ini, fim = texto.index(MARCA_INICIO), texto.index(MARCA_FIM) + len(MARCA_FIM)
+    # Volta o recuo da primeira linha (já está no arquivo) e mantém o fim de linha do arquivo.
+    novo = resumo_inicial().lstrip()
+    if "\r\n" in texto:
+        novo = novo.replace("\r\n", "\n").replace("\n", "\r\n")
+    with open(caminho, "w", encoding="utf-8", newline="") as f:
+        f.write(texto[:ini] + novo + texto[fim:])
 
 
 def pagina() -> str:
@@ -208,7 +262,7 @@ def pagina() -> str:
       <nav aria-label="Principal">
         <a class="secao" href="/#solucoes">Soluções</a>
         <a class="secao" href="/#como-funciona">Como funciona</a>
-        <a class="secao" href="/planos/" aria-current="page">Planos</a>
+        <a class="secao sempre" href="/planos/" aria-current="page">Planos</a>
         <a class="botao secundario pequeno" href="https://app.livih.com.br/">Entrar</a>
       </nav>
     </div>
@@ -342,3 +396,5 @@ if __name__ == "__main__":
     with open(os.path.join(pasta, "index.html"), "w", encoding="utf-8", newline="\n") as f:
         f.write(pagina())
     print("gerada: /planos/")
+    atualizar_inicial()
+    print("atualizada: seção Planos da página inicial")

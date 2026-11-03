@@ -36,6 +36,8 @@ header.topo { border-bottom: 1px solid var(--borda); background: #fff; position:
 .topo nav a.secao { color: var(--texto-2); text-decoration: none; font-weight: 500; font-size: .95rem; display: none; }
 .topo nav a.secao:hover { color: var(--texto); }
 @media (min-width: 48rem) { .topo nav a.secao { display: inline; } }
+/* Planos aparece também no celular (03/11): é o link mais procurado e o menu não tem gaveta. */
+.topo nav a.secao.sempre { display: inline; }
 
 .botao {
   display: inline-flex; align-items: center; justify-content: center; gap: .5rem;

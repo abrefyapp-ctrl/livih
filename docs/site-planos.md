@@ -83,3 +83,19 @@ pagamento (já está) e o cancelamento do anual.
 ## Andamento
 
 - 01/11: página `/planos/` feita pelo gerador, ainda sem link no menu nem no sitemap (não está anunciada).
+- 03/11, no `main` (sem preço, pode publicar quando quiser): a página Orçamentos e pedidos diz que a NF-e existe e que
+  pedido, estoque, financeiro e nota são do ERP; "usá-la" nos Termos.
+- 03/11, no branch **`site-planos`** (entra no `main` com o passo 6, Asaas de produção):
+  - preços dos módulos de 02/11 (R$ 79,90, juntos R$ 109,80; anual R$ 799 e R$ 1.098) e o financeiro nas descrições;
+  - perguntas novas: plano anual, cancelamento do anual, ligar e desligar módulos; troca de plano e formas de
+    pagamento pelas regras da entrega 4a e 4b;
+  - seção Planos na página inicial, **gerada pelo `gerar_planos.py`** entre os comentários `planos:inicio` e
+    `planos:fim` do `index.html` (os preços ficam num lugar só);
+  - "Planos" no menu (visível também no celular, classe `sempre`) e no rodapé de todas as páginas, menos a 404;
+  - Termos: seção 8 "Planos, pagamento e cancelamento" (as seguintes renumeradas), atualização de 3 de novembro;
+  - sitemap com `/planos/` e as datas de 03/11.
+- **Antes de juntar ao `main`:**
+  - o advogado ou o contador revisa a seção 8 dos Termos. O cancelamento do mensal (vale até o fim do mês faturado)
+    e o reajuste uma vez a cada 12 meses, com 30 dias de aviso, são redação proposta, ainda não decididos;
+  - o CNPJ adicional (R$ 49) e a nota além das 100 (R$ 0,20) estão na página, mas a fatura ainda não os conta
+    sozinha; até lá, a plataforma lança à mão ou retira da página.
