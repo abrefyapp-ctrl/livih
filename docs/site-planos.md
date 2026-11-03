@@ -94,8 +94,9 @@ pagamento (já está) e o cancelamento do anual.
   - "Planos" no menu (visível também no celular, classe `sempre`) e no rodapé de todas as páginas, menos a 404;
   - Termos: seção 8 "Planos, pagamento e cancelamento" (as seguintes renumeradas), atualização de 3 de novembro;
   - sitemap com `/planos/` e as datas de 03/11.
-- **Antes de juntar ao `main`:**
-  - o advogado ou o contador revisa a seção 8 dos Termos. O cancelamento do mensal (vale até o fim do mês faturado)
-    e o reajuste uma vez a cada 12 meses, com 30 dias de aviso, são redação proposta, ainda não decididos;
-  - o CNPJ adicional (R$ 49) e a nota além das 100 (R$ 0,20) estão na página, mas a fatura ainda não os conta
-    sozinha; até lá, a plataforma lança à mão ou retira da página.
+- **Decidido em 03/11:** o mensal cancelado vale até o fim do mês já faturado, sem devolução; o reajuste é no máximo
+  uma vez a cada 12 meses, com 30 dias de aviso (no anual, na renovação).
+- 03/11: o CNPJ adicional e as notas além das 100 passaram a ser cobrados na fatura (migration
+  `20261103120000_cobranca_cnpj_notas.sql`, no `main`).
+- **Antes de juntar ao `main`:** o advogado ou o contador revisa a seção 8 dos Termos, e o Asaas de produção fica
+  pronto (passo 6).
