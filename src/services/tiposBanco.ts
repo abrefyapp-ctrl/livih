@@ -725,6 +725,44 @@ export type Database = {
           },
         ]
       }
+      cobranca_ajustes: {
+        Row: {
+          criado_em: string
+          criado_por: string | null
+          descricao: string
+          id: string
+          mes: string
+          org_id: string
+          valor: number
+        }
+        Insert: {
+          criado_em?: string
+          criado_por?: string | null
+          descricao: string
+          id?: string
+          mes: string
+          org_id: string
+          valor: number
+        }
+        Update: {
+          criado_em?: string
+          criado_por?: string | null
+          descricao?: string
+          id?: string
+          mes?: string
+          org_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobranca_ajustes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compromissos: {
         Row: {
           atualizado_em: string
@@ -2889,6 +2927,8 @@ export type Database = {
           motivo_suspensao: string | null
           nome: string
           plano: string
+          plano_proximo: string | null
+          plano_proximo_em: string | null
           slug: string
           status: string
         }
@@ -2899,6 +2939,8 @@ export type Database = {
           motivo_suspensao?: string | null
           nome: string
           plano?: string
+          plano_proximo?: string | null
+          plano_proximo_em?: string | null
           slug: string
           status?: string
         }
@@ -2909,6 +2951,8 @@ export type Database = {
           motivo_suspensao?: string | null
           nome?: string
           plano?: string
+          plano_proximo?: string | null
+          plano_proximo_em?: string | null
           slug?: string
           status?: string
         }
@@ -2916,6 +2960,13 @@ export type Database = {
           {
             foreignKeyName: "organizacoes_plano_fkey"
             columns: ["plano"]
+            isOneToOne: false
+            referencedRelation: "planos"
+            referencedColumns: ["codigo"]
+          },
+          {
+            foreignKeyName: "organizacoes_plano_proximo_fkey"
+            columns: ["plano_proximo"]
             isOneToOne: false
             referencedRelation: "planos"
             referencedColumns: ["codigo"]
@@ -4443,6 +4494,10 @@ export type Database = {
           total: number
         }[]
       }
+      canais_sem_vaga: {
+        Args: { p_ignorar?: string; p_org: string }
+        Returns: string
+      }
       canal_atualizar_status: {
         Args: { p_canal: string; p_numero?: string; p_status: string }
         Returns: undefined
@@ -4567,6 +4622,7 @@ export type Database = {
         Returns: Record<string, unknown>
       }
       eh_admin_plataforma: { Args: never; Returns: boolean }
+      eh_dono_de_fato: { Args: { p_org: string }; Returns: boolean }
       eh_membro: { Args: { p_org: string }; Returns: boolean }
       eh_mensagem_automatica: {
         Args: { p_canal: string; p_texto: string }
@@ -4895,6 +4951,7 @@ export type Database = {
         Args: { p_itens: Json; p_nota: Json; p_org: string }
         Returns: Json
       }
+      nota_fiscal_liberada: { Args: { p_org: string }; Returns: boolean }
       numero_br: { Args: { p: number }; Returns: string }
       org_do_caminho: { Args: { p_nome: string }; Returns: string }
       org_modulos: {
@@ -5065,6 +5122,7 @@ export type Database = {
           plano: string
           plano_nome: string
           preco_mensal: number
+          reducao_troca: number
           usados: number
           valor_pacotes_mes: number
         }[]
@@ -5073,6 +5131,12 @@ export type Database = {
         Args: { p_escolha: string; p_org: string }
         Returns: undefined
       }
+      plano_troca_situacao: { Args: { p_org: string }; Returns: Json }
+      plano_trocar: {
+        Args: { p_confirmar?: boolean; p_org: string; p_plano: string }
+        Returns: Json
+      }
+      planos_aplicar_agendados: { Args: never; Returns: number }
       plataforma_cancelar_fatura: {
         Args: { p_fatura: string }
         Returns: undefined
