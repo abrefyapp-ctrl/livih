@@ -31,11 +31,13 @@ atendimentos (contagem, parar ou continuar, pacotes, avisos), dados de cobrança
 3. **CNPJ alfanumérico** (Receita, desde 07/2026): feito em 02/11 ([cnpj-alfanumerico.md](cnpj-alfanumerico.md)).
    Publicado em 02/11 (banco, `ler-nota`, app e agente no n8n). O PDF do orçamento mostra o CNPJ com letras sem
    pontuação até a próxima reconstrução do `livih-pdf` na VPS.
-4. **Cobrança, entrega 4, e regras dos planos** (regras decididas em 02/11 em [planos-modulos.md](planos-modulos.md):
-   módulos a R$ 79,90 e juntos a R$ 109,80, usuários ilimitados no Essencial, o dono troca o plano sozinho): escolha
-   mensal ou anual, cobrança anual (até 12x sem juros) com o excedente mensal, troca de plano no meio do ciclo,
-   renovação automática do anual, cancelamento do anual com devolução proporcional; limite de números de WhatsApp por
-   plano ao conectar (passo 4 de planos-modulos); nota fiscal só com ERP ou OS ligados (passo 3).
+4. **Cobrança, entrega 4, e regras dos planos** (regras decididas em 02/11 em [planos-modulos.md](planos-modulos.md)).
+   - **4a (regras do mensal):** publicada em 02/11. O dono troca o plano em Plano e consumo (subir na hora, com a
+     diferença e a franquia proporcionais aos dias; descer no dia 1 seguinte), módulos a R$ 79,90 e juntos a
+     R$ 109,80, limite de números de WhatsApp por plano ao conectar, nota fiscal só com ERP ou OS ligados.
+   - **4b (anual):** falta. Escolha mensal ou anual, cobrança anual (até 12x sem juros) com o excedente mensal, subir
+     no meio do ano com a diferença proporcional, renovação automática com aviso 15 dias antes, cancelamento com
+     devolução proporcional.
 5. **Site com os preços:** preços novos dos módulos no `site/gerar_planos.py` (ainda R$ 99 e R$ 149); seção curta de
    planos na página inicial e "Planos" no menu de todas as páginas; corrigir a
    página "Orçamentos e pedidos" (diz que a nota "ainda não" existe e que orçamento é pacote à parte); seção de
