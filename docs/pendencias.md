@@ -48,6 +48,8 @@ atendimentos (contagem, parar ou continuar, pacotes, avisos), dados de cobrança
 
 **Decisões em aberto, em paralelo (antes do passo 5):** licença do WAHA (o grátis roda uma sessão, há 3); integração
 com o Bling; regime tributário (Anexo III ou V); recarga automática da OpenAI (saldo de US$ 3,11 em 29/10).
+Notas recebidas (NF-e, CT-e e NFS-e Nacional): em espera até o usuário saber com a Focus quanto custam
+([notas-recebidas.md](notas-recebidas.md#parte-2-notas-recebidas-em-espera-desde-0311)).
 
 ## Em aberto em 28/10 (passagem de sessão)
 

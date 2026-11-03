@@ -6,6 +6,8 @@
 // para a Focus: não são gravados nem aparecem em log. Os tokens que a Focus devolve para o CNPJ ficam no Vault.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { encodeBase64 } from "jsr:@std/encoding@1/base64";
+import { decode, Image } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
 import { registrarGatilhos } from "../_shared/focus.ts";
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
@@ -31,7 +33,27 @@ type Emissora = {
   email: string | null; regime_tributario: number | null; nfe_serie: number; nfe_status: string;
   focus_empresa_id: number | null; certificado_validade: string | null;
   nfse_ativa: boolean; inscricao_municipal: string | null; codigo_municipio_ibge: string | null;
+  logo_path: string | null;
 };
+
+/**
+ * Logo do DANFE (pedido de 03/11): a mesma do orçamento, em PNG de até 200×200, que é o que a Focus aceita. A logo
+ * do cadastro pode ser JPG e de qualquer tamanho (até 2 MB): reduz mantendo a proporção. Se não der para ler, a nota
+ * segue sem logo (null) em vez de travar o cadastro na Focus.
+ */
+async function logoDanfe(path: string): Promise<string | null> {
+  try {
+    const { data, error } = await admin.storage.from("logos").download(path);
+    if (error || !data) throw error ?? new Error("sem arquivo");
+    const imagem = await decode(new Uint8Array(await data.arrayBuffer()));
+    if (!(imagem instanceof Image)) throw new Error("formato não suportado");
+    if (imagem.width > 200 || imagem.height > 200) imagem.contain(200, 200);
+    return encodeBase64(await imagem.encode());
+  } catch (err) {
+    console.error("logo danfe", path, String(err).slice(0, 200));
+    return null;
+  }
+}
 
 /** O que falta no cadastro do CNPJ para a Focus aceitar (a tela mostra a lista). */
 function faltando(e: Emissora): string[] {
@@ -127,6 +149,9 @@ Deno.serve(async (req) => {
     console.error("focus município", String(err).slice(0, 200));
   }
 
+  // Sem logo no cadastro, tira a da Focus: quem tirou a logo do orçamento não espera vê-la na nota.
+  const logo = e.logo_path ? await logoDanfe(e.logo_path) : null;
+
   const ie = (e.inscricao_estadual ?? "").replace(/\D/g, "");
   const im = (e.inscricao_municipal ?? "").replace(/\D/g, "");
   const corpo: Record<string, unknown> = {
@@ -153,6 +178,7 @@ Deno.serve(async (req) => {
     ...(e.nfse_ativa ? { habilita_nfsen_homologacao: true, habilita_nfsen_producao: true } : {}),
     // Como texto: a IM de Curitiba começa com zero (01 05 ...) e como número o zero se perdia.
     ...(im ? { inscricao_municipal: im } : {}),
+    ...(logo ? { arquivo_logo_base64: logo } : !e.logo_path && focusId ? { delete_logo: true } : {}),
     ...(temCertificado
       ? { arquivo_certificado_base64: p.certificado_base64, senha_certificado: p.senha_certificado, certificado_especifico: true }
       : {}),

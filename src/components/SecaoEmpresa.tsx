@@ -26,7 +26,7 @@ import { EstadoVazio } from './EstadoVazio'
 import { Icone } from './Icone'
 import { Modal } from './Modal'
 import { ModalNotaFiscal } from './ModalNotaFiscal'
-import { ROTULO_STATUS as ROTULO_STATUS_NFE } from '../services/nfe'
+import { ROTULO_STATUS as ROTULO_STATUS_NFE, sincronizarFocus } from '../services/nfe'
 
 const LIMITE_LOGO = 2 * 1024 * 1024
 
@@ -161,6 +161,8 @@ export function SecaoEmpresa() {
   const podeEditar = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const [dados, setDados] = useState<{ orgId: string; lista: Emissora[] } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
+  // Fora do erro geral: o recarregar da lista limpa o erro, e este aviso tem que ficar até a pessoa ler.
+  const [avisoLogo, setAvisoLogo] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
   const [form, setForm] = useState<Form | null>(null)
   const [logoNova, setLogoNova] = useState<File | null>(null)
@@ -266,6 +268,13 @@ export function SecaoEmpresa() {
       setForm((f) => f && { ...f, nova: false })
       if (logoNova) await trocarLogo(orgId, form, logoNova)
       else if (tirarLogoAtual) await tirarLogo(form)
+      // A logo também sai no DANFE (03/11): CNPJ já cadastrado na Focus recebe a logo nova na hora.
+      setAvisoLogo(null)
+      if ((logoNova || tirarLogoAtual) && dados?.lista.find((x) => x.id === form.id)?.focus_empresa_id) {
+        await sincronizarFocus(form.id, null, '').catch((err: Error) =>
+          setAvisoLogo(`A logo foi salva, mas não chegou à nota fiscal (${err.message.replace(/\.$/, '')}). Abra a Nota fiscal deste CNPJ e salve de novo.`),
+        )
+      }
       setForm(null)
       recarregar()
     } catch (err) {
@@ -322,6 +331,7 @@ export function SecaoEmpresa() {
 
       {!podeEditar && <Aviso>Só dono e admin alteram os dados da empresa.</Aviso>}
       {erro && <Aviso tom="erro">{erro}</Aviso>}
+      {avisoLogo && <Aviso tom="atencao">{avisoLogo}</Aviso>}
 
       {!lista ? (
         <p className="text-pequeno text-texto-3">Carregando…</p>
@@ -453,7 +463,7 @@ export function SecaoEmpresa() {
                       </Botao>
                     )}
                   </div>
-                  <p className="text-legenda text-texto-3">PNG ou JPG, até 2 MB. Fundo transparente ou branco fica melhor.</p>
+                  <p className="text-legenda text-texto-3">PNG ou JPG, até 2 MB. Sai no orçamento, no pedido e na nota fiscal. Fundo transparente ou branco fica melhor.</p>
                 </div>
               </div>
               <CampoTexto rotulo="Razão social" required maxLength={200} {...campo('razao_social')} />
