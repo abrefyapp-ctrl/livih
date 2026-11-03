@@ -4458,6 +4458,10 @@ export type Database = {
           texto: string
         }[]
       }
+      anual_a_cobrar: {
+        Args: { p_competencia: string; p_org: string }
+        Returns: boolean
+      }
       assistente_aplicar: {
         Args: { p_secoes: Json; p_sessao: string }
         Returns: Json
@@ -5206,6 +5210,10 @@ export type Database = {
         Returns: Json
       }
       planos_aplicar_agendados: { Args: never; Returns: number }
+      planos_aplicar_da_empresa: {
+        Args: { p_mes: string; p_org: string }
+        Returns: number
+      }
       plataforma_cancelar_fatura: {
         Args: { p_fatura: string }
         Returns: undefined
