@@ -35,8 +35,9 @@ atendimentos (contagem, parar ou continuar, pacotes, avisos), dados de cobrança
    - **4a (regras do mensal):** publicada em 02/11. O dono troca o plano em Plano e consumo (subir na hora, com a
      diferença e a franquia proporcionais aos dias; descer no dia 1 seguinte), módulos a R$ 79,90 e juntos a
      R$ 109,80, limite de números de WhatsApp por plano ao conectar, nota fiscal só com ERP ou OS ligados.
-   - **4b (anual e módulos pelo dono):** feita em 02/11, falta publicar (migration `20261102150000`, `asaas-cobranca`
-     e o app) e testar no sandbox um anual parcelado no cartão. Mensal ou anual pelo dono, fatura anual em até 12x sem
+   - **4b (anual e módulos pelo dono):** feita e publicada em 02/11 (migrations `20261102150000` e `20261102160000`,
+     `asaas-cobranca` e o app; conferido em 03/11). Falta testar no sandbox um anual parcelado no cartão: a fatura do
+     ano só sai no fechamento do dia 1 em que o ano começa (ver o roteiro em [cobranca-asaas.md](cobranca-asaas.md)). Mensal ou anual pelo dono, fatura anual em até 12x sem
      juros, subir no anual com cobrança avulsa, renovação automática com aviso 15 dias antes, "Encerrar o anual" pela
      plataforma (devolução feita à mão no Asaas) e ERP e OS contratados e desligados pelo dono.
 5. **Site com os preços:** publicado em 03/11, antes do Asaas de produção, por decisão do usuário

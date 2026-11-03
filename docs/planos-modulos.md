@@ -444,8 +444,8 @@ Migration `20261102150000_planos_anual_modulos.sql`, Edge Function `asaas-cobran
   - webhook: contestação, estorno e exclusão das parcelas 2 a 12 do cartão avisam a plataforma; os outros eventos
     delas não mudam a fatura;
   - agendados do dia 1 aplicados uma empresa por vez, cada uma com o próprio tratamento de erro.
-  - **A confirmar com o usuário:** a fatura anual parcelada também parcela o resto do mês anterior (atendimentos a
-    mais, pacotes e ajustes), com a taxa paga pela Livih.
+  - **Decidido em 03/11:** a fatura anual parcelada também parcela o resto do mês anterior (atendimentos a mais,
+    pacotes e ajustes), com a taxa paga pela Livih.
 
 ## CNPJ adicional e notas a mais na fatura (03/11)
 

@@ -101,4 +101,16 @@ módulos, os pacotes e o excedente de atendimentos. Sem isso, a página de plano
   (parcelamento no Asaas), cobranças avulsas (`faturas.tipo = 'avulsa'`) da diferença do anual ao subir de plano ou
   contratar módulo, renovação automática com aviso 15 dias antes, "Encerrar o anual" na janela Plano (calcula a
   devolução, feita à mão no Asaas) e ERP e OS contratados pelo dono. Regras em
-  [planos-modulos.md](planos-modulos.md#regras-construídas-0211-entrega-4b). 699/699 na bateria de testes.
+  [planos-modulos.md](planos-modulos.md#regras-construídas-0211-entrega-4b). 699/699 na bateria de testes.
+- 03/11: conferido que a 4b está publicada (migrations aplicadas, `asaas-cobranca` com o parcelamento, app com
+  "Encerrar o anual"). **Roteiro do teste no sandbox (empresa Teste, cobrança ligada, mensal desde 11/2026):**
+  1. Como dono da Teste, em Plano e consumo → Como pagar: anual, cartão em 12x. O anual fica marcado para 01/12
+     (fora do teste grátis, começa no dia 1 seguinte).
+  2. Em 01/12, depois do fechamento das 06:00: a fatura de 12/2026 sai com o Start anual (R$ 999) e o resto de
+     novembro, como parcelamento de 12x no Asaas sandbox; o link abre o pagamento no cartão.
+  3. Pagar com o cartão de teste do Asaas: a primeira parcela confirma, a fatura vira "Paga" e as parcelas 2 a 12 não
+     mudam a fatura.
+  4. Subir para o Pro na Teste: sai a cobrança avulsa da diferença dos meses que faltam, com vencimento em 3 dias.
+  5. Encerrar o anual pela plataforma: confere o cálculo da devolução (até 7 dias, integral) e a volta ao mensal.
+  Não dá para adiantar para hoje sem mexer à mão no banco: a fatura de 11/2026 da Teste já existe (paga em 02/11), e a
+  do ano só sai no mês em que o ano começa.
