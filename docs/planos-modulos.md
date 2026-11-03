@@ -46,6 +46,22 @@ cada um com a sua nota fiscal incluída).
   os meses usados a preço mensal ([site-planos.md](site-planos.md)).
 - **Preços no site só depois da cobrança pronta** (passo 6).
 
+**Decidido em 02/11 (regras dos planos, passo 4 das pendências):**
+- **Módulos mais baratos: ERP ou OS a R$ 79,90; os dois juntos no mesmo CNPJ, R$ 109,80** (R$ 79,90 + R$ 29,90). No
+  anual, R$ 799 e R$ 1.098. Eram R$ 99 e R$ 149 (seção de preços).
+- **O dono troca o plano sozinho** em Configurações → Plano e consumo (subir, descer, mensal ou anual); a plataforma
+  continua podendo trocar pela tela Empresas.
+- **Mensal: subir vale na hora** (franquia e números do plano novo já no mês), e a diferença proporcional aos dias que
+  faltam entra na próxima fatura; **descer vale no dia 1 seguinte**, sem devolução.
+- **Anual: subir vale na hora**, com uma cobrança da diferença anual proporcional aos meses que faltam (Start → Pro
+  com 6 meses restantes: (R$ 1.499 − R$ 999) × 6/12 = R$ 250); a data de renovação não muda. Descer, só na renovação.
+- **Anual em até 12x sem juros no cartão**, além de Pix e boleto à vista; a Livih absorve a taxa do parcelamento.
+- **Renovação do anual automática**, pelo preço de tabela do momento, com aviso ao dono 15 dias antes (dá tempo de
+  trocar para o mensal ou outro plano).
+- **Usuários ilimitados também no Essencial**, como nos outros planos (decisão de 20/10 mantida).
+- **Limite de números de WhatsApp:** para descer a um plano com menos números do que tem conectados, o dono desconecta
+  antes; a tela diz quantos.
+
 Por que o agente não é módulo:
 - **É o diferencial.** Sem ele, a Livih é mais um CRM de WhatsApp contra concorrentes com anos de mercado. O
   posicionamento de 20/10 é "controle comercial", e é o agente que entrega esse controle sem a equipe trabalhar a mais
@@ -172,16 +188,16 @@ ter custo.
 
 | Item | Preço ao cliente | Custo na Focus | Sobra antes do imposto |
 |---|---|---|---|
-| **ERP** (pedidos, estoque, entrada por nota, NF-e), com 1 CNPJ e 100 notas por mês | **R$ 99/mês** | ~R$ 39,90 | ~R$ 59 |
-| **Ordens de serviço** (OS, etapas, PDF, NFS-e), com 1 CNPJ e 100 notas por mês | **R$ 99/mês** | ~R$ 39,90 | ~R$ 59 |
-| **ERP e OS juntos** no mesmo CNPJ, com 100 notas por mês (01/11) | **R$ 149/mês** | ~R$ 39,90 | ~R$ 109 |
+| **ERP** (pedidos, estoque, entrada por nota, NF-e), com 1 CNPJ e 100 notas por mês | **R$ 79,90/mês** (02/11) | ~R$ 39,90 | ~R$ 40 |
+| **Ordens de serviço** (OS, etapas, PDF, NFS-e), com 1 CNPJ e 100 notas por mês | **R$ 79,90/mês** (02/11) | ~R$ 39,90 | ~R$ 40 |
+| **ERP e OS juntos** no mesmo CNPJ, com 100 notas por mês | **R$ 109,80/mês** (79,90 + 29,90; 02/11) | ~R$ 39,90 | ~R$ 70 |
 | CNPJ adicional | **R$ 49/mês** | R$ 39,90 | ~R$ 9 |
 | Nota além das 100 por CNPJ | **R$ 0,20** | R$ 0,11 | R$ 0,09 |
 
 Os módulos podem ser contratados do Start para cima; o Essencial não tem ERP nem OS. Os dois juntos têm desconto
 porque a Focus cobra o CNPJ uma vez só, emita ele NF-e, NFS-e ou as duas.
 
-Exemplo: a JoGrampo (2 CNPJs) no Start com o ERP pagaria R$ 99,90 + 99 + 49 = R$ 247,90. Como é do Programa Fundadores,
+Exemplo: a JoGrampo (2 CNPJs) no Start com o ERP pagaria R$ 99,90 + 79,90 + 49 = R$ 228,70 (preços de 02/11). Como é do Programa Fundadores,
 o ERP segue sem custo para ela.
 
 A primeira sugestão (ERP e OS a R$ 79 com a nota incluída) foi revista ao ver o custo da Focus: um cliente com 2 CNPJs
@@ -201,8 +217,8 @@ de explicar e com valores redondos.
 
 | Módulo | Mensal | Anual |
 |---|---|---|
-| ERP ou OS | R$ 99 | **R$ 990** |
-| ERP e OS juntos | R$ 149 | **R$ 1.490** |
+| ERP ou OS | R$ 79,90 | **R$ 799** |
+| ERP e OS juntos | R$ 109,80 | **R$ 1.098** |
 | CNPJ adicional | R$ 49 | **R$ 490** |
 
 - **Pior caso no anual** (franquia cheia todo mês, R$ 0,20 por atendimento, Anexo V e uma taxa de cobrança só no ano):
@@ -364,10 +380,8 @@ Migration `20261101120000_planos_franquia.sql`, testes no fim de `scripts/teste_
 
 ## Decisões em aberto
 
-- **Fechar os preços dos módulos** (ERP e OS a R$ 99); o núcleo foi fechado em 29/10 e revisto em 01/11.
-- **Excedente no plano anual:** cobrança mensal à parte (Pix ou boleto) ou só pacotes comprados antes.
-- **Taxa do Asaas** no cartão parcelado e na antecipação, antes de oferecer o anual parcelado sem juros.
-- **Usuários no Essencial:** ilimitados, como nos outros planos, ou limitados (2 ou 3) para marcar a diferença.
+- Fechados em 02/11 (seção "Decidido em 02/11"): preço dos módulos, usuários no Essencial e anual parcelado sem
+  juros. O excedente no anual já tinha ficado em fatura mensal à parte ([cobranca-asaas.md](cobranca-asaas.md)).
 - **WAHA:** confirmar a versão e a licença que rodam na VPS (seção de custos fixos).
 - **Contratar o plano Start da Focus** e confirmar se cancelamento e carta de correção contam como documento.
 - **Integração com o Bling**: fazer ou não, e antes ou depois do financeiro próprio.

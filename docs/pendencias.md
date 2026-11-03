@@ -31,10 +31,13 @@ atendimentos (contagem, parar ou continuar, pacotes, avisos), dados de cobrança
 3. **CNPJ alfanumérico** (Receita, desde 07/2026): feito em 02/11 ([cnpj-alfanumerico.md](cnpj-alfanumerico.md)).
    Publicado em 02/11 (banco, `ler-nota`, app e agente no n8n). O PDF do orçamento mostra o CNPJ com letras sem
    pontuação até a próxima reconstrução do `livih-pdf` na VPS.
-4. **Cobrança, entrega 4, e regras dos planos:** escolha mensal ou anual, cobrança anual (cartão parcelado) com o
-   excedente mensal, troca de plano no meio do ciclo, cancelamento do anual com devolução proporcional; limite de
-   números de WhatsApp por plano ao conectar (passo 4 de planos-modulos); nota fiscal só com ERP ou OS ligados (passo 3).
-5. **Site com os preços:** seção curta de planos na página inicial e "Planos" no menu de todas as páginas; corrigir a
+4. **Cobrança, entrega 4, e regras dos planos** (regras decididas em 02/11 em [planos-modulos.md](planos-modulos.md):
+   módulos a R$ 79,90 e juntos a R$ 109,80, usuários ilimitados no Essencial, o dono troca o plano sozinho): escolha
+   mensal ou anual, cobrança anual (até 12x sem juros) com o excedente mensal, troca de plano no meio do ciclo,
+   renovação automática do anual, cancelamento do anual com devolução proporcional; limite de números de WhatsApp por
+   plano ao conectar (passo 4 de planos-modulos); nota fiscal só com ERP ou OS ligados (passo 3).
+5. **Site com os preços:** preços novos dos módulos no `site/gerar_planos.py` (ainda R$ 99 e R$ 149); seção curta de
+   planos na página inicial e "Planos" no menu de todas as páginas; corrigir a
    página "Orçamentos e pedidos" (diz que a nota "ainda não" existe e que orçamento é pacote à parte); seção de
    cobrança nos Termos (mensal e anual, excedente, reajuste, suspensão, devolução do anual), com revisão do advogado ou
    contador pelo usuário; sitemap, revisor-textos e conferência no celular.
@@ -42,8 +45,7 @@ atendimentos (contagem, parar ou continuar, pacotes, avisos), dados de cobrança
    já); cancelar as faturas de sandbox, ligar `ASAAS_AMBIENTE=producao` (com aprovação), primeira cobrança real
    (JoGrampo) e publicar a página de planos.
 
-**Decisões em aberto, em paralelo (antes do passo 5):** preço dos módulos (ERP e OS a R$ 99, juntos R$ 149, já no
-sistema); usuários no Essencial (ilimitados ou 2 a 3); licença do WAHA (o grátis roda uma sessão, há 3); integração
+**Decisões em aberto, em paralelo (antes do passo 5):** licença do WAHA (o grátis roda uma sessão, há 3); integração
 com o Bling; regime tributário (Anexo III ou V); recarga automática da OpenAI (saldo de US$ 3,11 em 29/10).
 
 ## Em aberto em 28/10 (passagem de sessão)
