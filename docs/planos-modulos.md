@@ -59,8 +59,8 @@ cada um com a sua nota fiscal incluída).
 - **Renovação do anual automática**, pelo preço de tabela do momento, com aviso ao dono 15 dias antes (dá tempo de
   trocar para o mensal ou outro plano).
 - **Usuários ilimitados também no Essencial**, como nos outros planos (decisão de 20/10 mantida).
-- **Limite de números de WhatsApp:** para descer a um plano com menos números do que tem conectados, o dono desconecta
-  antes; a tela diz quantos.
+- **Limite de números de WhatsApp:** para descer a um plano com menos números do que tem conectados, o dono remove
+  antes os que sobram (botão Remover; Desconectar não libera a vaga); a tela diz quantos.
 
 Por que o agente não é módulo:
 - **É o diferencial.** Sem ele, a Livih é mais um CRM de WhatsApp contra concorrentes com anos de mercado. O
@@ -406,6 +406,34 @@ Migration `20261102140000_planos_troca.sql`, testes no fim de `scripts/teste_fas
 - **Ficou para depois** (revisão de 02/11): a plataforma cancelar um ajuste pela tela (hoje, só com SQL); ajustes de
   um mês sem fatura (empresa suspensa o mês inteiro) se perdem, como os atendimentos a mais; o preço dos dois módulos
   juntos (R$ 109,80) está escrito na `cobranca_itens`, não no catálogo.
+
+## Regras construídas (02/11, entrega 4b)
+
+Migration `20261102150000_planos_anual_modulos.sql`, Edge Function `asaas-cobranca`, testes no fim de
+`scripts/teste_fase1.sql`.
+
+- **Mensal ou anual pelo dono** (Plano e consumo → Como pagar, `plano_ciclo`). O anual começa no dia 1 seguinte; no
+  teste grátis, já na primeira fatura. A fatura do mês em que o ano começa leva o plano e os módulos do ano inteiro
+  (R$ 499 a R$ 1.999; ERP ou OS R$ 799, os dois R$ 1.098) mais o resto do mês anterior; nos outros meses, a fatura sai
+  só com os atendimentos a mais, os pacotes e os ajustes (R$ 5 ou mais).
+- **Pagamento do anual:** à vista (Pix, boleto ou cartão) ou no cartão em 2 a 12 parcelas sem juros, escolhido pelo
+  dono (`contratos_cobranca.anual_parcelas`). No Asaas, a fatura parcelada vira um parcelamento no cartão; cancelar
+  apaga o parcelamento inteiro.
+- **Subir no anual** vale na hora, com uma **cobrança avulsa** (`faturas.tipo = 'avulsa'`, vence em 3 dias) da
+  diferença anual pelos meses que faltam, contando o atual; a renovação não muda. Se a fatura do ano ainda não saiu,
+  ela sai com o plano novo. **Descer, desligar módulo e voltar ao mensal** valem na renovação.
+- **Renovação automática** no dia 1 em que o ano fecha, pelo preço de tabela, junto com as descidas e desligamentos
+  marcados para ela (`planos_aplicar_agendados`, antes do fechamento). Aviso ao dono e à plataforma 15 dias antes
+  (`cobranca_avisar_renovacoes`, 09:20), menos para quem já pediu o mensal.
+- **Encerrar o anual** (plataforma, janela Plano): mostra a devolução (integral até 7 dias depois do pagamento da
+  fatura anual; depois, o pago no ano menos os meses usados, contando o atual, a preço mensal de hoje; do 10º mês em
+  diante, nada), volta ao mensal e desliga a cobrança. A devolução é feita à mão no painel do Asaas. Desligar a
+  cobrança ou combinar um valor de uma empresa no anual passa antes por aqui.
+- **Módulos pelo dono** (`modulo_contratar`): ligar vale na hora (mensal: a diferença dos dias que faltam vira ajuste
+  na próxima fatura; anual: cobrança avulsa da diferença dos meses que faltam; ERP com OS: só os R$ 29,90 a mais).
+  Desligar vale no dia 1 seguinte (anual: na renovação), sem devolução; no teste grátis, na hora. Ligar de novo antes
+  da data só desfaz o desligamento. O Essencial não contrata módulo, e descer ao Essencial pede para desligar antes os
+  módulos. A plataforma recebe o aviso para conferir a vaga na Focus.
 
 ## Decisões em aberto
 

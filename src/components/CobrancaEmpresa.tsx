@@ -1,13 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { lerNumero } from '../services/formato'
+import { lerNumero, moeda } from '../services/formato'
 import {
   buscarContrato,
   cancelarFatura,
   definirContrato,
+  encerrarAnual,
   gerarFatura,
   listarFaturas,
   reenviarFatura,
   type Contrato,
+  type EncerramentoAnual,
   type Fatura,
 } from '../services/faturas'
 import { mesAtual } from '../services/usoIa'
@@ -16,6 +18,9 @@ import { Botao } from './Botao'
 import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { ListaFaturas } from './ListaFaturas'
 import { CLASSE_CAMPO, Campo } from './ModaisOs'
+
+const dataBr = (iso: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`))
+const somarMeses = (iso: string, n: number) => new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1 + n, 1)).toISOString().slice(0, 10)
 
 /**
  * Janela Plano (plataforma): liga a cobrança da empresa, o mês da primeira fatura e o preço combinado, se houver;
@@ -32,6 +37,7 @@ export function CobrancaEmpresa({ orgId, aoMudar }: { orgId: string; aoMudar: ()
   const [aviso, setAviso] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
   const [cancelar, setCancelar] = useState<Fatura | null>(null)
+  const [encerrar, setEncerrar] = useState<EncerramentoAnual | null>(null)
 
   useEffect(() => {
     let vivo = true
@@ -83,8 +89,22 @@ export function CobrancaEmpresa({ orgId, aoMudar }: { orgId: string; aoMudar: ()
     void executar(() => definirContrato(orgId, { ativo, inicio: `${inicio}-01`, valorFixo: fixo ?? null, motivo }), ok)
   }
 
-  // Cancelada não conta: o banco libera o mês para outra fatura (faturas_uma_por_mes).
-  const faturaDoMes = dados?.faturas.some((f) => f.competencia === mesAtual() && f.status !== 'cancelada')
+  // Cancelada e avulsa não contam: o banco libera o mês para outra fatura (faturas_uma_por_mes).
+  const faturaDoMes = dados?.faturas.some((f) => f.competencia === mesAtual() && f.tipo === 'mes' && f.status !== 'cancelada')
+  const contrato = dados?.contrato
+
+  async function calcularEncerramento() {
+    setSalvando(true)
+    setErro(null)
+    setAviso(null)
+    try {
+      setEncerrar(await encerrarAnual(orgId, false))
+    } catch (e) {
+      setErro((e as Error).message)
+    } finally {
+      setSalvando(false)
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -151,6 +171,25 @@ export function CobrancaEmpresa({ orgId, aoMudar }: { orgId: string; aoMudar: ()
               )}
             </div>
           </form>
+          {contrato?.ciclo === 'anual' && contrato.anual_inicio && (
+            <div className="space-y-2 rounded-md border border-borda p-3">
+              <p className="text-pequeno">
+                <span className="font-medium">Plano anual</span> desde {dataBr(contrato.anual_inicio)}, renova em{' '}
+                {dataBr(somarMeses(contrato.anual_inicio, 12))}
+                {contrato.anual_parcelas > 1 ? `, no cartão em ${contrato.anual_parcelas}x` : ', à vista'}
+                {contrato.ciclo_proximo === 'mensal' && '. O dono pediu para voltar ao mensal na renovação'}.
+              </p>
+              <Botao tamanho="sm" variante="secundario" onClick={() => void calcularEncerramento()} disabled={salvando}>
+                Encerrar o anual
+              </Botao>
+            </div>
+          )}
+          {contrato?.ciclo === 'mensal' && contrato.ciclo_proximo === 'anual' && contrato.ciclo_proximo_em && (
+            <p className="text-pequeno text-texto-2">
+              O dono escolheu o plano anual a partir de {dataBr(contrato.ciclo_proximo_em)}
+              {contrato.anual_parcelas > 1 ? `, no cartão em ${contrato.anual_parcelas}x` : ', à vista'}.
+            </p>
+          )}
           {dados.faturas.length > 0 && (
             <ListaFaturas
               faturas={dados.faturas}
@@ -176,6 +215,36 @@ export function CobrancaEmpresa({ orgId, aoMudar }: { orgId: string; aoMudar: ()
             aoCancelar={() => setCancelar(null)}
           >
             A cobrança deixa de valer e o mês fica livre para uma fatura nova. Use para teste no sandbox ou cobrança feita por engano.
+          </DialogoConfirmacao>
+          <DialogoConfirmacao
+            aberto={!!encerrar}
+            titulo="Encerrar o plano anual?"
+            rotuloConfirmar="Encerrar e desligar a cobrança"
+            perigo
+            carregando={salvando}
+            aoConfirmar={() => {
+              setEncerrar(null)
+              void executar(
+                () => encerrarAnual(orgId, true).then(() => undefined),
+                'Anual encerrado e cobrança desligada. Se houver devolução, faça no painel do Asaas, na cobrança paga.',
+              )
+            }}
+            aoCancelar={() => setEncerrar(null)}
+          >
+            {encerrar && (
+              <>
+                Pago no ano: {moeda(Number(encerrar.pago), true)}. Meses usados, contando este: {encerrar.meses_usados}.{' '}
+                {Number(encerrar.pago) <= 0
+                  ? 'Nada foi pago neste ano: não há devolução. Se a fatura anual estiver em aberto, cancele-a na lista de faturas desta janela.'
+                  : encerrar.integral
+                    ? `Pago há até 7 dias: a devolução é integral, ${moeda(Number(encerrar.devolver), true)}.`
+                    : encerrar.meses_usados >= 10
+                      ? 'Do 10º mês em diante, não há devolução.'
+                      : `Devolução: ${moeda(Number(encerrar.devolver), true)} (o pago menos ${encerrar.meses_usados} × ${moeda(Number(encerrar.mensal), true)}, o preço mensal de hoje do plano e dos módulos).`}{' '}
+                A empresa volta ao mensal com a cobrança desligada; a devolução é feita à mão no painel do Asaas. Para cortar o acesso,
+                suspenda a empresa na tela Empresas.
+              </>
+            )}
           </DialogoConfirmacao>
         </>
       )}

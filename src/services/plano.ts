@@ -58,7 +58,26 @@ export async function darCortesia(orgId: string, quantidade: number, motivo: str
 
 // ---------- troca de plano pelo dono (migration 20261102140000; decisões de 02/11) ----------
 
-export type PlanoOpcao = { codigo: string; nome: string; preco_mensal: number; numeros_whatsapp: number; atendimentos: number }
+export type PlanoOpcao = {
+  codigo: string
+  nome: string
+  preco_mensal: number
+  preco_anual: number
+  /** Falso no Essencial: sem ERP nem OS. */
+  permite_modulos: boolean
+  numeros_whatsapp: number
+  atendimentos: number
+}
+export type ModuloOpcao = {
+  codigo: string
+  nome: string
+  descricao: string
+  preco_mensal: number
+  preco_anual: number
+  ativo: boolean
+  /** Dia 1 em que o módulo desliga (pedido pelo dono); até lá, continua ligado. */
+  desliga_em: string | null
+}
 export type SituacaoTroca = {
   pode_trocar: boolean
   /** Por que o dono não troca sozinho (sem cobrança ligada ou com valor combinado). */
@@ -66,11 +85,25 @@ export type SituacaoTroca = {
   /** Dono de verdade da empresa (a equipe da plataforma, no modo suporte, troca pela tela Empresas). */
   eh_dono: boolean
   plano: string
-  /** Descida agendada para `vale_em` (dia 1 do mês seguinte). */
+  /** Descida agendada para `vale_em` (dia 1 do mês seguinte; no anual, a renovação). */
   plano_proximo: string | null
   vale_em: string
+  /** Quando valem as descidas e os desligamentos pedidos agora. */
+  fim_periodo: string
   numeros_ativos: number
+  ciclo: 'mensal' | 'anual'
+  anual_inicio: string | null
+  renova_em: string | null
+  /** Troca de ciclo agendada: anual no dia 1 seguinte, ou mensal na renovação. */
+  ciclo_proximo: 'mensal' | 'anual' | null
+  ciclo_proximo_em: string | null
+  /** 1: à vista; 2 a 12: cartão parcelado sem juros. */
+  anual_parcelas: number
+  teste_gratis: boolean | null
   planos: PlanoOpcao[]
+  modulos: ModuloOpcao[]
+  /** ERP e OS juntos. */
+  juntos: { mensal: number; anual: number }
 }
 /** subir: vale agora, com `valor` de ajuste na próxima fatura; descer: vale em `vale_em`; cancelar: desfaz a descida. */
 export type ResultadoTroca = {
@@ -83,6 +116,39 @@ export type ResultadoTroca = {
   teste_gratis?: boolean
   /** Atendimentos do mês depois de subir (franquia a mais proporcional aos dias que faltam); nulo no plano interno. */
   limite_mes?: number | null
+  /** No anual, `valor` é uma cobrança avulsa de `meses` dos 12 até `renova_em`. */
+  anual?: boolean
+  meses?: number
+  renova_em?: string | null
+}
+export type ResultadoCiclo = {
+  tipo: 'anual' | 'mensal' | 'cancelar' | 'parcelas' | 'igual'
+  ciclo: 'mensal' | 'anual'
+  vale_em?: string
+  /** Valor do primeiro ano: plano e módulos; `valor_plano`, só o plano. */
+  valor?: number
+  valor_plano?: number
+  parcelas?: number
+  plano?: string
+  /** Voltar ao mensal antes de a fatura anual sair: vale na hora. */
+  agora?: boolean
+}
+export type ResultadoModulo = {
+  tipo: 'ligar' | 'manter' | 'desligar' | 'igual'
+  modulo: string
+  valor?: number
+  diferenca?: number
+  anual?: boolean
+  dias?: number
+  dias_mes?: number
+  meses?: number
+  renova_em?: string | null
+  teste_gratis?: boolean
+  total_modulos?: number
+  vale_em?: string | null
+  agora?: boolean
+  /** Sem ERP nem OS depois disso: a nota fiscal some. */
+  sem_nota?: boolean
 }
 
 export async function buscarSituacaoTroca(orgId: string): Promise<SituacaoTroca> {
@@ -91,12 +157,26 @@ export async function buscarSituacaoTroca(orgId: string): Promise<SituacaoTroca>
   return data as unknown as SituacaoTroca
 }
 
+// Mensagens do banco que a tela mostra como vieram (as demais viram um texto genérico).
+const DO_BANCO = /^(Só o dono|Escolha|Para escolher|Para contratar|O plano )/
+
 /** Sem `confirmar`, só a prévia (o que acontece e quanto custa); com, faz a troca. */
 export async function trocarPlano(orgId: string, plano: string, confirmar: boolean): Promise<ResultadoTroca> {
   const { data, error } = await supabase.rpc('plano_trocar', { p_org: orgId, p_plano: plano, p_confirmar: confirmar })
-  if (error) {
-    const doBanco = /^(Só o dono|Escolha um|Para escolher|O plano )/.test(error.message)
-    throw new Error(doBanco ? error.message : 'Não foi possível trocar o plano. Confira a internet e tente de novo.')
-  }
+  if (error) throw new Error(DO_BANCO.test(error.message) ? error.message : 'Não foi possível trocar o plano. Confira a internet e tente de novo.')
   return data as unknown as ResultadoTroca
+}
+
+/** Mensal ou anual (migration 20261102150000). `parcelas`: 1 à vista, 2 a 12 no cartão sem juros. */
+export async function escolherCiclo(orgId: string, ciclo: 'mensal' | 'anual', parcelas: number, confirmar: boolean): Promise<ResultadoCiclo> {
+  const { data, error } = await supabase.rpc('plano_ciclo', { p_org: orgId, p_ciclo: ciclo, p_parcelas: parcelas, p_confirmar: confirmar })
+  if (error) throw new Error(DO_BANCO.test(error.message) ? error.message : 'Não foi possível trocar o plano. Confira a internet e tente de novo.')
+  return data as unknown as ResultadoCiclo
+}
+
+/** Liga ou desliga o ERP ou as OS. Sem `confirmar`, só a prévia. */
+export async function contratarModulo(orgId: string, modulo: string, ligar: boolean, confirmar: boolean): Promise<ResultadoModulo> {
+  const { data, error } = await supabase.rpc('modulo_contratar', { p_org: orgId, p_modulo: modulo, p_ligar: ligar, p_confirmar: confirmar })
+  if (error) throw new Error(DO_BANCO.test(error.message) ? error.message : 'Não foi possível mudar o módulo. Confira a internet e tente de novo.')
+  return data as unknown as ResultadoModulo
 }

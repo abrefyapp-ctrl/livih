@@ -6,6 +6,9 @@
 // link. A fatura passa por 'enviando' antes, para duas chamadas não cobrarem duas vezes; e, antes de criar, a função
 // procura no Asaas a cobrança com a referência da fatura (gravação perdida numa tentativa anterior). Fatura
 // 'a_cancelar' (cancelada pela plataforma depois de enviada) tem a cobrança apagada no Asaas.
+// Plano anual (entrega 4b): a fatura com parcelas > 1 vira um parcelamento no cartão (sem juros para o cliente; a Livih
+// absorve a taxa), e o cancelamento apaga o parcelamento inteiro. A fatura guarda a primeira parcela (asaas_id) e o
+// parcelamento (asaas_parcelamento); os eventos das outras parcelas não acham fatura e são ignorados pelo webhook.
 // No sandbox o cliente fica sem notificações do Asaas: o e-mail é o real da empresa, e a cobrança é de teste.
 // Ambiente: sandbox até ASAAS_AMBIENTE=producao nos secrets (chaves ASAAS_KEY_SANDBOX e ASAAS_KEY).
 
@@ -24,7 +27,7 @@ const LOTE = 20;
 const emSegundoPlano = (tarefa: Promise<unknown>) => globalThis.EdgeRuntime?.waitUntil?.(tarefa);
 
 type Fatura = { id: string; org_id: string; competencia: string; vencimento: string; valor: number; tentativas: number;
-  itens: { descricao: string; quantidade: number; valor: number }[] };
+  tipo: string; parcelas: number; itens: { descricao: string; quantidade: number; valor: number; anual?: boolean }[] };
 type Dados = { nome: string; documento: string; email: string; telefone: string | null; cep: string; logradouro: string;
   numero: string; complemento: string | null; bairro: string; cidade: string; uf: string };
 
@@ -90,7 +93,8 @@ async function garantirCliente(orgId: string): Promise<string> {
 function descricao(f: Fatura) {
   const [ano, mes] = f.competencia.split("-");
   const itens = f.itens.map((i) => i.quantidade > 1 ? `${i.descricao} (${i.quantidade})` : i.descricao).join("; ");
-  return `Mensalidade da Livih ${mes}/${ano}: ${itens}`.slice(0, 500);
+  const titulo = f.tipo === "avulsa" || f.itens.some((i) => i.anual) ? "Livih" : "Mensalidade da Livih";
+  return `${titulo} ${mes}/${ano}: ${itens}`.slice(0, 500);
 }
 
 // Falha de rede e tempo esgotado chegam em inglês: viram uma frase para a tela.
@@ -103,9 +107,9 @@ function mensagemDeErro(e: unknown) {
   return String(erro?.message ?? e).slice(0, 500);
 }
 
-async function cancelar(id: string, asaasId: string) {
+async function cancelar(id: string, asaasId: string, parcelamento: string | null) {
   try {
-    await asaas("DELETE", `/payments/${asaasId}`);
+    await asaas("DELETE", parcelamento ? `/installments/${parcelamento}` : `/payments/${asaasId}`);
   } catch (e) {
     // Já apagada no Asaas: segue e marca como cancelada.
     if ((e as { status?: number }).status !== 404) {
@@ -122,12 +126,17 @@ async function enviar(f: Fatura) {
   try {
     const cliente = await garantirCliente(f.org_id);
     const achadas = await asaas("GET", `/payments?externalReference=${encodeURIComponent(f.id)}`);
-    let cobranca = (achadas?.data ?? []).find((p: { deleted?: boolean }) => !p.deleted);
+    // No parcelamento, a referência acha todas as parcelas: vale a primeira.
+    type Achada = { id: string; status: string; invoiceUrl: string; installment?: string; deleted?: boolean;
+      installmentNumber?: number };
+    let cobranca = ((achadas?.data ?? []) as Achada[]).filter((p) => !p.deleted)
+      .sort((a, b) => (a.installmentNumber ?? 1) - (b.installmentNumber ?? 1))[0];
     if (!cobranca) {
       cobranca = await asaas("POST", "/payments", {
         customer: cliente,
-        billingType: "UNDEFINED",
-        value: Number(f.valor),
+        ...(f.parcelas > 1
+          ? { billingType: "CREDIT_CARD", installmentCount: f.parcelas, totalValue: Number(f.valor) }
+          : { billingType: "UNDEFINED", value: Number(f.valor) }),
         dueDate: f.vencimento,
         description: descricao(f),
         externalReference: f.id,
@@ -137,7 +146,8 @@ async function enviar(f: Fatura) {
     }
     const agora = new Date().toISOString();
     const { error } = await admin.from("faturas").update({
-      asaas_id: cobranca.id, link: cobranca.invoiceUrl, ambiente: AMBIENTE, erro: null,
+      asaas_id: cobranca.id, asaas_parcelamento: cobranca.installment ?? null, link: cobranca.invoiceUrl, ambiente: AMBIENTE,
+      erro: null,
       enviada_em: agora, atualizado_em: agora, tentativas: f.tentativas + 1,
     }).eq("id", f.id);
     if (error) console.error("gravar fatura enviada", f.id, error.message);
@@ -159,15 +169,16 @@ async function enviar(f: Fatura) {
 
 async function processar() {
   if (!CHAVE) return console.error(`asaas-cobranca: falta a chave do Asaas (${AMBIENTE})`);
-  const { data: canceladas } = await admin.from("faturas").select("id, asaas_id").eq("status", "a_cancelar").limit(LOTE);
-  for (const c of canceladas ?? []) if (c.asaas_id) await cancelar(c.id, c.asaas_id);
+  const { data: canceladas } = await admin.from("faturas").select("id, asaas_id, asaas_parcelamento").eq("status", "a_cancelar")
+    .limit(LOTE);
+  for (const c of canceladas ?? []) if (c.asaas_id) await cancelar(c.id, c.asaas_id, c.asaas_parcelamento);
   const { data: fila } = await admin.from("faturas").select("id").eq("status", "a_enviar").order("criado_em").limit(LOTE);
   if (!fila?.length) return;
   // Pega para si: só segue o que ainda estava 'a_enviar' (outra chamada pode ter pegado antes).
   const { data: pegas } = await admin.from("faturas")
     .update({ status: "enviando", atualizado_em: new Date().toISOString() })
     .in("id", fila.map((f) => f.id)).eq("status", "a_enviar")
-    .select("id, org_id, competencia, vencimento, valor, tentativas, itens");
+    .select("id, org_id, competencia, vencimento, valor, tentativas, itens, tipo, parcelas");
   for (const f of (pegas ?? []) as Fatura[]) await enviar(f);
 }
 

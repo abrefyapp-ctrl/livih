@@ -30,7 +30,9 @@ export function ListaFaturas({ faturas, acoes }: {
         return (
           <li key={f.id} className="space-y-1 p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-block font-medium first-letter:uppercase">{mesAno(f.competencia)}</span>
+              <span className="inline-block font-medium first-letter:uppercase">
+                {f.tipo === 'avulsa' ? `Cobrança avulsa de ${mesAno(f.competencia)}` : mesAno(f.competencia)}
+              </span>
               <span className={`rounded-sm px-1.5 py-0.5 text-legenda font-medium ${TONS[s.tom]}`}>{s.rotulo}</span>
               {f.ambiente === 'sandbox' && (
                 <span className="rounded-sm bg-slate-100 px-1.5 py-0.5 text-legenda text-texto-3">Teste</span>
@@ -39,6 +41,7 @@ export function ListaFaturas({ faturas, acoes }: {
             </div>
             <p className="text-legenda text-texto-3">
               Vence em {dia(f.vencimento)}
+              {f.parcelas > 1 && ` · no cartão em ${f.parcelas}x sem juros`}
               {f.paga_em && ` · paga em ${new Date(f.paga_em).toLocaleDateString('pt-BR')}`}
             </p>
             <ul className="text-legenda text-texto-2">
@@ -69,7 +72,7 @@ export function ListaFaturas({ faturas, acoes }: {
                   rel="noopener noreferrer"
                   className="inline-flex h-8 items-center rounded-md bg-primaria px-3 text-pequeno font-medium text-white hover:bg-primaria-hover"
                 >
-                  Abrir fatura (Pix, boleto ou cartão)
+                  {f.parcelas > 1 ? `Abrir fatura (cartão em ${f.parcelas}x)` : 'Abrir fatura (Pix, boleto ou cartão)'}
                 </a>
               )}
               {acoes && f.status === 'erro' && !f.asaas_id && (

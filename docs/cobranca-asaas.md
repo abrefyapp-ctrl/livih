@@ -58,7 +58,6 @@ módulos, os pacotes e o excedente de atendimentos. Sem isso, a página de plano
 
 ## Em aberto
 
-- Preço dos módulos (ERP e OS a R$ 99) ainda não está fechado ([planos-modulos.md](planos-modulos.md#decisões-em-aberto)).
 - Preço combinado da JoGrampo (terça, 03/11).
 - **CNPJ alfanumérico**: feito em 02/11 ([cnpj-alfanumerico.md](cnpj-alfanumerico.md)); os dados de cobrança aceitam
   o CNPJ com letras.
@@ -96,3 +95,10 @@ módulos, os pacotes e o excedente de atendimentos. Sem isso, a página de plano
 - 02/11: entrega 3 publicada e testada no sandbox com a empresa Teste: fatura de R$ 49,90 gerada pela janela Plano e
   paga com o cartão de teste; o `PAYMENT_CONFIRMED` chegou, a fatura virou "Paga" no mesmo segundo e a plataforma
   recebeu a notificação. Aviso aos 3 dias e suspensão aos 10 só valem em produção (conferidos na bateria de testes).
+- 02/11: entrega 4 feita em duas partes. 4a (migration `20261102140000_planos_troca`, publicada): troca de plano pelo
+  dono no mensal, ajustes na fatura seguinte, limite de números e nota fiscal só com ERP ou OS. 4b (migration
+  `20261102150000_planos_anual_modulos`): mensal ou anual pelo dono, fatura anual à vista ou no cartão em até 12x
+  (parcelamento no Asaas), cobranças avulsas (`faturas.tipo = 'avulsa'`) da diferença do anual ao subir de plano ou
+  contratar módulo, renovação automática com aviso 15 dias antes, "Encerrar o anual" na janela Plano (calcula a
+  devolução, feita à mão no Asaas) e ERP e OS contratados pelo dono. Regras em
+  [planos-modulos.md](planos-modulos.md#regras-construídas-0211-entrega-4b). 699/699 na bateria de testes.

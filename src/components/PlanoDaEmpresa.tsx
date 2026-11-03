@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSessao } from '../hooks/useSessao'
+import { buscarContrato, type Contrato } from '../services/faturas'
 import { moeda } from '../services/formato'
 import { buscarConsumoPlano, comprarPacote, definirEscolhaFranquia, type ConsumoPlano, type EscolhaFranquia } from '../services/plano'
 import { nomeDoMes } from '../services/usoIa'
@@ -9,6 +10,8 @@ import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { TrocaDePlano } from './TrocaDePlano'
 
 const numero = new Intl.NumberFormat('pt-BR')
+const renovaEm = (inicio: string) =>
+  new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(new Date(Date.UTC(+inicio.slice(0, 4) + 1, +inicio.slice(5, 7) - 1, 1)))
 const reais = (v: number | null) => moeda(v == null ? null : Number(v), true)
 
 const ESCOLHAS: { valor: EscolhaFranquia; rotulo: string; detalhe: (c: ConsumoPlano) => string }[] = [
@@ -25,7 +28,7 @@ export function PlanoDaEmpresa() {
   const { orgAtiva } = useSessao()
   const orgId = orgAtiva!.id
   const dono = orgAtiva?.papel === 'dono'
-  const [consumo, setConsumo] = useState<{ orgId: string; c: ConsumoPlano | null } | null>(null)
+  const [consumo, setConsumo] = useState<{ orgId: string; c: ConsumoPlano | null; contrato: Contrato | null } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
   const [salvando, setSalvando] = useState(false)
@@ -34,8 +37,8 @@ export function PlanoDaEmpresa() {
 
   useEffect(() => {
     let ativo = true
-    buscarConsumoPlano(orgId)
-      .then((c) => ativo && (setConsumo({ orgId, c }), setErro(null)))
+    Promise.all([buscarConsumoPlano(orgId), buscarContrato(orgId)])
+      .then(([c, contrato]) => ativo && (setConsumo({ orgId, c, contrato }), setErro(null)))
       .catch(() => ativo && setErro('Não foi possível carregar o plano. Confira a internet e tente de novo.'))
     return () => {
       ativo = false
@@ -43,6 +46,7 @@ export function PlanoDaEmpresa() {
   }, [orgId, versao])
 
   const c = consumo?.orgId === orgId ? consumo.c : null
+  const anual = consumo?.orgId === orgId && consumo.contrato?.ciclo === 'anual'
   if (!consumo) return erro ? <Aviso tom="erro">{erro}</Aviso> : <p className="text-pequeno text-texto-3">Carregando o plano…</p>
   if (!c) return null
 
@@ -100,7 +104,9 @@ export function PlanoDaEmpresa() {
           Plano {c.plano_nome}
         </h2>
         <p className="text-pequeno text-texto-2">
-          {reais(c.preco_mensal)} por mês
+          {anual && consumo.contrato?.anual_inicio
+            ? `Plano anual, renova em ${renovaEm(consumo.contrato.anual_inicio)}`
+            : `${reais(c.preco_mensal)} por mês`}
           {c.numeros_whatsapp != null &&
             ` · ${c.numeros_whatsapp === 1 ? '1 número de WhatsApp' : `${c.numeros_whatsapp} números de WhatsApp`}`}
           {' · '}

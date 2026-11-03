@@ -1164,7 +1164,7 @@ begin
     perform public.plataforma_definir_modulo(v_org, 'agenda', true);
     insert into resultado (teste, ok) values ('módulos: membro da empresa não liga módulo', false);
   exception when others then
-    insert into resultado (teste, ok) values ('módulos: membro da empresa não liga módulo', sqlerrm = 'só a equipe da plataforma');
+    insert into resultado (teste, ok) values ('módulos: membro da empresa não liga módulo', sqlerrm like 'Só a equipe da plataforma%');
   end;
 end $$;
 
@@ -4885,7 +4885,7 @@ begin
     insert into resultado (teste, ok) values ('planos: descer com números demais é recusado com quantos remover', false);
   exception when others then
     insert into resultado (teste, ok) values ('planos: descer com números demais é recusado com quantos remover',
-      sqlerrm like 'O plano Essencial permite 1 número de WhatsApp, e a empresa tem 2 em Configurações → WhatsApp. Para trocar, remova 1 número lá%');
+      sqlerrm like 'O plano Essencial permite 1 número de WhatsApp, e a empresa tem 2 números em Configurações → WhatsApp. Para trocar, remova 1 número lá%');
   end;
   r := public.plano_trocar(v_org, 'start', true);
   insert into resultado (teste, ok) select 'planos: descer fica agendado para o dia 1, sem ajuste',
@@ -5013,5 +5013,306 @@ insert into resultado (teste, ok) select 'planos: aplicação das descidas fecha
   not has_function_privilege('authenticated', 'public.planos_aplicar_agendados()', 'execute')
   and not has_function_privilege('authenticated', 'public.canais_sem_vaga(uuid, uuid)', 'execute')
   and not has_function_privilege('anon', 'public.plano_trocar(uuid, text, boolean)', 'execute');
+-- Plano anual e módulos pelo dono (migration 20261102150000).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_org uuid;
+begin
+  v_org := public.criar_organizacao('Anual Teste', 'teste-anual');
+  perform set_config('teste.anual', v_org::text, true);
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual')::uuid;
+  v_mes date := date_trunc('month', now() at time zone 'America/Sao_Paulo')::date;
+begin
+  update public.organizacoes set plano = 'start' where id = v_org;
+  insert into public.contratos_cobranca (org_id, ativo, inicio) values (v_org, true, v_mes);
+  -- A fatura deste mês já saiu: ligar um módulo gera a diferença dos dias que faltam.
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, ambiente)
+  values (v_org, v_mes, v_mes + 9, '[]', 99.90, 'aberta', 'sandbox');
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual')::uuid;
+  v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+  v_mes date := date_trunc('month', now() at time zone 'America/Sao_Paulo')::date;
+  v_prox date := (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month')::date;
+  r jsonb;
+begin
+  r := public.modulo_contratar(v_org, 'erp', true);
+  insert into resultado (teste, ok) select 'módulos: prévia de ligar o ERP mostra a diferença dos dias e não liga nada',
+    r ->> 'tipo' = 'ligar' and (r ->> 'diferenca')::numeric = 79.90
+    and (r ->> 'valor')::numeric = round(79.90 * (v_prox - v_hoje) / (v_prox - v_mes), 2)
+    and not public.modulo_ativo(v_org, 'erp');
+  r := public.modulo_contratar(v_org, 'erp', true, true);
+  insert into resultado (teste, ok) select 'módulos: o dono liga o ERP na hora e a diferença vai para a próxima fatura',
+    public.modulo_ativo(v_org, 'erp')
+    and (select count(*) = 1 and sum(valor) = (r ->> 'valor')::numeric from public.cobranca_ajustes where org_id = v_org)
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'contratar_modulo');
+  r := public.modulo_contratar(v_org, 'os', true);
+  insert into resultado (teste, ok) select 'módulos: com o ERP ligado, as OS custam só R$ 29,90 a mais',
+    (r ->> 'diferenca')::numeric = 29.90 and (r ->> 'total_modulos')::numeric = 109.80;
+  perform public.modulo_contratar(v_org, 'os', true, true);
+  begin
+    perform public.plano_trocar(v_org, 'essencial', true);
+    insert into resultado (teste, ok) values ('módulos: descer ao Essencial com módulos ligados é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('módulos: descer ao Essencial com módulos ligados é recusado',
+      sqlerrm like 'O plano Essencial não inclui ERP nem Ordens de serviço. Para descer, desligue antes estes módulos aqui em Plano e consumo: Pedidos e estoque (ERP) e Ordens de serviço%');
+  end;
+  r := public.modulo_contratar(v_org, 'os', false, true);
+  insert into resultado (teste, ok) select 'módulos: desligar fica para o dia 1 seguinte e o módulo continua até lá',
+    r ->> 'tipo' = 'desligar' and (r ->> 'vale_em')::date = v_prox and not (r ->> 'sem_nota')::boolean
+    and public.modulo_ativo(v_org, 'os')
+    and exists (select 1 from jsonb_array_elements(public.plano_troca_situacao(v_org) -> 'modulos') m
+                 where m ->> 'codigo' = 'os' and (m ->> 'desliga_em')::date = v_prox);
+  r := public.modulo_contratar(v_org, 'os', true, true);
+  insert into resultado (teste, ok) select 'módulos: ligar de novo desfaz o desligamento sem cobrar outra vez',
+    r ->> 'tipo' = 'manter'
+    and exists (select 1 from jsonb_array_elements(public.plano_troca_situacao(v_org) -> 'modulos') m
+                 where m ->> 'codigo' = 'os' and m ->> 'desliga_em' is null)
+    and (select count(*) = 2 from public.cobranca_ajustes where org_id = v_org);
+  perform public.modulo_contratar(v_org, 'erp', false, true);
+  r := public.modulo_contratar(v_org, 'os', false, true);
+  insert into resultado (teste, ok) select 'módulos: desligar o último módulo de nota avisa que a nota fiscal some',
+    (r ->> 'sem_nota')::boolean;
+  r := public.plano_trocar(v_org, 'essencial', true);
+  insert into resultado (teste, ok) select 'módulos: com os módulos desligando no dia 1, dá para descer ao Essencial',
+    r ->> 'tipo' = 'descer' and (r ->> 'vale_em')::date = v_prox;
+  insert into resultado (teste, ok) select 'módulos: situação lista os módulos pagos com o desligamento agendado',
+    jsonb_array_length(public.plano_troca_situacao(v_org) -> 'modulos') = 2
+    and (public.plano_troca_situacao(v_org) -> 'juntos' ->> 'anual')::numeric = 1098
+    and exists (select 1 from jsonb_array_elements(public.plano_troca_situacao(v_org) -> 'modulos') m
+                 where m ->> 'codigo' = 'os' and (m ->> 'desliga_em')::date = v_prox);
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual')::uuid;
+  v_mes date := date_trunc('month', now() at time zone 'America/Sao_Paulo')::date;
+begin
+  insert into resultado (teste, ok) select 'módulos: ERP e OS juntos saem por R$ 109,80 na fatura seguinte',
+    exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, (v_mes + interval '1 month')::date)) i
+             where i ->> 'descricao' = 'Módulos Pedidos e estoque (ERP) e Ordens de serviço' and (i ->> 'valor')::numeric = 109.80);
+  update public.organizacao_modulos set desliga_em = v_mes where org_id = v_org;
+  update public.organizacoes set plano_proximo_em = v_mes where id = v_org;
+  perform public.planos_aplicar_agendados();
+  insert into resultado (teste, ok) select 'módulos: no dia marcado os módulos desligam antes da descida ao Essencial',
+    not public.modulo_ativo(v_org, 'erp') and not public.modulo_ativo(v_org, 'os')
+    and (select plano = 'essencial' from public.organizacoes where id = v_org)
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'aplicar_desligar_modulo');
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$ begin
+  perform public.modulo_contratar(current_setting('teste.anual')::uuid, 'erp', true, true);
+  insert into resultado (teste, ok) values ('módulos: o Essencial não contrata módulo', false);
+exception when others then
+  insert into resultado (teste, ok) values ('módulos: o Essencial não contrata módulo', sqlerrm like 'O plano Essencial não inclui ERP nem Ordens de serviço. Para contratar, suba para o Start%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a2","role":"authenticated"}', true);
+do $$ begin
+  perform public.modulo_contratar(current_setting('teste.anual')::uuid, 'erp', true, true);
+  insert into resultado (teste, ok) values ('módulos: no modo suporte a equipe não contrata pela tela do cliente', false);
+exception when others then
+  insert into resultado (teste, ok) values ('módulos: no modo suporte a equipe não contrata pela tela do cliente', sqlerrm like 'Só o dono%');
+end $$;
+
+-- Anual: escolha, começo no dia 1, fatura do ano em 12x, subir com cobrança avulsa, descer e voltar ao mensal na renovação.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+update public.organizacoes set plano = 'start' where id = current_setting('teste.anual')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual')::uuid;
+  v_prox date := (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month')::date;
+  r jsonb;
+begin
+  r := public.plano_ciclo(v_org, 'anual', 12);
+  insert into resultado (teste, ok) select 'anual: prévia mostra o valor do ano e o começo no dia 1 seguinte',
+    r ->> 'tipo' = 'anual' and (r ->> 'valor')::numeric = 999 and (r ->> 'vale_em')::date = v_prox
+    and (select ciclo = 'mensal' and ciclo_proximo is null from public.contratos_cobranca where org_id = v_org);
+  perform public.plano_ciclo(v_org, 'anual', 12, true);
+  insert into resultado (teste, ok) select 'anual: escolher o anual fica agendado com as parcelas',
+    (select ciclo = 'mensal' and ciclo_proximo = 'anual' and ciclo_proximo_em = v_prox and anual_parcelas = 12
+       from public.contratos_cobranca where org_id = v_org);
+  r := public.plano_ciclo(v_org, 'mensal', 1, true);
+  insert into resultado (teste, ok) select 'anual: escolher de novo o mensal desfaz o anual agendado',
+    r ->> 'tipo' = 'cancelar'
+    and (select ciclo_proximo is null from public.contratos_cobranca where org_id = v_org);
+  perform public.plano_ciclo(v_org, 'anual', 12, true);
+  begin
+    perform public.plano_ciclo(v_org, 'anual', 13);
+    insert into resultado (teste, ok) values ('anual: mais de 12 parcelas é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('anual: mais de 12 parcelas é recusado', sqlerrm like 'Escolha de 1 a 12%');
+  end;
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual')::uuid;
+  v_mes date := date_trunc('month', now() at time zone 'America/Sao_Paulo')::date;
+  v_id uuid;
+begin
+  update public.contratos_cobranca set ciclo_proximo_em = v_mes where org_id = v_org;
+  perform public.planos_aplicar_agendados();
+  insert into resultado (teste, ok) select 'anual: começa no dia marcado',
+    (select ciclo = 'anual' and anual_inicio = v_mes and ciclo_proximo is null from public.contratos_cobranca where org_id = v_org)
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'comecar_anual');
+  insert into resultado (teste, ok) select 'anual: a fatura do começo leva o ano inteiro; as seguintes, não',
+    exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, v_mes)) i
+             where i ->> 'descricao' like 'Plano Start anual (%' and (i ->> 'valor')::numeric = 999 and (i ->> 'anual')::boolean)
+    and not exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, (v_mes + interval '1 month')::date)) i
+                     where i ->> 'descricao' like 'Plano%');
+  update public.faturas set status = 'cancelada' where org_id = v_org and tipo = 'mes';
+  v_id := public.cobranca_criar_fatura(v_org, v_mes);
+  insert into resultado (teste, ok) select 'anual: a fatura anual sai nas parcelas escolhidas',
+    (select parcelas = 12 and valor >= 999 and tipo = 'mes' from public.faturas where id = v_id);
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual')::uuid;
+  v_mes date := date_trunc('month', now() at time zone 'America/Sao_Paulo')::date;
+  r jsonb;
+begin
+  r := public.plano_trocar(v_org, 'pro', true);
+  insert into resultado (teste, ok) select 'anual: subir vale na hora com cobrança avulsa da diferença dos meses que faltam',
+    r ->> 'tipo' = 'subir' and (r ->> 'anual')::boolean and (r ->> 'meses')::int = 12 and (r ->> 'valor')::numeric = 500
+    and (select plano = 'pro' from public.organizacoes where id = v_org)
+    and (select count(*) = 1 and sum(valor) = 500 from public.faturas where org_id = v_org and tipo = 'avulsa')
+    and not exists (select 1 from public.cobranca_ajustes where org_id = v_org and descricao like 'Diferença do plano Pro%');
+  r := public.modulo_contratar(v_org, 'erp', true, true);
+  insert into resultado (teste, ok) select 'anual: ligar módulo no anual gera cobrança avulsa da diferença anual',
+    (r ->> 'valor')::numeric = 799
+    and (select count(*) = 2 from public.faturas where org_id = v_org and tipo = 'avulsa' and competencia = v_mes);
+  r := public.plano_trocar(v_org, 'start');
+  insert into resultado (teste, ok) select 'anual: descer fica para a renovação',
+    r ->> 'tipo' = 'descer' and (r ->> 'vale_em')::date = (v_mes + interval '12 months')::date;
+  r := public.modulo_contratar(v_org, 'erp', false);
+  insert into resultado (teste, ok) select 'anual: desligar módulo fica para a renovação',
+    (r ->> 'vale_em')::date = (v_mes + interval '12 months')::date;
+  r := public.plano_ciclo(v_org, 'mensal', 1, true);
+  insert into resultado (teste, ok) select 'anual: voltar ao mensal fica para a renovação depois da fatura anual',
+    r ->> 'tipo' = 'mensal' and not (r ->> 'agora')::boolean
+    and (select ciclo = 'anual' and ciclo_proximo = 'mensal' and ciclo_proximo_em = (v_mes + interval '12 months')::date
+           from public.contratos_cobranca where org_id = v_org);
+  insert into resultado (teste, ok) select 'anual: situação mostra o ciclo e a renovação',
+    public.plano_troca_situacao(v_org) ->> 'ciclo' = 'anual'
+    and (public.plano_troca_situacao(v_org) ->> 'renova_em')::date = (v_mes + interval '12 months')::date
+    and (public.plano_troca_situacao(v_org) ->> 'fim_periodo')::date = (v_mes + interval '12 months')::date;
+  begin
+    perform public.plataforma_definir_contrato(v_org, false, v_mes, null, null);
+    insert into resultado (teste, ok) values ('anual: desligar a cobrança do anual passa por "Encerrar o anual"', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('anual: desligar a cobrança do anual passa por "Encerrar o anual"',
+      sqlerrm like 'Esta empresa está no plano anual%');
+  end;
+end $$;
+
+-- Aviso 15 dias antes (só quando a renovação está nessa janela), renovação e volta ao mensal no dia 1.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual')::uuid;
+  v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+  v_mes date := date_trunc('month', now() at time zone 'America/Sao_Paulo')::date;
+  v_prox date := (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month')::date;
+begin
+  update public.contratos_cobranca set anual_inicio = (v_prox - interval '12 months')::date, ciclo_proximo = null,
+         ciclo_proximo_em = null where org_id = v_org;
+  perform public.cobranca_avisar_renovacoes();
+  insert into resultado (teste, ok) select 'anual: aviso de renovação só nos 15 dias antes',
+    (select (aviso_renovacao_em is not distinct from v_prox) = (v_prox - v_hoje <= 15)
+       from public.contratos_cobranca where org_id = v_org);
+
+  update public.contratos_cobranca set anual_inicio = (v_mes - interval '12 months')::date where org_id = v_org;
+  update public.organizacoes set plano_proximo = 'start', plano_proximo_em = v_mes where id = v_org;
+  perform public.planos_aplicar_agendados();
+  insert into resultado (teste, ok) select 'anual: renova sozinho e a descida pedida vale na renovação',
+    (select anual_inicio = v_mes and ciclo = 'anual' from public.contratos_cobranca where org_id = v_org)
+    and (select plano = 'start' from public.organizacoes where id = v_org)
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'renovar_anual');
+
+  update public.contratos_cobranca set anual_inicio = (v_mes - interval '12 months')::date, ciclo_proximo = 'mensal',
+         ciclo_proximo_em = v_mes where org_id = v_org;
+  perform public.planos_aplicar_agendados();
+  insert into resultado (teste, ok) select 'anual: volta ao mensal na renovação pedida',
+    (select ciclo = 'mensal' and anual_inicio is null and ciclo_proximo is null from public.contratos_cobranca where org_id = v_org);
+
+  -- Encerrar no 6º mês: R$ 999 pagos menos 6 × R$ 99,90 = R$ 399,60 (exemplo de site-planos.md).
+  delete from public.organizacao_modulos where org_id = v_org;
+  update public.contratos_cobranca set ciclo = 'anual', anual_inicio = (v_mes - interval '5 months')::date where org_id = v_org;
+  insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, ambiente, paga_em)
+  values (v_org, (v_mes - interval '5 months')::date, (v_mes - interval '5 months')::date + 9,
+          '[{"descricao": "Plano Start anual", "quantidade": 1, "valor": 999, "anual": true}]', 999, 'paga', 'sandbox',
+          now() - interval '150 days');
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual')::uuid;
+  r jsonb;
+begin
+  r := public.plataforma_encerrar_anual(v_org);
+  insert into resultado (teste, ok) select 'anual: encerrar no 6º mês devolve o pago menos os meses a preço mensal',
+    (r ->> 'meses_usados')::int = 6 and (r ->> 'pago')::numeric = 999 and (r ->> 'devolver')::numeric = 399.60
+    and not (r ->> 'integral')::boolean
+    and (select ciclo = 'anual' from public.contratos_cobranca where org_id = v_org);
+end $$;
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+update public.faturas set paga_em = now() - interval '2 days'
+ where org_id = current_setting('teste.anual')::uuid and status = 'paga';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual')::uuid;
+  r jsonb;
+begin
+  r := public.plataforma_encerrar_anual(v_org);
+  insert into resultado (teste, ok) select 'anual: até 7 dias depois do pagamento a devolução é integral',
+    (r ->> 'integral')::boolean and (r ->> 'devolver')::numeric = 999;
+  r := public.plataforma_encerrar_anual(v_org, true);
+  insert into resultado (teste, ok) select 'anual: encerrar volta ao mensal e desliga a cobrança',
+    (select ciclo = 'mensal' and not ativo from public.contratos_cobranca where org_id = v_org)
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'encerrar_anual');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.plataforma_encerrar_anual(current_setting('teste.anual')::uuid);
+  insert into resultado (teste, ok) values ('anual: só a plataforma encerra o anual', false);
+exception when others then
+  insert into resultado (teste, ok) values ('anual: só a plataforma encerra o anual', sqlerrm like 'Só a equipe%');
+end $$;
+reset role;
+insert into resultado (teste, ok) select 'anual: funções internas fechadas para o login',
+  not has_function_privilege('authenticated', 'public.cobranca_avisar_renovacoes()', 'execute')
+  and not has_function_privilege('authenticated', 'public.cobranca_criar_avulsa(uuid, jsonb)', 'execute')
+  and not has_function_privilege('authenticated', 'public.modulos_pagos(uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.plano_ciclo(uuid, text, integer, boolean)', 'execute')
+  and not has_function_privilege('anon', 'public.modulo_contratar(uuid, text, boolean, boolean)', 'execute');
 reset role;
 select n, teste, ok from resultado order by n;

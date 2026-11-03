@@ -49,7 +49,7 @@ export async function definirContrato(orgId: string, c: { ativo: boolean; inicio
     p_motivo: c.motivo,
   })
   if (error) {
-    const doBanco = /^(Informe|Salve|Empresa|Só a equipe)/.test(error.message)
+    const doBanco = /^(Informe|Salve|Empresa|Só a equipe|Esta empresa)/.test(error.message)
     throw new Error(doBanco ? error.message : 'Não foi possível salvar a cobrança. Confira a internet e tente de novo.')
   }
 }
@@ -70,6 +70,28 @@ export async function reenviarFatura(faturaId: string) {
     const doBanco = /^(Só dá|Só a equipe)/.test(error.message)
     throw new Error(doBanco ? error.message : 'Não foi possível tentar de novo. Confira a internet e tente outra vez.')
   }
+}
+
+export type EncerramentoAnual = {
+  pago: number
+  meses_usados: number
+  /** Plano e módulos por mês, pela tabela de hoje. */
+  mensal: number
+  /** Até 7 dias depois do pagamento da fatura anual. */
+  integral: boolean
+  devolver: number
+  anual_inicio: string
+  renova_em: string
+}
+
+/** Sem `confirmar`, só calcula a devolução; com, volta ao mensal e desliga a cobrança (migration 20261102150000). */
+export async function encerrarAnual(orgId: string, confirmar: boolean): Promise<EncerramentoAnual> {
+  const { data, error } = await supabase.rpc('plataforma_encerrar_anual', { p_org: orgId, p_confirmar: confirmar })
+  if (error) {
+    const doBanco = /^(Esta empresa|Só a equipe)/.test(error.message)
+    throw new Error(doBanco ? error.message : 'Não foi possível encerrar o anual. Confira a internet e tente de novo.')
+  }
+  return data as unknown as EncerramentoAnual
 }
 
 /** Cancela a fatura (teste no sandbox, cobrança por engano) e libera o mês; a cobrança no Asaas é apagada. */
