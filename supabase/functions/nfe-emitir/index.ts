@@ -69,6 +69,9 @@ Deno.serve(async (req) => {
   if (!visivel) return json(404, { erro: "Pedido não encontrado." });
   const { data: pode } = await comoUsuario.rpc("emite_nota_fiscal", { p_org: visivel.org_id });
   if (pode !== true) return json(403, { erro: "Você não tem a permissão \"Emite nota fiscal\". Peça ao dono ou ao admin." });
+  // Nota fiscal só com o ERP ou as OS ligados (planos de 28/10; nota_fiscal_liberada).
+  const { data: liberada } = await admin.rpc("nota_fiscal_liberada", { p_org: visivel.org_id });
+  if (liberada !== true) return json(403, { erro: "A nota fiscal vem com o módulo Pedidos e estoque (ERP) ou Ordens de serviço, e nenhum dos dois está ligado nesta empresa. Para ligar, o dono fala com a equipe da Livih." });
 
   const [{ data: ped }, { data: itens }, { data: viva }] = await Promise.all([
     admin.from("pedidos").select("*").eq("id", p.pedido_id).single(),

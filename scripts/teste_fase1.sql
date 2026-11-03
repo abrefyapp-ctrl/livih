@@ -4276,8 +4276,8 @@ begin
   insert into public.creditos_atendimentos (org_id, mes, tipo, quantidade, valor) values (v_org, v_ant, 'pacote', 100, 29.90);
 
   insert into public.organizacao_modulos (org_id, modulo, ativo) values (v_org, 'os', true);
-  insert into resultado (teste, ok) select 'faturas: ERP e OS juntos saem por R$ 149',
-    (select count(*) = 1 and min((i ->> 'valor')::numeric) = 149
+  insert into resultado (teste, ok) select 'faturas: ERP e OS juntos saem por R$ 109,80 (preço de 02/11)',
+    (select count(*) = 1 and min((i ->> 'valor')::numeric) = 109.80
        from jsonb_array_elements(public.cobranca_itens(v_org, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date)) i where i ->> 'descricao' like 'Módulo%');
   delete from public.organizacao_modulos where org_id = v_org and modulo = 'os';
 end $$;
@@ -4307,7 +4307,7 @@ begin
   v_fat := public.plataforma_gerar_fatura(v_org);
   select * into f from public.faturas where id = v_fat;
   insert into resultado (teste, ok) select 'faturas: plano, módulo, excedente e pacote do mês anterior numa fatura só',
-    f.valor = 99.90 + 99 + 1.20 + 29.90 and f.status = 'a_enviar' and jsonb_array_length(f.itens) = 4
+    f.valor = 99.90 + 79.90 + 1.20 + 29.90 and f.status = 'a_enviar' and jsonb_array_length(f.itens) = 4
     and f.vencimento >= f.competencia + 9 and f.competencia = date_trunc('month', now() at time zone 'America/Sao_Paulo')::date
     and (select inicio = date_trunc('month', now() at time zone 'America/Sao_Paulo')::date from public.contratos_cobranca where org_id = v_org);
 
@@ -4781,5 +4781,237 @@ end $$;
 reset role;
 insert into resultado (teste, ok) select 'cnpj alfanumérico: limpeza fechada para o anon',
   not has_function_privilege('anon', 'public.limpar_documento(text)', 'execute');
+
+-- Troca de plano pelo dono, descida agendada, ajuste na fatura e limite de números (migration 20261102140000).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_org uuid;
+begin
+  v_org := public.criar_organizacao('Plano Teste', 'teste-plano');
+  perform set_config('teste.plano', v_org::text, true);
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare v_org uuid := current_setting('teste.plano')::uuid;
+begin
+  insert into public.membros_org (org_id, user_id, papel) values (v_org, '00000000-0000-0000-0000-0000000000b1', 'atendente')
+  on conflict do nothing;
+  update public.organizacoes set plano = 'start' where id = v_org;
+  insert into public.organizacao_modulos (org_id, modulo, ativo) values (v_org, 'erp', true);
+  insert into resultado (teste, ok) select 'planos: ERP sozinho sai por R$ 79,90',
+    exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date)) i
+             where i ->> 'descricao' like 'Módulo%' and (i ->> 'valor')::numeric = 79.90);
+  delete from public.organizacao_modulos where org_id = v_org;
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$ begin
+  perform public.plano_trocar(current_setting('teste.plano')::uuid, 'pro', true);
+  insert into resultado (teste, ok) values ('planos: sem cobrança ligada o dono não troca o plano', false);
+exception when others then
+  insert into resultado (teste, ok) values ('planos: sem cobrança ligada o dono não troca o plano', sqlerrm like 'Para escolher ou trocar o plano%');
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+insert into public.contratos_cobranca (org_id, ativo, inicio) values (current_setting('teste.plano')::uuid, true, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date);
+
+-- Sem a fatura do mês (ela ainda vai sair, já com o plano novo): sem ajuste e com a franquia cheia.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'planos: sem a fatura do mês, subir não gera ajuste e dá a franquia cheia',
+  (r ->> 'valor')::numeric = 0 and (r ->> 'limite_mes')::int = 500
+  from (select public.plano_trocar(current_setting('teste.plano')::uuid, 'pro') r) x;
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+insert into public.faturas (org_id, competencia, vencimento, itens, valor, status, ambiente)
+values (current_setting('teste.plano')::uuid, date_trunc('month', now() at time zone 'America/Sao_Paulo')::date,
+        date_trunc('month', now() at time zone 'America/Sao_Paulo')::date + 9, '[]', 99.90, 'aberta', 'sandbox');
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.plano')::uuid;
+  v_hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+  v_prox date := (date_trunc('month', now() at time zone 'America/Sao_Paulo')::date + interval '1 month')::date;
+  v_esperado numeric := round(50 * (v_prox - v_hoje)::numeric / (v_prox - date_trunc('month', now() at time zone 'America/Sao_Paulo')::date), 2);
+  -- Start (350) → Pro (500): os 150 a mais na proporção dos dias que faltam.
+  v_extra integer := floor(150 * (v_prox - v_hoje)::numeric / (v_prox - date_trunc('month', now() at time zone 'America/Sao_Paulo')::date));
+  r jsonb;
+begin
+  r := public.plano_trocar(v_org, 'pro');
+  insert into resultado (teste, ok) select 'planos: prévia de subir mostra o ajuste proporcional e não troca nada',
+    r ->> 'tipo' = 'subir' and (r ->> 'valor')::numeric = v_esperado and (r ->> 'limite_mes')::int = 350 + v_extra
+    and (select plano = 'start' from public.organizacoes where id = v_org)
+    and not exists (select 1 from public.cobranca_ajustes where org_id = v_org);
+  r := public.plano_trocar(v_org, 'pro', true);
+  insert into resultado (teste, ok) select 'planos: subir vale na hora e o ajuste entra na fatura do mês seguinte',
+    (select plano = 'pro' from public.organizacoes where id = v_org)
+    and (select count(*) = 1 and sum(valor) = v_esperado from public.cobranca_ajustes where org_id = v_org)
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'trocar_plano');
+  insert into resultado (teste, ok) select 'planos: subir no meio do mês dá a franquia a mais proporcional aos dias',
+    (select limite = 350 + v_extra and reducao_troca = 150 - v_extra from public.plano_consumo(v_org));
+  insert into resultado (teste, ok) select 'planos: clique duplo não cobra o ajuste duas vezes',
+    public.plano_trocar(v_org, 'pro', true) ->> 'tipo' = 'igual'
+    and (select count(*) = 1 from public.cobranca_ajustes where org_id = v_org);
+end $$;
+
+-- Números: com 2 conectados, descer ao Essencial (1) é recusado; removido um, a descida fica para o dia 1.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+insert into resultado (teste, ok) select 'planos: o ajuste aparece nos itens da fatura do mês seguinte',
+  exists (select 1 from jsonb_array_elements(public.cobranca_itens(current_setting('teste.plano')::uuid,
+            (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month')::date)) i
+           where i ->> 'descricao' like 'Diferença do plano Pro de%'
+             and (i ->> 'valor')::numeric = (select sum(valor) from public.cobranca_ajustes where org_id = current_setting('teste.plano')::uuid));
+insert into public.canais (org_id, nome, telefone, instance_id) values
+  (current_setting('teste.plano')::uuid, 'Número 1', '5541999990101', 'INST-PLANO-1'),
+  (current_setting('teste.plano')::uuid, 'Número 2', '5541999990102', 'INST-PLANO-2');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.plano')::uuid;
+  r jsonb;
+begin
+  begin
+    perform public.plano_trocar(v_org, 'essencial', true);
+    insert into resultado (teste, ok) values ('planos: descer com números demais é recusado com quantos remover', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('planos: descer com números demais é recusado com quantos remover',
+      sqlerrm like 'O plano Essencial permite 1 número de WhatsApp, e a empresa tem 2 em Configurações → WhatsApp. Para trocar, remova 1 número lá%');
+  end;
+  r := public.plano_trocar(v_org, 'start', true);
+  insert into resultado (teste, ok) select 'planos: descer fica agendado para o dia 1, sem ajuste',
+    r ->> 'tipo' = 'descer' and (r ->> 'vale_em')::date = (date_trunc('month', now() at time zone 'America/Sao_Paulo')::date + interval '1 month')::date
+    and (select plano = 'pro' and plano_proximo = 'start' from public.organizacoes where id = v_org)
+    and (select count(*) = 1 from public.cobranca_ajustes where org_id = v_org);
+end $$;
+
+-- Com a descida agendada para o Start (2), o terceiro número já é recusado, embora o Pro permita 3.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare v_org uuid := current_setting('teste.plano')::uuid;
+begin
+  begin
+    insert into public.canais (org_id, nome, telefone, instance_id) values (v_org, 'Número 3', '5541999990103', 'INST-PLANO-3');
+    insert into resultado (teste, ok) values ('planos: limite de números vale o menor com a descida agendada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('planos: limite de números vale o menor com a descida agendada',
+      sqlerrm like 'O plano Start, que começa em %, permite 2 números de WhatsApp, e a empresa já tem 2.%');
+  end;
+  -- No mesmo mês (ex.: pedida no dia 1 antes do cron das 00:05), a descida não vale: só no mês marcado.
+  perform public.planos_aplicar_agendados();
+  insert into resultado (teste, ok) select 'planos: descida pedida no mês não vale antes do mês marcado',
+    (select plano = 'pro' and plano_proximo = 'start' from public.organizacoes where id = v_org);
+  update public.organizacoes set plano_proximo_em = date_trunc('month', now() at time zone 'America/Sao_Paulo')::date where id = v_org;
+  perform set_config('teste.aplicados', public.planos_aplicar_agendados()::text, true);
+  insert into resultado (teste, ok) select 'planos: descida agendada vale no dia 1',
+    current_setting('teste.aplicados')::int >= 1
+    and (select plano = 'start' and plano_proximo is null from public.organizacoes where id = v_org)
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'aplicar_troca_plano');
+  -- Removido um número, dá para descer ao Essencial; escolher de novo o plano atual desfaz a troca.
+  update public.canais set ativo = false where instance_id = 'INST-PLANO-2';
+  update public.organizacoes set plano = 'essencial' where id = v_org;
+  update public.canais set nome = 'Número 1 (oficial)' where instance_id = 'INST-PLANO-1';
+  insert into resultado (teste, ok) select 'planos: no limite, mudar outros dados do número continua funcionando',
+    exists (select 1 from public.canais where instance_id = 'INST-PLANO-1' and nome = 'Número 1 (oficial)')
+    and public.canais_sem_vaga(v_org) like 'O plano Essencial permite 1 número de WhatsApp, e a empresa já tem 1.%';
+  begin
+    update public.canais set ativo = true where instance_id = 'INST-PLANO-2';
+    insert into resultado (teste, ok) values ('planos: religar um número acima do limite é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('planos: religar um número acima do limite é recusado', sqlerrm like 'O plano Essencial permite%');
+  end;
+  update public.organizacoes set plano = 'start' where id = v_org;
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.plano')::uuid;
+begin
+  perform public.plano_trocar(v_org, 'essencial', true);
+  perform set_config('teste.troca', public.plano_trocar(v_org, 'start', true) ->> 'tipo', true);
+  insert into resultado (teste, ok) select 'planos: escolher o plano atual desfaz a descida agendada',
+    current_setting('teste.troca') = 'cancelar'
+    and (select plano = 'start' and plano_proximo is null from public.organizacoes where id = v_org);
+  perform public.plano_trocar(v_org, 'essencial', true);
+  perform public.plataforma_definir_plano(v_org, 'business');
+  insert into resultado (teste, ok) select 'planos: a troca pela plataforma desfaz a descida agendada',
+    (select plano = 'business' and plano_proximo is null from public.organizacoes where id = v_org);
+  insert into resultado (teste, ok) select 'planos: situação lista os planos sem o interno',
+    (select jsonb_array_length(public.plano_troca_situacao(v_org) -> 'planos') = 4)
+    and (public.plano_troca_situacao(v_org) ->> 'pode_trocar')::boolean;
+end $$;
+
+-- Teste grátis (cobrança começa no mês seguinte): sobe sem ajuste. Valor combinado: só a equipe troca.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+update public.contratos_cobranca set inicio = (date_trunc('month', now() at time zone 'America/Sao_Paulo')::date + interval '1 month')::date
+ where org_id = current_setting('teste.plano')::uuid;
+update public.organizacoes set plano = 'essencial' where id = current_setting('teste.plano')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.plano')::uuid;
+begin
+  insert into resultado (teste, ok) select 'planos: no teste grátis subir não gera ajuste',
+    (public.plano_trocar(v_org, 'pro', true) ->> 'valor')::numeric = 0
+    and (select count(*) = 1 from public.cobranca_ajustes where org_id = v_org);
+end $$;
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+update public.contratos_cobranca set valor_fixo = 50, motivo_valor = 'acordo' where org_id = current_setting('teste.plano')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$ begin
+  perform public.plano_trocar(current_setting('teste.plano')::uuid, 'business', true);
+  insert into resultado (teste, ok) values ('planos: com valor combinado só a equipe troca', false);
+exception when others then
+  insert into resultado (teste, ok) values ('planos: com valor combinado só a equipe troca', sqlerrm like 'O plano da sua empresa tem um valor combinado%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.plano_trocar(current_setting('teste.plano')::uuid, 'business', true);
+  insert into resultado (teste, ok) values ('planos: atendente não troca o plano', false);
+exception when others then
+  insert into resultado (teste, ok) values ('planos: atendente não troca o plano', sqlerrm like 'Só o dono%');
+end $$;
+insert into resultado (teste, ok) select 'planos: atendente não vê os ajustes', not exists (select 1 from public.cobranca_ajustes);
+reset role;
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000a2', 'suporte@teste.livih');
+insert into public.admins_plataforma (user_id) values ('00000000-0000-0000-0000-0000000000a2');
+update public.contratos_cobranca set valor_fixo = null, motivo_valor = null where org_id = current_setting('teste.plano')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a2","role":"authenticated"}', true);
+do $$ begin
+  insert into resultado (teste, ok) select 'planos: no modo suporte a equipe vê a situação, mas não como dona',
+    not (public.plano_troca_situacao(current_setting('teste.plano')::uuid) ->> 'eh_dono')::boolean;
+  perform public.plano_trocar(current_setting('teste.plano')::uuid, 'business', true);
+  insert into resultado (teste, ok) values ('planos: no modo suporte a equipe não troca pela tela do cliente', false);
+exception when others then
+  insert into resultado (teste, ok) values ('planos: no modo suporte a equipe não troca pela tela do cliente', sqlerrm like 'Só o dono%');
+end $$;
+reset role;
+insert into resultado (teste, ok) select 'planos: nota fiscal só com ERP ou OS ligados',
+  not public.nota_fiscal_liberada(current_setting('teste.plano')::uuid)
+  and public.nota_fiscal_liberada((select id from public.organizacoes where slug = 'teste-f7'))
+  = (public.modulo_ativo((select id from public.organizacoes where slug = 'teste-f7'), 'erp')
+     or public.modulo_ativo((select id from public.organizacoes where slug = 'teste-f7'), 'os'));
+insert into public.organizacao_modulos (org_id, modulo, ativo) values (current_setting('teste.plano')::uuid, 'os', true);
+insert into resultado (teste, ok) select 'planos: com as OS ligadas a nota fiscal é liberada',
+  public.nota_fiscal_liberada(current_setting('teste.plano')::uuid);
+insert into resultado (teste, ok) select 'planos: aplicação das descidas fechada para o login',
+  not has_function_privilege('authenticated', 'public.planos_aplicar_agendados()', 'execute')
+  and not has_function_privilege('authenticated', 'public.canais_sem_vaga(uuid, uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.plano_trocar(uuid, text, boolean)', 'execute');
 reset role;
 select n, teste, ok from resultado order by n;

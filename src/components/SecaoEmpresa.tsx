@@ -154,7 +154,9 @@ function Grupo({ titulo, children }: { titulo: string; children: ReactNode }) {
 }
 
 export function SecaoEmpresa() {
-  const { orgAtiva } = useSessao()
+  const { orgAtiva, modulos } = useSessao()
+  // Nota fiscal só com o ERP ou as OS ligados (nota_fiscal_liberada; a nfe-config confere de novo).
+  const notaLiberada = !!modulos?.has('erp') || !!modulos?.has('os')
   const orgId = orgAtiva!.id
   const podeEditar = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const [dados, setDados] = useState<{ orgId: string; lista: Emissora[] } | null>(null)
@@ -380,9 +382,11 @@ export function SecaoEmpresa() {
                   <Botao tamanho="sm" variante="secundario" onClick={() => abrir(paraForm(e))}>
                     Editar
                   </Botao>
-                  <Botao tamanho="sm" variante="secundario" icone="nota" onClick={() => setNotaFiscal(e)}>
-                    Nota fiscal
-                  </Botao>
+                  {notaLiberada && (
+                    <Botao tamanho="sm" variante="secundario" icone="nota" onClick={() => setNotaFiscal(e)}>
+                      Nota fiscal
+                    </Botao>
+                  )}
                   <Botao
                     tamanho="sm"
                     variante="fantasma"

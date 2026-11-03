@@ -138,9 +138,13 @@ export async function notaDoPedido(pedidoId: string): Promise<NotaFiscal | null>
   return data as unknown as NotaFiscal | null
 }
 
+/** Permissão de emitir e a nota liberada na empresa (ERP ou OS ligados, decisão de 28/10). */
 export async function podeEmitirNota(orgId: string): Promise<boolean> {
-  const { data } = await supabase.rpc('emite_nota_fiscal', { p_org: orgId })
-  return data === true
+  const [{ data: pode }, { data: liberada }] = await Promise.all([
+    supabase.rpc('emite_nota_fiscal', { p_org: orgId }),
+    supabase.rpc('nota_fiscal_liberada', { p_org: orgId }),
+  ])
+  return pode === true && liberada === true
 }
 
 export const FORMAS_PAGAMENTO: { valor: string; rotulo: string }[] = [

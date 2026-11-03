@@ -332,9 +332,9 @@ Em ordem; cada passo é uma entrega com o seu arquivo em `docs/` quando for cons
    (parar ou continuar), o excedente do mês e os avisos ao cliente e à plataforma em 80 % e 100 %. Na tela Empresas, a
    plataforma escolhe o plano, vê o consumo e acrescenta créditos de cortesia. O agente só muda para parar quando o
    cliente escolheu parar.
-3. **Nota fiscal dentro do ERP e das OS**: políticas e Edge Functions de nota (`nfe-config`, `nfe-emitir`,
+3. **Feito em 02/11 (entrega 4a).** **Nota fiscal dentro do ERP e das OS**: políticas e Edge Functions de nota (`nfe-config`, `nfe-emitir`,
    `nfse-emitir`) exigem o ERP ou as OS ligados; o botão de nota some sem eles. Quem já emite tem os módulos ligados.
-4. **Limite de números de WhatsApp** ao conectar um número, e franquia de notas fiscais.
+4. **Limite de números de WhatsApp** ao conectar um número (feito em 02/11, entrega 4a), e franquia de notas fiscais.
 5. **Feito em 01/11 (falta pedir módulo novo pela tela).** **Tela de plano para o dono da empresa**: o que está contratado, o consumo do mês, a escolha de parar ou
    continuar ao passar da franquia, a compra de pacote e como pedir um módulo novo.
 6. **Cobrança da Livih**: assinatura recorrente por empresa, mensal ou anual, somando o plano do núcleo, os módulos
@@ -377,6 +377,35 @@ Migration `20261101120000_planos_franquia.sql`, testes no fim de `scripts/teste_
   no celular e no WhatsApp cadastrado em Seus dados; equipe da plataforma no celular.
 - **Telas:** Configurações → Plano e consumo (antes "Uso da IA") para o dono; botão Plano e a linha de consumo na
   tela Empresas para a plataforma.
+
+## Regras construídas (02/11, entrega 4a)
+
+Migration `20261102140000_planos_troca.sql`, testes no fim de `scripts/teste_fase1.sql`.
+
+- **Módulos:** ERP ou OS a R$ 79,90; os dois juntos, R$ 109,80 na fatura.
+- **Troca pelo dono** em Configurações → Plano e consumo, com prévia antes de confirmar (`plano_trocar`); só o dono
+  de fato (no modo suporte, a equipe troca pela tela Empresas):
+  - **subir** vale na hora. Se a fatura do mês já saiu, a diferença dos dias que faltam, contando o dia da troca, vai
+    para `cobranca_ajustes` e entra na fatura seguinte, e a **franquia a mais vem na mesma proporção** (crédito
+    negativo do tipo `troca`; decisão de 02/11, para fechar a brecha de subir no último dia e descer em seguida). Se a
+    fatura do mês ainda não saiu, ela sai com o plano novo inteiro: sem ajuste e com a franquia cheia;
+  - **descer** fica em `organizacoes.plano_proximo` com a data em `plano_proximo_em` (dia 1 do mês seguinte, mesmo
+    pedida no próprio dia 1) e vale às 00:05 desse dia (cron `livih-planos-agendados`, e de novo no fechamento das
+    06:00). Escolher de novo o plano atual desfaz a descida.
+- **Só com a cobrança ligada e sem valor combinado:** sem contrato, o plano não é cobrado (subir sairia de graça); com
+  valor combinado, o preço não segue a tabela. Nesses casos, a tela diz para falar com a equipe, e a troca é pela tela
+  Empresas (imediata, sem ajuste, e desfaz a descida agendada). No teste grátis (cobrança começa no mês seguinte), a
+  troca não gera ajuste.
+- **Limite de números** (`canais_limite_plano`): conta os números ativos ("Desconectar" mantém o número; "Remover"
+  libera a vaga). Nenhum número novo além do plano; com descida agendada, vale o menor limite. Plano interno, sem
+  limite. Trocar para um plano com menos números do que a empresa tem é recusado com quantos remover.
+- **Nota fiscal** (`nota_fiscal_liberada`): configurar e emitir exigem o ERP ou as OS ligados (`nfe-config`,
+  `nfe-emitir`, `nfse-emitir` e a tela). As notas já emitidas continuam visíveis.
+- **Vaga conferida antes** (`canais_sem_vaga`): a `whatsapp-conexao` confere o limite antes de registrar o número na
+  Meta ou trocar o código do Embedded Signup, que não se desfazem; o gatilho confere de novo ao gravar.
+- **Ficou para depois** (revisão de 02/11): a plataforma cancelar um ajuste pela tela (hoje, só com SQL); ajustes de
+  um mês sem fatura (empresa suspensa o mês inteiro) se perdem, como os atendimentos a mais; o preço dos dois módulos
+  juntos (R$ 109,80) está escrito na `cobranca_itens`, não no catálogo.
 
 ## Decisões em aberto
 

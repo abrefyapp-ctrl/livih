@@ -83,6 +83,9 @@ Deno.serve(async (req) => {
   if (!plataforma && membro?.papel !== "dono" && membro?.papel !== "admin") {
     return json(403, { erro: "Só o dono e os administradores configuram a nota fiscal." });
   }
+  // Nota fiscal só com o ERP ou as OS ligados (planos de 28/10; nota_fiscal_liberada).
+  const { data: liberada } = await admin.rpc("nota_fiscal_liberada", { p_org: e.org_id });
+  if (liberada !== true) return json(403, { erro: "A nota fiscal vem com o módulo Pedidos e estoque (ERP) ou Ordens de serviço, e nenhum dos dois está ligado nesta empresa. Para ligar, o dono fala com a equipe da Livih." });
 
   const falta = faltando(e);
   if (falta.length) return json(422, { erro: `Preencha no cadastro do CNPJ: ${falta.join(", ")}.`, faltando: falta });

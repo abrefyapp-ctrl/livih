@@ -151,6 +151,8 @@ async function criarCanal(
   const { data, error } = await admin.from("canais")
     .insert({ id, org_id: orgId, tipo: "waha", nome, instance_id: `c-${id.replace(/-/g, "").slice(0, 16)}`, responsavel_id: responsavelId, ...extra })
     .select(CAMPOS).single();
+  // Limite de números do plano (canais_limite_plano): a mensagem do banco já diz o que fazer.
+  if (error?.message.startsWith("O plano ")) throw new ErroUsuario(error.message);
   if (error) throw new Error(`canal: ${error.message}`);
   const { data: modelo } = await admin.from("agentes").select("prompt, regras_humano, telefone_alerta, modelo")
     .eq("org_id", orgId).limit(1).maybeSingle();
@@ -396,6 +398,13 @@ Deno.serve(async (req) => {
     // Empresa suspensa não conecta nem reconecta número (o resto do sistema já a bloqueia por eh_membro/tem_papel).
     const { data: org } = await admin.from("organizacoes").select("status").eq("id", p.org_id).maybeSingle();
     if (org?.status !== "ativa") return json(403, { erro: "Esta empresa está suspensa. Fale com a equipe da Livih." });
+
+    // Limite de números do plano: confere antes de passos que não se desfazem (registro do número na Meta, troca do
+    // código do Embedded Signup). O gatilho canais_limite_plano confere de novo ao gravar.
+    if (p.acao === "criar" || p.acao === "oficial_sistema" || (p.acao === "oficial" && !p.canal_id)) {
+      const { data: semVaga } = await admin.rpc("canais_sem_vaga", { p_org: p.org_id });
+      if (semVaga) throw new ErroUsuario(semVaga);
+    }
 
     if (p.acao === "criar") {
       const nome = (p.nome ?? "").trim() || "WhatsApp";

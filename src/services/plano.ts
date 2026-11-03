@@ -55,3 +55,48 @@ export async function darCortesia(orgId: string, quantidade: number, motivo: str
   const { error } = await supabase.rpc('plataforma_dar_cortesia', { p_org: orgId, p_quantidade: quantidade, p_motivo: motivo })
   if (error) throw new Error(error.message.startsWith('Informe') ? error.message : 'Não foi possível dar a cortesia. Confira a internet e tente de novo.')
 }
+
+// ---------- troca de plano pelo dono (migration 20261102140000; decisões de 02/11) ----------
+
+export type PlanoOpcao = { codigo: string; nome: string; preco_mensal: number; numeros_whatsapp: number; atendimentos: number }
+export type SituacaoTroca = {
+  pode_trocar: boolean
+  /** Por que o dono não troca sozinho (sem cobrança ligada ou com valor combinado). */
+  motivo: string | null
+  /** Dono de verdade da empresa (a equipe da plataforma, no modo suporte, troca pela tela Empresas). */
+  eh_dono: boolean
+  plano: string
+  /** Descida agendada para `vale_em` (dia 1 do mês seguinte). */
+  plano_proximo: string | null
+  vale_em: string
+  numeros_ativos: number
+  planos: PlanoOpcao[]
+}
+/** subir: vale agora, com `valor` de ajuste na próxima fatura; descer: vale em `vale_em`; cancelar: desfaz a descida. */
+export type ResultadoTroca = {
+  tipo: 'subir' | 'descer' | 'cancelar' | 'igual'
+  plano: string
+  valor?: number
+  dias?: number
+  dias_mes?: number
+  vale_em?: string
+  teste_gratis?: boolean
+  /** Atendimentos do mês depois de subir (franquia a mais proporcional aos dias que faltam); nulo no plano interno. */
+  limite_mes?: number | null
+}
+
+export async function buscarSituacaoTroca(orgId: string): Promise<SituacaoTroca> {
+  const { data, error } = await supabase.rpc('plano_troca_situacao', { p_org: orgId })
+  if (error) throw error
+  return data as unknown as SituacaoTroca
+}
+
+/** Sem `confirmar`, só a prévia (o que acontece e quanto custa); com, faz a troca. */
+export async function trocarPlano(orgId: string, plano: string, confirmar: boolean): Promise<ResultadoTroca> {
+  const { data, error } = await supabase.rpc('plano_trocar', { p_org: orgId, p_plano: plano, p_confirmar: confirmar })
+  if (error) {
+    const doBanco = /^(Só o dono|Escolha um|Para escolher|O plano )/.test(error.message)
+    throw new Error(doBanco ? error.message : 'Não foi possível trocar o plano. Confira a internet e tente de novo.')
+  }
+  return data as unknown as ResultadoTroca
+}

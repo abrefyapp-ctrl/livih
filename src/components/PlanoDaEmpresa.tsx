@@ -6,6 +6,7 @@ import { nomeDoMes } from '../services/usoIa'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { DialogoConfirmacao } from './DialogoConfirmacao'
+import { TrocaDePlano } from './TrocaDePlano'
 
 const numero = new Intl.NumberFormat('pt-BR')
 const reais = (v: number | null) => moeda(v == null ? null : Number(v), true)
@@ -130,7 +131,10 @@ export function PlanoDaEmpresa() {
         </div>
         {!!c.creditos && (
           <p className="text-legenda text-texto-3">
-            {numero.format(c.franquia ?? 0)} do plano + {numero.format(c.creditos)} de pacotes e cortesias deste mês.
+            {numero.format(c.franquia ?? 0)} do plano
+            {c.creditos + c.reducao_troca > 0 && ` + ${numero.format(c.creditos + c.reducao_troca)} de pacotes e cortesias`}
+            {c.reducao_troca > 0 && ` − ${numero.format(c.reducao_troca)} pela troca de plano no meio do mês (a franquia a mais é proporcional aos dias)`}
+            {' '}deste mês.
           </p>
         )}
         <p className="text-legenda text-texto-3">
@@ -199,6 +203,8 @@ export function PlanoDaEmpresa() {
           </p>
         </div>
       )}
+
+      <TrocaDePlano orgId={orgId} aoTrocar={() => setVersao((v) => v + 1)} />
 
       <DialogoConfirmacao
         aberto={confirmarPacote}
