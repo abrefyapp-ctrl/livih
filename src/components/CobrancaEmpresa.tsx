@@ -235,12 +235,14 @@ export function CobrancaEmpresa({ orgId, aoMudar }: { orgId: string; aoMudar: ()
               <>
                 Pago no ano: {moeda(Number(encerrar.pago), true)}. Meses usados, contando este: {encerrar.meses_usados}.{' '}
                 {Number(encerrar.pago) <= 0
-                  ? 'Nada foi pago neste ano: não há devolução. Se a fatura anual estiver em aberto, cancele-a na lista de faturas desta janela.'
+                  ? 'Nada foi pago neste ano: não há devolução.'
                   : encerrar.integral
                     ? `Pago há até 7 dias: a devolução é integral, ${moeda(Number(encerrar.devolver), true)}.`
                     : encerrar.meses_usados >= 10
                       ? 'Do 10º mês em diante, não há devolução.'
                       : `Devolução: ${moeda(Number(encerrar.devolver), true)} (o pago menos ${encerrar.meses_usados} × ${moeda(Number(encerrar.mensal), true)}, o preço mensal de hoje do plano e dos módulos).`}{' '}
+                {encerrar.faturas_abertas > 0 &&
+                  `${encerrar.faturas_abertas === 1 ? 'A fatura do ano ainda não paga' : `As ${encerrar.faturas_abertas} faturas do ano ainda não pagas`} (${moeda(Number(encerrar.valor_aberto), true)}) ${encerrar.faturas_abertas === 1 ? 'é cancelada' : 'são canceladas'}, também no Asaas. `}
                 A empresa volta ao mensal com a cobrança desligada; a devolução é feita à mão no painel do Asaas. Para cortar o acesso,
                 suspenda a empresa na tela Empresas.
               </>

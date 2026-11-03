@@ -5175,15 +5175,16 @@ begin
   insert into resultado (teste, ok) select 'anual: começa no dia marcado',
     (select ciclo = 'anual' and anual_inicio = v_mes and ciclo_proximo is null from public.contratos_cobranca where org_id = v_org)
     and exists (select 1 from public.auditoria where org_id = v_org and acao = 'comecar_anual');
-  insert into resultado (teste, ok) select 'anual: a fatura do começo leva o ano inteiro; as seguintes, não',
+  insert into resultado (teste, ok) select 'anual: a fatura do começo leva o ano inteiro',
     exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, v_mes)) i
-             where i ->> 'descricao' like 'Plano Start anual (%' and (i ->> 'valor')::numeric = 999 and (i ->> 'anual')::boolean)
-    and not exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, (v_mes + interval '1 month')::date)) i
-                     where i ->> 'descricao' like 'Plano%');
+             where i ->> 'descricao' like 'Plano Start anual (%' and (i ->> 'valor')::numeric = 999 and (i ->> 'anual')::boolean);
   update public.faturas set status = 'cancelada' where org_id = v_org and tipo = 'mes';
   v_id := public.cobranca_criar_fatura(v_org, v_mes);
   insert into resultado (teste, ok) select 'anual: a fatura anual sai nas parcelas escolhidas',
     (select parcelas = 12 and valor >= 999 and tipo = 'mes' from public.faturas where id = v_id);
+  insert into resultado (teste, ok) select 'anual: depois da fatura do ano, as dos meses seguintes não levam o plano',
+    not exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, (v_mes + interval '1 month')::date)) i
+                 where i ->> 'descricao' like 'Plano%');
 end $$;
 
 set local role authenticated;
@@ -5314,5 +5315,134 @@ insert into resultado (teste, ok) select 'anual: funções internas fechadas par
   and not has_function_privilege('authenticated', 'public.modulos_pagos(uuid)', 'execute')
   and not has_function_privilege('anon', 'public.plano_ciclo(uuid, text, integer, boolean)', 'execute')
   and not has_function_privilege('anon', 'public.modulo_contratar(uuid, text, boolean, boolean)', 'execute');
+-- Correções do anual (migration 20261102160000).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_org uuid;
+begin
+  v_org := public.criar_organizacao('Anual Correções', 'teste-anual-2');
+  perform set_config('teste.anual2', v_org::text, true);
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual2')::uuid;
+  v_mes date := date_trunc('month', now() at time zone 'America/Sao_Paulo')::date;
+  v_id uuid;
+begin
+  update public.organizacoes set plano = 'start' where id = v_org;
+  insert into public.membros_org (org_id, user_id, papel) values (v_org, '00000000-0000-0000-0000-0000000000b1', 'atendente')
+  on conflict do nothing;
+  -- O ano devia ter começado no mês passado, mas a fatura não saiu (empresa suspensa na virada).
+  insert into public.contratos_cobranca (org_id, ativo, inicio, ciclo, anual_inicio, anual_parcelas)
+  values (v_org, true, (v_mes - interval '1 month')::date, 'anual', (v_mes - interval '1 month')::date, 3);
+  insert into resultado (teste, ok) select 'anual: fatura do ano que não saiu no mês certo sai no mês seguinte',
+    exists (select 1 from jsonb_array_elements(public.cobranca_itens(v_org, v_mes)) i
+             where i ->> 'descricao' like 'Plano Start anual (%' and (i ->> 'valor')::numeric = 999);
+  v_id := public.cobranca_criar_fatura(v_org, v_mes);
+  insert into resultado (teste, ok) select 'anual: o ano passa a contar do mês da fatura, nas parcelas escolhidas',
+    (select parcelas = 3 from public.faturas where id = v_id)
+    and (select anual_inicio = v_mes from public.contratos_cobranca where org_id = v_org)
+    and not public.anual_a_cobrar(v_org, v_mes);
+  -- Cancelada a fatura do ano, a próxima fatura do mês leva o ano de novo.
+  update public.faturas set status = 'cancelada' where id = v_id;
+  insert into resultado (teste, ok) select 'anual: fatura do ano cancelada volta a ser cobrada',
+    public.anual_a_cobrar(v_org, v_mes) and public.anual_a_cobrar(v_org, (v_mes + interval '1 month')::date);
+  -- Fatura do ano em aberto e uma diferença avulsa, para o encerramento.
+  v_id := public.cobranca_criar_fatura(v_org, v_mes);
+  update public.faturas set status = 'aberta', asaas_id = 'pay_anual_corr', asaas_parcelamento = 'ins_anual_corr',
+         ambiente = 'sandbox'
+   where id = v_id;
+  perform set_config('teste.anual2_fatura', v_id::text, true);
+end $$;
+
+-- Webhook: a parcela 5 do cartão não muda a fatura; a contestação avisa a plataforma.
+do $$
+declare
+  v_res text;
+  v_f uuid := current_setting('teste.anual2_fatura')::uuid;
+begin
+  v_res := public.cobranca_evento_asaas('evt_parc5_conf', 'PAYMENT_CONFIRMED',
+    jsonb_build_object('id', 'pay_parc5', 'installment', 'ins_anual_corr', 'installmentNumber', 5,
+                       'externalReference', v_f::text), 'sandbox');
+  insert into resultado (teste, ok) select 'anual: evento da parcela 5 do cartão não muda a fatura',
+    v_res like 'parcela 5:%' and (select status = 'aberta' and asaas_id = 'pay_anual_corr' from public.faturas where id = v_f);
+  v_res := public.cobranca_evento_asaas('evt_parc5_cb', 'PAYMENT_CHARGEBACK_REQUESTED',
+    jsonb_build_object('id', 'pay_parc5', 'installment', 'ins_anual_corr', 'installmentNumber', 5), 'sandbox');
+  insert into resultado (teste, ok) select 'anual: contestação de uma parcela fica registrada para a plataforma',
+    v_res = 'parcela 5: PAYMENT_CHARGEBACK_REQUESTED'
+    and exists (select 1 from public.asaas_eventos where id = 'sandbox:evt_parc5_cb' and fatura_id = v_f);
+  v_res := public.cobranca_evento_asaas('evt_parc1_conf', 'PAYMENT_CONFIRMED',
+    jsonb_build_object('id', 'pay_anual_corr', 'installment', 'ins_anual_corr', 'installmentNumber', 1), 'sandbox');
+  insert into resultado (teste, ok) select 'anual: a primeira parcela confirmada marca a fatura como paga',
+    v_res = 'paga';
+  update public.faturas set status = 'aberta', paga_em = null where id = v_f;
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual2')::uuid;
+  v_mes date := date_trunc('month', now() at time zone 'America/Sao_Paulo')::date;
+  r jsonb;
+begin
+  perform public.plano_trocar(v_org, 'pro', true);
+  perform public.plano_trocar(v_org, 'start', true);
+  r := public.plataforma_encerrar_anual(v_org);
+  insert into resultado (teste, ok) select 'anual: a prévia do encerramento mostra as faturas do ano em aberto',
+    (r ->> 'faturas_abertas')::int = 2 and (r ->> 'devolver')::numeric = 0;
+  r := public.plataforma_encerrar_anual(v_org, true);
+  insert into resultado (teste, ok) select 'anual: encerrar cancela as faturas do ano em aberto e traz a descida para o dia 1',
+    not exists (select 1 from public.faturas where org_id = v_org and status in ('aberta', 'a_enviar', 'erro'))
+    and (select status = 'a_cancelar' from public.faturas where id = current_setting('teste.anual2_fatura')::uuid)
+    and exists (select 1 from public.faturas where org_id = v_org and tipo = 'avulsa' and status = 'cancelada')
+    and (select plano_proximo_em = (v_mes + interval '1 month')::date from public.organizacoes where id = v_org);
+end $$;
+
+-- Teste grátis anual: descer antes da primeira fatura vale no dia 1 seguinte, não daqui a um ano.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+update public.contratos_cobranca
+   set ativo = true, inicio = (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month')::date,
+       ciclo = 'anual', anual_inicio = (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month')::date
+ where org_id = current_setting('teste.anual2')::uuid;
+update public.organizacoes set plano = 'business', plano_proximo = null, plano_proximo_em = null
+ where id = current_setting('teste.anual2')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.anual2')::uuid;
+  v_prox date := (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month')::date;
+  r jsonb;
+begin
+  r := public.plano_trocar(v_org, 'start', true);
+  insert into resultado (teste, ok) select 'anual: no teste grátis, descer vale no dia 1 seguinte',
+    (r ->> 'vale_em')::date = v_prox and not (r ->> 'anual')::boolean
+    and (public.plano_troca_situacao(v_org) ->> 'fim_periodo')::date = v_prox;
+end $$;
+
+-- Quem não é dono não escolhe o ciclo nem contrata módulo.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.plano_ciclo(current_setting('teste.anual2')::uuid, 'mensal', 1, true);
+  insert into resultado (teste, ok) values ('anual: atendente não troca mensal ou anual', false);
+exception when others then
+  insert into resultado (teste, ok) values ('anual: atendente não troca mensal ou anual', sqlerrm like 'Só o dono%');
+end $$;
+do $$ begin
+  perform public.modulo_contratar(current_setting('teste.anual2')::uuid, 'erp', true, true);
+  insert into resultado (teste, ok) values ('anual: atendente não contrata módulo', false);
+exception when others then
+  insert into resultado (teste, ok) values ('anual: atendente não contrata módulo', sqlerrm like 'Só o dono%');
+end $$;
+reset role;
+insert into resultado (teste, ok) select 'anual: funções novas fechadas para o login',
+  not has_function_privilege('authenticated', 'public.anual_a_cobrar(uuid, date)', 'execute')
+  and not has_function_privilege('authenticated', 'public.planos_aplicar_da_empresa(uuid, date)', 'execute');
 reset role;
 select n, teste, ok from resultado order by n;

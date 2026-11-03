@@ -82,6 +82,9 @@ export type EncerramentoAnual = {
   devolver: number
   anual_inicio: string
   renova_em: string
+  /** Faturas do ano ainda não pagas (a anual e as diferenças avulsas): canceladas ao encerrar (migration 20261102160000). */
+  faturas_abertas: number
+  valor_aberto: number
 }
 
 /** Sem `confirmar`, só calcula a devolução; com, volta ao mensal e desliga a cobrança (migration 20261102150000). */

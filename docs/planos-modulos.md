@@ -434,6 +434,18 @@ Migration `20261102150000_planos_anual_modulos.sql`, Edge Function `asaas-cobran
   Desligar vale no dia 1 seguinte (anual: na renovação), sem devolução; no teste grátis, na hora. Ligar de novo antes
   da data só desfaz o desligamento. O Essencial não contrata módulo, e descer ao Essencial pede para desligar antes os
   módulos. A plataforma recebe o aviso para conferir a vaga na Focus.
+- **Correções da revisão** (migration `20261102160000_planos_anual_correcoes.sql`, revisor-banco, 02/11):
+  - a fatura do ano não depende de sair no mês exato: se não saiu (empresa suspensa na virada, fatura cancelada), a
+    próxima fatura do mês leva o ano inteiro, e o ano passa a contar dali (`anual_a_cobrar`);
+  - encerrar o anual cancela as faturas do ano ainda não pagas e traz para o dia 1 seguinte a descida e os
+    desligamentos marcados para a renovação;
+  - antes de a fatura do ano sair (teste grátis, dia 1 antes do fechamento), descer e desligar valem no dia 1
+    seguinte;
+  - webhook: contestação, estorno e exclusão das parcelas 2 a 12 do cartão avisam a plataforma; os outros eventos
+    delas não mudam a fatura;
+  - agendados do dia 1 aplicados uma empresa por vez, cada uma com o próprio tratamento de erro.
+  - **A confirmar com o usuário:** a fatura anual parcelada também parcela o resto do mês anterior (atendimentos a
+    mais, pacotes e ajustes), com a taxa paga pela Livih.
 
 ## Decisões em aberto
 
