@@ -4568,6 +4568,18 @@ export type Database = {
         Returns: Json
       }
       cnpj_valido: { Args: { p: string }; Returns: boolean }
+      cnpjs_adicionais: {
+        Args: { p_competencia: string; p_org: string }
+        Returns: number
+      }
+      cnpjs_cobrados: {
+        Args: { p_competencia: string; p_org: string }
+        Returns: number
+      }
+      cnpjs_no_anual: {
+        Args: { p_inicio: string; p_org: string; p_so_pagas?: boolean }
+        Returns: number
+      }
       cobranca_atrasos: { Args: never; Returns: undefined }
       cobranca_avisar: {
         Args: {
@@ -5016,6 +5028,10 @@ export type Database = {
         Returns: Json
       }
       nota_fiscal_liberada: { Args: { p_org: string }; Returns: boolean }
+      notas_excedentes: {
+        Args: { p_mes: string; p_org: string }
+        Returns: number
+      }
       numero_br: { Args: { p: number }; Returns: string }
       org_do_caminho: { Args: { p_nome: string }; Returns: string }
       org_modulos: {
