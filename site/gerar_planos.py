@@ -8,7 +8,7 @@ Só o que a Livih cumpre: nada de "mais escolhido" sem cliente no plano.
 import json
 import os
 
-from gerar_solucoes import BEACON, SITE, WHATSAPP, e, rodape_solucoes
+from gerar_solucoes import BEACON, BOTAO_WHATSAPP, SITE, WHATSAPP, e, rodape_solucoes
 
 URL = f"{SITE}/planos/"
 TITLE = "Planos e preços | Livih, atendimento e vendas pelo WhatsApp"
@@ -385,7 +385,7 @@ def pagina() -> str:
       for (var k = 0; k < botoes.length; k++) botoes[k].addEventListener("click", function () {{ escolher(this.dataset.periodo); }});
     }})();
   </script>
-{BEACON}</body>
+{BOTAO_WHATSAPP}{BEACON}</body>
 </html>
 """
 
