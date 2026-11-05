@@ -3,8 +3,10 @@ import { useSessao } from '../hooks/useSessao'
 import {
   alterarMembro,
   convidarMembro,
+  definirRecebeContatos,
   linkNovaSenha,
   listarEquipeCompleta,
+  listarRecebeContatos,
   type MembroEquipe,
   type Papel,
 } from '../services/configuracoes'
@@ -57,6 +59,8 @@ export function SecaoEquipe() {
   // "Financeiro" (docs/financeiro.md): só aparece com o ERP ou as OS ligados, que é quando o financeiro existe.
   const comFinanceiro = !!modulos && (modulos.has('erp') || modulos.has('os'))
   const [financeiro, setFinanceiro] = useState<Set<string>>(new Set())
+  // "Recebe contatos novos" (docs/crm-acompanhamento.md, entrega 3): rodízio dos números da empresa que distribuem.
+  const [recebe, setRecebe] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let ativo = true
@@ -72,6 +76,9 @@ export function SecaoEquipe() {
     listarFinanceiro(orgId)
       .then((s) => ativo && setFinanceiro(s))
       .catch(() => ativo && setFinanceiro(new Set()))
+    listarRecebeContatos(orgId)
+      .then((s) => ativo && setRecebe(s))
+      .catch(() => ativo && setRecebe(new Set()))
     return () => {
       ativo = false
     }
@@ -95,6 +102,19 @@ export function SecaoEquipe() {
     setErroAcao(null)
     try {
       await definirFinanceiro(orgId, m.user_id, !financeiro.has(m.user_id))
+      recarregar()
+    } catch (e) {
+      setErroAcao((e as Error).message)
+    } finally {
+      setSalvando(null)
+    }
+  }
+
+  async function alternarRecebe(m: MembroEquipe) {
+    setSalvando(m.user_id)
+    setErroAcao(null)
+    try {
+      await definirRecebeContatos(orgId, m.user_id, !recebe.has(m.user_id))
       recarregar()
     } catch (e) {
       setErroAcao((e as Error).message)
@@ -246,6 +266,24 @@ export function SecaoEquipe() {
                       </label>
                     ) : (
                       financeiro.has(m.user_id) && <p className="mt-1 text-legenda text-texto-3">Financeiro</p>
+                    ))}
+                    {/* Qualquer papel vende: dono e admin também podem entrar no rodízio. */}
+                    {m.ativo && (gerencia ? (
+                      <label
+                        className={`mt-1 inline-flex cursor-pointer items-center gap-2 text-legenda text-texto-2 ${m.papel === 'atendente' ? 'ml-4' : ''}`}
+                        title="Entra no rodízio dos contatos novos dos números da empresa que distribuem"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={recebe.has(m.user_id)}
+                          disabled={salvando === m.user_id}
+                          onChange={() => void alternarRecebe(m)}
+                          className="size-3.5 accent-primaria"
+                        />
+                        Recebe contatos novos
+                      </label>
+                    ) : (
+                      recebe.has(m.user_id) && <p className="mt-1 text-legenda text-texto-3">Recebe contatos novos</p>
                     ))}
                   </div>
                   <div className="flex items-center gap-2">

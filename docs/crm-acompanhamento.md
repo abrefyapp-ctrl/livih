@@ -106,6 +106,20 @@ vendedores já são de quem os tem.
 - A conversa nova é atribuída na chegada (o agente continua atendendo, se estiver ligado). O contato sem carteira
   passa a ser da pessoa. Ela é avisada no celular; quando o agente chama a equipe, o aviso vai para ela.
 
+**Construída em 05/11:** migration `20261105160000_distribuicao_contatos.sql` e 10 testes. Mudança no desenho: a
+distribuição é pela **carteira** (`contatos.responsavel_id`), não por `conversas.atribuida_a`, que é "quem está
+atendendo agora" (o "Com você" da tela e a despedida do agente dependem dele). Por isso "rodízio" e "carteira
+primeiro" viraram uma opção só: quem já tem vendedor nunca troca.
+- `canais.distribuir` (só número sem vendedor; `canal_definir_distribuicao`, dono e admin) e
+  `membros_org.recebe_contatos` + `ultima_distribuicao_em` (`membro_definir_recebe_contatos`).
+- Gatilho `conversas_distribuir` em toda conversa nova (cliente, campanha, celular), menos a que a equipe começa:
+  `distribuir_contato` escolhe quem recebeu há mais tempo, põe na carteira, deixa o aviso na conversa e avisa no
+  celular.
+- `push_destino_conversa`: com a distribuição ligada, o aviso de "aguardando atendimento" vai só para o vendedor do
+  contato.
+- Telas: "Distribuir os contatos novos entre a equipe" em cada número da empresa (Configurações → WhatsApp) e "Recebe
+  contatos novos" por pessoa (Configurações → Equipe).
+
 ### 4. Importar/exportar contatos e motivo de perda
 
 - **Importar contatos** (dono e admin): CSV com nome, telefone, e-mail, empresa, etiquetas e o e-mail do vendedor

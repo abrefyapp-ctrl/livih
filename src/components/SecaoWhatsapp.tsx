@@ -6,12 +6,15 @@ import {
   conectarNumeroDoPortfolio,
   conectarOficial,
   criarNumero,
+  definirDistribuicao,
   desconectarNumero,
   editarNumero,
   iniciarNumero,
   ligarAgenteNoNumero,
   listarEquipeCompleta,
   listarNumeros,
+  listarRecebeContatos,
+  numerosQueDistribuem,
   qrNumero,
   removerNumero,
   type MembroEquipe,
@@ -164,6 +167,20 @@ export function SecaoWhatsapp() {
     }
   }, [orgId, gerencia])
 
+  // Distribuição dos contatos novos (docs/crm-acompanhamento.md, entrega 3): só nos números da empresa.
+  const [distribuicao, setDistribuicao] = useState<{ orgId: string; numeros: Set<string>; recebem: number } | null>(null)
+  useEffect(() => {
+    if (!gerencia) return
+    let ativo = true
+    Promise.all([numerosQueDistribuem(orgId), listarRecebeContatos(orgId)])
+      .then(([numeros, recebem]) => ativo && setDistribuicao({ orgId, numeros, recebem: recebem.size }))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [orgId, gerencia, versao])
+  const distribui = (id: string) => distribuicao?.orgId === orgId && distribuicao.numeros.has(id)
+
   const nomeDe = (userId: string) => {
     const m = equipe.find((x) => x.user_id === userId)
     return userId === eu ? 'você' : (m?.nome ?? m?.email ?? 'um vendedor')
@@ -296,6 +313,34 @@ export function SecaoWhatsapp() {
                     )}
                   </div>
                 </div>
+
+                {gerencia && !n.responsavel_id && (
+                  <div className="space-y-2 border-t border-borda px-4 py-3">
+                    <label className="flex cursor-pointer items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={distribui(n.id)}
+                        disabled={ocupado === n.id || !distribuicao}
+                        onChange={(e) => void executar(n.id, () => definirDistribuicao(n.id, e.target.checked))}
+                        className="mt-0.5 size-4 shrink-0 accent-primaria"
+                      />
+                      <span>
+                        <span className="block text-pequeno font-medium text-texto">Distribuir os contatos novos entre a equipe</span>
+                        <span className="block text-legenda text-texto-3">
+                          Quem escreve pela primeira vez e ainda não tem vendedor entra na carteira do próximo da fila, que é
+                          avisado no celular. O agente continua atendendo; quando ele chamar a equipe, o aviso vai para esse
+                          vendedor. Quem já tem vendedor continua com ele.
+                        </span>
+                      </span>
+                    </label>
+                    {distribui(n.id) && distribuicao?.recebem === 0 && (
+                      <Aviso tom="atencao">
+                        Ninguém está marcado para receber contatos novos, então nada é distribuído. Marque as pessoas em
+                        Configurações → Equipe, na opção “Recebe contatos novos”.
+                      </Aviso>
+                    )}
+                  </div>
+                )}
 
                 {gerencia && (
                   <div className="flex flex-wrap gap-2 border-t border-borda px-4 py-3">

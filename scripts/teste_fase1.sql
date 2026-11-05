@@ -6091,5 +6091,89 @@ end $$;
 insert into resultado (teste, ok) select 'mensagem nova: a função é só do agente',
   not has_function_privilege('authenticated', 'public.agente_pedir_humano(uuid, text, uuid)', 'execute')
   and has_function_privilege('service_role', 'public.agente_pedir_humano(uuid, text, uuid)', 'execute');
+
+-- Distribuição dos contatos novos do número da empresa (migration 20261105160000). Rodízio entre a1 e b1.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.canal_definir_distribuicao((select id from public.canais where instance_id = 'INST-F7'), true);
+  insert into resultado (teste, ok) values ('distribuição: atendente não liga a distribuição', false);
+exception when others then
+  insert into resultado (teste, ok) values ('distribuição: atendente não liga a distribuição', sqlerrm like 'só dono e admin%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  update public.canais set responsavel_id = null where instance_id = 'INST-F7';
+  perform public.canal_definir_distribuicao((select id from public.canais where instance_id = 'INST-F7'), true);
+  perform public.membro_definir_recebe_contatos(v_org, '00000000-0000-0000-0000-0000000000a1', true);
+  perform public.membro_definir_recebe_contatos(v_org, '00000000-0000-0000-0000-0000000000b1', true);
+  insert into resultado (teste, ok) values ('distribuição: dono liga no número da empresa e escolhe quem recebe',
+    (select distribuir from public.canais where instance_id = 'INST-F7')
+    and (select count(*) from public.membros_org where org_id = v_org and recebe_contatos) = 2);
+  begin
+    perform public.canal_definir_distribuicao((select id from public.canais where instance_id = 'INST-VITOR'), true);
+    insert into resultado (teste, ok) values ('distribuição: número de vendedor não distribui', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('distribuição: número de vendedor não distribui', sqlerrm like 'número de vendedor%');
+  end;
+end $$;
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select id from public.canais where instance_id = 'INST-F7');
+  v_ct uuid[] := '{}'; v_id uuid; v_conv uuid; i int; v_resp uuid[] := '{}';
+begin
+  update public.membros_org set ultima_distribuicao_em = null where org_id = v_org;
+  for i in 1..3 loop
+    insert into public.contatos (org_id, telefone, nome) values (v_org, '554190003310' || i, 'Lead ' || i) returning id into v_id;
+    insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_id) returning id into v_conv;
+    v_ct := v_ct || v_id;
+    v_resp := v_resp || (select responsavel_id from public.contatos where id = v_id);
+    if i = 1 then perform set_config('teste.dist_conv', v_conv::text, true); end if;
+  end loop;
+  insert into resultado (teste, ok) values ('distribuição: contatos novos entram na carteira em rodízio',
+    v_resp[1] is not null and v_resp[2] is not null and v_resp[1] <> v_resp[2] and v_resp[3] = v_resp[1]
+    and v_resp[1] in ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1'));
+  insert into resultado (teste, ok) values ('distribuição: a conversa mostra para quem foi e a pessoa é avisada',
+    exists (select 1 from public.mensagens where conversa_id = current_setting('teste.dist_conv')::uuid
+             and autor_tipo = 'sistema' and texto like 'Contato novo distribuído para%')
+    and (public.agente_contexto(current_setting('teste.dist_conv')::uuid) is not null));
+  insert into resultado (teste, ok) values ('distribuição: o aviso de "aguardando" vai só para o vendedor do contato',
+    public.push_destino_conversa(current_setting('teste.dist_conv')::uuid) = array[v_resp[1]]);
+
+  -- Contato que já tem vendedor fica com ele; conversa começada pela equipe não distribui.
+  insert into public.contatos (org_id, telefone, nome, responsavel_id)
+  values (v_org, '5541900033201', 'Cliente antigo', '00000000-0000-0000-0000-0000000000d1') returning id into v_id;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_id);
+  insert into resultado (teste, ok) values ('distribuição: contato que já tem vendedor continua com ele',
+    (select responsavel_id from public.contatos where id = v_id) = '00000000-0000-0000-0000-0000000000d1');
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900033202', 'Prospecção') returning id into v_id;
+  insert into public.conversas (org_id, canal_id, contato_id, estado, atribuida_a)
+  values (v_org, v_canal, v_id, 'humano', '00000000-0000-0000-0000-0000000000a1');
+  insert into resultado (teste, ok) values ('distribuição: conversa que a equipe começa não entra no rodízio',
+    (select responsavel_id from public.contatos where id = v_id) is null);
+
+  -- Desligada: nada muda, e o aviso volta para todos que veem o número.
+  update public.canais set distribuir = false where id = v_canal;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900033203', 'Lead sem rodízio') returning id into v_id;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_id) returning id into v_conv;
+  insert into resultado (teste, ok) values ('distribuição: desligada, o contato novo fica sem vendedor e o aviso vai para a equipe',
+    (select responsavel_id from public.contatos where id = v_id) is null
+    and cardinality(public.push_destino_conversa(v_conv)) >= 2);
+  -- Número que ganha vendedor deixa de distribuir.
+  update public.canais set distribuir = true where id = v_canal;
+  update public.canais set responsavel_id = '00000000-0000-0000-0000-0000000000a1' where id = v_canal;
+  insert into resultado (teste, ok) values ('distribuição: número que passa a ser de um vendedor para de distribuir',
+    not (select distribuir from public.canais where id = v_canal));
+  update public.canais set responsavel_id = null where id = v_canal;
+end $$;
+insert into resultado (teste, ok) select 'distribuição: rodízio fechado para o login',
+  not has_function_privilege('authenticated', 'public.distribuir_contato(uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.canal_definir_distribuicao(uuid, boolean)', 'execute');
 reset role;
 select n, teste, ok from resultado order by n;

@@ -173,6 +173,38 @@ export async function ligarAgenteNoNumero(canalId: string, ativo: boolean) {
   if (error) throw new Error('Não foi possível mudar o agente deste número. Tente de novo.')
 }
 
+// ---- distribuição dos contatos novos (migration 20261105160000, docs/crm-acompanhamento.md entrega 3) ----
+
+/** Números da empresa com a distribuição ligada. */
+export async function numerosQueDistribuem(orgId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.from('canais').select('id').eq('org_id', orgId).eq('distribuir', true)
+  if (error) throw error
+  return new Set((data ?? []).map((c) => c.id))
+}
+
+export async function definirDistribuicao(canalId: string, valor: boolean) {
+  const { error } = await supabase.rpc('canal_definir_distribuicao', { p_canal: canalId, p_valor: valor })
+  if (error) {
+    throw new Error(
+      error.message.includes('número de vendedor')
+        ? 'Só o número da empresa distribui: os contatos do número de um vendedor já são dele.'
+        : 'Não foi possível mudar a distribuição. Só dono e admin mudam.',
+    )
+  }
+}
+
+/** Quem entra no rodízio dos contatos novos. */
+export async function listarRecebeContatos(orgId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.from('membros_org').select('user_id').eq('org_id', orgId).eq('recebe_contatos', true)
+  if (error) throw error
+  return new Set((data ?? []).map((m) => m.user_id))
+}
+
+export async function definirRecebeContatos(orgId: string, userId: string, valor: boolean) {
+  const { error } = await supabase.rpc('membro_definir_recebe_contatos', { p_org: orgId, p_usuario: userId, p_valor: valor })
+  if (error) throw new Error('Não foi possível mudar. Só dono e admin mudam.')
+}
+
 /** Números fora do ar há mais de 5 min (só os que a pessoa pode ver) — para a faixa de aviso. */
 export async function numerosCaidos(orgId: string): Promise<{ id: string; nome: string }[]> {
   const { data, error } = await supabase
