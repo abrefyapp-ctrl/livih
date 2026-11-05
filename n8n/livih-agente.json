@@ -34,7 +34,7 @@
     },
     {
       "parameters": {
-        "amount": 12,
+        "amount": 20,
         "unit": "seconds"
       },
       "type": "n8n-nodes-base.wait",

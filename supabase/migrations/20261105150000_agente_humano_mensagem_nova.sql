@@ -6,7 +6,7 @@
 -- mensagem que o agente atende ainda é a última do cliente). Chamar a equipe não era: a ferramenta mudava a conversa
 -- na hora. Agora a ferramenta do agente passa a mensagem que ele está atendendo; se já há outra mais nova, a passagem
 -- é recusada, a resposta desta rodada também não sai, e a rodada da mensagem nova decide com tudo junto.
--- Junto (no n8n): a espera antes de responder subiu de 6 para 12 segundos.
+-- Junto (no n8n): a espera antes de responder subiu de 6 para 20 segundos.
 --
 -- As passagens automáticas do banco (franquia esgotada, possível robô do outro lado, contato "sem agente") seguem
 -- em agente_chamar_humano, sem esta conferência.

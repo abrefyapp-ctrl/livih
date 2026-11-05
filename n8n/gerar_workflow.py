@@ -596,9 +596,9 @@ nodes = [
     no("Webhook", "n8n-nodes-base.webhook", 2.1, {"httpMethod": "POST", "path": "livih-agente", "options": {}},
        [0, 0], webhookId="5f0d6c1e-1a2b-4a9e-9a61-0000000000a1"),
     no("Validar", "n8n-nodes-base.code", 2, {"jsCode": VALIDAR}, [220, 0]),
-    # Só a última mensagem de uma sequência é respondida (Contexto confere se mensagem_id ainda é a última). 12 s desde
-    # 05/11 (eram 6): na JoGrampo, mensagens quebradas em partes chegavam com 7 a 22 s de intervalo.
-    no("Aguardar", "n8n-nodes-base.wait", 1.1, {"amount": 12, "unit": "seconds"}, [440, 0],
+    # Só a última mensagem de uma sequência é respondida (Contexto confere se mensagem_id ainda é a última). 20 s desde
+    # 05/11 (eram 6), decisão do usuário: na JoGrampo, mensagens quebradas em partes chegavam com 7 a 22 s de intervalo.
+    no("Aguardar", "n8n-nodes-base.wait", 1.1, {"amount": 20, "unit": "seconds"}, [440, 0],
        webhookId="5f0d6c1e-1a2b-4a9e-9a61-0000000000a2"),
     no("Contexto", "n8n-nodes-base.code", 2, {"jsCode": CONTEXTO}, [660, 0]),
     no("AI Agent", "@n8n/n8n-nodes-langchain.agent", 3.1,
@@ -645,7 +645,7 @@ print("n8n/livih-agente.json:", len(nodes), "nós")
 # ============================================================================
 # Mesmo prompt (o Contexto é o do agente, com 3 trocas) e as mesmas ferramentas (nome, descrição e esquema), mas
 # sem estado e sem gravar: a tela manda a conversa de teste inteira a cada pergunta; leituras são reais e o que
-# gravaria só é simulado. Webhook síncrono (responde com o último nó), sem a espera de 12 s.
+# gravaria só é simulado. Webhook síncrono (responde com o último nó), sem a espera de 20 s.
 
 def trocar(texto, antigo, novo):
     assert texto.count(antigo) == 1, f"o Contexto do agente mudou; ajuste o simulador: {antigo[:60]!r}"
