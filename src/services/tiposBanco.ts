@@ -618,6 +618,7 @@ export type Database = {
           criado_em: string
           desconectado_em: string | null
           desconectado_por: string | null
+          distribuir: boolean
           id: string
           instance_id: string | null
           meta_coexistencia: boolean
@@ -643,6 +644,7 @@ export type Database = {
           criado_em?: string
           desconectado_em?: string | null
           desconectado_por?: string | null
+          distribuir?: boolean
           id?: string
           instance_id?: string | null
           meta_coexistencia?: boolean
@@ -668,6 +670,7 @@ export type Database = {
           criado_em?: string
           desconectado_em?: string | null
           desconectado_por?: string | null
+          distribuir?: boolean
           id?: string
           instance_id?: string | null
           meta_coexistencia?: boolean
@@ -2343,6 +2346,8 @@ export type Database = {
           financeiro: boolean
           org_id: string
           papel: Database["public"]["Enums"]["papel_org"]
+          recebe_contatos: boolean
+          ultima_distribuicao_em: string | null
           user_id: string
           ve_todos_clientes: boolean
         }
@@ -2353,6 +2358,8 @@ export type Database = {
           financeiro?: boolean
           org_id: string
           papel?: Database["public"]["Enums"]["papel_org"]
+          recebe_contatos?: boolean
+          ultima_distribuicao_em?: string | null
           user_id: string
           ve_todos_clientes?: boolean
         }
@@ -2363,6 +2370,8 @@ export type Database = {
           financeiro?: boolean
           org_id?: string
           papel?: Database["public"]["Enums"]["papel_org"]
+          recebe_contatos?: boolean
+          ultima_distribuicao_em?: string | null
           user_id?: string
           ve_todos_clientes?: boolean
         }
@@ -4625,6 +4634,10 @@ export type Database = {
         Args: { p_conversa: string; p_texto: string }
         Returns: Json
       }
+      agente_pedir_humano: {
+        Args: { p_conversa: string; p_mensagem: string; p_motivo: string }
+        Returns: Json
+      }
       agente_preparar_documento: {
         Args: { p_conversa: string; p_documento: string; p_reenviar?: boolean }
         Returns: Json
@@ -4772,6 +4785,10 @@ export type Database = {
         Args: { p_canal: string; p_numero?: string; p_status: string }
         Returns: undefined
       }
+      canal_definir_distribuicao: {
+        Args: { p_canal: string; p_valor: boolean }
+        Returns: undefined
+      }
       canal_por_numero_meta: {
         Args: { p_phone_number_id: string }
         Returns: {
@@ -4904,6 +4921,7 @@ export type Database = {
         Args: { p_canal: string; p_token: string }
         Returns: undefined
       }
+      distribuir_contato: { Args: { p_conversa: string }; Returns: string }
       documento_cliente: {
         Args: { p: string }
         Returns: Record<string, unknown>
@@ -5228,6 +5246,10 @@ export type Database = {
         Returns: undefined
       }
       membro_definir_financeiro: {
+        Args: { p_org: string; p_usuario: string; p_valor: boolean }
+        Returns: undefined
+      }
+      membro_definir_recebe_contatos: {
         Args: { p_org: string; p_usuario: string; p_valor: boolean }
         Returns: undefined
       }
@@ -5606,6 +5628,7 @@ export type Database = {
       }
       push_cancelar: { Args: { p_endpoint: string }; Returns: undefined }
       push_chaves: { Args: never; Returns: Json }
+      push_destino_conversa: { Args: { p_conversa: string }; Returns: string[] }
       push_enfileirar: {
         Args: {
           p_conversa: string
