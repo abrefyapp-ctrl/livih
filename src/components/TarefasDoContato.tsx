@@ -76,6 +76,7 @@ export function LinhaTarefa({
             {tarefa.oportunidade && <span className="truncate">{tarefa.oportunidade.titulo}</span>}
           </span>
         </button>
+        {!aberta && tarefa.resultado && <p className="text-legenda text-texto-3">{tarefa.resultado}</p>}
         {mostrarCliente && tarefa.contato && (
           <Link to={`/contatos/${tarefa.contato.id}`} className="text-legenda text-primaria hover:underline">
             {nomeDoContato(tarefa.contato)}

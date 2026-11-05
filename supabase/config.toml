@@ -487,3 +487,7 @@ verify_jwt = false
 # asaas-webhook: chamado pelo Asaas (sem login); confere o token asaas-access-token (secrets ASAAS_WEBHOOK_TOKEN e ASAAS_WEBHOOK_TOKEN_SANDBOX) dentro da função.
 [functions.asaas-webhook]
 verify_jwt = false
+
+# Retomada do cliente pelo agente: só o banco chama (x-livih-segredo, conferido dentro da função).
+[functions.agente-followup]
+verify_jwt = false

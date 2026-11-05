@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { avisosDaEquipe, dataInput, horaInput, juntar } from '../services/agenda'
 import { listarContatos, listarOportunidades, type ContatoLista, type Oportunidade } from '../services/crm'
+import { buscarFollowup } from '../services/followup'
 import { nomeDoContato } from '../services/formato'
 import {
   apagarTarefa,
@@ -74,9 +75,23 @@ export function ModalTarefa({
   const [salvando, setSalvando] = useState(false)
   const [apagando, setApagando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  // Quem faz: com a retomada do agente ligada, a tarefa nova pode ser "o agente escreve ao cliente nesta hora".
+  const [executor, setExecutor] = useState<'equipe' | 'agente'>('equipe')
+  const [retomadaLigada, setRetomadaLigada] = useState(false)
 
   const escolheContato = !contatoFixo && !existente
-  const doAgente = tarefa?.executor === 'agente'
+  const doAgente = existente ? tarefa?.executor === 'agente' : executor === 'agente'
+
+  useEffect(() => {
+    if (existente) return
+    let ativo = true
+    buscarFollowup(orgId)
+      .then((c) => ativo && setRetomadaLigada(c.ativo))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [orgId, existente])
   const podeApagar = existente && (gerencia || tarefa?.criado_por === sessao?.user.id)
 
   useEffect(() => {
@@ -151,7 +166,12 @@ export function ModalTarefa({
     }
     try {
       if (existente) await atualizarTarefa(tarefa!.id, { ...dados, status: situacao })
-      else await criarTarefa(orgId, { ...dados, conversa_id: conversaId ?? null })
+      else
+        await criarTarefa(orgId, {
+          ...dados,
+          conversa_id: conversaId ?? null,
+          ...(doAgente ? { executor: 'agente' as const, responsavel_id: null, lembrete_minutos: null } : {}),
+        })
       aoSalvar()
     } catch (e) {
       setErro((e as Error).message)
@@ -226,6 +246,25 @@ export function ModalTarefa({
               </div>
             )}
           </div>
+
+          {!existente && retomadaLigada && contatoId && (
+            <fieldset className="space-y-1.5">
+              <legend className="text-pequeno font-medium text-texto-2">Quem faz</legend>
+              <div className="flex flex-wrap gap-4">
+                {(
+                  [
+                    ['equipe', 'Alguém da equipe'],
+                    ['agente', 'O agente escreve ao cliente'],
+                  ] as const
+                ).map(([v, r]) => (
+                  <label key={v} className="flex cursor-pointer items-center gap-2 text-pequeno">
+                    <input type="radio" name="tarefa-executor" checked={executor === v} onChange={() => setExecutor(v)} className="accent-primaria" />
+                    {r}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             {!doAgente && (

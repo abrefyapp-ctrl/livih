@@ -20,7 +20,7 @@ export type Tarefa = Pick<
 export type DadosTarefa = Pick<
   Tabela['Insert'],
   'titulo' | 'observacao' | 'vence_em' | 'responsavel_id' | 'contato_id' | 'oportunidade_id' | 'conversa_id' | 'lembrete_minutos'
->
+> & { executor?: 'equipe' | 'agente' }
 
 /** Antecedência do lembrete para o responsável (celular e WhatsApp). Nulo = sem lembrete. */
 export const LEMBRETES_TAREFA: [number | null, string][] = [
@@ -40,7 +40,9 @@ const CAMPOS =
 
 const erroAmigavel = (m: string) =>
   new Error(
-    m.includes('responsável precisa')
+    m.includes('tarefas_uma_retomada_aberta')
+      ? 'Este cliente já tem uma retomada do agente marcada. Abra a que existe em Tarefas para mudar a data.'
+      : m.includes('responsável precisa')
       ? 'O responsável precisa ser da equipe.'
       : m.includes('outro contato')
         ? 'A oportunidade escolhida é de outro contato.'

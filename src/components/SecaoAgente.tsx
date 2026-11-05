@@ -12,6 +12,7 @@ import { HorarioAtendimento } from './HorarioAtendimento'
 import { Icone } from './Icone'
 import { ModalAssistente } from './ModalAssistente'
 import { ModalSimulador } from './ModalSimulador'
+import { SecaoFollowup } from './SecaoFollowup'
 import { SecaoSaudeAgente } from './SecaoSaudeAgente'
 
 type Formulario = {
@@ -343,6 +344,9 @@ export function SecaoAgente() {
           className="max-w-sm"
         />
       </fieldset>
+
+      {/* Salva à parte (tabela agente_followup): não entra no "Salvar alterações" do agente. */}
+      <SecaoFollowup podeEditar={podeEditar} />
 
       {podeEditar && (alterado || salvo || erro) && (
         <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center justify-end gap-3 border-t border-borda bg-superficie px-4 py-3 lg:-mx-8 lg:px-8">

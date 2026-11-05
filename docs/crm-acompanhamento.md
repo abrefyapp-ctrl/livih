@@ -78,6 +78,24 @@ padrão:
 retomada por contato por dia; conversa com o agente pausado pela empresa não recebe; número desconectado adia. A
 mensagem fica na conversa marcada como retomada do agente, para a equipe e o relatório saberem.
 
+**Construída em 05/11:** migration `20261105140000_followup_agente.sql` e 22 testes.
+- Tabela `agente_followup` (uma linha por empresa; `followup_salvar` só para dono e admin, valida o modelo como nas
+  campanhas). `ativado_em`: só o que parou depois de ligar é retomado; desligar cancela as retomadas abertas.
+- `tarefas` ganhou `followup_motivo`, `tentativa`, `followup_ref` (a mesma parada não volta), `mensagem_id` e
+  `enviando_em`; índice único: uma retomada aberta do agente por contato.
+- Cron `livih-followup` a cada 5 min: `followup_detectar` (orçamento: PDF com nome "Orcamento…" depois da última
+  mensagem do cliente e pedido em rascunho; conversa: última mensagem nossa; oportunidade: sem mensagem há X dias) e
+  `followup_rodar` (horário do agente, número conectado, 1 por contato a cada 20 h, franquia, 24 h da API oficial).
+- Edge Function [agente-followup](../supabase/functions/agente-followup/index.ts) (gpt-5-mini, `MODELO_FOLLOWUP`):
+  `agente_followup_dados` → IA com saída estruturada `{enviar, mensagem}` → `agente_followup_concluir`. Falha: tenta
+  de novo em 1 hora. Consumo em `uso_ia` tipo "followup".
+- Gatilho `mensagens_fechar_retomadas`: mensagem do cliente fecha as retomadas e a tarefa "sem resposta"; mensagem
+  da equipe cancela a retomada do agente.
+- Ferramenta do agente `agendar_retorno` (n8n) e `simulador_agendar_retorno`.
+- Telas: seção "Retomar o cliente que parou de responder" em Configurações → Agente
+  ([SecaoFollowup.tsx](../src/components/SecaoFollowup.tsx)); "Quem faz: o agente escreve ao cliente" na nova
+  tarefa; o resultado aparece nas tarefas concluídas.
+
 ### 3. Distribuição automática
 
 Vale para o **número da empresa** (sem vendedor responsável), onde hoje a conversa nova fica sem dono. Os números dos

@@ -133,6 +133,7 @@ Você trabalha dentro do CRM da ${c.organizacao?.nome || 'empresa'}. As ferramen
 - **enviar_orcamento**: envia ao cliente o PDF do pedido montado. Use quando o cliente pedir o orçamento, a proposta ou o PDF, ou confirmar os itens. Antes, monte (ou atualize) com montar_pedido. Depois de enviar, diga em uma frase que o orçamento foi enviado e que a equipe confirma frete e pagamento.
 - **buscar_documentos** e **enviar_documento**: quando o cliente pedir um arquivo (vista explodida, desenho de peças, manual, catálogo, ficha técnica, foto do produto), busque na biblioteca com o produto e o tipo que ele disse. Se vier exatamente o que ele pediu, envie com enviar_documento; se vierem vários parecidos, pergunte qual; se não vier nenhum, diga que a equipe envia e chame chamar_humano. Envie só o que ele pediu (no máximo 3 por resposta). Se a ferramenta disser que o documento já foi enviado, diga que está na mensagem daquele horário; reenvie (reenviar=sim) só se o cliente disser que não recebeu.
 - **consultar_os**: quando o cliente perguntar de equipamento que deixou para conserto ("meu motor ficou pronto?", "como está a OS 123?", "já aprovaram o orçamento?"), consulte antes de responder; com o nº da OS, NF ou modelo que ele citar, use como busca. Responda a etapa e desde quando; a previsão de término é estimativa: diga "a previsão é…", nunca prometa a data. Pronto: diga que está pronto para retirada (combinar a retirada é com a equipe). Aguardando aprovação: informe o valor do orçamento se ele perguntar. Se o cliente aprovar ou recusar o orçamento por escrito, NÃO diga que já está aprovado no sistema: registre com registrar_nota ("Cliente aprovou o orçamento da OS nº X, item Y") e chame a equipe com chamar_humano. Se não achar a OS, peça o nº da OS ou a NF; se ainda assim não achar, chame a equipe.
+- **agendar_retorno**: quando o cliente pedir para falar depois numa data ("me chama semana que vem", "volto a falar dia 20", "depois do feriado"), marque com agendar_retorno: calcule a data a partir da data de hoje (em dia útil e de manhã, se ele não disse o dia ou a hora exatos) e confirme ao cliente em uma frase o dia combinado. Use só quando o cliente pedir para ser procurado depois; não use para lembrar algo da equipe.
 - **identificar_cliente** e **cadastrar_cliente**: se montar_pedido responder com identificar_cliente, antes do orçamento peça, numa pergunta só, o CNPJ (empresa) ou o CPF (pessoa), explicando que é para o orçamento sair no nome certo. Com o número, chame identificar_cliente (com CPF, mande também o nome completo; se não tiver, peça). Encontrado: monte o orçamento de novo e siga. Cliente novo com CNPJ: confirme com o cliente a razão social que veio da Receita (receita.razao_social) e chame cadastrar_cliente com o CNPJ; se a Receita não respondeu, peça a razão social e mande em nome. Cliente novo com CPF: chame cadastrar_cliente com o CPF e o nome completo. Depois de cadastrar, monte o orçamento de novo. Do cadastro, diga ao cliente só a razão social que a ferramenta devolveu, nunca endereço, e-mail ou outro dado. Se o cliente mandar o CNPJ ou o CPF por conta própria, use identificar_cliente, mesmo que ele já tenha empresa ligada: um CNPJ novo liga mais uma empresa a este WhatsApp e o orçamento em aberto passa a sair nela. Se a ferramenta mandar chamar a equipe, chame chamar_humano.
 - **chamar_humano**: chame quando acontecer um destes casos:
 ${regras.map((r) => `  - ${r}`).join('\n') || '  - o cliente pedir para falar com uma pessoa'}
@@ -572,6 +573,15 @@ FERRAMENTAS = [
         obj({"documento": "O mesmo CNPJ ou CPF usado em identificar_cliente",
              "nome": "CPF: nome completo. CNPJ: a razão social, só quando a Receita não respondeu"}, ["documento"]),
     ),
+    # Follow-up do agente (migration 20261105140000): o cliente pede para ser procurado numa data.
+    ferramenta(
+        "agendar_retorno",
+        "Marca para voltar a falar com o cliente na data que ele pediu (ex.: 'me chama semana que vem', 'fala comigo dia 20').",
+        "agente_agendar_retorno",
+        "{ p_conversa: conversa, p_quando: String(args.quando || ''), p_assunto: args.assunto || null }",
+        obj({"quando": "Data em AAAA-MM-DD, ou AAAA-MM-DD HH:MM se o cliente disse a hora (horário de Brasília), calculada a partir da data de hoje",
+             "assunto": "Do que falar na retomada, em poucas palavras (ex.: orçamento dos grampos 14/19)"}, ["quando", "assunto"]),
+    ),
 ]
 
 
@@ -703,6 +713,7 @@ CORPO_SIM = {
     "consultar_os": "JSON.stringify(await rpc('simulador_consultar_os', { p_org: org, p_busca: args.busca || null }))",
     "identificar_cliente": "JSON.stringify(await rpc('simulador_identificar_cliente', { p_org: org, p_documento: String(args.documento || ''), p_nome: args.nome || null }))",
     "cadastrar_cliente": "JSON.stringify({ sucesso: true, simulado: true, cadastrado: true })",
+    "agendar_retorno": "JSON.stringify(await rpc('simulador_agendar_retorno', { p_org: org, p_quando: String(args.quando || ''), p_assunto: args.assunto || null }))",
 }
 
 ferramentas_sim = []

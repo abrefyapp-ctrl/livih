@@ -54,6 +54,59 @@ export type Database = {
         }
         Relationships: []
       }
+      agente_followup: {
+        Row: {
+          ativado_em: string | null
+          ativo: boolean
+          atualizado_em: string
+          atualizado_por: string | null
+          conversa_horas: number | null
+          equipe: boolean
+          intervalo_dias: number
+          modelo: Json | null
+          oportunidade_dias: number | null
+          orcamento_horas: number | null
+          org_id: string
+          pedido_cliente: boolean
+        }
+        Insert: {
+          ativado_em?: string | null
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          conversa_horas?: number | null
+          equipe?: boolean
+          intervalo_dias?: number
+          modelo?: Json | null
+          oportunidade_dias?: number | null
+          orcamento_horas?: number | null
+          org_id: string
+          pedido_cliente?: boolean
+        }
+        Update: {
+          ativado_em?: string | null
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          conversa_horas?: number | null
+          equipe?: boolean
+          intervalo_dias?: number
+          modelo?: Json | null
+          oportunidade_dias?: number | null
+          orcamento_horas?: number | null
+          org_id?: string
+          pedido_cliente?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agente_followup_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agentes: {
         Row: {
           ativado_em: string | null
@@ -4045,16 +4098,21 @@ export type Database = {
           conversa_id: string | null
           criado_em: string
           criado_por: string | null
+          enviando_em: string | null
           executor: string
+          followup_motivo: string | null
+          followup_ref: string | null
           id: string
           lembrete_enviado_em: string | null
           lembrete_minutos: number | null
+          mensagem_id: string | null
           observacao: string | null
           oportunidade_id: string | null
           org_id: string
           responsavel_id: string | null
           resultado: string | null
           status: string
+          tentativa: number | null
           titulo: string
           vence_em: string
         }
@@ -4066,16 +4124,21 @@ export type Database = {
           conversa_id?: string | null
           criado_em?: string
           criado_por?: string | null
+          enviando_em?: string | null
           executor?: string
+          followup_motivo?: string | null
+          followup_ref?: string | null
           id?: string
           lembrete_enviado_em?: string | null
           lembrete_minutos?: number | null
+          mensagem_id?: string | null
           observacao?: string | null
           oportunidade_id?: string | null
           org_id: string
           responsavel_id?: string | null
           resultado?: string | null
           status?: string
+          tentativa?: number | null
           titulo: string
           vence_em: string
         }
@@ -4087,16 +4150,21 @@ export type Database = {
           conversa_id?: string | null
           criado_em?: string
           criado_por?: string | null
+          enviando_em?: string | null
           executor?: string
+          followup_motivo?: string | null
+          followup_ref?: string | null
           id?: string
           lembrete_enviado_em?: string | null
           lembrete_minutos?: number | null
+          mensagem_id?: string | null
           observacao?: string | null
           oportunidade_id?: string | null
           org_id?: string
           responsavel_id?: string | null
           resultado?: string | null
           status?: string
+          tentativa?: number | null
           titulo?: string
           vence_em?: string
         }
@@ -4114,6 +4182,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "conversas"
             referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "tarefas_mensagem_id_fkey"
+            columns: ["mensagem_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "tarefas_oportunidade_id_org_id_fkey"
@@ -4437,6 +4512,10 @@ export type Database = {
         }[]
       }
       agenda_lembretes: { Args: never; Returns: number }
+      agente_agendar_retorno: {
+        Args: { p_assunto: string; p_conversa: string; p_quando: string }
+        Returns: Json
+      }
       agente_atualizar_contato: {
         Args: { p_conversa: string; p_dados: Json }
         Returns: Json
@@ -4498,6 +4577,11 @@ export type Database = {
         Args: { p_conversa: string; p_documento: string; p_path: string }
         Returns: Json
       }
+      agente_followup_concluir: {
+        Args: { p_erro?: string; p_tarefa: string; p_texto: string }
+        Returns: Json
+      }
+      agente_followup_dados: { Args: { p_tarefa: string }; Returns: Json }
       agente_franquia_esgotada: {
         Args: { p_conversa: string }
         Returns: boolean
@@ -5034,6 +5118,36 @@ export type Database = {
           p_valor: number
         }
         Returns: string
+      }
+      followup_detectar: { Args: never; Returns: number }
+      followup_enviar_modelo: {
+        Args: { p_conversa: string; p_modelo: Json; p_tarefa: string }
+        Returns: undefined
+      }
+      followup_para_equipe: {
+        Args: { p_motivo: string; p_tarefa: string }
+        Returns: undefined
+      }
+      followup_proxima: { Args: { p_tarefa: string }; Returns: undefined }
+      followup_quando: { Args: { p_quando: string }; Returns: string }
+      followup_registrar_envio: {
+        Args: {
+          p_conversa: string
+          p_mensagem: string
+          p_resultado: string
+          p_tarefa: string
+          p_texto: string
+        }
+        Returns: undefined
+      }
+      followup_responsavel: {
+        Args: { p_contato: string; p_conversa: string; p_oportunidade: string }
+        Returns: string
+      }
+      followup_rodar: { Args: never; Returns: number }
+      followup_salvar: {
+        Args: { p_cfg: Json; p_org: string }
+        Returns: undefined
       }
       formatar_documento: { Args: { p: string }; Returns: string }
       fotos_candidatas: {
@@ -5581,6 +5695,10 @@ export type Database = {
         Returns: Json
       }
       sem_acento: { Args: { p: string }; Returns: string }
+      simulador_agendar_retorno: {
+        Args: { p_assunto: string; p_org: string; p_quando: string }
+        Returns: Json
+      }
       simulador_consultar_os: {
         Args: { p_busca?: string; p_org: string }
         Returns: Json

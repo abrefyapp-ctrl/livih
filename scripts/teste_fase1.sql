@@ -5888,5 +5888,178 @@ end $$;
 insert into resultado (teste, ok) select 'tarefas: rotina do lembrete fechada para o login',
   not has_function_privilege('authenticated', 'public.tarefas_lembretes()', 'execute')
   and exists (select 1 from cron.job where jobname = 'livih-tarefas-lembretes');
+
+-- Follow-up do agente (migration 20261105140000). Número INST-F7 (WAHA, conectado, agente ligado 24 h); retomada
+-- ligada há 3 dias. Mensagens com criado_em no passado simulam as conversas paradas.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select id from public.canais where instance_id = 'INST-F7');
+  v_a uuid; v_b uuid; v_c uuid; v_e uuid; v_g uuid;
+  v_ca uuid; v_cb uuid; v_cc uuid; v_ce uuid; v_cg uuid;
+  n int; r jsonb; v_t public.tarefas;
+begin
+  update public.canais set ativo = true, status_conexao = 'WORKING', tipo = 'waha' where id = v_canal;
+  update public.agentes set ativo = true, horario = null where canal_id = v_canal;
+  insert into public.agente_followup (org_id, ativo, ativado_em) values (v_org, true, now() - interval '3 days');
+
+  -- A: conversa parada (o agente falou por último há 26 h).
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900055101', 'Ana Parada') returning id into v_a;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_a, 'bot') returning id into v_ca;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, criado_em, status_entrega)
+  values (v_org, v_ca, 'entrada', 'contato', 'texto', 'Quanto custa o grampo?', now() - interval '30 hours', 'recebida'),
+         (v_org, v_ca, 'saida', 'bot', 'texto', 'Custa R$ 10. Quer que eu monte o orçamento?', now() - interval '26 hours', 'enviada');
+  -- B: orçamento sem resposta (PDF depois da última mensagem do cliente e pedido em rascunho).
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900055102', 'Bruno Orçamento') returning id into v_b;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_b, 'bot') returning id into v_cb;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, midia_nome, criado_em, status_entrega)
+  values (v_org, v_cb, 'entrada', 'contato', 'texto', 'Me manda o orçamento', null, now() - interval '30 hours', 'recebida'),
+         (v_org, v_cb, 'saida', 'bot', 'documento', 'Orcamento-90.pdf', 'Orcamento-90-Bruno.pdf', now() - interval '26 hours', 'enviada');
+  insert into public.pedidos (org_id, contato_id, numero) values (v_org, v_b, 0);
+  -- C: parou antes de a retomada ser ligada (5 dias): não entra.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900055103', 'Carla Antiga') returning id into v_c;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_c, 'bot') returning id into v_cc;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, criado_em, status_entrega)
+  values (v_org, v_cc, 'entrada', 'contato', 'texto', 'oi', now() - interval '6 days', 'recebida'),
+         (v_org, v_cc, 'saida', 'bot', 'texto', 'Olá!', now() - interval '5 days', 'enviada');
+  -- E: parada, mas a equipe já marcou o próximo passo: não entra.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900055105', 'Edu Com Tarefa') returning id into v_e;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_e, 'bot') returning id into v_ce;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, criado_em, status_entrega)
+  values (v_org, v_ce, 'entrada', 'contato', 'texto', 'Vou ver', now() - interval '30 hours', 'recebida'),
+         (v_org, v_ce, 'saida', 'bot', 'texto', 'Combinado!', now() - interval '26 hours', 'enviada');
+  insert into public.tarefas (org_id, titulo, vence_em, contato_id, responsavel_id)
+  values (v_org, 'Ligar para o Edu', now() + interval '1 day', v_e, '00000000-0000-0000-0000-0000000000a1');
+
+  n := public.followup_detectar();
+  insert into resultado (teste, ok) values ('follow-up: conversa parada vira retomada do agente',
+    exists (select 1 from public.tarefas where contato_id = v_a and executor = 'agente' and status = 'aberta'
+             and followup_motivo = 'conversa' and tentativa = 1 and conversa_id = v_ca));
+  insert into resultado (teste, ok) values ('follow-up: orçamento enviado sem resposta é reconhecido',
+    exists (select 1 from public.tarefas where contato_id = v_b and executor = 'agente' and followup_motivo = 'orcamento'));
+  insert into resultado (teste, ok) values ('follow-up: o que parou antes de ligar a retomada não entra',
+    not exists (select 1 from public.tarefas where contato_id = v_c));
+  insert into resultado (teste, ok) values ('follow-up: contato com próximo passo da equipe não é retomado',
+    not exists (select 1 from public.tarefas where contato_id = v_e and executor = 'agente'));
+  perform public.followup_detectar();
+  insert into resultado (teste, ok) values ('follow-up: rodar de novo não repete a retomada',
+    (select count(*) from public.tarefas where contato_id in (v_a, v_b) and executor = 'agente') = 2);
+
+  -- Rodada: o agente vai escrever (a Edge Function é chamada; aqui só a marcação, o pg_net sai depois do commit).
+  n := public.followup_rodar();
+  insert into resultado (teste, ok) values ('follow-up: a rodada manda as retomadas para o agente escrever',
+    (select count(*) from public.tarefas where contato_id in (v_a, v_b) and executor = 'agente' and enviando_em is not null) = 2);
+  r := public.agente_followup_dados((select id from public.tarefas where contato_id = v_a and executor = 'agente'));
+  insert into resultado (teste, ok) values ('follow-up: a Edge Function recebe o contexto, o motivo e a tentativa',
+    (r ->> 'valido')::boolean and r ->> 'motivo' = 'conversa' and (r ->> 'tentativa')::int = 1
+    and jsonb_array_length(r -> 'contexto' -> 'mensagens') = 2);
+
+  -- A: o agente escreveu.
+  select * into v_t from public.tarefas where contato_id = v_a and executor = 'agente' and status = 'aberta';
+  r := public.agente_followup_concluir(v_t.id, 'Oi, Ana! Conseguiu pensar no grampo? Monto o orçamento para você.');
+  insert into resultado (teste, ok) values ('follow-up: a retomada sai como mensagem do agente e fica registrada',
+    (r ->> 'enviado')::boolean
+    and exists (select 1 from public.mensagens m where m.id = (r ->> 'mensagem_id')::uuid and m.autor_tipo = 'bot'
+                 and m.direcao = 'saida' and m.texto like 'Oi, Ana!%')
+    and exists (select 1 from public.fila_envio where mensagem_id = (r ->> 'mensagem_id')::uuid)
+    and (select status = 'feita' and mensagem_id = (r ->> 'mensagem_id')::uuid from public.tarefas where id = v_t.id)
+    and exists (select 1 from public.mensagens where conversa_id = v_ca and autor_tipo = 'sistema' and texto like 'Retomada do agente (1 de 2)%'));
+  insert into resultado (teste, ok) values ('follow-up: a 2ª tentativa fica marcada para depois do intervalo',
+    exists (select 1 from public.tarefas where contato_id = v_a and executor = 'agente' and status = 'aberta' and tentativa = 2
+             and vence_em between now() + interval '47 hours' and now() + interval '49 hours'));
+  -- O cliente respondeu: a 2ª tentativa fecha.
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, status_entrega)
+  values (v_org, v_ca, 'entrada', 'contato', 'texto', 'Pode montar sim', 'recebida');
+  insert into resultado (teste, ok) values ('follow-up: o cliente respondeu, as retomadas abertas fecham',
+    not exists (select 1 from public.tarefas where contato_id = v_a and status = 'aberta')
+    and exists (select 1 from public.tarefas where contato_id = v_a and tentativa = 2 and resultado = 'O cliente respondeu'));
+
+  -- B: o agente avaliou que não era hora (sem texto): fecha sem 2ª tentativa.
+  select * into v_t from public.tarefas where contato_id = v_b and executor = 'agente' and status = 'aberta';
+  r := public.agente_followup_concluir(v_t.id, null);
+  insert into resultado (teste, ok) values ('follow-up: sem texto, a retomada fecha sem mandar e sem 2ª tentativa',
+    not (r ->> 'enviado')::boolean
+    and (select status = 'feita' and mensagem_id is null from public.tarefas where id = v_t.id)
+    and not exists (select 1 from public.tarefas where contato_id = v_b and status = 'aberta'));
+
+  -- G: 2ª tentativa sem resposta vira tarefa do vendedor; o modelo (fora das 24 h) sai com o nome do contato.
+  insert into public.contatos (org_id, telefone, nome, responsavel_id)
+  values (v_org, '5541900055107', 'Gabi Sumida', '00000000-0000-0000-0000-0000000000a1') returning id into v_g;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_g, 'bot') returning id into v_cg;
+  insert into public.tarefas (org_id, titulo, vence_em, executor, contato_id, conversa_id, followup_motivo, tentativa, followup_ref)
+  values (v_org, 'Retomar a conversa parada', now(), 'agente', v_g, v_cg, 'conversa', 2, 'msg:teste') returning * into v_t;
+  perform public.followup_enviar_modelo(v_t.id, v_cg,
+    '{"nome":"retomada","idioma":"pt_BR","corpo":"Olá, {{1}}! Ainda posso ajudar?","variaveis":[{"fonte":"nome"}]}');
+  insert into resultado (teste, ok) values ('follow-up: fora das 24 h vai o modelo, com as variáveis preenchidas',
+    exists (select 1 from public.mensagens where conversa_id = v_cg and autor_tipo = 'bot' and texto = 'Olá, Gabi Sumida! Ainda posso ajudar?'
+             and modelo ->> 'nome' = 'retomada' and modelo -> 'parametros' ->> 0 = 'Gabi Sumida'));
+  insert into resultado (teste, ok) values ('follow-up: depois da 2ª sem resposta, a tarefa vai para o vendedor',
+    exists (select 1 from public.tarefas where contato_id = v_g and executor = 'equipe' and status = 'aberta'
+             and followup_motivo = 'sem_resposta' and responsavel_id = '00000000-0000-0000-0000-0000000000a1'));
+
+  -- Retorno combinado pelo agente.
+  r := public.agente_agendar_retorno(v_ce, to_char((now() at time zone 'America/Sao_Paulo')::date + 7, 'YYYY-MM-DD'), 'nova tabela de preços');
+  insert into resultado (teste, ok) values ('follow-up: o agente combina a data e a retomada fica marcada às 9 h',
+    (r ->> 'sucesso')::boolean
+    and exists (select 1 from public.tarefas where contato_id = v_e and executor = 'agente' and status = 'aberta'
+                 and followup_motivo = 'pedido_cliente' and titulo = 'Retomar: nova tabela de preços'
+                 and to_char(vence_em at time zone 'America/Sao_Paulo', 'HH24:MI') = '09:00'));
+  r := public.agente_agendar_retorno(v_ce, '2020-01-01', 'x');
+  insert into resultado (teste, ok) values ('follow-up: data no passado é recusada',
+    not (r ->> 'sucesso')::boolean and r ->> 'aviso' like 'Data inválida%');
+  -- A equipe escreveu ao cliente: a retomada do agente perde o sentido.
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, autor_id, tipo, texto, status_entrega)
+  values (v_org, v_ce, 'saida', 'atendente', '00000000-0000-0000-0000-0000000000a1', 'texto', 'Edu, segue a tabela', 'enviada');
+  insert into resultado (teste, ok) values ('follow-up: a equipe escreveu, a retomada do agente é cancelada',
+    not exists (select 1 from public.tarefas where contato_id = v_e and executor = 'agente' and status = 'aberta')
+    and exists (select 1 from public.tarefas where contato_id = v_e and titulo = 'Ligar para o Edu' and status = 'aberta'));
+  begin
+    insert into public.tarefas (org_id, titulo, vence_em, executor, contato_id) values (v_org, 'a', now(), 'agente', v_g);
+    insert into public.tarefas (org_id, titulo, vence_em, executor, contato_id) values (v_org, 'b', now(), 'agente', v_g);
+    insert into resultado (teste, ok) values ('follow-up: uma retomada aberta por contato', false);
+  exception when unique_violation then
+    insert into resultado (teste, ok) values ('follow-up: uma retomada aberta por contato', true);
+  end;
+  perform set_config('teste.fu_a', v_a::text, true);
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.followup_salvar(current_setting('teste.f7')::uuid, '{"ativo":false}');
+  insert into resultado (teste, ok) values ('follow-up: atendente não muda a configuração', false);
+exception when others then
+  insert into resultado (teste, ok) values ('follow-up: atendente não muda a configuração', sqlerrm like 'só dono e admin%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_g uuid := (select id from public.contatos where org_id = current_setting('teste.f7')::uuid and telefone = '5541900055107');
+begin
+  begin
+    perform public.followup_salvar(v_org, '{"ativo":true,"modelo":{"nome":"retomada","idioma":"pt_BR","corpo":"Olá, {{1}}!","variaveis":[]}}');
+    insert into resultado (teste, ok) values ('follow-up: modelo sem as variáveis é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('follow-up: modelo sem as variáveis é recusado', sqlerrm = 'preencha todas as variáveis do modelo');
+  end;
+  insert into public.tarefas (org_id, titulo, vence_em, executor, contato_id) values (v_org, 'O agente retoma', now() + interval '1 day', 'agente', v_g);
+  insert into resultado (teste, ok) values ('follow-up: a equipe pede ao agente para retomar',
+    exists (select 1 from public.tarefas where contato_id = v_g and executor = 'agente' and status = 'aberta'
+             and followup_motivo = 'manual' and tentativa = 1 and responsavel_id is null));
+  perform public.followup_salvar(v_org, '{"ativo":false,"orcamento_horas":24,"conversa_horas":24,"oportunidade_dias":3}');
+  insert into resultado (teste, ok) values ('follow-up: desligar cancela as retomadas que o agente faria',
+    not exists (select 1 from public.tarefas where org_id = v_org and executor = 'agente' and status = 'aberta')
+    and (select not ativo and ativado_em is null from public.agente_followup where org_id = v_org));
+end $$;
+reset role;
+insert into resultado (teste, ok) select 'follow-up: funções da rodada fechadas para o login',
+  not has_function_privilege('authenticated', 'public.followup_rodar()', 'execute')
+  and not has_function_privilege('authenticated', 'public.agente_followup_concluir(uuid, text, text)', 'execute')
+  and not has_function_privilege('authenticated', 'public.agente_agendar_retorno(uuid, text, text)', 'execute')
+  and has_function_privilege('service_role', 'public.agente_agendar_retorno(uuid, text, text)', 'execute')
+  and exists (select 1 from cron.job where jobname = 'livih-followup');
 reset role;
 select n, teste, ok from resultado order by n;
