@@ -18,6 +18,7 @@ import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
 import { EtiquetaEtapa } from './EtiquetaEtapa'
 import { Modal } from './Modal'
+import { TarefasDoContato } from './TarefasDoContato'
 
 const paraNumero = (v: string): number | null | undefined => {
   const limpo = v.replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')
@@ -322,6 +323,16 @@ export function ModalOportunidade({
           </p>
         )}
       </form>
+      {/* Fora do form: a janela da tarefa tem o form dela (o Modal não usa portal). */}
+      {existente && oportunidade && !oportunidade.fechada_em && (
+        <div className="mt-4 border-t border-borda pt-4">
+          <p className="mb-1 text-pequeno font-medium text-texto-2">Próximo passo</p>
+          <TarefasDoContato
+            contato={{ id: oportunidade.contato_id, nome: nomeDoContato(oportunidade.contato) }}
+            oportunidade={{ id: oportunidade.id, titulo: oportunidade.titulo }}
+          />
+        </div>
+      )}
     </Modal>
   )
 }

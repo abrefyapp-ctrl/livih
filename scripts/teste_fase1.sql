@@ -5742,5 +5742,151 @@ insert into resultado (teste, ok) select 'varios clientes: funções do agente f
   not has_function_privilege('authenticated', 'public.agente_montar_pedido(uuid, jsonb, text, text)', 'execute')
   and not has_function_privilege('anon', 'public.agente_montar_pedido(uuid, jsonb, text, text)', 'execute')
   and not has_function_privilege('authenticated', 'public.contatos_cliente_principal()', 'execute');
+
+-- Tarefas com lembrete (migration 20261105130000). Contato do número da empresa (INST-F7, todos veem) e contato só
+-- do número do vendedor d1 (o atendente b1 não vê).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select id from public.canais where instance_id = 'INST-F7');
+  v_etapa uuid := (select id from public.etapas_funil where org_id = current_setting('teste.f7')::uuid and tipo = 'aberta' order by ordem limit 1);
+  v_ct uuid; v_ct2 uuid; v_op uuid; v_op2 uuid;
+begin
+  update public.canais set responsavel_id = null where id = v_canal;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900066101', 'Cliente da tarefa') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_ct, 'humano');
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, responsavel_id)
+  values (v_org, v_ct, v_etapa, 'Proposta da tarefa', '00000000-0000-0000-0000-0000000000d1')
+  returning id into v_op;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900066102', 'Outro cliente') returning id into v_ct2;
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, responsavel_id)
+  values (v_org, v_ct2, v_etapa, 'Outra proposta', '00000000-0000-0000-0000-0000000000d1')
+  returning id into v_op2;
+  perform set_config('teste.tf_ct', v_ct::text, true);
+  perform set_config('teste.tf_op', v_op::text, true);
+  perform set_config('teste.tf_op2', v_op2::text, true);
+  perform set_config('teste.tf_ct_vend', (select contato_id from public.conversas where id = current_setting('teste.conv_vendedor')::uuid)::text, true);
+  insert into public.tarefas (org_id, titulo, vence_em, responsavel_id, contato_id, criado_por)
+  values (v_org, 'Tarefa do contato do vendedor', now() + interval '1 day', '00000000-0000-0000-0000-0000000000a1',
+          current_setting('teste.tf_ct_vend')::uuid, '00000000-0000-0000-0000-0000000000a1');
+  begin
+    insert into public.tarefas (org_id, titulo, vence_em, executor) values (v_org, 'Retomar', now(), 'agente');
+    insert into resultado (teste, ok) values ('tarefas: retomada do agente sem contato é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('tarefas: retomada do agente sem contato é recusada', sqlerrm like 'a retomada do agente precisa%');
+  end;
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_t public.tarefas;
+begin
+  insert into public.tarefas (org_id, titulo, vence_em, oportunidade_id)
+  values (v_org, '  Ligar para confirmar a proposta ', now() + interval '2 days', current_setting('teste.tf_op')::uuid)
+  returning * into v_t;
+  perform set_config('teste.tf_b1', v_t.id::text, true);
+  insert into resultado (teste, ok) values ('tarefas: sem responsável fica com quem criou, e o contato vem da oportunidade',
+    v_t.responsavel_id = '00000000-0000-0000-0000-0000000000b1' and v_t.criado_por = '00000000-0000-0000-0000-0000000000b1'
+    and v_t.contato_id = current_setting('teste.tf_ct')::uuid and v_t.titulo = 'Ligar para confirmar a proposta'
+    and v_t.executor = 'equipe' and v_t.status = 'aberta');
+  begin
+    insert into public.tarefas (org_id, titulo, vence_em, contato_id, oportunidade_id)
+    values (v_org, 'x', now(), current_setting('teste.tf_ct')::uuid, current_setting('teste.tf_op2')::uuid);
+    insert into resultado (teste, ok) values ('tarefas: oportunidade de outro contato é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('tarefas: oportunidade de outro contato é recusada', sqlerrm = 'a oportunidade é de outro contato');
+  end;
+  begin
+    insert into public.tarefas (org_id, titulo, vence_em, contato_id, responsavel_id)
+    values (v_org, 'x', now(), current_setting('teste.tf_ct')::uuid, '00000000-0000-0000-0000-0000000000c1');
+    insert into resultado (teste, ok) values ('tarefas: responsável de fora da equipe é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('tarefas: responsável de fora da equipe é recusado', sqlerrm = 'o responsável precisa ser da equipe');
+  end;
+  begin
+    insert into public.tarefas (org_id, titulo, vence_em, contato_id)
+    values (v_org, 'x', now(), current_setting('teste.tf_ct_vend')::uuid);
+    insert into resultado (teste, ok) values ('tarefas: atendente não cria tarefa de contato que não vê', false);
+  exception when insufficient_privilege then
+    insert into resultado (teste, ok) values ('tarefas: atendente não cria tarefa de contato que não vê', true);
+  end;
+  insert into resultado (teste, ok) values ('tarefas: atendente não vê a tarefa do contato do vendedor',
+    not exists (select 1 from public.tarefas where titulo = 'Tarefa do contato do vendedor'));
+
+  update public.tarefas set status = 'feita', resultado = 'Cliente confirmou' where id = v_t.id returning * into v_t;
+  insert into resultado (teste, ok) values ('tarefas: concluir guarda quando e quem',
+    v_t.concluida_em is not null and v_t.concluida_por = '00000000-0000-0000-0000-0000000000b1');
+  update public.tarefas set status = 'aberta' where id = v_t.id returning * into v_t;
+  insert into resultado (teste, ok) values ('tarefas: reabrir limpa a conclusão',
+    v_t.concluida_em is null and v_t.concluida_por is null and v_t.resultado is null);
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  r jsonb;
+begin
+  insert into resultado (teste, ok) values ('tarefas: o dono vê todas, inclusive a do contato do vendedor',
+    exists (select 1 from public.tarefas where titulo = 'Tarefa do contato do vendedor')
+    and exists (select 1 from public.tarefas where id = current_setting('teste.tf_b1')::uuid));
+  -- Filtra pelo vendedor d1, dono só destas duas oportunidades (a lista tem limite de 30).
+  r := public.painel_pendencias(v_org, null, '00000000-0000-0000-0000-0000000000d1');
+  insert into resultado (teste, ok) values ('tarefas: oportunidade com próximo passo no prazo sai do "sem retorno"',
+    not (r -> 'sem_retorno' @> jsonb_build_array(jsonb_build_object('oportunidade_id', current_setting('teste.tf_op')::uuid)))
+    and r -> 'sem_retorno' @> jsonb_build_array(jsonb_build_object('oportunidade_id', current_setting('teste.tf_op2')::uuid)));
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  delete from public.tarefas where titulo = 'Tarefa do contato do vendedor';
+  delete from public.tarefas where id = current_setting('teste.tf_b1')::uuid;
+  insert into resultado (teste, ok) values ('tarefas: quem criou apaga a própria tarefa',
+    not exists (select 1 from public.tarefas where id = current_setting('teste.tf_b1')::uuid));
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$ begin
+  insert into resultado (teste, ok) values ('tarefas: outra empresa não vê nada',
+    not exists (select 1 from public.tarefas where org_id = current_setting('teste.f7')::uuid));
+end $$;
+
+-- Lembrete: a que vence em 5 min com 10 de antecedência avisa; a de daqui a 2 h e a vencida há 1 h, não.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_agora uuid; v_depois uuid; v_velha uuid; n int;
+  v_push int := (select count(*) from public.push_fila);
+  v_alert int := (select count(*) from public.alertas);
+begin
+  update public.perfis set telefone = '5541988887777' where user_id = '00000000-0000-0000-0000-0000000000a1';
+  insert into public.tarefas (org_id, titulo, vence_em, responsavel_id, contato_id, lembrete_minutos)
+  values (v_org, 'Lembrar agora', now() + interval '5 minutes', '00000000-0000-0000-0000-0000000000a1', current_setting('teste.tf_ct')::uuid, 10)
+  returning id into v_agora;
+  insert into public.tarefas (org_id, titulo, vence_em, responsavel_id, lembrete_minutos)
+  values (v_org, 'Lembrar depois', now() + interval '2 hours', '00000000-0000-0000-0000-0000000000a1', 0) returning id into v_depois;
+  insert into public.tarefas (org_id, titulo, vence_em, responsavel_id, lembrete_minutos)
+  values (v_org, 'Já passou', now() - interval '1 hour', '00000000-0000-0000-0000-0000000000a1', 0) returning id into v_velha;
+  n := public.tarefas_lembretes();
+  insert into resultado (teste, ok) values ('tarefas: lembrete só da que chegou na hora',
+    (select lembrete_enviado_em is not null from public.tarefas where id = v_agora)
+    and (select lembrete_enviado_em is null from public.tarefas where id = v_depois)
+    and (select lembrete_enviado_em is null from public.tarefas where id = v_velha));
+  insert into resultado (teste, ok) values ('tarefas: o lembrete vai pelo WhatsApp da pessoa',
+    (select count(*) from public.alertas) = v_alert + 1
+    and exists (select 1 from public.alertas where telefone = '5541988887777' and texto like '✅ *Tarefa*%Lembrar agora%Cliente da tarefa%'));
+  update public.tarefas set vence_em = vence_em + interval '1 minute' where id = v_agora;
+  insert into resultado (teste, ok) values ('tarefas: remarcar faz o lembrete valer de novo',
+    (select lembrete_enviado_em is null from public.tarefas where id = v_agora));
+end $$;
+insert into resultado (teste, ok) select 'tarefas: rotina do lembrete fechada para o login',
+  not has_function_privilege('authenticated', 'public.tarefas_lembretes()', 'execute')
+  and exists (select 1 from cron.job where jobname = 'livih-tarefas-lembretes');
 reset role;
 select n, teste, ok from resultado order by n;

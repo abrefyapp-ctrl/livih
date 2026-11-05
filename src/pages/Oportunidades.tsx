@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { escutarParaRecarregar } from '../services/aoVivo'
 import { atualizarOportunidade, listarEtapas, listarOportunidades, type Etapa, type Oportunidade } from '../services/crm'
 import { haQuanto, moeda, nomeDoContato } from '../services/formato'
+import { prazo, proximosPassos, quandoTarefa, type ProximoPasso } from '../services/tarefas'
 import { useSessao } from '../hooks/useSessao'
 import { Avatar } from '../components/Avatar'
 import { Aviso } from '../components/Aviso'
@@ -23,11 +24,18 @@ export function Oportunidades() {
   const { orgAtiva, sessao, equipe } = useSessao()
   const orgId = orgAtiva!.id
   const eu = sessao?.user.id
-  const [dados, setDados] = useState<{ orgId: string; etapas: Etapa[]; lista: Oportunidade[]; corte: number } | null>(null)
+  const [dados, setDados] = useState<{
+    orgId: string
+    etapas: Etapa[]
+    lista: Oportunidade[]
+    corte: number
+    passos: Awaited<ReturnType<typeof proximosPassos>>
+  } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
   const [busca, setBusca] = useState('')
   const [soMinhas, setSoMinhas] = useState(false)
+  const [semPasso, setSemPasso] = useState(false)
   const [abertura, setAbertura] = useState<Abertura | null>(null)
   const [arrastando, setArrastando] = useState<string | null>(null)
   const [sobre, setSobre] = useState<string | null>(null)
@@ -37,11 +45,11 @@ export function Oportunidades() {
   useEffect(() => {
     let ativo = true
     const buscar = () =>
-      Promise.all([listarEtapas(orgId), listarOportunidades(orgId)])
-        .then(([etapas, lista]) => {
+      Promise.all([listarEtapas(orgId), listarOportunidades(orgId), proximosPassos(orgId)])
+        .then(([etapas, lista, passos]) => {
           if (!ativo) return
           // Fechadas há mais de 30 dias saem do quadro; o corte é fixado quando os dados chegam.
-          setDados({ orgId, etapas, lista, corte: Date.now() - DIAS_FECHADAS * 86_400_000 })
+          setDados({ orgId, etapas, lista, passos, corte: Date.now() - DIAS_FECHADAS * 86_400_000 })
           setErro(null)
         })
         .catch(() => ativo && setErro('Não foi possível carregar o funil.'))
@@ -57,16 +65,23 @@ export function Oportunidades() {
   const atual = dados?.orgId === orgId ? dados : null
   const recarregar = () => setVersao((v) => v + 1)
 
+  // Próximo passo: a tarefa aberta da oportunidade ou, sem ela, a do contato sem oportunidade (como no Painel).
+  const passoDe = (o: Oportunidade): ProximoPasso | undefined =>
+    atual?.passos.porOportunidade.get(o.id) ?? atual?.passos.porContato.get(o.contato_id)
+  const abertaIds = useMemo(() => new Set(atual?.etapas.filter((e) => e.tipo === 'aberta').map((e) => e.id)), [atual])
+
   const visiveis = useMemo(() => {
     if (!atual) return []
     const t = busca.trim().toLowerCase()
     return atual.lista.filter((o) => {
       if (soMinhas && o.responsavel_id !== eu) return false
       if (o.fechada_em && new Date(o.fechada_em).getTime() < atual.corte) return false
+      if (semPasso && (!abertaIds.has(o.etapa_id) || atual.passos.porOportunidade.has(o.id) || atual.passos.porContato.has(o.contato_id)))
+        return false
       if (!t) return true
       return `${o.titulo} ${nomeDoContato(o.contato)}`.toLowerCase().includes(t)
     })
-  }, [atual, busca, soMinhas, eu])
+  }, [atual, busca, soMinhas, semPasso, abertaIds, eu])
 
   async function mover(o: Oportunidade, etapa: Etapa) {
     if (o.etapa_id === etapa.id || !atual) return
@@ -128,6 +143,10 @@ export function Oportunidades() {
             <input type="checkbox" checked={soMinhas} onChange={(e) => setSoMinhas(e.target.checked)} className="size-4 accent-primaria" />
             Só as minhas
           </label>
+          <label className="flex cursor-pointer items-center gap-2 text-pequeno text-texto-2">
+            <input type="checkbox" checked={semPasso} onChange={(e) => setSemPasso(e.target.checked)} className="size-4 accent-primaria" />
+            Sem próximo passo
+          </label>
         </div>
         {erro && <Aviso tom="erro">{erro}</Aviso>}
       </div>
@@ -179,6 +198,8 @@ export function Oportunidades() {
                   <ul className="relative min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2">
                     {cartoes.map((o) => {
                       const resp = nomeResp(o.responsavel_id)
+                      const passo = etapa.tipo === 'aberta' ? passoDe(o) : undefined
+                      const atrasado = !!passo && prazo(passo.vence_em) === 'atrasada'
                       return (
                         <li
                           key={o.id}
@@ -197,6 +218,18 @@ export function Oportunidades() {
                           <button onClick={() => setAbertura({ oportunidade: o })} className="block w-full cursor-grab p-3 text-left active:cursor-grabbing">
                             <span className="block font-medium">{o.titulo}</span>
                             <span className="mt-0.5 block truncate text-pequeno text-texto-3">{nomeDoContato(o.contato)}</span>
+                            {etapa.tipo === 'aberta' &&
+                              (passo ? (
+                                <span className={`mt-2 flex items-center gap-1 text-legenda ${atrasado ? 'font-semibold text-erro' : 'text-texto-2'}`}>
+                                  <Icone nome={passo.executor === 'agente' ? 'agente' : 'check'} className="size-3.5 shrink-0" />
+                                  <span className="truncate">
+                                    {atrasado && 'Atrasado · '}
+                                    {quandoTarefa(passo.vence_em)} · {passo.titulo}
+                                  </span>
+                                </span>
+                              ) : (
+                                <span className="mt-2 block text-legenda font-medium text-atencao">Sem próximo passo</span>
+                              ))}
                             <span className="mt-2 flex items-center gap-2 text-legenda text-texto-3">
                               {o.valor_estimado != null && <span className="font-medium text-texto-2">{moeda(o.valor_estimado)}</span>}
                               <span className="ml-auto">{haQuanto(o.atualizado_em)}</span>

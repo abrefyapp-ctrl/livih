@@ -4036,6 +4036,101 @@ export type Database = {
           },
         ]
       }
+      tarefas: {
+        Row: {
+          atualizado_em: string
+          concluida_em: string | null
+          concluida_por: string | null
+          contato_id: string | null
+          conversa_id: string | null
+          criado_em: string
+          criado_por: string | null
+          executor: string
+          id: string
+          lembrete_enviado_em: string | null
+          lembrete_minutos: number | null
+          observacao: string | null
+          oportunidade_id: string | null
+          org_id: string
+          responsavel_id: string | null
+          resultado: string | null
+          status: string
+          titulo: string
+          vence_em: string
+        }
+        Insert: {
+          atualizado_em?: string
+          concluida_em?: string | null
+          concluida_por?: string | null
+          contato_id?: string | null
+          conversa_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          executor?: string
+          id?: string
+          lembrete_enviado_em?: string | null
+          lembrete_minutos?: number | null
+          observacao?: string | null
+          oportunidade_id?: string | null
+          org_id: string
+          responsavel_id?: string | null
+          resultado?: string | null
+          status?: string
+          titulo: string
+          vence_em: string
+        }
+        Update: {
+          atualizado_em?: string
+          concluida_em?: string | null
+          concluida_por?: string | null
+          contato_id?: string | null
+          conversa_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          executor?: string
+          id?: string
+          lembrete_enviado_em?: string | null
+          lembrete_minutos?: number | null
+          observacao?: string | null
+          oportunidade_id?: string | null
+          org_id?: string
+          responsavel_id?: string | null
+          resultado?: string | null
+          status?: string
+          titulo?: string
+          vence_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tarefas_contato_id_org_id_fkey"
+            columns: ["contato_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "tarefas_conversa_id_org_id_fkey"
+            columns: ["conversa_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "conversas"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "tarefas_oportunidade_id_org_id_fkey"
+            columns: ["oportunidade_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "oportunidades"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "tarefas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uso_ia: {
         Row: {
           chamadas: number
@@ -5386,6 +5481,15 @@ export type Database = {
             }
             Returns: boolean
           }
+      pode_ver_tarefa: {
+        Args: {
+          p_contato: string
+          p_criado_por: string
+          p_org: string
+          p_responsavel: string
+        }
+        Returns: boolean
+      }
       push_cancelar: { Args: { p_endpoint: string }; Returns: undefined }
       push_chaves: { Args: never; Returns: Json }
       push_enfileirar: {
@@ -5497,6 +5601,7 @@ export type Database = {
         Args: { p_org: string; p_user: string }
         Returns: boolean
       }
+      tarefas_lembretes: { Args: never; Returns: number }
       tem_papel: {
         Args: {
           p_org: string

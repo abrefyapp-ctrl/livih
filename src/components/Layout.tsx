@@ -59,6 +59,7 @@ export function Layout() {
       rotulo: 'Vendas',
       itens: [
         { para: '/oportunidades', rotulo: 'Oportunidades', icone: 'funil' },
+        { para: '/tarefas', rotulo: 'Tarefas', icone: 'check' },
         { para: '/contatos', rotulo: 'Contatos', icone: 'usuario' },
         { para: '/clientes', rotulo: 'Clientes', icone: 'empresa' },
         ...(modulos?.has('agenda') ? [{ para: '/agenda', rotulo: 'Agenda', icone: 'calendario' as const }] : []),

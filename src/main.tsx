@@ -18,6 +18,7 @@ import { Clientes } from './pages/Clientes'
 import { ClientePerfil } from './pages/ClientePerfil'
 import { Agenda } from './pages/Agenda'
 import { Oportunidades } from './pages/Oportunidades'
+import { Tarefas } from './pages/Tarefas'
 import { PedidoDetalhe } from './pages/PedidoDetalhe'
 import { Pedidos } from './pages/Pedidos'
 import { Produtos } from './pages/Produtos'
@@ -65,6 +66,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="clientes" element={<Clientes />} />
             <Route path="clientes/:id" element={<ClientePerfil />} />
             <Route path="oportunidades" element={<Oportunidades />} />
+            <Route path="tarefas" element={<Tarefas />} />
             <Route path="agenda" element={<Agenda />} />
             <Route path="campanhas" element={<Campanhas />} />
             <Route path="pedidos" element={<Pedidos />} />

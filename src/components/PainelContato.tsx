@@ -11,6 +11,7 @@ import { Icone, type NomeIcone } from './Icone'
 import { ModalContato } from './ModalContato'
 import { NotasContato } from './NotasContato'
 import { ClienteDoContato } from './ClienteDoContato'
+import { TarefasDoContato } from './TarefasDoContato'
 
 function Linha({ icone, children }: { icone: NomeIcone; children: ReactNode }) {
   return (
@@ -138,6 +139,10 @@ export function PainelContato({ contatoId, conversaId }: { contatoId: string; co
         ) : (
           <p className="text-pequeno text-texto-3">Nenhuma oportunidade. O agente cria quando identifica interesse.</p>
         )}
+      </Secao>
+
+      <Secao titulo="Tarefas">
+        <TarefasDoContato contato={{ id: contato.id, nome }} conversaId={conversaId} />
       </Secao>
 
       <Secao titulo="Notas da equipe">
