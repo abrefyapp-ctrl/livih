@@ -6061,5 +6061,35 @@ insert into resultado (teste, ok) select 'follow-up: funções da rodada fechada
   and not has_function_privilege('authenticated', 'public.agente_agendar_retorno(uuid, text, text)', 'execute')
   and has_function_privilege('service_role', 'public.agente_agendar_retorno(uuid, text, text)', 'execute')
   and exists (select 1 from cron.job where jobname = 'livih-followup');
+
+-- O agente não chama a equipe se o cliente escreveu de novo enquanto ele pensava (migration 20261105150000).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select id from public.canais where instance_id = 'INST-F7');
+  v_ct uuid; v_conv uuid; v_m1 uuid; v_m2 uuid; r jsonb;
+begin
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541900044101', 'Cliente em partes') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_ct, 'bot') returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, status_entrega, criado_em)
+  values (v_org, v_conv, 'entrada', 'contato', 'texto', 'Segue comprovante', 'recebida', now() - interval '20 seconds')
+  returning id into v_m1;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'texto', 'Posso pedir motoboy?', 'recebida') returning id into v_m2;
+
+  r := public.agente_pedir_humano(v_conv, 'Comprovante recebido', v_m1);
+  insert into resultado (teste, ok) values ('mensagem nova: o agente não chama a equipe atendendo uma mensagem velha',
+    not (r ->> 'sucesso')::boolean and (r ->> 'mensagem_nova')::boolean
+    and (select estado = 'bot' from public.conversas where id = v_conv));
+  r := public.agente_pedir_humano(v_conv, 'Comprovante e pedido de motoboy', v_m2);
+  insert into resultado (teste, ok) values ('mensagem nova: atendendo a última, a conversa passa para a equipe',
+    (r ->> 'sucesso')::boolean
+    and (select estado = 'aguardando_humano' and motivo_humano = 'Comprovante e pedido de motoboy' from public.conversas where id = v_conv));
+end $$;
+insert into resultado (teste, ok) select 'mensagem nova: a função é só do agente',
+  not has_function_privilege('authenticated', 'public.agente_pedir_humano(uuid, text, uuid)', 'execute')
+  and has_function_privilege('service_role', 'public.agente_pedir_humano(uuid, text, uuid)', 'execute');
 reset role;
 select n, teste, ok from resultado order by n;

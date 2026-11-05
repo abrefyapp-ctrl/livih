@@ -34,7 +34,7 @@
     },
     {
       "parameters": {
-        "amount": 6,
+        "amount": 12,
         "unit": "seconds"
       },
       "type": "n8n-nodes-base.wait",
@@ -272,7 +272,7 @@
     {
       "parameters": {
         "description": "Passa a conversa para a equipe: o assistente para de responder e a equipe é avisada no WhatsApp.",
-        "jsCode": "const rpc = async (fn, body) => {\n  const r = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${$env.LIVIH_SUPABASE_URL}/rest/v1/rpc/${fn}`,\n    headers: { apikey: $env.LIVIH_SUPABASE_KEY, Authorization: `Bearer ${$env.LIVIH_SUPABASE_KEY}` },\n    body,\n    json: true,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n  if (r.statusCode >= 400) return { erro: r.body?.message || `HTTP ${r.statusCode}` };\n  return r.body;\n};\n\n// A conversa vem do webhook, nunca do modelo: o agente não escolhe em qual conversa mexe.\nconst conversa = $('Validar').first().json.conversa_id;\n// $input.item.json traz o item inteiro do workflow junto com os argumentos: fica só o que é do esquema.\nconst CAMPOS = [\"motivo\"];\nconst args = Object.fromEntries(Object.entries($input.item.json || {}).filter(([k]) => CAMPOS.includes(k)));\nreturn JSON.stringify(await rpc('agente_chamar_humano', { p_conversa: conversa, p_motivo: args.motivo }));\n",
+        "jsCode": "const rpc = async (fn, body) => {\n  const r = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${$env.LIVIH_SUPABASE_URL}/rest/v1/rpc/${fn}`,\n    headers: { apikey: $env.LIVIH_SUPABASE_KEY, Authorization: `Bearer ${$env.LIVIH_SUPABASE_KEY}` },\n    body,\n    json: true,\n    ignoreHttpStatusErrors: true,\n    returnFullResponse: true,\n  });\n  if (r.statusCode >= 400) return { erro: r.body?.message || `HTTP ${r.statusCode}` };\n  return r.body;\n};\n\n// A conversa vem do webhook, nunca do modelo: o agente não escolhe em qual conversa mexe.\nconst conversa = $('Validar').first().json.conversa_id;\n// $input.item.json traz o item inteiro do workflow junto com os argumentos: fica só o que é do esquema.\nconst CAMPOS = [\"motivo\"];\nconst args = Object.fromEntries(Object.entries($input.item.json || {}).filter(([k]) => CAMPOS.includes(k)));\nreturn JSON.stringify(await rpc('agente_pedir_humano', { p_conversa: conversa, p_motivo: args.motivo, p_mensagem: $('Validar').first().json.mensagem_id }));\n",
         "specifyInputSchema": true,
         "schemaType": "manual",
         "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"motivo\": {\n      \"type\": \"string\",\n      \"description\": \"Por que a equipe deve assumir, em uma frase\"\n    }\n  },\n  \"required\": [\n    \"motivo\"\n  ]\n}"
