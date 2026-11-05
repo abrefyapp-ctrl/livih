@@ -52,6 +52,15 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/definir-senha" element={<DefinirSenha />} />
+          {/* Ajuda abre em outra aba, sem o menu do app: o cliente lê de um lado e faz do outro. */}
+          <Route
+            path="/ajuda/:manual?"
+            element={
+              <RotaProtegida>
+                <Ajuda />
+              </RotaProtegida>
+            }
+          />
           <Route
             element={
               <RotaProtegida>
@@ -68,7 +77,6 @@ createRoot(document.getElementById('root')!).render(
             <Route path="clientes/:id" element={<ClientePerfil />} />
             <Route path="oportunidades" element={<Oportunidades />} />
             <Route path="tarefas" element={<Tarefas />} />
-            <Route path="ajuda/:manual?" element={<Ajuda />} />
             <Route path="agenda" element={<Agenda />} />
             <Route path="campanhas" element={<Campanhas />} />
             <Route path="pedidos" element={<Pedidos />} />

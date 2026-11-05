@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { useSessao } from '../hooks/useSessao'
 import {
   acaoCampanha,
@@ -44,7 +44,6 @@ function Numeros({ r }: { r: Resumo | null }) {
 /** Campanhas de divulgação pela API oficial (docs/campanhas.md). Só dono e admin. */
 export function Campanhas() {
   const { orgAtiva } = useSessao()
-  const navigate = useNavigate()
   const orgId = orgAtiva!.id
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const [dados, setDados] = useState<{ orgId: string; lista: { campanha: Campanha; resumo: Resumo | null }[] } | null>(null)
@@ -101,7 +100,7 @@ export function Campanhas() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Botao variante="secundario" icone="livro" onClick={() => navigate('/ajuda/campanhas')}>
+            <Botao variante="secundario" icone="livro" title="Abre o manual em outra aba" onClick={() => window.open('/ajuda/campanhas', '_blank', 'noopener')}>
               Como usar
             </Botao>
             <Botao icone="mais" onClick={() => setNova(true)}>

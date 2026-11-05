@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { Caminho, Figura, Lista, Paragrafo, Secao, Subtitulo, Tabela } from './componentes'
 
 // Manual de Campanhas (05/11). Mesmo texto do documento "Manual da Livih: Campanhas"; mudou a tela de campanhas
@@ -54,7 +53,7 @@ export function ManualCampanhas() {
           preços do WhatsApp Business, da Meta.
         </Paragrafo>
         <Paragrafo>
-          O menu fica em <Link to="/campanhas" className="font-semibold text-primaria hover:underline">Vendas → Campanhas</Link>.
+          O menu fica em <Caminho>Vendas → Campanhas</Caminho>.
         </Paragrafo>
       </Secao>
 
@@ -66,7 +65,7 @@ export function ManualCampanhas() {
         <Lista
           numerada
           itens={[
-            <>Abra <Link to="/configuracoes/modelos" className="font-semibold text-primaria hover:underline">Configurações → Modelos</Link> e escolha o número da API oficial.</>,
+            <>Abra <Caminho>Configurações → Modelos</Caminho> e escolha o número da API oficial.</>,
             <>Clique em <Caminho>Novo modelo</Caminho>. Dá para começar de um pronto: <Caminho>Promoção</Caminho> ou <Caminho>Reativar cliente</Caminho> são de Marketing.</>,
             <>Escolha a categoria <Caminho>Marketing</Caminho>. As campanhas só aceitam essa categoria.</>,
             <>Escreva a mensagem. Para cada {'{{n}}'}, preencha um exemplo (ex.: Maria): a Meta usa para entender o texto.</>,

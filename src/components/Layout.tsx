@@ -11,7 +11,8 @@ import { Modal } from './Modal'
 import { useInstalarApp } from '../pwa'
 import { podeFinanceiro } from '../services/financeiro'
 
-type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: number }
+/** novaAba: abre em outra aba (a Ajuda, para ler de um lado e fazer do outro). */
+type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: number; novaAba?: boolean }
 /** Bloco do menu: rótulo pequeno em cima (no menu só de ícones vira uma linha); bloco vazio não aparece. */
 type GrupoMenu = { rotulo?: string; itens: ItemMenu[] }
 
@@ -82,7 +83,7 @@ export function Layout() {
     },
   ]
   const rodape: ItemMenu[] = [
-    { para: '/ajuda', rotulo: 'Ajuda', icone: 'livro' },
+    { para: '/ajuda', rotulo: 'Ajuda', icone: 'livro', novaAba: true },
     { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
     ...(adminPlataforma ? [{ para: '/empresas', rotulo: 'Empresas', icone: 'painel' as const }] : []),
   ]
@@ -94,7 +95,8 @@ export function Layout() {
     <NavLink
       key={item.para}
       to={item.para}
-      title={compacto ? item.rotulo : undefined}
+      title={compacto ? item.rotulo : item.novaAba ? 'Abre em outra aba' : undefined}
+      {...(item.novaAba ? { target: '_blank', rel: 'noopener' } : {})}
       onClick={() => setGaveta(false)}
       className={({ isActive }) =>
         `relative flex h-10 items-center gap-3 rounded-md px-3 font-medium transition-colors ${

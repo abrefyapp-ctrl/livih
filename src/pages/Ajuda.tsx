@@ -1,14 +1,43 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { MANUAIS } from '../ajuda/manuais'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { Icone } from '../components/Icone'
+import { Logo } from '../components/Logo'
+
+/** A aba da Ajuda: sem o menu do app, só o cabeçalho e a leitura. */
+function Casca({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    document.title = 'Ajuda · Livih'
+  }, [])
+  return (
+    <div className="flex h-dvh flex-col bg-fundo">
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-borda bg-superficie px-4 lg:px-8">
+        <Link to="/ajuda" aria-label="Ajuda da Livih" className="flex items-center gap-3">
+          <Logo />
+          <span className="border-l border-borda pl-3 font-semibold text-texto-2">Ajuda</span>
+        </Link>
+        <span className="ml-auto hidden text-legenda text-texto-3 sm:block">Leia aqui e faça os passos na aba da Livih.</span>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+    </div>
+  )
+}
 
 /**
- * Ajuda: os manuais de uso da Livih (src/ajuda/). /ajuda lista os manuais; /ajuda/<id> abre um, com o índice das
- * seções ao lado (no celular, em cima). /ajuda/<id>#<seção> já abre na seção.
+ * Ajuda: os manuais de uso da Livih (src/ajuda/). Abre em outra aba (menu Ajuda e "Como usar" das telas), fora do
+ * layout do app. /ajuda lista os manuais; /ajuda/<id> abre um, com o índice das seções ao lado (no celular, em cima).
+ * /ajuda/<id>#<seção> já abre na seção.
  */
 export function Ajuda() {
+  return (
+    <Casca>
+      <Conteudo />
+    </Casca>
+  )
+}
+
+function Conteudo() {
   const { manual: id } = useParams()
   const manual = id ? MANUAIS.find((m) => m.id === id) : null
 
@@ -31,7 +60,7 @@ export function Ajuda() {
 
   if (!manual) {
     return (
-      <div className="h-full overflow-y-auto">
+      <div>
         <div className="mx-auto max-w-3xl space-y-4 px-4 py-6 lg:px-8">
           <div>
             <h1 className="text-h1 font-semibold">Ajuda</h1>
@@ -69,10 +98,10 @@ export function Ajuda() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div>
       <div className="mx-auto max-w-5xl px-4 py-6 lg:px-8">
         <Link to="/ajuda" className="inline-flex items-center gap-1 text-pequeno text-texto-3 hover:text-texto">
-          <Icone nome="voltar" className="size-4" /> Ajuda
+          <Icone nome="voltar" className="size-4" /> Todos os manuais
         </Link>
         <div className="mt-2 mb-6">
           <h1 className="text-h1 font-semibold">{manual.titulo}</h1>
