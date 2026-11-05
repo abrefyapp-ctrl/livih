@@ -2527,6 +2527,41 @@ export type Database = {
         }
         Relationships: []
       }
+      motivos_perda: {
+        Row: {
+          ativo: boolean
+          criado_em: string
+          id: string
+          nome: string
+          ordem: number
+          org_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          criado_em?: string
+          id?: string
+          nome: string
+          ordem?: number
+          org_id: string
+        }
+        Update: {
+          ativo?: boolean
+          criado_em?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motivos_perda_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notas: {
         Row: {
           autor_id: string | null
@@ -2891,6 +2926,7 @@ export type Database = {
           fechada_em: string | null
           id: string
           motivo_perda: string | null
+          motivo_perda_id: string | null
           org_id: string
           origem: string | null
           responsavel_id: string | null
@@ -2906,6 +2942,7 @@ export type Database = {
           fechada_em?: string | null
           id?: string
           motivo_perda?: string | null
+          motivo_perda_id?: string | null
           org_id: string
           origem?: string | null
           responsavel_id?: string | null
@@ -2921,6 +2958,7 @@ export type Database = {
           fechada_em?: string | null
           id?: string
           motivo_perda?: string | null
+          motivo_perda_id?: string | null
           org_id?: string
           origem?: string | null
           responsavel_id?: string | null
@@ -2941,6 +2979,13 @@ export type Database = {
             columns: ["etapa_id", "org_id"]
             isOneToOne: false
             referencedRelation: "etapas_funil"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "oportunidades_motivo_perda_fk"
+            columns: ["motivo_perda_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "motivos_perda"
             referencedColumns: ["id", "org_id"]
           },
         ]
@@ -4912,6 +4957,10 @@ export type Database = {
         }
         Returns: string
       }
+      contatos_importar: {
+        Args: { p_linhas: Json; p_org: string }
+        Returns: Json
+      }
       cpf_valido: { Args: { p: string }; Returns: boolean }
       criar_organizacao: {
         Args: { p_dono?: string; p_nome: string; p_slug: string }
@@ -5294,6 +5343,7 @@ export type Database = {
         Args: { p_anual: boolean; p_modulos: string[] }
         Returns: number
       }
+      motivos_perda_padrao: { Args: { p_org: string }; Returns: undefined }
       nfe_manutencao: { Args: never; Returns: undefined }
       nfe_salvar_tokens: {
         Args: { p_emissora: string; p_homologacao: string; p_producao: string }
@@ -5425,6 +5475,15 @@ export type Database = {
       }
       painel_pendencias: {
         Args: { p_canal?: string; p_org: string; p_vendedor?: string }
+        Returns: Json
+      }
+      painel_perdas: {
+        Args: {
+          p_ate: string
+          p_de: string
+          p_org: string
+          p_vendedor?: string
+        }
         Returns: Json
       }
       painel_periodo: {
