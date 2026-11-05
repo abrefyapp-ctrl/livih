@@ -49,6 +49,12 @@ export const criarModelo = (orgId: string, canalId: string, modelo: ModeloNovo) 
   chamar<{ id: string; status: string }>(orgId, canalId, 'criar', { modelo })
 export const apagarModelo = (orgId: string, canalId: string, nome: string) => chamar(orgId, canalId, 'apagar', { nome })
 
+/**
+ * hello_world é o modelo de exemplo que a Meta cria sozinha em toda conta da API oficial (texto em inglês, para testar
+ * o número). Não serve para cliente: fica fora das listas de escolha da campanha e da retomada (05/11).
+ */
+export const modeloDeExemplo = (m: Modelo) => m.name === 'hello_world'
+
 /** Variáveis {{n}} distintas do texto, em ordem. */
 export function variaveisDe(texto: string): number[] {
   return [...new Set([...texto.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map((v) => Number(v[1])))].sort((a, b) => a - b)

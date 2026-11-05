@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { enviarModelo } from '../services/atendimento'
-import { listarModelos, partesDe, ROTULO_CATEGORIA, textoEnviado, variaveisDe, type Modelo } from '../services/modelos'
+import { listarModelos, modeloDeExemplo, partesDe, ROTULO_CATEGORIA, textoEnviado, variaveisDe, type Modelo } from '../services/modelos'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
@@ -34,7 +34,7 @@ export function ModalEnviarModelo({
     if (!aberto) return
     let ativo = true
     listarModelos(orgId, canalId)
-      .then((l) => ativo && setModelos({ canalId, lista: l.filter((m) => m.status === 'APPROVED') }))
+      .then((l) => ativo && setModelos({ canalId, lista: l.filter((m) => m.status === 'APPROVED' && !modeloDeExemplo(m)) }))
       .catch((e) => ativo && setErroLista((e as Error).message))
     return () => {
       ativo = false

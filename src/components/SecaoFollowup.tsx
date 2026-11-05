@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { listarNumerosVisiveis } from '../services/atendimento'
 import { ROTULO_FONTE, type FonteVariavel, type VariavelCampanha } from '../services/campanhas'
 import { buscarFollowup, CONFIG_PADRAO, salvarFollowup, type ConfigFollowup } from '../services/followup'
-import { listarModelos, partesDe, variaveisDe, type Modelo } from '../services/modelos'
+import { listarModelos, modeloDeExemplo, partesDe, variaveisDe, type Modelo } from '../services/modelos'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
@@ -18,7 +18,12 @@ const INTERVALOS = [1, 2, 3, 5, 7]
 /** Modelo que serve para a retomada: aprovado, sem mídia nem variável no cabeçalho. */
 const usavel = (m: Modelo) => {
   const cab = m.components.find((c) => c.type === 'HEADER')
-  return m.status === 'APPROVED' && m.category !== 'AUTHENTICATION' && (!cab || (cab.format === 'TEXT' && !/\{\{/.test(cab.text ?? '')))
+  return (
+    !modeloDeExemplo(m) &&
+    m.status === 'APPROVED' &&
+    m.category !== 'AUTHENTICATION' &&
+    (!cab || (cab.format === 'TEXT' && !/\{\{/.test(cab.text ?? '')))
+  )
 }
 
 /** Um caso da retomada: liga/desliga e o tempo de espera. */

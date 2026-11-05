@@ -11,7 +11,7 @@ import {
   type VariavelCampanha,
 } from '../services/campanhas'
 import { listarEtapas, type Etapa } from '../services/crm'
-import { listarModelos, partesDe, variaveisDe, type Modelo } from '../services/modelos'
+import { listarModelos, modeloDeExemplo, partesDe, variaveisDe, type Modelo } from '../services/modelos'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
@@ -22,7 +22,12 @@ import { PreviaModelo } from './PreviaModelo'
 /** Modelo que a campanha consegue enviar: aprovado, de Marketing, sem imagem/vídeo/documento nem variável no cabeçalho. */
 const enviavel = (m: Modelo) => {
   const cab = m.components.find((c) => c.type === 'HEADER')
-  return m.status === 'APPROVED' && m.category === 'MARKETING' && (!cab || (cab.format === 'TEXT' && !/\{\{/.test(cab.text ?? '')))
+  return (
+    !modeloDeExemplo(m) &&
+    m.status === 'APPROVED' &&
+    m.category === 'MARKETING' &&
+    (!cab || (cab.format === 'TEXT' && !/\{\{/.test(cab.text ?? '')))
+  )
 }
 
 /** Texto que entra quando o contato não tem nome ou empresa, se a pessoa não escrever outro. */
