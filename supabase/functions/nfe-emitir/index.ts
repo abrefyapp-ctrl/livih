@@ -40,6 +40,31 @@ function ratear(total: number, bases: number[]): number[] {
   return partes;
 }
 
+/**
+ * Fatura e duplicatas (grupo cobr da NF-e): as parcelas a receber do pedido, numeradas 001, 002… É o quadro
+ * "Fatura / Duplicatas" do DANFE, onde o cliente vê vencimento e valor. Caso da JoGrampo em 05/11: pedido em boleto
+ * para 28 dias, e a nota saía só com o prazo no texto das informações complementares.
+ * A SEFAZ recusa vencimento antes da emissão e soma das duplicatas diferente do valor líquido: com alguma parcela já
+ * vencida (nota emitida depois do vencimento), a nota sai sem duplicatas; o valor da fatura é a soma das parcelas.
+ */
+function fatura(numeroPedido: number, parcelas: { valor: number | string; vencimento: string }[]) {
+  const hoje = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+  if (!parcelas.length || parcelas.some((x) => x.vencimento < hoje)) return {};
+  const duplicatas = parcelas.map((x, i) => ({
+    numero: String(i + 1).padStart(3, "0"),
+    data_vencimento: x.vencimento,
+    valor: r2(Number(x.valor)),
+  }));
+  const total = r2(duplicatas.reduce((a, d) => a + d.valor, 0));
+  return {
+    numero_fatura: String(numeroPedido),
+    valor_original_fatura: total,
+    valor_desconto_fatura: 0,
+    valor_liquido_fatura: total,
+    duplicatas,
+  };
+}
+
 /** Data e hora de Brasília com fuso (formato da SEFAZ). */
 function agoraBrasilia() {
   const d = new Date(Date.now() - 3 * 3600_000);
@@ -73,10 +98,13 @@ Deno.serve(async (req) => {
   const { data: liberada } = await admin.rpc("nota_fiscal_liberada", { p_org: visivel.org_id });
   if (liberada !== true) return json(403, { erro: "A nota fiscal vem com o módulo Pedidos e estoque (ERP) ou Ordens de serviço, e nenhum dos dois está ligado nesta empresa. Para ligar, o dono fala com a equipe da Livih." });
 
-  const [{ data: ped }, { data: itens }, { data: viva }] = await Promise.all([
+  const [{ data: ped }, { data: itens }, { data: viva }, { data: parcelas }] = await Promise.all([
     admin.from("pedidos").select("*").eq("id", p.pedido_id).single(),
     admin.from("pedido_itens").select("*").eq("pedido_id", p.pedido_id).order("ordem"),
     admin.from("notas_fiscais").select("id, status").eq("pedido_id", p.pedido_id).in("status", ["processando", "autorizada"]).maybeSingle(),
+    // Parcelas a receber do pedido (geradas ao confirmar, docs/financeiro.md): viram as duplicatas da nota.
+    admin.from("fin_lancamentos").select("valor, vencimento, parcela").eq("pedido_id", p.pedido_id).eq("tipo", "receber")
+      .is("cancelado_em", null).order("vencimento").order("parcela"),
   ]);
   if (!ped) return json(404, { erro: "Pedido não encontrado." });
   if (viva) return json(409, { erro: viva.status === "autorizada" ? "Este pedido já tem nota autorizada." : "A nota deste pedido já está sendo processada." });
@@ -179,6 +207,7 @@ Deno.serve(async (req) => {
     formas_pagamento: [{
       indicador_pagamento: p.a_prazo ? 1 : 0, forma_pagamento: forma, valor_pagamento: forma === "90" ? 0 : valorTotal,
     }],
+    ...fatura(ped.numero, parcelas ?? []),
     informacoes_adicionais_contribuinte: [`Pedido nº ${ped.numero}`, (p.informacoes ?? "").trim()].filter(Boolean).join(". ").slice(0, 5000),
     items: (itens ?? []).map((i, n) => {
       const pr = porId.get(i.produto_id!)!;
