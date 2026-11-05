@@ -106,7 +106,7 @@ gerados: é esperado. Rode `npx eslint <arquivos>` e deixe o `tsc` para depois d
 Salve no git só os arquivos da mudança (`git add <arquivos>`, nunca `-A`) e passe ao usuário, prontos para copiar:
 
 ```
-npx supabase db push
+npx supabase db push --remote
 npm run tipos
 git add src/services/tiposBanco.ts
 git commit -m "Tipos: <assunto>"

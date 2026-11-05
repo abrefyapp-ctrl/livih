@@ -380,6 +380,7 @@ export function PedidoDetalhe() {
       {escolherCliente && (
         <ModalEscolherCliente
           orgId={orgId}
+          contatoId={pedido.contato_id}
           salvando={ocupado === 'cliente'}
           aoFechar={() => setEscolherCliente(false)}
           aoEscolher={(clienteId) =>

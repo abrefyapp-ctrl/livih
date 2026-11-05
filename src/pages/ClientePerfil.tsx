@@ -7,10 +7,11 @@ import {
   contatosDoCliente,
   enderecoEmLinha,
   formatarDocumento,
-  ligarContato,
+  ligarEmpresa,
   ordensDoCliente,
   pedidosDoCliente,
   procurarContatos,
+  soltarEmpresa,
   type Cliente,
   type ContatoDoCliente,
   type ConversaDoCliente,
@@ -111,10 +112,10 @@ export function ClientePerfil() {
   const recarregar = () => setVersao((v) => v + 1)
 
   async function confirmarSoltar() {
-    if (!soltar) return
+    if (!soltar || !id) return
     setSalvando(true)
     try {
-      await ligarContato(soltar.id, null)
+      await soltarEmpresa(soltar.id, id)
       recarregar()
     } catch (e) {
       setAviso((e as Error).message)
@@ -333,7 +334,7 @@ export function ClientePerfil() {
           aoSalvar={async (contatoId) => {
             setNovoContato(false)
             try {
-              await ligarContato(contatoId, c.id)
+              await ligarEmpresa(orgId, contatoId, c.id)
             } catch (e) {
               setAviso((e as Error).message)
             }
@@ -378,7 +379,7 @@ export function ClientePerfil() {
   )
 }
 
-/** Busca entre os contatos que a pessoa vê e liga ao cliente (o que já está em outro cliente muda de cliente). */
+/** Busca entre os contatos que a pessoa vê e liga ao cliente (o que já está em outro cliente fica com os dois). */
 function ModalLigarContato({ orgId, clienteId, aoFechar, aoLigar }: { orgId: string; clienteId: string; aoFechar: () => void; aoLigar: () => void }) {
   const [busca, setBusca] = useState('')
   const [achados, setAchados] = useState<Awaited<ReturnType<typeof procurarContatos>>>([])
@@ -402,7 +403,7 @@ function ModalLigarContato({ orgId, clienteId, aoFechar, aoLigar }: { orgId: str
     setLigando(contatoId)
     setErro(null)
     try {
-      await ligarContato(contatoId, clienteId)
+      await ligarEmpresa(orgId, contatoId, clienteId)
       aoLigar()
     } catch (e) {
       setErro((e as Error).message)
@@ -430,14 +431,14 @@ function ModalLigarContato({ orgId, clienteId, aoFechar, aoLigar }: { orgId: str
         {achados.length > 0 && (
           <ul className="divide-y divide-borda rounded-md border border-borda">
             {achados.map((ct) => {
-              const aqui = ct.cliente_id === clienteId
+              const aqui = ct.clientes.includes(clienteId)
               return (
                 <li key={ct.id} className="flex items-center gap-3 px-3 py-2">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-pequeno font-medium">{nomeDoContato(ct)}</span>
                     <span className="block truncate text-legenda text-texto-3">
                       {formatarTelefone(ct.telefone)}
-                      {ct.cliente_id && !aqui && ' · ligado a outro cliente (muda para este)'}
+                      {ct.clientes.length > 0 && !aqui && ' · já ligado a outro cliente (fica com os dois)'}
                     </span>
                   </span>
                   <Botao tamanho="sm" variante="secundario" onClick={() => void ligar(ct.id)} disabled={aqui} carregando={ligando === ct.id}>

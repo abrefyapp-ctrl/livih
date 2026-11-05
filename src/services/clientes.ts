@@ -3,9 +3,9 @@ import type { Database, Json } from './tiposBanco'
 import type { LinhaCliente } from './planilhaClientes'
 import { cnpjValido, limparDocumento } from './formato'
 
-// Cadastro de clientes (migration 20261024120000, docs/clientes.md). Cliente é quem compra (CNPJ ou CPF); os
-// contatos do WhatsApp apontam o cliente (contatos.cliente_id). A RLS segue a carteira; quem tem "Vê todos os
-// clientes" vê todos (balcão), sem ver as conversas.
+// Cadastro de clientes (migration 20261024120000, docs/clientes.md). Cliente é quem compra (CNPJ ou CPF); um contato
+// do WhatsApp pode comprar por mais de um cliente (contatos_clientes, migration 20261105120000), e o principal fica em
+// contatos.cliente_id. A RLS segue a carteira; quem tem "Vê todos os clientes" vê todos (balcão), sem ver as conversas.
 
 type Tabelas = Database['public']['Tables']
 export type Cliente = Tabelas['clientes']['Row']
@@ -17,7 +17,7 @@ export type DadosCliente = Pick<
 > & { responsavel_id?: string | null }
 
 export type ClienteLista = Cliente & {
-  contatos: { count: number }[]
+  contatos_clientes: { count: number }[]
   pedidos: { numero: number; criado_em: string }[]
 }
 export type ContatoDoCliente = Pick<Tabelas['contatos']['Row'], 'id' | 'nome' | 'nome_whatsapp' | 'telefone' | 'email' | 'responsavel_id'>
@@ -75,7 +75,7 @@ const erroAmigavel = (e: { message: string; code?: string }, padrao: string) =>
 // ---- clientes ----
 
 export async function listarClientes(orgId: string, busca: string, comPedidos: boolean): Promise<ClienteLista[]> {
-  const campos = comPedidos ? '*, contatos(count), pedidos(numero, criado_em)' : '*, contatos(count)'
+  const campos = comPedidos ? '*, contatos_clientes(count), pedidos(numero, criado_em)' : '*, contatos_clientes(count)'
   let consulta = supabase.from('clientes').select(campos).eq('org_id', orgId)
   const termo = busca.trim().replace(/[,()%]/g, ' ')
   if (termo) {
@@ -144,22 +144,66 @@ export async function clienteResumo(id: string): Promise<ClienteResumo | null> {
 export async function contatosDoCliente(clienteId: string): Promise<ContatoDoCliente[]> {
   const { data, error } = await supabase
     .from('contatos')
-    .select('id, nome, nome_whatsapp, telefone, email, responsavel_id')
-    .eq('cliente_id', clienteId)
+    .select('id, nome, nome_whatsapp, telefone, email, responsavel_id, contatos_clientes!inner(cliente_id)')
+    .eq('contatos_clientes.cliente_id', clienteId)
     .order('nome')
   if (error) throw error
-  return data ?? []
+  return (data ?? []).map((ct) => ({
+    id: ct.id,
+    nome: ct.nome,
+    nome_whatsapp: ct.nome_whatsapp,
+    telefone: ct.telefone,
+    email: ct.email,
+    responsavel_id: ct.responsavel_id,
+  }))
 }
 
-/** Liga (ou solta, com null) o contato a um cliente. */
+/** Empresa do contato; cliente null quando é da carteira de outro vendedor (a RLS esconde o cadastro). */
+export type EmpresaDoContato = { cliente_id: string; cliente: ClienteResumo | null }
+
+/** As empresas por que o contato compra, na ordem em que foram ligadas. */
+export async function empresasDoContato(contatoId: string): Promise<EmpresaDoContato[]> {
+  const { data, error } = await supabase
+    .from('contatos_clientes')
+    .select(`cliente_id, cliente:clientes(${RESUMO})`)
+    .eq('contato_id', contatoId)
+    .order('criado_em')
+  if (error) throw error
+  return (data ?? []) as unknown as EmpresaDoContato[]
+}
+
+/** Muda o cliente principal do contato (o que o pedido novo pega). Com null, solta o principal. */
 export async function ligarContato(contatoId: string, clienteId: string | null) {
   const { data, error } = await supabase.from('contatos').update({ cliente_id: clienteId }).eq('id', contatoId).select('id')
   if (error) throw erroAmigavel(error, 'Não foi possível ligar o contato. Tente de novo.')
   if (!data?.length) throw new Error('Este contato é da carteira de outro vendedor: só ele, o dono ou o admin mudam.')
 }
 
-/** Contatos que a pessoa vê, para ligar ao cliente. */
-export async function procurarContatos(orgId: string, busca: string): Promise<(ContatoDoCliente & { cliente_id: string | null })[]> {
+/** Liga o contato a mais um cliente. O primeiro vira o principal; os outros não mudam o principal. */
+export async function ligarEmpresa(orgId: string, contatoId: string, clienteId: string) {
+  const { error } = await supabase.from('contatos_clientes').insert({ org_id: orgId, contato_id: contatoId, cliente_id: clienteId })
+  if (!error || error.code === '23505') return
+  throw new Error(
+    error.code === '42501'
+      ? 'Este contato é da carteira de outro vendedor, ou o cliente é: só ele, o dono ou o admin ligam.'
+      : 'Não foi possível ligar o contato. Tente de novo.',
+  )
+}
+
+/** Solta o contato de um cliente. Se era o principal, o mais antigo que sobrar vira o principal. */
+export async function soltarEmpresa(contatoId: string, clienteId: string) {
+  const { data, error } = await supabase
+    .from('contatos_clientes')
+    .delete()
+    .eq('contato_id', contatoId)
+    .eq('cliente_id', clienteId)
+    .select('cliente_id')
+  if (error) throw new Error('Não foi possível tirar o contato do cliente. Tente de novo.')
+  if (!data?.length) throw new Error('Este contato é da carteira de outro vendedor: só ele, o dono ou o admin mudam.')
+}
+
+/** Contatos que a pessoa vê, para ligar ao cliente, com os clientes a que cada um já está ligado. */
+export async function procurarContatos(orgId: string, busca: string): Promise<(ContatoDoCliente & { clientes: string[] })[]> {
   const termo = busca.trim().replace(/[,()%]/g, ' ')
   if (!termo) return []
   const digitos = termo.replace(/\D/g, '')
@@ -167,12 +211,12 @@ export async function procurarContatos(orgId: string, busca: string): Promise<(C
   if (digitos.length >= 4) filtros.push(`telefone.like.%${digitos}%`)
   const { data, error } = await supabase
     .from('contatos')
-    .select('id, nome, nome_whatsapp, telefone, email, responsavel_id, cliente_id')
+    .select('id, nome, nome_whatsapp, telefone, email, responsavel_id, contatos_clientes(cliente_id)')
     .eq('org_id', orgId)
     .or(filtros.join(','))
     .limit(8)
   if (error) throw error
-  return data ?? []
+  return (data ?? []).map(({ contatos_clientes: ligacoes, ...ct }) => ({ ...ct, clientes: ligacoes.map((l) => l.cliente_id) }))
 }
 
 export async function pedidosDoCliente(clienteId: string): Promise<PedidoDoCliente[]> {

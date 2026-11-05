@@ -54,7 +54,7 @@ CRM de atendimento e vendas pelo WhatsApp, multiempresa, com agente de IA. Produ
 2. Bloco de testes no fim de `scripts/teste_fase1.sql` (antes do `reset role; select … from resultado`), no padrão
    dos blocos existentes.
 3. `python scripts/testar_migrations.py`: todos OK antes de seguir.
-4. Aplicar (`npx supabase db push`), gerar os tipos (`npm run tipos`) e **salvar `tiposBanco.ts` no git**. Enquanto
+4. Aplicar (`npx supabase db push --remote`; sem o `--remote`, o CLI novo tenta o banco local), gerar os tipos (`npm run tipos`) e **salvar `tiposBanco.ts` no git**. Enquanto
    a migration não está aplicada, `tsc` acusa erro nas colunas novas: é esperado.
 
 ## Publicação

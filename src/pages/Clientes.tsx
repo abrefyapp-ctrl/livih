@@ -12,7 +12,7 @@ import { ModalCliente } from '../components/ModalCliente'
 import { ModalImportarClientes } from '../components/ModalImportarClientes'
 
 const local = (c: ClienteLista) => [c.cidade, c.uf].filter(Boolean).join('/')
-const contatos = (c: ClienteLista) => c.contatos[0]?.count ?? 0
+const contatos = (c: ClienteLista) => c.contatos_clientes[0]?.count ?? 0
 
 /** Clientes (docs/clientes.md): quem compra, com o cadastro fiscal; os contatos do WhatsApp ficam ligados a eles. */
 export function Clientes() {

@@ -37,8 +37,10 @@ Cada ligação ou cadastro vira um aviso na conversa, só para a equipe: "O agen
 
 - A trava fica no banco (`agente_montar_pedido`), não só nas instruções: com a opção ligada, o agente não consegue
   montar orçamento para contato sem cliente.
-- Contato já ligado a outro cliente que informa outro documento: o agente não troca, avisa e chama a equipe (ex.: o
-  comprador que atende duas empresas).
+- Contato já ligado a outro cliente que informa outro documento: desde 05/11 o agente liga mais essa empresa (o
+  contato compra pelas duas), o orçamento em aberto passa a sair nela e fica o aviso "O agente ligou este contato
+  também ao cliente…". Antes ele não trocava e chamava a equipe. Contato com 2 ou mais empresas: o agente pergunta para
+  qual delas é o orçamento ([clientes.md](clientes.md), "Contato de mais de uma empresa").
 - A carteira do cliente que já existe não muda. O cliente novo fica com quem atende a conversa (ou o responsável pelo
   contato).
 - Opção desligada: as duas funções recusam e a montagem não pede identificação. O agente guarda o CNPJ no contato,

@@ -3205,12 +3205,15 @@ begin
            and texto like 'O agente ligou este contato ao cliente%') = 1);
   r := public.agente_identificar_cliente(v_c1, '04252011000110');
   insert into resultado (teste, ok) values ('identificar: de novo, já identificado', (r ->> 'ja_identificado')::boolean);
+  -- Desde 20261105120000: outro CNPJ liga mais uma empresa, e a principal continua a primeira.
   r := public.agente_identificar_cliente(v_c1, '11444777000161');
-  insert into resultado (teste, ok) values ('identificar: contato de outro cliente não troca e chama a equipe',
-    not (r ->> 'sucesso')::boolean and r ->> 'aviso' like '%chamar_humano%'
+  insert into resultado (teste, ok) values ('identificar: contato de outro cliente ganha mais esta empresa, sem trocar a principal',
+    (r ->> 'sucesso')::boolean and r ->> 'aviso' is null
+    and (select count(*) from public.contatos_clientes where contato_id = (select contato_id from public.conversas where id = v_c1)) = 2
     and (select cl.documento from public.contatos ct join public.clientes cl on cl.id = ct.cliente_id
-          where ct.id = (select contato_id from public.conversas where id = v_c1)) = '04252011000110');
-  r := public.agente_montar_pedido(v_c1, '[{"codigo":"X","quantidade":1}]');
+          where ct.id = (select contato_id from public.conversas where id = v_c1)) = '04252011000110'
+    and exists (select 1 from public.mensagens where conversa_id = v_c1 and texto like 'O agente ligou este contato também ao cliente%'));
+  r := public.agente_montar_pedido(v_c1, '[{"codigo":"X","quantidade":1}]', null, 'Delta Peças');
   insert into resultado (teste, ok) values ('identificar: identificado, o orçamento segue', r -> 'identificar_cliente' is null);
 
   -- CPF: só liga se o nome conferir, e não revela o nome do cadastro.
@@ -5599,5 +5602,145 @@ insert into resultado (teste, ok) select 'cnpj: funções novas fechadas para o 
   and not has_function_privilege('authenticated', 'public.cnpjs_no_anual(uuid, date, boolean)', 'execute')
   and not has_function_privilege('authenticated', 'public.notas_excedentes(uuid, date)', 'execute')
   and not has_function_privilege('anon', 'public.notas_excedentes(uuid, date)', 'execute');
+
+-- Contato ligado a mais de um cliente (migration 20261105120000). Clientes do teste: Beta (11444777000161), Delta
+-- Peças (04252011000110) e Empresa Nova (11222333000181).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select id from public.canais where instance_id = 'INST-F7');
+  v_beta uuid := (select id from public.clientes where org_id = current_setting('teste.f7')::uuid and documento = '11444777000161');
+  v_delta uuid := (select id from public.clientes where org_id = current_setting('teste.f7')::uuid and documento = '04252011000110');
+  v_nova uuid := (select id from public.clientes where org_id = current_setting('teste.f7')::uuid and documento = '11222333000181');
+  v_ct uuid; v_conv uuid; v_ped public.pedidos; r jsonb;
+begin
+  insert into public.contatos (org_id, telefone, nome, cliente_id) values (v_org, '5541900099001', 'Compradora do grupo', v_delta)
+  returning id into v_ct;
+  perform set_config('teste.ct_grupo', v_ct::text, true);
+  insert into resultado (teste, ok) values ('varios clientes: gravar o cliente do contato cria a ligação',
+    exists (select 1 from public.contatos_clientes where contato_id = v_ct and cliente_id = v_delta and org_id = v_org));
+  insert into public.contatos_clientes (org_id, contato_id, cliente_id) values (v_org, v_ct, v_beta);
+  insert into resultado (teste, ok) values ('varios clientes: a segunda empresa não muda a principal',
+    (select cliente_id from public.contatos where id = v_ct) = v_delta
+    and (select count(*) from public.contatos_clientes where contato_id = v_ct) = 2);
+  delete from public.contatos_clientes where contato_id = v_ct and cliente_id = v_delta;
+  insert into resultado (teste, ok) values ('varios clientes: tirar a principal promove a que sobrou',
+    (select cliente_id from public.contatos where id = v_ct) = v_beta);
+  update public.contatos set cliente_id = null where id = v_ct;
+  insert into resultado (teste, ok) values ('varios clientes: apagar a última deixa o contato sem cliente',
+    (select cliente_id from public.contatos where id = v_ct) is null
+    and not exists (select 1 from public.contatos_clientes where contato_id = v_ct));
+  insert into public.contatos_clientes (org_id, contato_id, cliente_id) values (v_org, v_ct, v_delta);
+  insert into public.contatos_clientes (org_id, contato_id, cliente_id) values (v_org, v_ct, v_beta);
+  insert into resultado (teste, ok) values ('varios clientes: a primeira ligação vira a principal',
+    (select cliente_id from public.contatos where id = v_ct) = v_delta);
+  update public.contatos set cliente_id = v_beta where id = v_ct;
+  insert into resultado (teste, ok) values ('varios clientes: trocar a principal mantém a outra empresa',
+    (select cliente_id from public.contatos where id = v_ct) = v_beta
+    and (select count(*) from public.contatos_clientes where contato_id = v_ct) = 2);
+  update public.contatos set cliente_id = null where id = v_ct;
+  insert into resultado (teste, ok) values ('varios clientes: apagar a principal solta só ela e promove a outra',
+    (select cliente_id from public.contatos where id = v_ct) = v_delta
+    and not exists (select 1 from public.contatos_clientes where contato_id = v_ct and cliente_id = v_beta));
+  insert into public.contatos_clientes (org_id, contato_id, cliente_id) values (v_org, v_ct, v_beta);
+  begin
+    insert into public.contatos_clientes (org_id, contato_id, cliente_id)
+    values (current_setting('teste.cli')::uuid, v_ct, v_nova);
+    insert into resultado (teste, ok) values ('varios clientes: não liga a cliente de outra empresa', false);
+  exception when foreign_key_violation then
+    insert into resultado (teste, ok) values ('varios clientes: não liga a cliente de outra empresa', true);
+  end;
+
+  -- Agente: com duas empresas, pergunta para qual é o orçamento.
+  update public.agentes set identificar_cliente = true where canal_id = v_canal;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_canal, v_ct, 'bot') returning id into v_conv;
+  perform set_config('teste.conv_grupo', v_conv::text, true);
+  r := public.agente_contexto(v_conv);
+  insert into resultado (teste, ok) values ('varios clientes: o contexto do agente traz as duas empresas, a principal primeiro',
+    jsonb_array_length(r -> 'clientes') = 2 and (r -> 'clientes' -> 0 ->> 'principal')::boolean
+    and r -> 'clientes' -> 0 ->> 'nome' = 'Delta Peças' and r -> 'clientes' -> 1 ->> 'cnpj' = '11.444.777/0001-61'
+    and r -> 'cliente' ->> 'nome' = 'Delta Peças');
+  r := public.agente_montar_pedido(v_conv, '[{"codigo":"14/19","quantidade":2}]');
+  insert into resultado (teste, ok) values ('varios clientes: sem dizer a empresa, o agente pergunta antes do orçamento',
+    not (r ->> 'sucesso')::boolean and (r ->> 'escolher_empresa')::boolean and jsonb_array_length(r -> 'empresas') = 2
+    and (public.agente_rascunho_atual(v_conv)).id is null);
+  r := public.agente_montar_pedido(v_conv, '[{"codigo":"14/19","quantidade":2}]', null, 'Empresa que não é dele');
+  insert into resultado (teste, ok) values ('varios clientes: empresa que não é do contato é recusada',
+    not (r ->> 'sucesso')::boolean and r ->> 'aviso' like 'Essa empresa não está entre as deste WhatsApp%');
+  r := public.agente_montar_pedido(v_conv, '[{"codigo":"14/19","quantidade":2}]', null, '11.444.777/0001-61');
+  v_ped := public.agente_rascunho_atual(v_conv);
+  insert into resultado (teste, ok) values ('varios clientes: com o CNPJ escolhido, o orçamento sai nessa empresa',
+    (r ->> 'sucesso')::boolean and v_ped.cliente_id = v_beta and r ->> 'empresa' = 'Beta Comércio Ltda'
+    and r ? 'aviso_empresa');
+  r := public.agente_montar_pedido(v_conv, '[{"codigo":"14/19","quantidade":3}]');
+  insert into resultado (teste, ok) values ('varios clientes: atualizar o orçamento em aberto não pergunta de novo',
+    (r ->> 'sucesso')::boolean and (public.agente_rascunho_atual(v_conv)).cliente_id = v_beta);
+  r := public.agente_identificar_cliente(v_conv, '04.252.011/0001-10');
+  insert into resultado (teste, ok) values ('varios clientes: o CNPJ de uma empresa dele muda o orçamento em aberto',
+    (r ->> 'ja_identificado')::boolean and (public.agente_rascunho_atual(v_conv)).cliente_id = v_delta);
+  r := public.agente_identificar_cliente(v_conv, '11222333000181');
+  insert into resultado (teste, ok) values ('varios clientes: CNPJ de outra empresa do cadastro liga mais uma e o orçamento vai para ela',
+    (r ->> 'sucesso')::boolean and (r ->> 'encontrado')::boolean
+    and (select count(*) from public.contatos_clientes where contato_id = v_ct) = 3
+    and (select cliente_id from public.contatos where id = v_ct) = v_delta
+    and (public.agente_rascunho_atual(v_conv)).cliente_id = v_nova
+    and exists (select 1 from public.mensagens where conversa_id = v_conv and texto like 'O agente ligou este contato também ao cliente%'));
+  r := public.agente_cadastrar_cliente(v_conv, '12.345.678/0001-95', 'GRUPO FILIAL SUL LTDA');
+  insert into resultado (teste, ok) values ('varios clientes: CNPJ novo é cadastrado e ligado como mais uma empresa',
+    (r ->> 'cadastrado')::boolean
+    and (select count(*) from public.contatos_clientes where contato_id = v_ct) = 4
+    and (select cl.documento from public.pedidos p join public.clientes cl on cl.id = p.cliente_id
+          where p.id = (public.agente_rascunho_atual(v_conv)).id) = '12345678000195'
+    and exists (select 1 from public.mensagens where conversa_id = v_conv and texto like 'O agente cadastrou o cliente%também a ele.%'));
+
+  -- Apagar o cliente principal: a ligação some e outra empresa vira a principal (no teste todas têm o mesmo
+  -- criado_em, então qualquer uma das que sobraram serve).
+  update public.contatos set cliente_id = (select id from public.clientes where org_id = v_org and documento = '12345678000195')
+   where id = v_ct;
+  delete from public.clientes where org_id = v_org and documento = '12345678000195';
+  insert into resultado (teste, ok) values ('varios clientes: apagar o cliente principal promove outra empresa',
+    (select count(*) from public.contatos_clientes where contato_id = v_ct) = 3
+    and exists (select 1 from public.contatos ct join public.contatos_clientes cc on cc.contato_id = ct.id and cc.cliente_id = ct.cliente_id
+                 where ct.id = v_ct));
+  -- Daqui em diante, Beta é a principal.
+  update public.contatos set cliente_id = v_beta where id = v_ct;
+end $$;
+
+-- Tela: quem vê o contato liga e solta; a importação liga mais uma empresa.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_ct uuid := current_setting('teste.ct_grupo')::uuid;
+  r jsonb;
+begin
+  delete from public.contatos_clientes where contato_id = v_ct
+     and cliente_id = (select id from public.clientes where org_id = v_org and documento = '11222333000181');
+  insert into resultado (teste, ok) values ('varios clientes: o dono solta uma empresa do contato',
+    (select count(*) from public.contatos_clientes where contato_id = v_ct) = 2);
+  r := public.clientes_importar(v_org, jsonb_build_array(
+    jsonb_build_object('nome', 'Grupo Filial Norte', 'documento', '98.765.432/0001-98', 'celular', '(41) 90009-9001')));
+  insert into resultado (teste, ok) values ('varios clientes: importar o celular de um contato com cliente liga mais uma empresa',
+    (r ->> 'contatos_ligados')::int = 1 and jsonb_array_length(r -> 'avisos') = 0
+    and exists (select 1 from public.contatos_clientes cc join public.clientes cl on cl.id = cc.cliente_id
+                 where cc.contato_id = v_ct and cl.documento = '98765432000198')
+    and (select cl.documento from public.contatos ct join public.clientes cl on cl.id = ct.cliente_id where ct.id = v_ct) = '11444777000161');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$ begin
+  insert into resultado (teste, ok) values ('varios clientes: outra empresa não vê as ligações',
+    not exists (select 1 from public.contatos_clientes where contato_id = current_setting('teste.ct_grupo')::uuid));
+  delete from public.contatos_clientes where contato_id = current_setting('teste.ct_grupo')::uuid;
+end $$;
+reset role;
+insert into resultado (teste, ok) values ('varios clientes: outra empresa não solta as ligações',
+  (select count(*) from public.contatos_clientes where contato_id = current_setting('teste.ct_grupo')::uuid) = 3);
+insert into resultado (teste, ok) select 'varios clientes: funções do agente fechadas para o login',
+  not has_function_privilege('authenticated', 'public.agente_montar_pedido(uuid, jsonb, text, text)', 'execute')
+  and not has_function_privilege('anon', 'public.agente_montar_pedido(uuid, jsonb, text, text)', 'execute')
+  and not has_function_privilege('authenticated', 'public.contatos_cliente_principal()', 'execute');
 reset role;
 select n, teste, ok from resultado order by n;

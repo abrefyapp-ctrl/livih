@@ -5,13 +5,14 @@ ou CPF, inscrição estadual nem endereço. O orçamento em PDF mostra só nome,
 NF-e (roadmap, item 5) vai precisar do cadastro fiscal.
 
 **Cliente** é quem compra: uma empresa (CNPJ) ou uma pessoa (CPF). **Contato** é quem fala no WhatsApp (comprador,
-financeiro, dono). Um cliente tem vários contatos; um contato é de no máximo um cliente.
+financeiro, dono). Um cliente tem vários contatos; um contato pode comprar por mais de um cliente (desde 05/11, veja
+"Contato de mais de uma empresa"), e um deles é o principal.
 
 ## Decisões de 22/10
 
 | Pergunta | Decisão |
 |---|---|
-| Contato em mais de um cliente? | Não: um cliente só (`contatos.cliente_id`) |
+| Contato em mais de um cliente? | Não: um cliente só (`contatos.cliente_id`). Mudou em 05/11: pode ter vários (abaixo) |
 | Para quais empresas? | Todas, com ou sem o módulo de pedidos |
 | Primeira entrega | Cadastro + vínculo nos dois sentidos, cliente no pedido e no orçamento, busca pelo CNPJ, importar planilha |
 | Agente | Só lê o cliente do contato; não cria nem edita (mudou em 26/10: com a opção ligada, identifica pelo CNPJ/CPF, liga e cadastra; [agente-identificar-cliente.md](agente-identificar-cliente.md)) |
@@ -164,6 +165,30 @@ admin mudam (pela função que já altera papel e status do membro, com auditori
 Esforço estimado: 2 a 3 dias, mais meio dia para a OS.
 
 Cada entrega vai ao ar separada (migration → funções/front → n8n), com os testes em `begin … rollback` antes.
+
+## Contato de mais de uma empresa (05/11)
+
+Pedido da JoGrampo: a mesma compradora compra por 2 ou mais CNPJs de um grupo, e o contato só ligava a um deles.
+Deve ser comum em outras empresas também.
+
+| Pergunta | Decisão |
+|---|---|
+| Como guardar? | Tabela `contatos_clientes` (todas as empresas do contato). `contatos.cliente_id` continua como a **principal**: o pedido e a OS novos pegam ela, e pedido, OS, nota, cobrança e campanhas não mudam |
+| Qual é a principal? | A primeira ligada. Tirar a principal promove a mais antiga que sobrar; no perfil do contato dá para escolher outra ("Tornar principal") |
+| Agente, contato com 2 ou mais empresas | Antes do primeiro orçamento, pergunta para qual empresa ele é (decisão do usuário). A trava fica no banco: `montar_pedido` recusa sem a empresa e devolve a lista |
+| Agente, CNPJ/CPF diferente do que o contato tem | Liga mais essa empresa (cadastra, se for nova), o orçamento em aberto passa a sair nela e fica um aviso na conversa (decisão do usuário; antes ele chamava a equipe) |
+| Importação de planilha | Celular de contato já ligado a outro cliente ganha mais uma ligação (antes virava aviso) |
+
+Na tela: o bloco "Cliente" do contato lista as empresas (principal marcada, "Tornar principal", "Tirar", "Ligar outra
+empresa"); o perfil do cliente lista todos os contatos ligados a ele, e "Tirar" solta só daquele cliente; no pedido,
+"trocar cliente" mostra primeiro as empresas do contato.
+
+Técnico: `20261105120000_contato_varios_clientes.sql`. Os gatilhos mantêm a regra "a principal é sempre uma das
+ligações e só fica vazia sem nenhuma ligação", então quem grava direto em `contatos.cliente_id` continua funcionando
+(trocar a principal mantém a outra ligação; gravar null solta só a principal). A RLS da tabela segue a do contato:
+vê quem usa o contato (carteira ou "Vê todos os clientes"), liga quem edita o contato e vê o cliente, solta quem edita
+o contato. O vendedor vê o cliente que tem um contato dele por qualquer das ligações. O agente recebe `clientes` no
+contexto (CNPJ formatado; CPF não vai) e `montar_pedido` ganhou o parâmetro `empresa` (nome ou CNPJ).
 
 ## Fora desta etapa
 

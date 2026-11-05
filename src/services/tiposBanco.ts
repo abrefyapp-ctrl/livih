@@ -920,6 +920,52 @@ export type Database = {
           },
         ]
       }
+      contatos_clientes: {
+        Row: {
+          cliente_id: string
+          contato_id: string
+          criado_em: string
+          criado_por: string | null
+          org_id: string
+        }
+        Insert: {
+          cliente_id: string
+          contato_id: string
+          criado_em?: string
+          criado_por?: string | null
+          org_id: string
+        }
+        Update: {
+          cliente_id?: string
+          contato_id?: string
+          criado_em?: string
+          criado_por?: string | null
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contatos_clientes_cliente_id_org_id_fkey"
+            columns: ["cliente_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "contatos_clientes_contato_id_org_id_fkey"
+            columns: ["contato_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "contatos_clientes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contratos_cobranca: {
         Row: {
           anual_inicio: string | null
@@ -4376,7 +4422,12 @@ export type Database = {
       }
       agente_marcar: { Args: never; Returns: undefined }
       agente_montar_pedido: {
-        Args: { p_conversa: string; p_itens: Json; p_observacao?: string }
+        Args: {
+          p_conversa: string
+          p_empresa?: string
+          p_itens: Json
+          p_observacao?: string
+        }
         Returns: Json
       }
       agente_montar_pedido_itens: {
