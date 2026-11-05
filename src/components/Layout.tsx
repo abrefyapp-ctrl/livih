@@ -82,6 +82,7 @@ export function Layout() {
     },
   ]
   const rodape: ItemMenu[] = [
+    { para: '/ajuda', rotulo: 'Ajuda', icone: 'livro' },
     { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
     ...(adminPlataforma ? [{ para: '/empresas', rotulo: 'Empresas', icone: 'painel' as const }] : []),
   ]

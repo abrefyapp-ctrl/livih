@@ -158,7 +158,7 @@ export function SecaoFollowup({ podeEditar }: { podeEditar: boolean }) {
   return (
     <section aria-labelledby="titulo-followup" className="space-y-4 rounded-lg border border-borda bg-superficie p-4">
       <div>
-        <h3 id="titulo-followup" className="text-h3 font-semibold">
+        <h3 id="titulo-followup" className="text-h2 font-semibold">
           Retomar o cliente que parou de responder
         </h3>
         <p className="text-pequeno text-texto-3">

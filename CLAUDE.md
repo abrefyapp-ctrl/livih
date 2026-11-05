@@ -20,6 +20,9 @@ CRM de atendimento e vendas pelo WhatsApp, multiempresa, com agente de IA. Produ
 - **Site institucional** (`site/public/`, HTML estático): livih.com.br. As páginas de solução saem de
   `site/gerar_solucoes.py`; mudou o texto, mude também o gerador.
 - **Docs** (`docs/`): um arquivo por entrega (plano, decisões, técnico). `docs/roadmap.md` é do usuário.
+- **Ajuda** (`src/ajuda/`, menu Ajuda e `/ajuda/<manual>`): manuais para quem usa a Livih. Um componente por manual,
+  registrado em `src/ajuda/manuais.ts`, com as imagens em `public/ajuda/<manual>/` (sem dados reais de clientes: troque
+  por nomes fictícios antes de capturar). Mudou a tela ou a regra de uma área com manual, mude o manual junto.
 
 ## Comandos
 
