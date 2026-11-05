@@ -28,7 +28,7 @@ export type ContatoPerfil = Tabelas['contatos']['Row'] & {
 
 export type Oportunidade = Pick<
   Tabelas['oportunidades']['Row'],
-  'id' | 'titulo' | 'resumo' | 'valor_estimado' | 'responsavel_id' | 'origem' | 'fechada_em' | 'motivo_perda' | 'etapa_id' | 'contato_id' | 'criado_em' | 'atualizado_em'
+  'id' | 'titulo' | 'resumo' | 'valor_estimado' | 'responsavel_id' | 'origem' | 'fechada_em' | 'motivo_perda' | 'motivo_perda_id' | 'etapa_id' | 'contato_id' | 'criado_em' | 'atualizado_em'
 > & { contato: { id: string; nome: string | null; nome_whatsapp: string | null; telefone: string | null } | null }
 
 export type PassoFunil = {
@@ -81,6 +81,89 @@ export async function listarContatos(orgId: string, busca: string): Promise<Cont
   const { data, error } = await consulta.order('atualizado_em', { ascending: false }).limit(300)
   if (error) throw error
   return (data ?? []) as unknown as ContatoLista[]
+}
+
+// ---- importar e exportar contatos (migration 20261105170000, docs/crm-acompanhamento.md entrega 4) ----
+
+export type ContatoExportado = Pick<
+  Tabelas['contatos']['Row'],
+  'nome' | 'nome_whatsapp' | 'telefone' | 'email' | 'empresa' | 'tags' | 'responsavel_id' | 'origem' | 'sem_agente' | 'descadastrado_em' | 'criado_em'
+>
+
+/** Todos os contatos que a pessoa vê (com a busca da tela), em páginas de 1.000, até 20.000. */
+export async function exportarContatos(orgId: string, busca: string): Promise<ContatoExportado[]> {
+  const termo = busca.trim().replace(/[,()%]/g, ' ')
+  const todos: ContatoExportado[] = []
+  for (let de = 0; de < 20_000; de += 1000) {
+    let q = supabase
+      .from('contatos')
+      .select('nome, nome_whatsapp, telefone, email, empresa, tags, responsavel_id, origem, sem_agente, descadastrado_em, criado_em')
+      .eq('org_id', orgId)
+    if (termo) {
+      const digitos = termo.replace(/\D/g, '')
+      const filtros = [`nome.ilike.%${termo}%`, `nome_whatsapp.ilike.%${termo}%`, `empresa.ilike.%${termo}%`, `email.ilike.%${termo}%`]
+      if (digitos.length >= 4) filtros.push(`telefone.like.%${digitos}%`)
+      q = q.or(filtros.join(','))
+    }
+    const { data, error } = await q.order('criado_em').order('id').range(de, de + 999)
+    if (error) throw error
+    todos.push(...(data ?? []))
+    if ((data ?? []).length < 1000) break
+  }
+  return todos
+}
+
+export type ResultadoImportacaoContatos = { criados: number; atualizados: number; avisos: string[] }
+
+export async function importarContatos(orgId: string, linhas: unknown[]): Promise<ResultadoImportacaoContatos> {
+  const { data, error } = await supabase.rpc('contatos_importar', { p_org: orgId, p_linhas: linhas as never })
+  if (error) {
+    throw new Error(
+      error.message.includes('só dono e admin')
+        ? 'Só dono e admin importam contatos.'
+        : error.message.includes('5.000')
+          ? 'No máximo 5.000 linhas por vez. Divida a planilha.'
+          : 'Não foi possível importar. Confira a planilha e tente de novo.',
+    )
+  }
+  return data as ResultadoImportacaoContatos
+}
+
+// ---- motivos de perda ----
+
+export type MotivoPerda = Pick<Tabelas['motivos_perda']['Row'], 'id' | 'nome' | 'ordem' | 'ativo'>
+
+export async function listarMotivosPerda(orgId: string): Promise<MotivoPerda[]> {
+  const { data, error } = await supabase.from('motivos_perda').select('id, nome, ordem, ativo').eq('org_id', orgId).order('ordem').order('nome')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function salvarMotivosPerda(orgId: string, motivos: { id?: string; nome: string; ativo: boolean }[], apagar: string[]) {
+  for (const [i, m] of motivos.entries()) {
+    const linha = { org_id: orgId, nome: m.nome.trim(), ordem: i + 1, ativo: m.ativo }
+    const { error } = m.id
+      ? await supabase.from('motivos_perda').update(linha).eq('id', m.id)
+      : await supabase.from('motivos_perda').insert(linha)
+    if (error) throw new Error(error.code === '23505' ? `O motivo “${m.nome.trim()}” está repetido.` : 'Não foi possível salvar os motivos de perda.')
+  }
+  if (apagar.length) {
+    const { error } = await supabase.from('motivos_perda').delete().in('id', apagar)
+    if (error) throw new Error('Não foi possível apagar os motivos de perda.')
+  }
+}
+
+export type PerdaPorMotivo = { motivo: string; quantidade: number; valor: number }
+
+export async function perdasPorMotivo(orgId: string, de: Date, ate: Date, vendedor: string | null): Promise<PerdaPorMotivo[]> {
+  const { data, error } = await supabase.rpc('painel_perdas', {
+    p_org: orgId,
+    p_de: de.toISOString(),
+    p_ate: ate.toISOString(),
+    p_vendedor: vendedor as string,
+  })
+  if (error) throw error
+  return (data ?? []) as PerdaPorMotivo[]
 }
 
 export async function buscarContatoPerfil(id: string): Promise<ContatoPerfil | null> {
@@ -145,7 +228,7 @@ export async function salvarFunil(
 }
 
 const CAMPOS_OPORTUNIDADE =
-  'id, titulo, resumo, valor_estimado, responsavel_id, origem, fechada_em, motivo_perda, etapa_id, contato_id, criado_em, atualizado_em, ' +
+  'id, titulo, resumo, valor_estimado, responsavel_id, origem, fechada_em, motivo_perda, motivo_perda_id, etapa_id, contato_id, criado_em, atualizado_em, ' +
   'contato:contatos(id, nome, nome_whatsapp, telefone)'
 
 export async function listarOportunidades(orgId: string, contatoId?: string): Promise<Oportunidade[]> {
@@ -166,7 +249,7 @@ export async function criarOportunidade(
 
 export async function atualizarOportunidade(
   id: string,
-  campos: Partial<Pick<Oportunidade, 'titulo' | 'resumo' | 'valor_estimado' | 'responsavel_id' | 'etapa_id' | 'motivo_perda'>>,
+  campos: Partial<Pick<Oportunidade, 'titulo' | 'resumo' | 'valor_estimado' | 'responsavel_id' | 'etapa_id' | 'motivo_perda' | 'motivo_perda_id'>>,
 ) {
   const { error } = await supabase.from('oportunidades').update(campos).eq('id', id)
   if (error) throw erroAmigavel(error, 'Não foi possível salvar a oportunidade. Tente de novo.')

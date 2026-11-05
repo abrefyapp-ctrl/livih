@@ -5,8 +5,10 @@ import {
   criarOportunidade,
   historicoOportunidade,
   listarContatos,
+  listarMotivosPerda,
   type ContatoLista,
   type Etapa,
+  type MotivoPerda,
   type Oportunidade,
   type PassoFunil,
 } from '../services/crm'
@@ -62,6 +64,9 @@ export function ModalOportunidade({
   )
   const [resumo, setResumo] = useState(oportunidade?.resumo ?? '')
   const [motivoPerda, setMotivoPerda] = useState(oportunidade?.motivo_perda ?? '')
+  // Motivo da lista da empresa (motivos_perda, migration 20261105170000); o texto acima vira o detalhe.
+  const [motivoId, setMotivoId] = useState(oportunidade?.motivo_perda_id ?? '')
+  const [motivos, setMotivos] = useState<MotivoPerda[]>([])
   const [contatoId, setContatoId] = useState(contatoFixo?.id ?? oportunidade?.contato_id ?? '')
   const [busca, setBusca] = useState('')
   const [contatos, setContatos] = useState<ContatoLista[]>([])
@@ -81,6 +86,17 @@ export function ModalOportunidade({
       ativo = false
     }
   }, [precisaContato, orgId])
+
+  useEffect(() => {
+    if (!orgId) return
+    let ativo = true
+    listarMotivosPerda(orgId)
+      .then((l) => ativo && setMotivos(l))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [orgId])
 
   const oportunidadeId = oportunidade?.id
   useEffect(() => {
@@ -111,9 +127,11 @@ export function ModalOportunidade({
     e?.preventDefault()
     if (!orgAtiva || valorNum === undefined) return
     const destino = etapaForcada ?? etapaId
-    if (etapas.find((x) => x.id === destino)?.tipo === 'perdido' && !motivoPerda.trim()) {
+    // Sem lista (empresa apagou todos os motivos), vale o texto, como antes.
+    const comLista = motivos.some((m) => m.ativo || m.id === motivoId)
+    if (etapas.find((x) => x.id === destino)?.tipo === 'perdido' && (comLista ? !motivoId : !motivoPerda.trim())) {
       setEtapaId(destino)
-      setErro('Conte em uma frase por que o negócio foi perdido.')
+      setErro(comLista ? 'Escolha por que o negócio foi perdido.' : 'Conte em uma frase por que o negócio foi perdido.')
       return
     }
     setSalvando(true)
@@ -129,7 +147,8 @@ export function ModalOportunidade({
         await atualizarOportunidade(oportunidade!.id, {
           ...campos,
           resumo: resumo.trim() || null,
-          motivo_perda: etapas.find((x) => x.id === destino)?.tipo === 'perdido' ? motivoPerda.trim() : null,
+          motivo_perda: etapas.find((x) => x.id === destino)?.tipo === 'perdido' ? motivoPerda.trim() || null : null,
+          motivo_perda_id: etapas.find((x) => x.id === destino)?.tipo === 'perdido' ? motivoId || null : null,
         })
       } else {
         await criarOportunidade(orgAtiva.id, { ...campos, contato_id: contatoId })
@@ -254,7 +273,38 @@ export function ModalOportunidade({
           />
         </div>
 
-        {perdido && (
+        {perdido && motivos.some((m) => m.ativo || m.id === motivoId) && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label htmlFor="oport-motivo" className="block text-pequeno font-medium text-texto-2">
+                Por que foi perdido?
+              </label>
+              <select
+                id="oport-motivo"
+                required
+                value={motivoId}
+                onChange={(e) => setMotivoId(e.target.value)}
+                className="block h-10 w-full rounded-md border border-borda bg-superficie px-3 focus:border-primaria focus:outline-none"
+              >
+                <option value="">Escolha o motivo</option>
+                {motivos
+                  .filter((m) => m.ativo || m.id === motivoId)
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.nome}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <CampoTexto
+              rotulo="Detalhe (opcional)"
+              value={motivoPerda}
+              onChange={(e) => setMotivoPerda(e.target.value)}
+              placeholder="Ex.: achou 10% mais barato"
+            />
+          </div>
+        )}
+        {perdido && !motivos.some((m) => m.ativo || m.id === motivoId) && (
           <CampoTexto
             rotulo="Por que foi perdido?"
             required

@@ -7,6 +7,7 @@ import { Icone } from '../components/Icone'
 import { ModalRelatorioPiloto } from '../components/ModalRelatorioPiloto'
 import { useEquipe } from '../hooks/useEquipe'
 import { useSessao } from '../hooks/useSessao'
+import { perdasPorMotivo, type PerdaPorMotivo } from '../services/crm'
 import { moeda } from '../services/formato'
 import {
   buscarPendencias,
@@ -46,7 +47,7 @@ export function Painel() {
   const [canal, setCanal] = useState('')
   const [vendedor, setVendedor] = useState('')
   const [numeros, setNumeros] = useState<{ id: string; nome: string }[]>([])
-  const [dados, setDados] = useState<{ chave: string; resumo: Resumo; pendencias: Pendencias } | null>(null)
+  const [dados, setDados] = useState<{ chave: string; resumo: Resumo; pendencias: Pendencias; perdas: PerdaPorMotivo[] } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [relatorio, setRelatorio] = useState(false)
   const [versao, setVersao] = useState(0)
@@ -66,8 +67,13 @@ export function Painel() {
     let ativo = true
     const ate = new Date()
     const de = new Date(ate.getTime() - dias * 864e5)
-    Promise.all([buscarResumo(orgId, de, ate, canal || null, vendedor || null), buscarPendencias(orgId, canal || null, vendedor || null)])
-      .then(([resumo, pendencias]) => ativo && (setDados({ chave, resumo, pendencias }), setErro(null)))
+    Promise.all([
+      buscarResumo(orgId, de, ate, canal || null, vendedor || null),
+      buscarPendencias(orgId, canal || null, vendedor || null),
+      // Perdas por motivo (migration 20261105170000); se falhar, o resto do Painel aparece igual.
+      perdasPorMotivo(orgId, de, ate, vendedor || null).catch(() => []),
+    ])
+      .then(([resumo, pendencias, perdas]) => ativo && (setDados({ chave, resumo, pendencias, perdas }), setErro(null)))
       .catch(() => ativo && setErro('Não foi possível carregar o painel.'))
     return () => {
       ativo = false
@@ -187,6 +193,12 @@ export function Painel() {
                   <Mini rotulo="Perdidas" valor={String(a.funil.perdidas)} />
                 </div>
                 <Etapas etapas={a.funil.etapas} />
+                {atual!.perdas.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-legenda font-semibold tracking-wide text-texto-3 uppercase">Perdas do período por motivo</p>
+                    <Perdas perdas={atual!.perdas} />
+                  </div>
+                )}
               </Secao>
             </div>
 
@@ -368,6 +380,26 @@ function Etapas({ etapas }: { etapas: Resumo['atual']['funil']['etapas'] }) {
           <span className="w-24 text-right tabular-nums">
             {e.abertas}
             {e.valor > 0 && <span className="text-legenda text-texto-3"> · {moeda(e.valor)}</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function Perdas({ perdas }: { perdas: PerdaPorMotivo[] }) {
+  const max = Math.max(1, ...perdas.map((p) => p.quantidade))
+  return (
+    <ul className="space-y-1.5">
+      {perdas.map((p) => (
+        <li key={p.motivo} className="grid grid-cols-[9rem_1fr_auto] items-center gap-2 text-pequeno">
+          <span className="truncate text-texto-2" title={p.motivo}>{p.motivo}</span>
+          <span className="h-3 rounded-sm bg-fundo">
+            <span className="block h-3 rounded-r-sm bg-erro/70" style={{ width: `${(p.quantidade / max) * 100}%` }} />
+          </span>
+          <span className="w-24 text-right tabular-nums">
+            {p.quantidade}
+            {p.valor > 0 && <span className="text-legenda text-texto-3"> · {moeda(p.valor)}</span>}
           </span>
         </li>
       ))}

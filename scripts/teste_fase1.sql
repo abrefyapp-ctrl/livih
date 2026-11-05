@@ -6175,5 +6175,83 @@ end $$;
 insert into resultado (teste, ok) select 'distribuição: rodízio fechado para o login',
   not has_function_privilege('authenticated', 'public.distribuir_contato(uuid)', 'execute')
   and has_function_privilege('authenticated', 'public.canal_definir_distribuicao(uuid, boolean)', 'execute');
+
+-- Importar contatos e motivo de perda em lista (migration 20261105170000).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.contatos_importar(current_setting('teste.f7')::uuid, '[{"telefone":"41999990000"}]');
+  insert into resultado (teste, ok) values ('importar contatos: atendente não importa', false);
+exception when others then
+  insert into resultado (teste, ok) values ('importar contatos: atendente não importa', sqlerrm like 'só dono e admin%');
+end $$;
+do $$ begin
+  insert into public.motivos_perda (org_id, nome) values (current_setting('teste.f7')::uuid, 'Motivo do atendente');
+  insert into resultado (teste, ok) values ('motivos de perda: atendente não edita a lista', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('motivos de perda: atendente não edita a lista', true);
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  r jsonb;
+  v_ct public.contatos;
+begin
+  r := public.contatos_importar(v_org, jsonb_build_array(
+    jsonb_build_object('nome', 'Paula Importada', 'telefone', '(41) 90002-2001', 'email', 'PAULA@EXEMPLO.COM',
+                       'empresa', 'Loja da Paula', 'etiquetas', 'vip; atacado', 'vendedor', 'atendente@f7.teste'),
+    jsonb_build_object('telefone', '5541900066101', 'empresa', 'Empresa atualizada', 'etiquetas', 'reativar'),
+    jsonb_build_object('nome', 'Sem celular', 'telefone', '123'),
+    jsonb_build_object('nome', 'Vendedor errado', 'telefone', '41900022003', 'vendedor', 'ninguem@exemplo.com')));
+  insert into resultado (teste, ok) values ('importar contatos: cria, atualiza pelo celular e avisa o que ficou de fora',
+    (r ->> 'criados')::int = 2 and (r ->> 'atualizados')::int = 1 and jsonb_array_length(r -> 'avisos') = 2);
+  select * into v_ct from public.contatos where org_id = v_org and telefone = '5541900022001';
+  insert into resultado (teste, ok) values ('importar contatos: com 55, e-mail em minúsculas, etiquetas e vendedor pelo e-mail',
+    v_ct.nome = 'Paula Importada' and v_ct.email = 'paula@exemplo.com' and v_ct.tags @> array['vip', 'atacado']
+    and v_ct.responsavel_id = '00000000-0000-0000-0000-0000000000b1' and v_ct.origem = 'importacao');
+  insert into resultado (teste, ok) values ('importar contatos: sem vendedor na linha, fica com a equipe toda (não com quem importou)',
+    (select responsavel_id from public.contatos where org_id = v_org and telefone = '5541900022003') is null);
+  select * into v_ct from public.contatos where org_id = v_org and telefone = '5541900066101';
+  insert into resultado (teste, ok) values ('importar contatos: o que já existe muda só no que veio e ganha a etiqueta',
+    v_ct.nome = 'Cliente da tarefa' and v_ct.empresa = 'Empresa atualizada' and 'reativar' = any(v_ct.tags));
+
+  insert into resultado (teste, ok) values ('motivos de perda: a empresa já tem a lista padrão',
+    (select count(*) from public.motivos_perda where org_id = v_org) = 6
+    and exists (select 1 from public.motivos_perda where org_id = current_setting('teste.cli')::uuid and nome = 'Preço'));
+  insert into public.motivos_perda (org_id, nome, ordem) values (v_org, 'Frete caro', 7);
+  insert into resultado (teste, ok) values ('motivos de perda: o dono acrescenta motivo',
+    exists (select 1 from public.motivos_perda where org_id = v_org and nome = 'Frete caro'));
+end $$;
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_perdido uuid := (select id from public.etapas_funil where org_id = current_setting('teste.f7')::uuid and tipo = 'perdido' limit 1);
+  v_preco uuid := (select id from public.motivos_perda where org_id = current_setting('teste.f7')::uuid and nome = 'Preço');
+  v_ct uuid := (select id from public.contatos where org_id = current_setting('teste.f7')::uuid and telefone = '5541900022001');
+begin
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, valor_estimado, motivo_perda_id, motivo_perda)
+  values (v_org, v_ct, v_perdido, 'Perdida por preço', 500, v_preco, 'Achou 10% mais barato');
+  begin
+    insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, motivo_perda_id)
+    values (v_org, v_ct, v_perdido, 'Motivo de outra empresa',
+            (select id from public.motivos_perda where org_id = current_setting('teste.cli')::uuid limit 1));
+    insert into resultado (teste, ok) values ('motivos de perda: não aceita motivo de outra empresa', false);
+  exception when foreign_key_violation then
+    insert into resultado (teste, ok) values ('motivos de perda: não aceita motivo de outra empresa', true);
+  end;
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare r jsonb;
+begin
+  r := public.painel_perdas(current_setting('teste.f7')::uuid, now() - interval '1 day', now() + interval '1 minute');
+  insert into resultado (teste, ok) values ('motivos de perda: o Painel soma as perdas do período por motivo',
+    r @> '[{"motivo":"Preço","quantidade":1}]'::jsonb
+    and ((select x from jsonb_array_elements(r) x where x ->> 'motivo' = 'Preço') ->> 'valor')::numeric = 500);
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

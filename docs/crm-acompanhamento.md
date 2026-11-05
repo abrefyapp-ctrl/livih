@@ -128,6 +128,16 @@ primeiro" viraram uma opção só: quem já tem vendedor nunca troca.
 - **Motivo de perda em lista**, editável pela empresa (padrão: preço, prazo, escolheu outro fornecedor, sem
   resposta, desistiu da compra, outro), com o texto livre como detalhe; o Painel mostra as perdas por motivo.
 
+**Construída em 05/11:** migration `20261105170000_contatos_importar_motivos_perda.sql` e 10 testes.
+- `contatos_importar` (dono e admin; até 5.000 linhas): acha pelo celular (com 55), muda só o que veio, soma as
+  etiquetas, vendedor pelo e-mail (sem vendedor fica com a equipe toda, não com quem importou). Tela: Contatos →
+  Importar planilha, com modelo e prévia ([ModalImportarContatos.tsx](../src/components/ModalImportarContatos.tsx)).
+- Exportar: Contatos (todos os que a pessoa vê com a busca e os filtros, não só os 300 da lista) e Oportunidades (os
+  cartões na tela, com próximo passo e motivo de perda), em CSV que abre no Excel.
+- Tabela `motivos_perda` (padrão: Preço, Prazo de entrega, Escolheu outro fornecedor, Sem resposta do cliente,
+  Desistiu da compra, Outro; dono e admin editam em Oportunidades → Motivos de perda), `oportunidades.motivo_perda_id`
+  (o texto livre vira o detalhe) e `painel_perdas`: o Painel mostra as perdas do período por motivo, no bloco Funil.
+
 ## Esforço estimado
 
 Entrega 1: 1,5 a 2 dias. Entrega 2: 2 a 3 dias. Entrega 3: 1 dia. Entrega 4: 1 dia.

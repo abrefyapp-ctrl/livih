@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { escutarParaRecarregar } from '../services/aoVivo'
-import { atualizarOportunidade, listarEtapas, listarOportunidades, type Etapa, type Oportunidade } from '../services/crm'
-import { haQuanto, moeda, nomeDoContato } from '../services/formato'
+import { atualizarOportunidade, listarEtapas, listarMotivosPerda, listarOportunidades, type Etapa, type Oportunidade } from '../services/crm'
+import { formatarTelefone, haQuanto, moeda, nomeDoContato } from '../services/formato'
+import { baixarArquivo, csv } from '../services/planilhaContatos'
 import { prazo, proximosPassos, quandoTarefa, type ProximoPasso } from '../services/tarefas'
 import { useSessao } from '../hooks/useSessao'
 import { Avatar } from '../components/Avatar'
@@ -10,6 +11,7 @@ import { Botao } from '../components/Botao'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { Icone } from '../components/Icone'
 import { ModalEtapas } from '../components/ModalEtapas'
+import { ModalMotivosPerda } from '../components/ModalMotivosPerda'
 import { ModalOportunidade } from '../components/ModalOportunidade'
 
 const DIAS_FECHADAS = 30
@@ -40,6 +42,7 @@ export function Oportunidades() {
   const [arrastando, setArrastando] = useState<string | null>(null)
   const [sobre, setSobre] = useState<string | null>(null)
   const [editandoEtapas, setEditandoEtapas] = useState(false)
+  const [editandoMotivos, setEditandoMotivos] = useState(false)
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
 
   useEffect(() => {
@@ -92,7 +95,7 @@ export function Oportunidades() {
     // Otimista: o cartão já aparece na coluna nova; se o banco recusar, volta.
     setDados({ ...atual, lista: atual.lista.map((x) => (x.id === o.id ? { ...x, etapa_id: etapa.id } : x)) })
     try {
-      await atualizarOportunidade(o.id, { etapa_id: etapa.id, motivo_perda: null })
+      await atualizarOportunidade(o.id, { etapa_id: etapa.id, motivo_perda: null, motivo_perda_id: null })
     } catch (e) {
       setErro((e as Error).message)
       recarregar()
@@ -108,6 +111,33 @@ export function Oportunidades() {
 
   const nomeResp = (id: string | null) => (id ? (id === eu ? 'Você' : (equipe.get(id)?.nome ?? 'Equipe')) : null)
 
+  // Exportar o que está na tela (com a busca e os filtros), para abrir no Excel.
+  async function exportar() {
+    if (!atual) return
+    const motivos = new Map((await listarMotivosPerda(orgId).catch(() => [])).map((m) => [m.id, m.nome]))
+    const etapaDe = new Map(atual.etapas.map((e) => [e.id, e.nome]))
+    const data = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '')
+    const linhas = visiveis.map((o) => {
+      const passo = passoDe(o)
+      return [
+        o.titulo,
+        nomeDoContato(o.contato),
+        formatarTelefone(o.contato?.telefone ?? null),
+        etapaDe.get(o.etapa_id) ?? '',
+        o.valor_estimado != null ? o.valor_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '',
+        o.responsavel_id ? (equipe.get(o.responsavel_id)?.nome ?? '') : '',
+        passo ? `${quandoTarefa(passo.vence_em)} · ${passo.titulo}` : '',
+        [o.motivo_perda_id ? motivos.get(o.motivo_perda_id) : null, o.motivo_perda].filter(Boolean).join(' · '),
+        data(o.criado_em),
+        data(o.fechada_em),
+      ]
+    })
+    baixarArquivo(
+      `oportunidades-${new Date().toISOString().slice(0, 10)}.csv`,
+      csv(['Título', 'Cliente', 'WhatsApp', 'Etapa', 'Valor (R$)', 'Responsável', 'Próximo passo', 'Motivo de perda', 'Criada em', 'Fechada em'], linhas),
+    )
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="space-y-3 px-4 pt-6 lg:px-8">
@@ -117,6 +147,14 @@ export function Oportunidades() {
             <p className="text-pequeno text-texto-3">Arraste os cartões entre as etapas. O agente cria e avança; ganho e perdido são da equipe.</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Botao variante="secundario" icone="baixar" onClick={() => void exportar()} disabled={!visiveis.length}>
+              Exportar
+            </Botao>
+            {gerencia && (
+              <Botao variante="secundario" onClick={() => setEditandoMotivos(true)}>
+                Motivos de perda
+              </Botao>
+            )}
             {gerencia && (
               <Botao variante="secundario" icone="config" onClick={() => setEditandoEtapas(true)} disabled={!atual?.etapas.length}>
                 Editar etapas
@@ -268,6 +306,8 @@ export function Oportunidades() {
           }}
         />
       )}
+
+      {editandoMotivos && <ModalMotivosPerda orgId={orgId} aoFechar={() => setEditandoMotivos(false)} />}
 
       {abertura && atual && (
         <ModalOportunidade

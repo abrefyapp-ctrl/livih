@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { listarContatos, type ContatoLista } from '../services/crm'
+import { exportarContatos, listarContatos, type ContatoLista } from '../services/crm'
 import { formatarTelefone, moeda, nomeDoContato, quandoCurto } from '../services/formato'
+import { baixarArquivo, csv } from '../services/planilhaContatos'
 import { useSessao } from '../hooks/useSessao'
 import { Avatar } from '../components/Avatar'
 import { Aviso } from '../components/Aviso'
@@ -10,6 +11,7 @@ import { EstadoVazio } from '../components/EstadoVazio'
 import { EtiquetaEtapa } from '../components/EtiquetaEtapa'
 import { Icone } from '../components/Icone'
 import { ModalContato } from '../components/ModalContato'
+import { ModalImportarContatos } from '../components/ModalImportarContatos'
 
 // O negócio que mais importa agora: o aberto mais recente; sem aberto, o último fechado.
 function negocioAtual(c: ContatoLista) {
@@ -35,6 +37,10 @@ export function Contatos() {
   const [dados, setDados] = useState<{ chave: string; lista: ContatoLista[] } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [novo, setNovo] = useState(false)
+  const [importando, setImportando] = useState(false)
+  const [exportando, setExportando] = useState(false)
+  const [versao, setVersao] = useState(0)
+  const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
 
   // Busca no banco com uma pausa curta enquanto digita.
   useEffect(() => {
@@ -42,7 +48,7 @@ export function Contatos() {
     return () => clearTimeout(t)
   }, [busca])
 
-  const chave = `${orgId}|${buscaAplicada}`
+  const chave = `${orgId}|${buscaAplicada}|${versao}`
   useEffect(() => {
     let ativo = true
     listarContatos(orgId, buscaAplicada)
@@ -60,6 +66,41 @@ export function Contatos() {
 
   const responsavel = (id: string | null) => (id ? (id === eu ? 'Você' : (equipe.get(id)?.nome ?? '—')) : '—')
 
+  // Exporta todos os contatos que a pessoa vê com a busca e os filtros da tela (não só os 300 da lista).
+  async function exportar() {
+    setExportando(true)
+    setErro(null)
+    try {
+      const todos = (await exportarContatos(orgId, buscaAplicada)).filter(
+        (c) => (!soMeus || c.responsavel_id === eu) && (!soSemAgente || c.sem_agente),
+      )
+      const data = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '')
+      baixarArquivo(
+        `contatos-${new Date().toISOString().slice(0, 10)}.csv`,
+        csv(
+          ['Nome', 'Nome no WhatsApp', 'Celular', 'E-mail', 'Empresa', 'Etiquetas', 'Vendedor', 'Origem', 'Atendido pelo agente', 'Recebe campanhas', 'Cadastrado em'],
+          todos.map((c) => [
+            c.nome,
+            c.nome_whatsapp,
+            c.telefone,
+            c.email,
+            c.empresa,
+            c.tags.join('; '),
+            c.responsavel_id ? (equipe.get(c.responsavel_id)?.nome ?? '') : '',
+            c.origem,
+            c.sem_agente ? 'Não' : 'Sim',
+            c.descadastrado_em ? 'Não' : 'Sim',
+            data(c.criado_em),
+          ]),
+        ),
+      )
+    } catch {
+      setErro('Não foi possível exportar. Tente de novo.')
+    } finally {
+      setExportando(false)
+    }
+  }
+
   return (
     <div className="relative h-full overflow-y-auto">
       <div className="mx-auto max-w-6xl space-y-4 px-4 py-6 lg:px-8">
@@ -68,9 +109,19 @@ export function Contatos() {
             <h1 className="text-h1 font-semibold">Contatos</h1>
             <p className="text-pequeno text-texto-3">Os clientes da sua carteira e os que falaram com o número da empresa.</p>
           </div>
-          <Botao icone="mais" onClick={() => setNovo(true)}>
-            Novo contato
-          </Botao>
+          <div className="flex flex-wrap gap-2">
+            <Botao variante="secundario" icone="baixar" onClick={() => void exportar()} carregando={exportando} disabled={!lista?.length}>
+              Exportar
+            </Botao>
+            {gerencia && (
+              <Botao variante="secundario" icone="arquivo" onClick={() => setImportando(true)}>
+                Importar planilha
+              </Botao>
+            )}
+            <Botao icone="mais" onClick={() => setNovo(true)}>
+              Novo contato
+            </Botao>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -193,6 +244,16 @@ export function Contatos() {
         </div>
       </div>
 
+      {importando && (
+        <ModalImportarContatos
+          orgId={orgId}
+          aoFechar={() => setImportando(false)}
+          aoImportar={() => {
+            setImportando(false)
+            setVersao((v) => v + 1)
+          }}
+        />
+      )}
       {novo && (
         <ModalContato
           aberto
