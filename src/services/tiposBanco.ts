@@ -4945,6 +4945,13 @@ export type Database = {
         }[]
       }
       campanha_etiquetas: { Args: { p_org: string }; Returns: string[] }
+      campanha_motivos_erro: {
+        Args: { p_campanha: string }
+        Returns: {
+          motivo: string
+          quantidade: number
+        }[]
+      }
       campanha_parametros: {
         Args: { p_contato: string; p_modelo: Json }
         Returns: string[]
@@ -5938,6 +5945,7 @@ export type Database = {
       registrar_status_entrega: {
         Args: {
           p_canal: string
+          p_erro?: string
           p_status: Database["public"]["Enums"]["status_entrega"]
           p_wa_id: string
         }
