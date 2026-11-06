@@ -126,6 +126,14 @@ export function ManualCampanhas() {
           legenda="Sem filtro marcado, entram todos os contatos. Os nomes de pessoas nesta imagem foram borrados."
         />
 
+        <Paragrafo>
+          Para mandar a quem ainda não é contato, troque para <Caminho>Lista de números</Caminho> e cole os números, um por
+          linha, com o nome depois, se quiser (ex.: “(41) 99999-0001 Vidraçaria Sol”). Não precisa cadastrar antes: ao criar a
+          campanha, cada número novo vira contato, para a resposta cair em Conversas. A <Caminho>Etiqueta</Caminho> opcional
+          marca todos (ex.: “vidraçaria”), para achar a lista depois. Linha que não parece celular aparece em vermelho e
+          precisa ser corrigida antes de enviar. Até 500 números por campanha.
+        </Paragrafo>
+
         <Subtitulo>Mensagem</Subtitulo>
         <Lista
           numerada

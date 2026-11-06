@@ -98,13 +98,49 @@ export async function listarEtiquetas(orgId: string): Promise<string[]> {
   return data ?? []
 }
 
+export type NumeroLista = { telefone: string; nome: string | null }
+
+/**
+ * Lista de números colada na campanha: um por linha, com o nome depois, se quiser ("(41) 99999-0000 Vidraçaria Sol").
+ * Linha só com números separados por vírgula ou ponto e vírgula vira vários. O celular fica só com dígitos e com 55,
+ * como o banco guarda; repetido sai, e o que não parece celular volta em `invalidos` para a pessoa corrigir.
+ */
+export function lerListaNumeros(texto: string): { numeros: NumeroLista[]; invalidos: string[] } {
+  const numeros: NumeroLista[] = []
+  const invalidos: string[] = []
+  const vistos = new Set<string>()
+  const pedacos = texto
+    .split(/\r?\n/)
+    .flatMap((l) => (/\p{L}/u.test(l) ? [l] : l.split(/[,;]/)))
+    .map((l) => l.trim())
+    .filter(Boolean)
+  for (const p of pedacos) {
+    const m = /^([+\d\s().-]+?)(?:\s*[,;\t–-]\s*|\s+)(\p{L}.*)$/u.exec(p)
+    const bruto = m ? m[1] : p
+    const nome = m ? m[2].trim().slice(0, 200) : null
+    let tel = bruto.replace(/\D/g, '')
+    if (tel.length === 10 || tel.length === 11) tel = '55' + tel
+    if (!/^\d{12,15}$/.test(tel)) {
+      invalidos.push(p)
+      continue
+    }
+    if (vistos.has(tel)) continue
+    vistos.add(tel)
+    numeros.push({ telefone: tel, nome })
+  }
+  return { numeros, invalidos }
+}
+
 export async function criarCampanha(
   orgId: string,
   dados: {
     nome: string
     canal_id: string
     modelo: ModeloCampanha
-    filtros: FiltrosCampanha
+    /** Público por filtros, ou `numeros` (lista digitada; os novos viram contato com a `etiqueta`). */
+    filtros?: FiltrosCampanha
+    numeros?: NumeroLista[]
+    etiqueta?: string | null
     agendada_para: string | null
     limite_dia: number
     consentimento: boolean
@@ -113,7 +149,8 @@ export async function criarCampanha(
   const { data, error } = await supabase.rpc('campanha_criar', { p_org: orgId, p_dados: dados as unknown as Json })
   if (error) {
     // As mensagens do banco já são para a pessoa (filtros sem ninguém, variável vazia, número fora da API oficial).
-    if (/nenhum contato|preencha|confirme|API oficial|modelo inválido/.test(error.message)) throw new Error(error.message)
+    if (/nenhum contato|nenhum número|número inválido|no máximo|preencha|confirme|API oficial|modelo inválido/.test(error.message))
+      throw new Error(error.message.charAt(0).toUpperCase() + error.message.slice(1) + '.')
     throw new Error('Não foi possível criar a campanha. Tente de novo.')
   }
   return data as string

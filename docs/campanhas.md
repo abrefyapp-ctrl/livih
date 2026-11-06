@@ -21,6 +21,10 @@ mandam um modelo de Marketing aprovado para uma parte dos contatos. As respostas
 1. **Público** (filtros sobre os contatos, todos opcionais): etiquetas (qualquer uma), oportunidade aberta em certas
    etapas do funil, carteira de certos vendedores, ligado ou não a um cliente do cadastro, sem conversa há N dias. Ficam
    de fora contatos sem telefone válido e os descadastrados. A tela mostra quantos e alguns nomes.
+   **Ou uma lista de números** (06/11, migration `20261106150000`): colada na hora, um por linha com o nome opcional, até
+   500. Ao criar, o número que já é contato entra como está (o nome digitado só preenche contato sem nome); o novo vira
+   contato (origem `campanha`, sem vendedor), com a etiqueta opcional em todos. Descadastrado fica de fora. Caso real:
+   mandar o modelo a 5 vidraçarias que nunca falaram com a empresa.
 2. **Mensagem:** o modelo e, para cada variável do corpo, de onde vem o valor: nome do contato, empresa do contato
    (cliente do cadastro, ou o campo empresa) ou texto fixo. Prévia com um contato de exemplo.
 3. **Envio:** agora ou agendado, com limite por dia no número (padrão 250). Ao criar, a lista de destinatários é tirada

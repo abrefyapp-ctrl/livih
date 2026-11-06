@@ -6519,5 +6519,58 @@ begin
   insert into resultado (teste, ok) values ('alerta de estoque: ninguém marcado, ninguém avisado',
     (select count(*) from public.alertas where id > v_antes) = v_n);
 end $$;
+
+-- Campanha para uma lista de números (migration 20261106150000).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_meta uuid := (select id from public.canais where instance_id = 'PNID-AVISO');
+  v_id uuid;
+  v_dados jsonb;
+  v_ct public.contatos;
+begin
+  v_dados := jsonb_build_object('nome', 'Vidraçarias', 'canal_id', v_meta, 'consentimento', true, 'etiqueta', 'vidraçaria',
+    'modelo', '{"nome":"promo_outubro","idioma":"pt_BR","categoria":"MARKETING","cabecalho":"","corpo":"Oi {{1}}, temos novidades.","rodape":"","variaveis":[{"fonte":"nome","padrao":"cliente"}]}'::jsonb);
+  begin
+    perform public.campanha_criar(v_org, v_dados || jsonb_build_object('numeros', jsonb_build_array(
+      jsonb_build_object('telefone', '(41) 96666-0001'), jsonb_build_object('telefone', '123'))));
+    insert into resultado (teste, ok) values ('campanha por números: número inválido para a campanha', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('campanha por números: número inválido para a campanha', sqlerrm like 'número inválido na lista: 123%');
+  end;
+
+  v_id := public.campanha_criar(v_org, v_dados || jsonb_build_object('numeros', jsonb_build_array(
+    jsonb_build_object('telefone', '(41) 96666-0001', 'nome', 'Vidraçaria Sol'),
+    jsonb_build_object('telefone', '41966660002'),
+    jsonb_build_object('telefone', '5541966660001', 'nome', 'Repetida'),
+    jsonb_build_object('telefone', '5541911100001', 'nome', 'Outro nome'),
+    jsonb_build_object('telefone', '5541911100004', 'nome', 'Carla'))));
+  insert into resultado (teste, ok) values ('campanha por números: um envio por número, sem repetido nem descadastrado',
+    -- Esperado: os 4 contatos distintos da lista, menos quem pediu para não receber (blocos anteriores descadastram).
+    (select count(*) from public.campanha_destinatarios where campanha_id = v_id)
+      = (select count(*) from public.contatos where org_id = v_org and descadastrado_em is null
+           and telefone in ('5541966660001', '5541966660002', '5541911100001', '5541911100004'))
+    and not exists (select 1 from public.campanha_destinatarios d join public.contatos c on c.id = d.contato_id
+                     where d.campanha_id = v_id and c.telefone = '5541911100004'));
+  select * into v_ct from public.contatos where org_id = v_org and telefone = '5541966660001';
+  insert into resultado (teste, ok) values ('campanha por números: número novo vira contato da equipe, com nome e etiqueta',
+    v_ct.nome = 'Vidraçaria Sol' and v_ct.origem = 'campanha' and v_ct.responsavel_id is null and v_ct.tags = array['vidraçaria']);
+  select * into v_ct from public.contatos where org_id = v_org and telefone = '5541911100001';
+  insert into resultado (teste, ok) values ('campanha por números: contato que já existe mantém o nome e ganha a etiqueta',
+    v_ct.nome = 'Ana Campanha' and 'vidraçaria' = any (v_ct.tags) and 'promo' = any (v_ct.tags));
+  insert into resultado (teste, ok) values ('campanha por números: a campanha guarda quantos números e a etiqueta',
+    (select filtros from public.campanhas where id = v_id) = '{"numeros": 4, "etiqueta": "vidraçaria"}'::jsonb);
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.campanha_criar(current_setting('teste.f7')::uuid, jsonb_build_object('numeros', '[{"telefone":"41966660009"}]'::jsonb));
+  insert into resultado (teste, ok) values ('campanha por números: atendente não cria', false);
+exception when others then
+  insert into resultado (teste, ok) values ('campanha por números: atendente não cria',
+    sqlerrm like 'só dono e admin%' and not exists (select 1 from public.contatos where telefone = '5541966660009'));
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

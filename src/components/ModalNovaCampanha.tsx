@@ -3,6 +3,7 @@ import { useSessao } from '../hooks/useSessao'
 import { listarNumerosVisiveis, type NumeroVisivel } from '../services/atendimento'
 import {
   criarCampanha,
+  lerListaNumeros,
   listarEtiquetas,
   previaPublico,
   ROTULO_FONTE,
@@ -33,6 +34,8 @@ const enviavel = (m: Modelo) => {
 /** Texto que entra quando o contato não tem nome ou empresa, se a pessoa não escrever outro. */
 const PADRAO: Record<FonteVariavel, string> = { nome: 'cliente', empresa: 'sua empresa', fixo: '' }
 
+const EXEMPLO_LISTA = ['(41) 99999-0001 Vidraçaria Sol', '(41) 98888-0002 Vidros & Cia', '41977770003'].join('\n')
+
 const alternar = (lista: string[], valor: string) => (lista.includes(valor) ? lista.filter((v) => v !== valor) : [...lista, valor])
 
 function Chip({ ativo, children, aoClicar }: { ativo: boolean; children: string; aoClicar: () => void }) {
@@ -51,8 +54,9 @@ function Chip({ ativo, children, aoClicar }: { ativo: boolean; children: string;
 }
 
 /**
- * Nova campanha (docs/campanhas.md): número da API oficial, público por filtros, modelo de Marketing com as variáveis
- * e quando enviar. A lista de destinatários é tirada ao criar.
+ * Nova campanha (docs/campanhas.md): número da API oficial, público por filtros ou por uma lista de números digitada
+ * (os novos viram contato ao criar), modelo de Marketing com as variáveis e quando enviar. A lista de destinatários é
+ * tirada ao criar.
  */
 export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boolean; aoFechar: () => void; aoCriar: () => void }) {
   const { orgAtiva, equipe } = useSessao()
@@ -69,6 +73,12 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
     com_cliente: null,
     inativos_dias: null,
   })
+  // "Lista de números" (06/11): mandar para quem ainda não é contato, sem cadastrar antes (ex.: 5 vidraçarias).
+  const [modoPublico, setModoPublico] = useState<'filtros' | 'numeros'>('filtros')
+  const [listaTexto, setListaTexto] = useState('')
+  const [etiquetaLista, setEtiquetaLista] = useState('')
+  const lista = useMemo(() => lerListaNumeros(listaTexto), [listaTexto])
+  const porNumeros = modoPublico === 'numeros'
   const [publico, setPublico] = useState<{
     chave: string
     total: number
@@ -138,9 +148,9 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
   const partes = modelo ? partesDe(modelo) : null
   const numerosVar = partes ? variaveisDe(partes.corpo) : []
   const membros = useMemo(() => [...equipe.entries()].map(([id, p]) => ({ id, nome: p.nome ?? 'Sem nome' })), [equipe])
-  const total = publico?.chave === chaveFiltros ? publico.total : null
+  const total = porNumeros ? lista.numeros.length : publico?.chave === chaveFiltros ? publico.total : null
   const limiteNum = Number(limite)
-  const exemplo = publico?.amostra[0] ?? 'Maria'
+  const exemplo = (porNumeros ? lista.numeros.find((n) => n.nome)?.nome : publico?.amostra[0]) ?? 'Maria'
   const valoresPrevia = numerosVar.map((_, i) => {
     const v = variaveis[i]
     return !v ? '' : v.fonte === 'fixo' ? (v.valor ?? '') : v.fonte === 'nome' ? exemplo : v.padrao?.trim() || PADRAO.empresa
@@ -148,6 +158,7 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
   const variaveisOk = numerosVar.every((_, i) => variaveis[i] && (variaveis[i].fonte !== 'fixo' || variaveis[i].valor?.trim()))
   const pronto =
     !!nome.trim() && !!canalId && !!modelo && variaveisOk && !!total && consentimento &&
+    (!porNumeros || (!lista.invalidos.length && lista.numeros.length <= 500)) &&
     Number.isInteger(limiteNum) && limiteNum >= 1 && (quando === 'agora' || !!agendadaPara)
 
   function escolherModelo(id: string) {
@@ -164,6 +175,9 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
     setConsentimento(false)
     setQuando('agora')
     setAgendadaPara('')
+    setModoPublico('filtros')
+    setListaTexto('')
+    setEtiquetaLista('')
     setErro(null)
     aoFechar()
   }
@@ -190,7 +204,7 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
               : { fonte: variaveis[i].fonte, padrao: variaveis[i].padrao?.trim() || PADRAO[variaveis[i].fonte] },
           ),
         },
-        filtros,
+        ...(porNumeros ? { numeros: lista.numeros, etiqueta: etiquetaLista.trim() || null } : { filtros }),
         agendada_para: quando === 'agendar' ? new Date(agendadaPara).toISOString() : null,
         limite_dia: limiteNum,
         consentimento,
@@ -216,7 +230,7 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
             Cancelar
           </Botao>
           <Botao type="submit" form="form-campanha" carregando={salvando} disabled={!pronto}>
-            {quando === 'agora' ? `Enviar para ${total ?? 0} contatos` : 'Agendar campanha'}
+            {quando === 'agora' ? `Enviar para ${total ?? 0} ${porNumeros ? 'números' : 'contatos'}` : 'Agendar campanha'}
           </Botao>
         </>
       }
@@ -248,6 +262,62 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
 
         <fieldset className="space-y-3">
           <legend className="mb-1 font-semibold text-texto">Público</legend>
+          <div role="radiogroup" aria-label="De onde vem o público" className="inline-flex rounded-md border border-borda p-0.5">
+            {(
+              [
+                ['filtros', 'Contatos cadastrados'],
+                ['numeros', 'Lista de números'],
+              ] as const
+            ).map(([id, rotulo]) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={modoPublico === id}
+                onClick={() => setModoPublico(id)}
+                className={`rounded px-3 py-1.5 text-pequeno font-medium ${
+                  modoPublico === id ? 'bg-primaria-suave text-primaria' : 'text-texto-2 hover:bg-fundo'
+                }`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+          {porNumeros ? (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label htmlFor="campanha-lista" className="block text-pequeno font-medium text-texto-2">
+                  Números (um por linha, com o nome depois, se quiser)
+                </label>
+                <textarea
+                  id="campanha-lista"
+                  value={listaTexto}
+                  onChange={(ev) => setListaTexto(ev.target.value)}
+                  rows={6}
+                  placeholder={EXEMPLO_LISTA}
+                  className="block w-full rounded-md border border-borda bg-superficie px-3 py-2 text-pequeno placeholder:text-texto-3 focus:border-primaria focus:outline-none"
+                />
+              </div>
+              <CampoTexto rotulo="Etiqueta para estes contatos (opcional)" value={etiquetaLista} maxLength={40}
+                onChange={(ev) => setEtiquetaLista(ev.target.value)} placeholder="Ex.: vidraçaria"
+                ajuda="Ajuda a achar a lista depois em Contatos e numa próxima campanha." />
+              {lista.invalidos.length > 0 && (
+                <Aviso tom="erro">
+                  {lista.invalidos.length === 1 ? 'Esta linha não parece um celular' : 'Estas linhas não parecem celulares'} (use DDD +
+                  número): {lista.invalidos.slice(0, 5).join(' · ')}
+                  {lista.invalidos.length > 5 && ` e mais ${lista.invalidos.length - 5}`}. Corrija ou apague para enviar.
+                </Aviso>
+              )}
+              <p className="rounded-md bg-fundo px-3 py-2 text-pequeno text-texto-2" aria-live="polite">
+                <span className="font-semibold text-texto">
+                  {lista.numeros.length} {lista.numeros.length === 1 ? 'número' : 'números'}
+                </span>
+                {lista.numeros.length > 500 && ' (o máximo é 500 por campanha)'}. Quem ainda não é contato vira contato ao
+                criar a campanha, para a resposta cair em Conversas. Quem pediu para não receber campanhas fica de fora.
+              </p>
+            </div>
+          ) : (
+          <>
           {etiquetas.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-pequeno font-medium text-texto-2">Etiquetas (qualquer uma)</p>
@@ -307,6 +377,8 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
               </>
             )}
           </p>
+          </>
+          )}
         </fieldset>
 
         <fieldset className="space-y-3">
@@ -349,6 +421,12 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
                         value={variaveis[i].padrao ?? ''} maxLength={200} placeholder={PADRAO[variaveis[i].fonte]}
                         onChange={(ev) => setVariaveis((vs) => vs.map((v, j) => (j === i ? { ...v, padrao: ev.target.value } : v)))}
                         ajuda={(() => {
+                          if (porNumeros) {
+                            const sem = lista.numeros.filter((x) => !x.nome).length
+                            return variaveis[i].fonte === 'nome' && sem
+                              ? `${sem} ${sem === 1 ? 'número da lista está' : 'números da lista estão'} sem nome (se já for contato com nome, vale o do cadastro).`
+                              : undefined
+                          }
                           const n = variaveis[i].fonte === 'nome' ? publico?.sem_nome : publico?.sem_empresa
                           return n ? `${n} ${n === 1 ? 'contato do público está' : 'contatos do público estão'} sem ${variaveis[i].fonte === 'nome' ? 'nome' : 'empresa'}.` : undefined
                         })()} />
