@@ -4,6 +4,7 @@ import { useSessao } from '../hooks/useSessao'
 import {
   acaoCampanha,
   listarCampanhas,
+  motivosNaoEntregues,
   ROTULO_STATUS,
   type Campanha,
   type Resumo,
@@ -19,7 +20,35 @@ const quando = (iso: string) =>
   new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 const pct = (n: number, de: number) => (de ? `${Math.round((n / de) * 100)}%` : '—')
 
-function Numeros({ r }: { r: Resumo | null }) {
+/** Motivos de não entrega da campanha (ex.: conta do WhatsApp sem forma de pagamento), carregados quando há erro. */
+function MotivosErro({ campanhaId, erros }: { campanhaId: string; erros: number }) {
+  const [motivos, setMotivos] = useState<{ motivo: string; quantidade: number }[] | null>(null)
+  useEffect(() => {
+    let ativo = true
+    motivosNaoEntregues(campanhaId)
+      .then((m) => ativo && setMotivos(m))
+      .catch(() => ativo && setMotivos([]))
+    return () => {
+      ativo = false
+    }
+  }, [campanhaId, erros])
+  return (
+    <div className="col-span-full space-y-1 rounded-md bg-erro-suave px-3 py-2 text-legenda text-erro">
+      <p className="font-medium">
+        {erros} {erros === 1 ? 'mensagem não foi entregue' : 'mensagens não foram entregues'}
+        {motivos?.length ? ':' : '.'}
+      </p>
+      {motivos?.map((m) => (
+        <p key={m.motivo}>
+          {motivos.length > 1 && `${m.quantidade} · `}
+          {m.motivo}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+function Numeros({ r, campanhaId }: { r: Resumo | null; campanhaId: string }) {
   if (!r) return <span className="text-texto-3">—</span>
   const itens: [string, string][] = [
     ['Enviadas', `${r.enviadas} de ${r.total - r.puladas}`],
@@ -36,7 +65,7 @@ function Numeros({ r }: { r: Resumo | null }) {
           <dd className="font-medium text-texto tabular-nums">{valor}</dd>
         </div>
       ))}
-      {r.erros > 0 && <p className="col-span-full text-legenda text-erro">{r.erros} não foram entregues (número inválido ou sem WhatsApp).</p>}
+      {r.erros > 0 && <MotivosErro campanhaId={campanhaId} erros={r.erros} />}
     </dl>
   )
 }
@@ -154,7 +183,7 @@ export function Campanhas() {
                         )}
                       </span>
                     </div>
-                    <Numeros r={resumo} />
+                    <Numeros r={resumo} campanhaId={c.id} />
                   </li>
                 )
               })}

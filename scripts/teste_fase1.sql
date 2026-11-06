@@ -6572,5 +6572,38 @@ exception when others then
   insert into resultado (teste, ok) values ('campanha por números: atendente não cria',
     sqlerrm like 'só dono e admin%' and not exists (select 1 from public.contatos where telefone = '5541966660009'));
 end $$;
+-- Motivo de a Meta não entregar (migration 20261106160000). Usa uma mensagem de campanha dos blocos anteriores.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_d public.campanha_destinatarios;
+  v_canal uuid;
+begin
+  select d.* into v_d from public.campanha_destinatarios d
+   where d.org_id = current_setting('teste.f7')::uuid and d.mensagem_id is not null limit 1;
+  select c.canal_id into v_canal from public.conversas c join public.mensagens m on m.conversa_id = c.id where m.id = v_d.mensagem_id;
+  update public.mensagens set wa_id = 'wamid.TESTE-FALHA', status_entrega = 'enviada', erro = null where id = v_d.mensagem_id;
+  perform public.registrar_status_entrega(v_canal, 'wamid.TESTE-FALHA', 'erro',
+    'A Meta não entregou: falta a forma de pagamento na conta do WhatsApp.');
+  insert into resultado (teste, ok) values ('falha da Meta: o motivo fica na mensagem',
+    (select status_entrega = 'erro' and erro like 'A Meta não entregou: falta a forma%' from public.mensagens where id = v_d.mensagem_id));
+  perform public.registrar_status_entrega(v_canal, 'wamid.TESTE-FALHA', 'lida');
+  insert into resultado (teste, ok) values ('falha da Meta: status sem motivo (chamada antiga, WAHA) continua funcionando',
+    (select status_entrega = 'erro' from public.mensagens where id = v_d.mensagem_id));
+  perform set_config('teste.campanha_falha', v_d.campanha_id::text, true);
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$ begin
+  insert into resultado (teste, ok) values ('falha da Meta: a campanha mostra os motivos agrupados',
+    exists (select 1 from public.campanha_motivos_erro(current_setting('teste.campanha_falha')::uuid)
+             where motivo like 'A Meta não entregou: falta a forma%' and quantidade >= 1));
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  insert into resultado (teste, ok) values ('falha da Meta: atendente não vê os motivos da campanha',
+    not exists (select 1 from public.campanha_motivos_erro(current_setting('teste.campanha_falha')::uuid)));
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

@@ -156,6 +156,13 @@ export async function criarCampanha(
   return data as string
 }
 
+/** Por que as mensagens da campanha não foram entregues, agrupado (o meta-webhook grava o motivo traduzido). */
+export async function motivosNaoEntregues(campanhaId: string): Promise<{ motivo: string; quantidade: number }[]> {
+  const { data, error } = await supabase.rpc('campanha_motivos_erro', { p_campanha: campanhaId })
+  if (error) throw error
+  return (data ?? []).map((r) => ({ motivo: r.motivo, quantidade: Number(r.quantidade) }))
+}
+
 export async function acaoCampanha(id: string, acao: 'pausar' | 'retomar' | 'cancelar') {
   const { error } = await supabase.rpc('campanha_acao', { p_campanha: id, p_acao: acao })
   if (error) throw new Error('Não foi possível mudar a campanha. Recarregue a página e tente de novo.')

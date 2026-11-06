@@ -9,6 +9,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { avisarAgente, emSegundoPlano, normalizarTelefone, transcreverEAvisar } from "../_shared/atendimento.ts";
 import { descreve, guardarDescreverEAvisar, guardarMidiaRecebida } from "../_shared/midia.ts";
+import { motivoNaoEntregue } from "../_shared/errosMeta.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -203,7 +204,13 @@ Deno.serve(async (req) => {
           for (const s of valor.statuses ?? []) {
             const status = STATUS[s.status];
             if (status && s.id) {
-              await supabase.rpc("registrar_status_entrega", { p_canal: canal.canal_id, p_wa_id: String(s.id), p_status: status });
+              // Recusa depois de aceitar (ex.: 131042, conta sem forma de pagamento): o motivo vai para a mensagem.
+              await supabase.rpc("registrar_status_entrega", {
+                p_canal: canal.canal_id,
+                p_wa_id: String(s.id),
+                p_status: status,
+                p_erro: s.status === "failed" ? motivoNaoEntregue(s.errors) : null,
+              });
             }
             if (s.status === "failed") console.error("envio recusado pela Meta", s.id, JSON.stringify(s.errors ?? []).slice(0, 300));
           }

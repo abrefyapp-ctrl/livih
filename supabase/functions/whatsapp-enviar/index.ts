@@ -3,6 +3,7 @@
 // Um adaptador por provedor: WAHA e a API oficial da Meta (Cloud API).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { ERROS_META } from "../_shared/errosMeta.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -110,18 +111,7 @@ async function postWaha(rota: string, corpoEnvio: unknown, prazoMs: number): Pro
 }
 
 // Erros da Meta que a equipe precisa entender (o resto vai como veio).
-const ERROS_META: Record<number, string> = {
-  131047: "Passaram mais de 24 h desde a última mensagem do cliente. Fora dessa janela a API oficial só envia modelo aprovado.",
-  131026: "O número não recebe mensagens (sem WhatsApp ou versão antiga).",
-  131052: "A Meta não conseguiu baixar o arquivo. Tente enviar de novo.",
-  131053: "A Meta recusou o arquivo (formato ou tamanho não aceito pelo WhatsApp).",
-  132001: "Esse modelo não existe (ou não neste idioma) na conta do WhatsApp. Confira em Configurações → Modelos.",
-  132000: "A quantidade de variáveis não bate com o modelo aprovado.",
-  132015: "O modelo foi pausado pela Meta por baixa qualidade.",
-  132016: "O modelo foi desativado pela Meta.",
-  130497: "Envio bloqueado para o país deste número.",
-  190: "O acesso ao WhatsApp oficial expirou. Conecte o número de novo em Configurações → WhatsApp.",
-};
+// Tradução dos erros da Meta: _shared/errosMeta.ts (também usada pelo meta-webhook).
 
 async function conteudoMeta(item: ItemFila) {
   if (item.midia_path) {
