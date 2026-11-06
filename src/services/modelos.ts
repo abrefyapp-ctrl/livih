@@ -142,6 +142,20 @@ export const EXEMPLOS: { titulo: string; quando: string; modelo: ModeloNovo }[] 
     },
   },
   {
+    titulo: 'Atualização do pedido',
+    quando: 'Aviso de pedidos, depois de 24 horas sem o cliente escrever (Configurações → Aviso de pedidos).',
+    modelo: {
+      nome: 'atualizacao_pedido',
+      categoria: 'UTILITY',
+      idioma: 'pt_BR',
+      cabecalho: '',
+      corpo: 'Olá, {{1}}! Atualização do seu pedido nº {{2}}: {{3}}. Qualquer dúvida, é só responder esta mensagem.',
+      exemplos: ['Maria', '1234', 'saiu para entrega'],
+      rodape: '',
+      botoes: [],
+    },
+  },
+  {
     titulo: 'Orçamento enviado',
     quando: 'Perguntar se ficou alguma dúvida sobre o orçamento.',
     modelo: {

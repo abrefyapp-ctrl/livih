@@ -6321,5 +6321,132 @@ begin
     insert into resultado (teste, ok) values ('respostas rápidas: quem é de fora não cria na empresa', true);
   end;
 end $$;
+
+-- Aviso de status do pedido (migration 20261106130000).
+-- Dois clientes: Joana no número WAHA (sempre dentro da janela) e um sem nome no número oficial, que escreveu há 2 dias.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_waha uuid; v_meta uuid; v_ct1 uuid; v_ct2 uuid; v_cv2 uuid; v_prod uuid;
+  v_p1 uuid; v_p2 uuid; v_p3 uuid; v_p4 uuid;
+begin
+  -- Plano sem limite de números: os blocos anteriores deixam a empresa num plano com limite já ocupado.
+  update public.organizacoes set plano = 'interno' where id = v_org;
+  insert into public.canais (org_id, nome, telefone, instance_id, status_conexao)
+  values (v_org, 'WhatsApp aviso', '5541999996601', 'INST-AVISO', 'WORKING') returning id into v_waha;
+  insert into public.canais (org_id, tipo, nome, instance_id, meta_waba_id)
+  values (v_org, 'meta', 'Oficial aviso', 'PNID-AVISO', 'WABA-AVISO') returning id into v_meta;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541977700001', 'Joana Silva') returning id into v_ct1;
+  insert into public.contatos (org_id, telefone) values (v_org, '5541977700002') returning id into v_ct2;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_waha, v_ct1, 'humano');
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_org, v_meta, v_ct2, 'humano') returning id into v_cv2;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv2, 'entrada', 'contato', 'quero 2 caixas', 'recebida', now() - interval '2 days');
+  insert into public.produtos (org_id, nome, preco, controla_estoque) values (v_org, 'Serviço aviso', 10, false) returning id into v_prod;
+  insert into public.pedidos (org_id, contato_id) values (v_org, v_ct1) returning id into v_p1;
+  insert into public.pedidos (org_id, contato_id) values (v_org, v_ct2) returning id into v_p2;
+  insert into public.pedidos (org_id) values (v_org) returning id into v_p3;
+  insert into public.pedidos (org_id, contato_id) values (v_org, v_ct1) returning id into v_p4;
+  insert into public.pedido_itens (org_id, pedido_id, produto_id, descricao, quantidade, preco_unitario)
+  select v_org, p, v_prod, 'Serviço aviso', 1, 10 from unnest(array[v_p1, v_p2, v_p3, v_p4]) p;
+  perform set_config('teste.aviso_p1', v_p1::text, true);
+  perform set_config('teste.aviso_p2', v_p2::text, true);
+  perform set_config('teste.aviso_p3', v_p3::text, true);
+  perform set_config('teste.aviso_p4', v_p4::text, true);
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.pedido_avisos_salvar(current_setting('teste.f7')::uuid, '{"ativo":true,"situacoes":["confirmado"]}');
+  insert into resultado (teste, ok) values ('aviso de pedido: atendente não muda a configuração', false);
+exception when others then
+  insert into resultado (teste, ok) values ('aviso de pedido: atendente não muda a configuração', sqlerrm like 'só dono e admin%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_p1 uuid := current_setting('teste.aviso_p1')::uuid;
+  v_p2 uuid := current_setting('teste.aviso_p2')::uuid;
+  v_p3 uuid := current_setting('teste.aviso_p3')::uuid;
+  v_txt text;
+  v_m public.mensagens;
+begin
+  -- Desligado (padrão): nada sai, nada fica registrado.
+  perform public.pedido_mudar_status(v_p3, 'confirmado');
+  insert into resultado (teste, ok) values ('aviso de pedido: desligado não avisa',
+    not exists (select 1 from public.pedido_avisos_envios where pedido_id = v_p3));
+
+  begin
+    perform public.pedido_avisos_salvar(v_org, '{"ativo":true,"situacoes":[]}');
+    insert into resultado (teste, ok) values ('aviso de pedido: ligado pede ao menos uma situação', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('aviso de pedido: ligado pede ao menos uma situação', sqlerrm like 'escolha ao menos%');
+  end;
+  perform public.pedido_avisos_salvar(v_org, jsonb_build_object('ativo', true, 'situacoes', jsonb_build_array('confirmado', 'enviado', 'entregue'),
+    'textos', jsonb_build_object(
+      'confirmado', 'Olá, {nome}! O seu pedido nº {numero} foi confirmado.',
+      'enviado', 'Olá, {nome}! O seu pedido nº {numero} saiu para entrega.',
+      'entregue', 'Olá, {nome}! Pedido {numero} entregue.')));
+
+  perform public.pedido_mudar_status(v_p1, 'confirmado');
+  select m.* into v_m from public.pedido_avisos_envios e join public.mensagens m on m.id = e.mensagem_id
+   where e.pedido_id = v_p1 and e.status = 'confirmado' and e.enviado;
+  v_txt := 'Olá, Joana! O seu pedido nº ' || (select numero from public.pedidos where id = v_p1) || ' foi confirmado.';
+  insert into resultado (teste, ok) values ('aviso de pedido: confirmado sai com o primeiro nome e o número, na fila de envio',
+    v_m.texto = v_txt and v_m.modelo is null and exists (select 1 from public.fila_envio where mensagem_id = v_m.id));
+
+  perform public.pedido_mudar_status(v_p1, 'separando');
+  insert into resultado (teste, ok) values ('aviso de pedido: situação não marcada (separando) não avisa',
+    not exists (select 1 from public.pedido_avisos_envios where pedido_id = v_p1 and status = 'separando'));
+  perform public.pedido_mudar_status(v_p1, 'confirmado');
+  insert into resultado (teste, ok) values ('aviso de pedido: voltar para confirmado não repete o aviso',
+    (select count(*) from public.pedido_avisos_envios where pedido_id = v_p1 and status = 'confirmado') = 1);
+
+  -- Número oficial, cliente escreveu há 2 dias, sem modelo: não sai e o motivo fica no pedido.
+  perform public.pedido_mudar_status(v_p2, 'confirmado');
+  insert into resultado (teste, ok) values ('aviso de pedido: fora das 24 horas sem modelo não sai e registra o motivo',
+    exists (select 1 from public.pedido_avisos_envios where pedido_id = v_p2 and status = 'confirmado' and not enviado
+             and resultado like '%24 horas%'));
+
+  perform public.pedido_mudar_status(v_p3, 'enviado');
+  insert into resultado (teste, ok) values ('aviso de pedido: pedido sem cliente registra o motivo',
+    exists (select 1 from public.pedido_avisos_envios where pedido_id = v_p3 and not enviado and resultado like '%não tem cliente%'));
+
+  perform public.pedido_avisos_salvar(v_org, jsonb_build_object('ativo', true, 'situacoes', jsonb_build_array('confirmado', 'enviado', 'entregue'),
+    'textos', jsonb_build_object('confirmado', 'Confirmado {numero}', 'enviado', 'Enviado {numero}', 'entregue', 'Entregue {numero}'),
+    'modelo', jsonb_build_object('nome', 'atualizacao_pedido', 'idioma', 'pt_BR', 'categoria', 'UTILITY',
+      'corpo', 'Olá, {{1}}! Atualização do seu pedido nº {{2}}: {{3}}. Qualquer dúvida, responda aqui.',
+      'variaveis', jsonb_build_array(jsonb_build_object('fonte', 'nome', 'padrao', 'cliente'),
+                                     jsonb_build_object('fonte', 'pedido'), jsonb_build_object('fonte', 'situacao')))));
+  perform public.pedido_mudar_status(v_p2, 'enviado');
+  select m.* into v_m from public.pedido_avisos_envios e join public.mensagens m on m.id = e.mensagem_id
+   where e.pedido_id = v_p2 and e.status = 'enviado' and e.enviado and e.modelo;
+  insert into resultado (teste, ok) values ('aviso de pedido: fora das 24 horas vai o modelo com nome, número e situação',
+    v_m.modelo ->> 'nome' = 'atualizacao_pedido'
+    and v_m.modelo -> 'parametros' = jsonb_build_array('cliente', (select numero from public.pedidos where id = v_p2)::text, 'saiu para entrega')
+    and v_m.texto like 'Olá, cliente! Atualização do seu pedido nº%: saiu para entrega.%');
+end $$;
+-- O agente (sem login) mudando a situação não avisa: ele já está conversando com o cliente.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare v_p4 uuid := current_setting('teste.aviso_p4')::uuid;
+begin
+  perform set_config('livih.pedido_status', 'on', true);
+  update public.pedidos set status = 'confirmado' where id = v_p4;
+  perform set_config('livih.pedido_status', 'off', true);
+  insert into resultado (teste, ok) values ('aviso de pedido: mudança feita pelo sistema ou pelo agente não avisa',
+    not exists (select 1 from public.pedido_avisos_envios where pedido_id = v_p4));
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$ begin
+  insert into resultado (teste, ok) values ('aviso de pedido: outra empresa não vê os avisos nem a configuração',
+    not exists (select 1 from public.pedido_avisos_envios where pedido_id = current_setting('teste.aviso_p1')::uuid)
+    and not exists (select 1 from public.pedido_avisos where org_id = current_setting('teste.f7')::uuid));
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

@@ -32,6 +32,7 @@ import { ModalEscolherCliente } from '../components/ClienteDoContato'
 import { BlocoNota } from '../components/NotaFiscal'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
+import { AvisosDoPedido } from '../components/AvisosDoPedido'
 import { Botao } from '../components/Botao'
 import { CampoTexto } from '../components/CampoTexto'
 import { DialogoConfirmacao } from '../components/DialogoConfirmacao'
@@ -296,6 +297,7 @@ export function PedidoDetalhe() {
           </Aviso>
         )}
         {rascunho && <Aviso>Rascunho: ajuste os itens e confirme. Só na confirmação o estoque baixa.</Aviso>}
+        <AvisosDoPedido pedidoId={pedido.id} versao={versao} />
 
         <Itens orgId={orgId} pedido={pedido} itens={itens} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />
 

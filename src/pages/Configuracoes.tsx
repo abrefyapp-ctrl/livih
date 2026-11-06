@@ -4,6 +4,7 @@ import { PrimeirosPassos } from '../components/PrimeirosPassos'
 import { Icone, type NomeIcone } from '../components/Icone'
 import { CLASSE_CAMPO } from '../components/ModaisOs'
 import { SecaoAgente } from '../components/SecaoAgente'
+import { SecaoAvisosPedido } from '../components/SecaoAvisosPedido'
 import { SecaoBase } from '../components/SecaoBase'
 import { SecaoDocumentos } from '../components/SecaoDocumentos'
 import { SecaoEmpresa } from '../components/SecaoEmpresa'
@@ -31,6 +32,7 @@ const SECOES: { id: string; rotulo: string; icone: NomeIcone; grupo: Grupo; modu
   { id: 'agente', rotulo: 'Agente', icone: 'agente', grupo: 'Agente' },
   { id: 'base', rotulo: 'Base de conhecimento', icone: 'livro', grupo: 'Agente' },
   { id: 'documentos', rotulo: 'Documentos', icone: 'arquivo', grupo: 'Agente' },
+  { id: 'pedidos', rotulo: 'Aviso de pedidos', icone: 'pedido', grupo: 'Módulos', modulo: 'erp' },
   { id: 'os', rotulo: 'Ordens de serviço', icone: 'ferramenta', grupo: 'Módulos', modulo: 'os' },
 ]
 const GRUPOS: Grupo[] = ['Empresa', 'WhatsApp', 'Agente', 'Módulos']
@@ -117,6 +119,7 @@ export function Configuracoes() {
             {secao === 'documentos' && <SecaoDocumentos />}
             {secao === 'uso' && <SecaoUsoIa />}
             {secao === 'notificacoes' && <SecaoNotificacoes />}
+            {secao === 'pedidos' && <SecaoAvisosPedido />}
             {secao === 'os' && <SecaoOrdensServico />}
           </div>
         </div>

@@ -53,7 +53,7 @@ compromisso e Google Agenda ([roadmap.md](roadmap.md), seção Agenda); os próx
 |---|---|---|---|---|
 | 1 | **Venda de balcão** (tela rápida com NF-e e impressão) | Já decidido em 27/10 e não construído ([balcao.md](balcao.md)) | Alta | Médio |
 | 2 | **Financeiro, entregas 3 e 4**: fluxo de caixa realizado e previsto, vencidos, totais por categoria; Pix copia e cola e cobrança pelo WhatsApp com lembrete | Planejado ([financeiro.md](financeiro.md)); a cobrança pelo WhatsApp é o diferencial contra o Bling | Alta | 3 a 4 dias |
-| 3 | **Aviso de status do pedido ao cliente** no WhatsApp (confirmado, separando, enviado, entregue), opcional por empresa | Estava no MVP do ERP ([roadmap.md](roadmap.md)) e não foi feito | Alta | Pequeno |
+| 3 | **Aviso de status do pedido ao cliente** no WhatsApp (confirmado, separando, enviado, entregue), opcional por empresa. **Feito em 06/11**: Configurações → Aviso de pedidos (desligado por padrão; confirmado, enviado e entregue; modelo fora das 24 h) e o resultado de cada aviso na tela do pedido | Estava no MVP do ERP ([roadmap.md](roadmap.md)) | Alta | Pequeno |
 | 4 | **Alerta de estoque mínimo** (notificação para quem compra e resumo diário) | Hoje é só um filtro na tela Produtos | Alta | Pequeno |
 | 5 | **Tabela de preço e desconto por cliente** (ou por grupo: revenda, consumidor final), que o agente e o pedido usam | Distribuidor B2B quase sempre tem preço por cliente | Alta | Médio |
 | 6 | **Relatórios de venda**: por produto (curva ABC), cliente, vendedor e período, com **margem** (o custo já vem da nota de entrada) | Os dados existem; falta a tela. Gestor pergunta "o que vende e quanto sobra" | Alta | Pequeno a médio |
