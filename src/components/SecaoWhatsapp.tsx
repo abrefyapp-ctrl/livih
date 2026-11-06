@@ -15,10 +15,12 @@ import {
   listarNumeros,
   listarRecebeContatos,
   numerosQueDistribuem,
+  pagamentoMeta,
   qrNumero,
   removerNumero,
   type MembroEquipe,
   type NumeroWhatsapp,
+  type PagamentoMetaCanal,
 } from '../services/configuracoes'
 import { formatarTelefone, haQuanto, quandoCurto } from '../services/formato'
 import { Aviso } from './Aviso'
@@ -28,6 +30,7 @@ import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { EstadoVazio } from './EstadoVazio'
 import { Icone } from './Icone'
 import { Modal } from './Modal'
+import { PagamentoMeta } from './PagamentoMeta'
 
 type Edicao = { id: string | null; nome: string; responsavel_id: string }
 type Portfolio = { nome: string; waba_id: string; phone_number_id: string }
@@ -181,6 +184,21 @@ export function SecaoWhatsapp() {
   }, [orgId, gerencia, versao])
   const distribui = (id: string) => distribuicao?.orgId === orgId && distribuicao.numeros.has(id)
 
+  // Forma de pagamento da Meta nos números oficiais (06/11): a Meta cobra a empresa direto e a API não diz se há cartão.
+  const [pagamentoLido, setPagamentoLido] = useState<{ orgId: string; mapa: Map<string, PagamentoMetaCanal> } | null>(null)
+  const [versaoPagamento, setVersaoPagamento] = useState(0)
+  useEffect(() => {
+    let ativo = true
+    pagamentoMeta(orgId)
+      .then((l) => ativo && setPagamentoLido({ orgId, mapa: new Map(l.map((c) => [c.id, c])) }))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [orgId, versao, versaoPagamento])
+  const pagamentos = pagamentoLido?.orgId === orgId ? pagamentoLido.mapa : null
+  const recarregarPagamentos = () => setVersaoPagamento((v) => v + 1)
+
   const nomeDe = (userId: string) => {
     const m = equipe.find((x) => x.user_id === userId)
     return userId === eu ? 'você' : (m?.nome ?? m?.email ?? 'um vendedor')
@@ -289,6 +307,11 @@ export function SecaoWhatsapp() {
                       {n.tipo === 'meta' && (n.meta_coexistencia ? ' · API oficial, também no app do celular' : ' · API oficial')}
                     </p>
                     <Situacao n={n} />
+                    {n.tipo === 'meta' && pagamentos?.get(n.id) && (
+                      <div className="pt-2">
+                        <PagamentoMeta canal={pagamentos.get(n.id)!} gerencia={gerencia} aoConfirmar={recarregarPagamentos} />
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">

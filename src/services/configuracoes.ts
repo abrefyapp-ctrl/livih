@@ -217,6 +217,29 @@ export async function definirAlertaEstoque(orgId: string, userId: string, valor:
   if (error) throw new Error('Não foi possível mudar. Só dono e admin mudam.')
 }
 
+/** Forma de pagamento da Meta por número oficial (migration 20261106170000): confirmada e última recusa por pagamento. */
+export type PagamentoMetaCanal = { id: string; nome: string; ok_em: string | null; falha_em: string | null }
+
+export async function pagamentoMeta(orgId: string): Promise<PagamentoMetaCanal[]> {
+  const { data, error } = await supabase
+    .from('canais')
+    .select('id, nome, meta_pagamento_ok_em, meta_pagamento_falha_em')
+    .eq('org_id', orgId)
+    .eq('tipo', 'meta')
+    .eq('ativo', true)
+  if (error) throw error
+  return (data ?? []).map((c) => ({ id: c.id, nome: c.nome, ok_em: c.meta_pagamento_ok_em, falha_em: c.meta_pagamento_falha_em }))
+}
+
+/** Ainda falta a forma de pagamento: nunca confirmada, ou a Meta recusou por pagamento depois da confirmação. */
+export const pagamentoPendente = (c: Pick<PagamentoMetaCanal, 'ok_em' | 'falha_em'>) =>
+  !c.ok_em || (!!c.falha_em && c.falha_em > c.ok_em)
+
+export async function confirmarPagamentoMeta(canalId: string) {
+  const { error } = await supabase.rpc('canal_confirmar_pagamento_meta', { p_canal: canalId })
+  if (error) throw new Error('Não foi possível salvar. Só dono e admin confirmam.')
+}
+
 /** Números fora do ar há mais de 5 min (só os que a pessoa pode ver) — para a faixa de aviso. */
 export async function numerosCaidos(orgId: string): Promise<{ id: string; nome: string }[]> {
   const { data, error } = await supabase

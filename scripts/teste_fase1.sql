@@ -6605,5 +6605,43 @@ do $$ begin
   insert into resultado (teste, ok) values ('falha da Meta: atendente não vê os motivos da campanha',
     not exists (select 1 from public.campanha_motivos_erro(current_setting('teste.campanha_falha')::uuid)));
 end $$;
+-- Forma de pagamento da Meta (migration 20261106170000).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.canal_confirmar_pagamento_meta((select id from public.canais where instance_id = 'PNID-AVISO'));
+  insert into resultado (teste, ok) values ('pagamento Meta: atendente não confirma', false);
+exception when others then
+  insert into resultado (teste, ok) values ('pagamento Meta: atendente não confirma', sqlerrm like 'só dono e admin%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_canal uuid := (select id from public.canais where instance_id = 'PNID-AVISO');
+begin
+  perform public.canal_confirmar_pagamento_meta(v_canal);
+  insert into resultado (teste, ok) values ('pagamento Meta: o dono marca "Já cadastrei"',
+    (select meta_pagamento_ok_em is not null from public.canais where id = v_canal));
+  begin
+    perform public.canal_confirmar_pagamento_meta((select id from public.canais where instance_id = 'INST-AVISO'));
+    insert into resultado (teste, ok) values ('pagamento Meta: número do WAHA não tem cobrança da Meta', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('pagamento Meta: número do WAHA não tem cobrança da Meta', sqlerrm like 'só número da API oficial%');
+  end;
+  begin
+    perform public.canal_falha_pagamento_meta(v_canal);
+    insert into resultado (teste, ok) values ('pagamento Meta: a falha só é gravada pelo webhook', false);
+  exception when insufficient_privilege then
+    insert into resultado (teste, ok) values ('pagamento Meta: a falha só é gravada pelo webhook', true);
+  end;
+end $$;
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare v_canal uuid := (select id from public.canais where instance_id = 'PNID-AVISO');
+begin
+  perform public.canal_falha_pagamento_meta(v_canal);
+  insert into resultado (teste, ok) values ('pagamento Meta: recusa depois do "Já cadastrei" fica mais nova que a confirmação',
+    (select meta_pagamento_falha_em >= meta_pagamento_ok_em from public.canais where id = v_canal));
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

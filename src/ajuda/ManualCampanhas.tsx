@@ -25,7 +25,7 @@ export function ManualCampanhas() {
       </Paragrafo>
 
       <Secao id="antes-de-comecar" titulo={titulo('antes-de-comecar')}>
-        <Paragrafo>Você precisa de quatro coisas prontas. Sem elas, a Livih não deixa criar a campanha.</Paragrafo>
+        <Paragrafo>Você precisa de cinco coisas prontas. Sem elas, a campanha não sai.</Paragrafo>
         <Tabela
           colunas={['O que', 'Por quê', 'Onde resolver']}
           linhas={[
@@ -39,6 +39,11 @@ export function ManualCampanhas() {
               <>Um modelo de mensagem de <strong>Marketing aprovado</strong> pela Meta</>,
               'Fora de uma conversa aberta, o WhatsApp só deixa a empresa mandar mensagem com modelo aprovado',
               'Configurações → Modelos (Passo 1)',
+            ],
+            [
+              <>Uma <strong>forma de pagamento</strong> na conta do WhatsApp Business</>,
+              'A Meta cobra direto da sua empresa cada mensagem de campanha entregue. Sem cartão, ela aceita o envio e depois recusa',
+              'business.facebook.com → Configurações → Cobrança e pagamentos → a conta do WhatsApp Business → Adicionar forma de pagamento. Depois, marque “Já cadastrei” em Configurações → WhatsApp',
             ],
             [
               'Contatos que autorizaram receber mensagens',
@@ -251,7 +256,7 @@ export function ManualCampanhas() {
             ['O botão de enviar não libera', 'Falta o nome, o modelo, uma variável de texto fixo, a confirmação de autorização, ou o público deu zero', 'Preencha o que falta e confira os filtros'],
             ['A campanha parou sozinha (Pausada)', 'O número desconectou ou saiu da API oficial', 'Reconecte em Configurações → WhatsApp e clique em Retomar'],
             ['Saiu menos do que o esperado hoje', 'O limite por dia do número foi atingido', 'O resto sai no dia seguinte, sozinho'],
-            ['Muitas “não entregues”', 'Números inválidos ou sem WhatsApp na base', 'Corrija o telefone no contato'],
+            ['Muitas “não entregues”', 'O cartão da campanha mostra o motivo. Os mais comuns: número sem WhatsApp, ou falta a forma de pagamento na Meta', 'Número: corrija o telefone no contato. Pagamento: cadastre o cartão (veja “Antes de começar”) e crie a campanha de novo'],
           ]}
         />
         <Paragrafo>Dúvidas que este manual não responde: fale com o suporte da Livih.</Paragrafo>

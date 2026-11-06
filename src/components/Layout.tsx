@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useSessao } from '../hooks/useSessao'
 import { useContagemAguardando } from '../hooks/useConversas'
 import { useNumerosCaidos } from '../hooks/useNumerosCaidos'
+import { pagamentoMeta } from '../services/configuracoes'
 import { Avatar } from './Avatar'
 import { LogoOrganizacao } from './LogoOrganizacao'
 import { Icone, type NomeIcone } from './Icone'
@@ -27,6 +28,25 @@ export function Layout() {
   const caidos = useNumerosCaidos(orgAtiva?.id)
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const [gaveta, setGaveta] = useState(false)
+  // Faixa para dono e admin quando a Meta recusou por falta de forma de pagamento depois do "Já cadastrei" (ou sem ele).
+  const [semPagamento, setSemPagamento] = useState<{ orgId: string; nomes: string[] } | null>(null)
+  // Relê ao trocar de tela: some logo depois do "Já cadastrei" em Configurações → WhatsApp.
+  const { pathname } = useLocation()
+  useEffect(() => {
+    const id = orgAtiva?.id
+    if (!id || !gerencia) return
+    let ativo = true
+    pagamentoMeta(id)
+      .then((l) =>
+        ativo &&
+        setSemPagamento({ orgId: id, nomes: l.filter((c) => c.falha_em && (!c.ok_em || c.falha_em > c.ok_em)).map((c) => c.nome) }),
+      )
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [orgAtiva?.id, gerencia, pathname])
+  const recusadosPorPagamento = gerencia && semPagamento?.orgId === orgAtiva?.id ? semPagamento.nomes : []
   const app = useInstalarApp()
   const [ajudaIos, setAjudaIos] = useState(false)
   // Financeiro (docs/financeiro.md): vem com o ERP ou as OS; dono e admin sempre veem, o atendente só com a permissão.
@@ -278,6 +298,17 @@ export function Layout() {
             ) : (
               <span>Avise um administrador.</span>
             )}
+          </div>
+        )}
+
+        {recusadosPorPagamento.length > 0 && (
+          <div role="alert" className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-atencao px-4 py-2 text-pequeno text-white lg:px-6">
+            <Icone nome="alerta" className="size-4 shrink-0" />
+            <span className="font-semibold">A Meta recusou mensagens por falta de forma de pagamento.</span>
+            <span>Campanhas e modelos fora das 24 horas não saem até cadastrar o cartão na conta do WhatsApp Business.</span>
+            <Link to="/configuracoes/whatsapp" className="font-semibold underline">
+              Ver como resolver
+            </Link>
           </div>
         )}
 

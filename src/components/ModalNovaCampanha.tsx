@@ -11,6 +11,7 @@ import {
   type FonteVariavel,
   type VariavelCampanha,
 } from '../services/campanhas'
+import { pagamentoMeta, type PagamentoMetaCanal } from '../services/configuracoes'
 import { listarEtapas, type Etapa } from '../services/crm'
 import { listarModelos, modeloDeExemplo, partesDe, variaveisDe, type Modelo } from '../services/modelos'
 import { Aviso } from './Aviso'
@@ -18,6 +19,7 @@ import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
 import { Campo, CLASSE_CAMPO } from './ModaisOs'
 import { Modal } from './Modal'
+import { PagamentoMeta } from './PagamentoMeta'
 import { PreviaModelo } from './PreviaModelo'
 
 /** Modelo que a campanha consegue enviar: aprovado, de Marketing, sem imagem/vídeo/documento nem variável no cabeçalho. */
@@ -88,6 +90,8 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
     amostra: string[]
   } | null>(null)
   const [modelos, setModelos] = useState<{ canalId: string; lista: Modelo[] } | null>(null)
+  const [pagamentos, setPagamentos] = useState<PagamentoMetaCanal[]>([])
+  const [versaoPagamento, setVersaoPagamento] = useState(0)
   const [erroModelos, setErroModelos] = useState<string | null>(null)
   const [modeloId, setModeloId] = useState('')
   const [variaveis, setVariaveis] = useState<VariavelCampanha[]>([])
@@ -131,6 +135,17 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
       clearTimeout(t)
     }
   }, [aberto, orgId, chaveFiltros])
+
+  useEffect(() => {
+    if (!aberto) return
+    let ativo = true
+    pagamentoMeta(orgId)
+      .then((l) => ativo && setPagamentos(l))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [aberto, orgId, versaoPagamento])
 
   useEffect(() => {
     if (!aberto || !canalId) return
@@ -258,6 +273,9 @@ export function ModalNovaCampanha({ aberto, aoFechar, aoCriar }: { aberto: boole
               </select>
             </Campo>
           </div>
+          {pagamentos.find((p) => p.id === canalId) && (
+            <PagamentoMeta canal={pagamentos.find((p) => p.id === canalId)!} gerencia aoConfirmar={() => setVersaoPagamento((v) => v + 1)} />
+          )}
         </fieldset>
 
         <fieldset className="space-y-3">

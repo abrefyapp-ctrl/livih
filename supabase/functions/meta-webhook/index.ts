@@ -211,6 +211,10 @@ Deno.serve(async (req) => {
                 p_status: status,
                 p_erro: s.status === "failed" ? motivoNaoEntregue(s.errors) : null,
               });
+              // Sem forma de pagamento na conta do WhatsApp: a tela volta a pedir o cartão (faixa para dono e admin).
+              if (s.status === "failed" && (s.errors ?? []).some((e: Json) => Number(e?.code) === 131042)) {
+                await supabase.rpc("canal_falha_pagamento_meta", { p_canal: canal.canal_id });
+              }
             }
             if (s.status === "failed") console.error("envio recusado pela Meta", s.id, JSON.stringify(s.errors ?? []).slice(0, 300));
           }
