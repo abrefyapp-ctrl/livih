@@ -4114,6 +4114,44 @@ export type Database = {
         }
         Relationships: []
       }
+      respostas_rapidas: {
+        Row: {
+          atalho: string
+          atualizado_em: string
+          criado_em: string
+          id: string
+          org_id: string
+          texto: string
+          usuario_id: string | null
+        }
+        Insert: {
+          atalho: string
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          org_id: string
+          texto: string
+          usuario_id?: string | null
+        }
+        Update: {
+          atalho?: string
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          org_id?: string
+          texto?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "respostas_rapidas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       simulacoes_agente: {
         Row: {
           criado_em: string
