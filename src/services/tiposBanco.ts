@@ -2346,6 +2346,7 @@ export type Database = {
           financeiro: boolean
           org_id: string
           papel: Database["public"]["Enums"]["papel_org"]
+          recebe_alerta_estoque: boolean
           recebe_contatos: boolean
           ultima_distribuicao_em: string | null
           user_id: string
@@ -2358,6 +2359,7 @@ export type Database = {
           financeiro?: boolean
           org_id: string
           papel?: Database["public"]["Enums"]["papel_org"]
+          recebe_alerta_estoque?: boolean
           recebe_contatos?: boolean
           ultima_distribuicao_em?: string | null
           user_id: string
@@ -2370,6 +2372,7 @@ export type Database = {
           financeiro?: boolean
           org_id?: string
           papel?: Database["public"]["Enums"]["papel_org"]
+          recebe_alerta_estoque?: boolean
           recebe_contatos?: boolean
           ultima_distribuicao_em?: string | null
           user_id?: string
@@ -5172,6 +5175,15 @@ export type Database = {
           user_id: string
         }[]
       }
+      estoque_avisar_equipe: {
+        Args: {
+          p_corpo: string
+          p_org: string
+          p_titulo: string
+          p_whatsapp: string
+        }
+        Returns: number
+      }
       estoque_definir_saldos: {
         Args: { p_itens: Json; p_org: string }
         Returns: Json
@@ -5185,6 +5197,8 @@ export type Database = {
         }
         Returns: undefined
       }
+      estoque_qtd: { Args: { p: number }; Returns: string }
+      estoque_resumo_diario: { Args: never; Returns: number }
       fila_manutencao: { Args: never; Returns: undefined }
       fila_reivindicar: {
         Args: { p_limite?: number }
@@ -5434,6 +5448,10 @@ export type Database = {
         Returns: string
       }
       limpar_documento: { Args: { p: string }; Returns: string }
+      membro_definir_alerta_estoque: {
+        Args: { p_org: string; p_usuario: string; p_valor: boolean }
+        Returns: undefined
+      }
       membro_definir_emite_nota_fiscal: {
         Args: { p_org: string; p_usuario: string; p_valor: boolean }
         Returns: undefined
