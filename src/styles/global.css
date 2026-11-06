@@ -1,4 +1,6 @@
-@import "tailwindcss";
+/* Só a pasta src/ (06/11): sem isso o Tailwind lia também arquivos fora do git (ex.: .claude/settings.local.json),
+   o CSS local saía diferente do da Cloudflare e o npm run publicar ficava esperando um hash que nunca chegava. */
+@import "tailwindcss" source("../");
 
 /* Tokens — ver docs/design-system.md. Primitivos da paleta do kit; os semânticos abaixo são o que
    os componentes usam. Trocar a identidade = mexer aqui, não nos componentes. */
