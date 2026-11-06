@@ -6253,5 +6253,73 @@ begin
     r @> '[{"motivo":"Preço","quantidade":1}]'::jsonb
     and ((select x from jsonb_array_elements(r) x where x ->> 'motivo' = 'Preço') ->> 'valor')::numeric = 500);
 end $$;
+
+-- Respostas rápidas (migration 20261106120000).
+-- O dono cria a da empresa e uma pessoal; o atendente cria a dele, usa a da empresa e não mexe nela.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  insert into public.respostas_rapidas (org_id, atalho, texto) values (v_org, 'pix', 'Oi {nome}, a chave Pix é o CNPJ.');
+  insert into public.respostas_rapidas (org_id, usuario_id, atalho, texto)
+  values (v_org, '00000000-0000-0000-0000-0000000000a1', 'pix', 'Minha versão do Pix');
+  insert into resultado (teste, ok) values ('respostas rápidas: o dono cria a da empresa e uma pessoal com o mesmo atalho',
+    (select count(*) from public.respostas_rapidas where org_id = v_org and atalho = 'pix') = 2);
+  begin
+    insert into public.respostas_rapidas (org_id, atalho, texto) values (v_org, 'pix', 'Repetida');
+    insert into resultado (teste, ok) values ('respostas rápidas: atalho repetido na lista da empresa é recusado', false);
+  exception when unique_violation then
+    insert into resultado (teste, ok) values ('respostas rápidas: atalho repetido na lista da empresa é recusado', true);
+  end;
+  begin
+    insert into public.respostas_rapidas (org_id, atalho, texto) values (v_org, 'Com Espaço', 'Atalho inválido');
+    insert into resultado (teste, ok) values ('respostas rápidas: atalho só com minúsculas, números, - e _', false);
+  exception when check_violation then
+    insert into resultado (teste, ok) values ('respostas rápidas: atalho só com minúsculas, números, - e _', true);
+  end;
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_n integer;
+begin
+  insert into public.respostas_rapidas (org_id, usuario_id, atalho, texto)
+  values (v_org, '00000000-0000-0000-0000-0000000000b1', 'frete', 'O frete sai em 2 dias.');
+  insert into resultado (teste, ok) values ('respostas rápidas: o atendente vê a da empresa e a dele, não a pessoal do dono',
+    (select count(*) from public.respostas_rapidas where org_id = v_org) = 2
+    and not exists (select 1 from public.respostas_rapidas where usuario_id = '00000000-0000-0000-0000-0000000000a1'));
+  update public.respostas_rapidas set texto = 'Mudado pelo atendente' where org_id = v_org and usuario_id is null;
+  get diagnostics v_n = row_count;
+  insert into resultado (teste, ok) values ('respostas rápidas: o atendente não muda a da empresa', v_n = 0);
+  begin
+    insert into public.respostas_rapidas (org_id, atalho, texto) values (v_org, 'nova', 'Da empresa pelo atendente');
+    insert into resultado (teste, ok) values ('respostas rápidas: o atendente não cria na lista da empresa', false);
+  exception when insufficient_privilege then
+    insert into resultado (teste, ok) values ('respostas rápidas: o atendente não cria na lista da empresa', true);
+  end;
+  begin
+    insert into public.respostas_rapidas (org_id, usuario_id, atalho, texto)
+    values (v_org, '00000000-0000-0000-0000-0000000000a1', 'falsa', 'Em nome do dono');
+    insert into resultado (teste, ok) values ('respostas rápidas: ninguém cria resposta pessoal em nome de outro', false);
+  exception when insufficient_privilege then
+    insert into resultado (teste, ok) values ('respostas rápidas: ninguém cria resposta pessoal em nome de outro', true);
+  end;
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  insert into resultado (teste, ok) values ('respostas rápidas: outra empresa não vê nenhuma',
+    not exists (select 1 from public.respostas_rapidas where org_id = v_org));
+  begin
+    insert into public.respostas_rapidas (org_id, usuario_id, atalho, texto)
+    values (v_org, '00000000-0000-0000-0000-0000000000c1', 'intrusa', 'De fora');
+    insert into resultado (teste, ok) values ('respostas rápidas: quem é de fora não cria na empresa', false);
+  exception when insufficient_privilege then
+    insert into resultado (teste, ok) values ('respostas rápidas: quem é de fora não cria na empresa', true);
+  end;
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

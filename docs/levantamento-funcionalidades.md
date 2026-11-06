@@ -28,7 +28,7 @@ JoGrampo) e a promessa do piloto (responder mais rápido, acompanhar os leads e 
 | # | O que falta | Por quê | Prioridade | Esforço |
 |---|---|---|---|---|
 | 1 | **Tarefas e próximo passo** na oportunidade e no contato ("ligar quinta", "mandar proposta"), com data, responsável e lembrete; oportunidade aberta sem próximo passo aparece como alerta | Hoje o acompanhamento é só a lista "sem retorno" no Painel, que ninguém é avisado de olhar. É o centro da promessa "acompanhar os leads" | Alta | Médio |
-| 2 | **Respostas rápidas** na conversa (mensagens prontas com atalho, por empresa e por pessoa) | Uso diário de todo atendente; hoje não existe | Alta | Pequeno |
+| 2 | **Respostas rápidas** na conversa (mensagens prontas com atalho, por empresa e por pessoa). **Feito em 06/11**: "/" ou o raio na caixa da conversa, {nome} do cliente, cadastro em Configurações → Respostas rápidas | Uso diário de todo atendente | Alta | Pequeno |
 | 3 | **Distribuição automática** de conversas novas (rodízio entre vendedores, por carteira, por horário) | Público-alvo tem vários vendedores; hoje a conversa fica sem dono até alguém pegar | Alta | Médio |
 | 4 | **Importar e exportar contatos** (CSV/Excel), com etiquetas e responsável | Implantação: o cliente chega com a lista dele. Hoje só clientes e produtos importam; nada exporta | Alta | Pequeno |
 | 5 | **Retomada automática do lead parado**: oportunidade sem resposta há X dias → o agente (dentro das 24 h) ou um modelo aprovado retoma, uma ou duas vezes | Converte o que hoje morre no "sem retorno"; diferencial claro sobre CRM comum | Alta | Médio |

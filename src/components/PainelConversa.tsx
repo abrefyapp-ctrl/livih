@@ -12,6 +12,7 @@ import {
   type ConversaLista,
   type Mensagem,
 } from '../services/atendimento'
+import { listarRespostasRapidas, preencherResposta, type RespostaRapida } from '../services/respostasRapidas'
 import { formatarTelefone, mesmoDia, nomeDoContato, rotuloDia } from '../services/formato'
 import { useMensagens } from '../hooks/useMensagens'
 import { useSessao } from '../hooks/useSessao'
@@ -66,6 +67,20 @@ export function PainelConversa({
   const { mensagens, carregando, erro } = useMensagens(conversaId)
   const rolagem = useRef<HTMLDivElement>(null)
   const noFim = useRef(true)
+  const orgId = orgAtiva?.id
+  const [respostas, setRespostas] = useState<RespostaRapida[] | undefined>()
+
+  // Respostas rápidas da empresa e da pessoa; se não carregar, a caixa só fica sem a lista.
+  useEffect(() => {
+    if (!orgId) return
+    let ativo = true
+    listarRespostasRapidas(orgId)
+      .then((l) => ativo && setRespostas(l))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [orgId])
 
   // Conversa: carrega e acompanha mudanças de estado feitas por outra pessoa ou pelo agente.
   useEffect(() => {
@@ -110,6 +125,13 @@ export function PainelConversa({
   }
 
   const nome = nomeDoContato(conversa.contato)
+  const primeiroNome = (conversa.contato?.nome?.trim() || conversa.contato?.nome_whatsapp?.trim() || '').split(/\s+/)[0] || null
+  const respostasProntas = respostas?.map((r) => ({
+    id: r.id,
+    atalho: r.atalho,
+    texto: preencherResposta(r.texto, primeiroNome),
+    pessoal: r.usuario_id !== null,
+  }))
   const estado = conversa.estado
   const minha = estado === 'humano' && conversa.atribuida_a === eu
   const atendente = (conversa.atribuida_a && equipe.get(conversa.atribuida_a)?.nome) || undefined
@@ -270,6 +292,7 @@ export function PainelConversa({
         aoEnviarArquivo={orgAtiva ? (f, legenda) => enviarArquivo(orgAtiva.id, conversaId, f, legenda) : undefined}
         aoAbrirBiblioteca={orgAtiva ? () => setBiblioteca(true) : undefined}
         acao={botaoModelo}
+        respostas={respostasProntas}
         bloqueio={
           janelaFechada &&
           `Faz mais de 24 horas que ${nome} escreveu. Pela API oficial do WhatsApp, só dá para retomar com um modelo aprovado.`

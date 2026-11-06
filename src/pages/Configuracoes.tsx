@@ -11,6 +11,7 @@ import { SecaoEquipe } from '../components/SecaoEquipe'
 import { SecaoModelos } from '../components/SecaoModelos'
 import { SecaoNotificacoes } from '../components/SecaoNotificacoes'
 import { SecaoOrdensServico } from '../components/SecaoOrdensServico'
+import { SecaoRespostas } from '../components/SecaoRespostas'
 import { SecaoUsoIa } from '../components/SecaoUsoIa'
 import { SecaoWhatsapp } from '../components/SecaoWhatsapp'
 
@@ -26,6 +27,7 @@ const SECOES: { id: string; rotulo: string; icone: NomeIcone; grupo: Grupo; modu
   { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone', grupo: 'WhatsApp' },
   // Modelos só existem na API oficial (liberada para todas as empresas em 26/10).
   { id: 'modelos', rotulo: 'Modelos', icone: 'arquivo', grupo: 'WhatsApp' },
+  { id: 'respostas', rotulo: 'Respostas rápidas', icone: 'raio', grupo: 'WhatsApp' },
   { id: 'agente', rotulo: 'Agente', icone: 'agente', grupo: 'Agente' },
   { id: 'base', rotulo: 'Base de conhecimento', icone: 'livro', grupo: 'Agente' },
   { id: 'documentos', rotulo: 'Documentos', icone: 'arquivo', grupo: 'Agente' },
@@ -109,6 +111,7 @@ export function Configuracoes() {
             {secao === 'empresa' && <SecaoEmpresa />}
             {secao === 'whatsapp' && <SecaoWhatsapp />}
             {secao === 'modelos' && <SecaoModelos />}
+            {secao === 'respostas' && <SecaoRespostas />}
             {secao === 'agente' && <SecaoAgente />}
             {secao === 'base' && <SecaoBase />}
             {secao === 'documentos' && <SecaoDocumentos />}
