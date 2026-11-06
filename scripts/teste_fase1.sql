@@ -6448,5 +6448,76 @@ do $$ begin
     not exists (select 1 from public.pedido_avisos_envios where pedido_id = current_setting('teste.aviso_p1')::uuid)
     and not exists (select 1 from public.pedido_avisos where org_id = current_setting('teste.f7')::uuid));
 end $$;
+
+-- Alerta de estoque mínimo (migration 20261106140000). b1 recebe o alerta (celular no perfil); mínimo 5.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+update public.perfis set telefone = '5541977700099' where user_id = '00000000-0000-0000-0000-0000000000b1';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.membro_definir_alerta_estoque(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000b1', true);
+  insert into resultado (teste, ok) values ('alerta de estoque: atendente não escolhe quem recebe', false);
+exception when others then
+  insert into resultado (teste, ok) values ('alerta de estoque: atendente não escolhe quem recebe', sqlerrm like 'só dono e admin%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_prod uuid;
+  v_antes bigint;
+  v_alertas integer;
+begin
+  perform public.membro_definir_alerta_estoque(v_org, '00000000-0000-0000-0000-0000000000b1', true);
+  insert into public.produtos (org_id, codigo, nome, unidade, preco, estoque_minimo)
+  values (v_org, 'GRP-ALERTA', 'Grampo do alerta', 'cx', 10, 5) returning id into v_prod;
+  perform public.estoque_lancar(v_prod, 10, 'entrada');
+  select coalesce(max(id), 0) into v_antes from public.alertas;
+
+  perform public.estoque_lancar(v_prod, -4, 'ajuste', 'venda balcão');
+  insert into resultado (teste, ok) values ('alerta de estoque: saldo ainda no mínimo ou acima não avisa',
+    not exists (select 1 from public.alertas where id > v_antes and texto like '%Grampo do alerta%'));
+
+  perform public.estoque_lancar(v_prod, -2, 'ajuste', 'venda balcão');
+  insert into resultado (teste, ok) values ('alerta de estoque: ao passar para baixo do mínimo, avisa quem recebe no WhatsApp',
+    exists (select 1 from public.alertas where id > v_antes and telefone = '5541977700099'
+             and texto like '%Grampo do alerta (GRP-ALERTA)%Saldo: 4 cx · mínimo: 5%'));
+
+  select count(*) into v_alertas from public.alertas where id > v_antes and texto like '%Grampo do alerta%';
+  perform public.estoque_lancar(v_prod, -1, 'ajuste', 'venda balcão');
+  insert into resultado (teste, ok) values ('alerta de estoque: continuar abaixo do mínimo não repete o aviso',
+    (select count(*) from public.alertas where id > v_antes and texto like '%Grampo do alerta%') = v_alertas);
+
+  perform public.estoque_lancar(v_prod, 10, 'entrada');
+  perform public.estoque_lancar(v_prod, -10, 'ajuste', 'venda grande');
+  insert into resultado (teste, ok) values ('alerta de estoque: reposto e baixado de novo, avisa de novo',
+    (select count(*) from public.alertas where id > v_antes and texto like '%Grampo do alerta%') = v_alertas + 1);
+
+  -- O resumo da manhã lista o produto (roda como o cron).
+  perform set_config('teste.alerta_antes', v_antes::text, true);
+  perform set_config('teste.alerta_prod', v_prod::text, true);
+end $$;
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_antes bigint := current_setting('teste.alerta_antes')::bigint;
+  v_n integer;
+begin
+  v_n := public.estoque_resumo_diario();
+  insert into resultado (teste, ok) values ('alerta de estoque: o resumo da manhã lista o que está abaixo do mínimo',
+    v_n >= 1 and exists (select 1 from public.alertas where id > v_antes and telefone = '5541977700099'
+                          and texto like '%resumo da manhã%' and texto like '%• Grampo do alerta (GRP-ALERTA): 3 cx (mínimo 5)%'));
+  update public.membros_org set recebe_alerta_estoque = false
+   where org_id = current_setting('teste.f7')::uuid and recebe_alerta_estoque;
+  select count(*) into v_n from public.alertas where id > v_antes;
+  insert into public.estoque_movimentos (org_id, produto_id, quantidade, tipo, motivo)
+  select org_id, id, 10, 'entrada', null from public.produtos where id = current_setting('teste.alerta_prod')::uuid;
+  insert into public.estoque_movimentos (org_id, produto_id, quantidade, tipo, motivo)
+  select org_id, id, -10, 'ajuste', 'teste' from public.produtos where id = current_setting('teste.alerta_prod')::uuid;
+  insert into resultado (teste, ok) values ('alerta de estoque: ninguém marcado, ninguém avisado',
+    (select count(*) from public.alertas where id > v_antes) = v_n);
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

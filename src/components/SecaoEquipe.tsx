@@ -3,9 +3,11 @@ import { useSessao } from '../hooks/useSessao'
 import {
   alterarMembro,
   convidarMembro,
+  definirAlertaEstoque,
   definirRecebeContatos,
   linkNovaSenha,
   listarEquipeCompleta,
+  listarAlertaEstoque,
   listarRecebeContatos,
   type MembroEquipe,
   type Papel,
@@ -61,6 +63,9 @@ export function SecaoEquipe() {
   const [financeiro, setFinanceiro] = useState<Set<string>>(new Set())
   // "Recebe contatos novos" (docs/crm-acompanhamento.md, entrega 3): rodízio dos números da empresa que distribuem.
   const [recebe, setRecebe] = useState<Set<string>>(new Set())
+  // "Alerta de estoque" (06/11): quem cuida das compras recebe o aviso de produto abaixo do mínimo.
+  const comErp = !!modulos?.has('erp')
+  const [alertaEstoque, setAlertaEstoque] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let ativo = true
@@ -79,6 +84,9 @@ export function SecaoEquipe() {
     listarRecebeContatos(orgId)
       .then((s) => ativo && setRecebe(s))
       .catch(() => ativo && setRecebe(new Set()))
+    listarAlertaEstoque(orgId)
+      .then((s) => ativo && setAlertaEstoque(s))
+      .catch(() => ativo && setAlertaEstoque(new Set()))
     return () => {
       ativo = false
     }
@@ -115,6 +123,19 @@ export function SecaoEquipe() {
     setErroAcao(null)
     try {
       await definirRecebeContatos(orgId, m.user_id, !recebe.has(m.user_id))
+      recarregar()
+    } catch (e) {
+      setErroAcao((e as Error).message)
+    } finally {
+      setSalvando(null)
+    }
+  }
+
+  async function alternarAlertaEstoque(m: MembroEquipe) {
+    setSalvando(m.user_id)
+    setErroAcao(null)
+    try {
+      await definirAlertaEstoque(orgId, m.user_id, !alertaEstoque.has(m.user_id))
       recarregar()
     } catch (e) {
       setErroAcao((e as Error).message)
@@ -284,6 +305,23 @@ export function SecaoEquipe() {
                       </label>
                     ) : (
                       recebe.has(m.user_id) && <p className="mt-1 text-legenda text-texto-3">Recebe contatos novos</p>
+                    ))}
+                    {comErp && m.ativo && (gerencia ? (
+                      <label
+                        className="mt-1 ml-4 inline-flex cursor-pointer items-center gap-2 text-legenda text-texto-2"
+                        title="Recebe no celular e no WhatsApp o aviso de produto abaixo do estoque mínimo e o resumo da manhã"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={alertaEstoque.has(m.user_id)}
+                          disabled={salvando === m.user_id}
+                          onChange={() => void alternarAlertaEstoque(m)}
+                          className="size-3.5 accent-primaria"
+                        />
+                        Alerta de estoque
+                      </label>
+                    ) : (
+                      alertaEstoque.has(m.user_id) && <p className="mt-1 text-legenda text-texto-3">Alerta de estoque</p>
                     ))}
                   </div>
                   <div className="flex items-center gap-2">

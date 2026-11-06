@@ -65,7 +65,7 @@ function ListaProdutos({ orgId, gerencia }: { orgId: string; gerencia: boolean }
   const [versao, setVersao] = useState(0)
   const [busca, setBusca] = useState('')
   const [inativos, setInativos] = useState(false)
-  const [soAbaixo, setSoAbaixo] = useState(false)
+  const [soAbaixo, setSoAbaixo] = useState(() => new URLSearchParams(window.location.search).get('abaixo') === '1')
   const [soSemPreco, setSoSemPreco] = useState(false)
   const [entradaNota, setEntradaNota] = useState(false)
   const [mensagem, setMensagem] = useState<string | null>(null)

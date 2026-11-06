@@ -205,6 +205,18 @@ export async function definirRecebeContatos(orgId: string, userId: string, valor
   if (error) throw new Error('Não foi possível mudar. Só dono e admin mudam.')
 }
 
+/** Quem recebe o alerta de produto abaixo do estoque mínimo (na hora e o resumo da manhã). */
+export async function listarAlertaEstoque(orgId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.from('membros_org').select('user_id').eq('org_id', orgId).eq('recebe_alerta_estoque', true)
+  if (error) throw error
+  return new Set((data ?? []).map((m) => m.user_id))
+}
+
+export async function definirAlertaEstoque(orgId: string, userId: string, valor: boolean) {
+  const { error } = await supabase.rpc('membro_definir_alerta_estoque', { p_org: orgId, p_usuario: userId, p_valor: valor })
+  if (error) throw new Error('Não foi possível mudar. Só dono e admin mudam.')
+}
+
 /** Números fora do ar há mais de 5 min (só os que a pessoa pode ver) — para a faixa de aviso. */
 export async function numerosCaidos(orgId: string): Promise<{ id: string; nome: string }[]> {
   const { data, error } = await supabase
