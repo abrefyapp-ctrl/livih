@@ -3519,6 +3519,112 @@ export type Database = {
           },
         ]
       }
+      pedido_avisos: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          atualizado_por: string | null
+          modelo: Json | null
+          org_id: string
+          situacoes: string[]
+          textos: Json
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          modelo?: Json | null
+          org_id: string
+          situacoes?: string[]
+          textos?: Json
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          modelo?: Json | null
+          org_id?: string
+          situacoes?: string[]
+          textos?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_avisos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedido_avisos_envios: {
+        Row: {
+          conversa_id: string | null
+          criado_em: string
+          enviado: boolean
+          id: string
+          mensagem_id: string | null
+          modelo: boolean
+          org_id: string
+          pedido_id: string
+          resultado: string
+          status: string
+        }
+        Insert: {
+          conversa_id?: string | null
+          criado_em?: string
+          enviado: boolean
+          id?: string
+          mensagem_id?: string | null
+          modelo?: boolean
+          org_id: string
+          pedido_id: string
+          resultado: string
+          status: string
+        }
+        Update: {
+          conversa_id?: string | null
+          criado_em?: string
+          enviado?: boolean
+          id?: string
+          mensagem_id?: string | null
+          modelo?: boolean
+          org_id?: string
+          pedido_id?: string
+          resultado?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_avisos_envios_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_avisos_envios_mensagem_id_fkey"
+            columns: ["mensagem_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_avisos_envios_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_avisos_envios_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedido_itens: {
         Row: {
           descricao: string
@@ -5545,6 +5651,14 @@ export type Database = {
         }
         Returns: Json
       }
+      pedido_avisar: {
+        Args: { p_pedido: string; p_status: string }
+        Returns: undefined
+      }
+      pedido_avisos_salvar: {
+        Args: { p_cfg: Json; p_org: string }
+        Returns: undefined
+      }
       pedido_mudar_status: {
         Args: { p_pedido: string; p_status: string }
         Returns: undefined
@@ -5560,6 +5674,7 @@ export type Database = {
           vencimento: string
         }[]
       }
+      pedido_situacao_texto: { Args: { p_status: string }; Returns: string }
       plano_ciclo: {
         Args: {
           p_ciclo: string
