@@ -5,6 +5,7 @@ import './styles/global.css'
 import { ProvedorSessao } from './components/ProvedorSessao'
 import { RotaProtegida } from './components/RotaProtegida'
 import { Layout } from './components/Layout'
+import { RodapeF7 } from './components/RodapeF7'
 import { Login } from './pages/Login'
 import { DefinirSenha } from './pages/DefinirSenha'
 import { Conversas } from './pages/Conversas'
@@ -49,6 +50,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <ProvedorSessao>
+        <div className="flex h-full flex-col">
+        <div className="relative min-h-0 flex-1">
+        <div className="absolute inset-0 overflow-auto">
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/definir-senha" element={<DefinirSenha />} />
@@ -90,6 +94,10 @@ createRoot(document.getElementById('root')!).render(
             <Route path="*" element={<NaoEncontrada />} />
           </Route>
         </Routes>
+        </div>
+        </div>
+        <RodapeF7 />
+        </div>
       </ProvedorSessao>
     </BrowserRouter>
   </StrictMode>,
