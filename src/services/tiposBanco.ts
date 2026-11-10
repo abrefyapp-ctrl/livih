@@ -1599,6 +1599,35 @@ export type Database = {
           },
         ]
       }
+      equipes: {
+        Row: {
+          criado_em: string
+          id: string
+          nome: string
+          org_id: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          nome: string
+          org_id: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          nome?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       estoque_movimentos: {
         Row: {
           autor_id: string | null
@@ -2349,7 +2378,9 @@ export type Database = {
           ativo: boolean
           criado_em: string
           emite_nota_fiscal: boolean
+          equipe_id: string | null
           financeiro: boolean
+          gestor: boolean
           org_id: string
           papel: Database["public"]["Enums"]["papel_org"]
           recebe_alerta_estoque: boolean
@@ -2362,7 +2393,9 @@ export type Database = {
           ativo?: boolean
           criado_em?: string
           emite_nota_fiscal?: boolean
+          equipe_id?: string | null
           financeiro?: boolean
+          gestor?: boolean
           org_id: string
           papel?: Database["public"]["Enums"]["papel_org"]
           recebe_alerta_estoque?: boolean
@@ -2375,7 +2408,9 @@ export type Database = {
           ativo?: boolean
           criado_em?: string
           emite_nota_fiscal?: boolean
+          equipe_id?: string | null
           financeiro?: boolean
+          gestor?: boolean
           org_id?: string
           papel?: Database["public"]["Enums"]["papel_org"]
           recebe_alerta_estoque?: boolean
@@ -2385,6 +2420,13 @@ export type Database = {
           ve_todos_clientes?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "membros_org_equipe_fk"
+            columns: ["equipe_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "equipes"
+            referencedColumns: ["id", "org_id"]
+          },
           {
             foreignKeyName: "membros_org_org_id_fkey"
             columns: ["org_id"]
@@ -4798,6 +4840,10 @@ export type Database = {
         Args: { p_conversa: string; p_documento: string; p_nome?: string }
         Returns: Json
       }
+      agente_ligar: {
+        Args: { p_ativo: boolean; p_canal: string }
+        Returns: undefined
+      }
       agente_ligar_cliente: {
         Args: {
           p_cliente: Database["public"]["Tables"]["clientes"]["Row"]
@@ -5196,6 +5242,12 @@ export type Database = {
           user_id: string
         }[]
       }
+      equipe_que_gerencio: { Args: { p_org: string }; Returns: string }
+      equipe_remover: { Args: { p_equipe: string }; Returns: undefined }
+      equipe_salvar: {
+        Args: { p_equipe: string; p_nome: string; p_org: string }
+        Returns: string
+      }
       estoque_avisar_equipe: {
         Args: {
           p_corpo: string
@@ -5449,6 +5501,10 @@ export type Database = {
         Returns: undefined
       }
       gerar_segredo_webhook: { Args: { p_canal: string }; Returns: string }
+      gestor_ve: {
+        Args: { p_org: string; p_usuario: string }
+        Returns: boolean
+      }
       guardar_midia: {
         Args: {
           p_mensagem: string
@@ -5475,6 +5531,15 @@ export type Database = {
       }
       membro_definir_emite_nota_fiscal: {
         Args: { p_org: string; p_usuario: string; p_valor: boolean }
+        Returns: undefined
+      }
+      membro_definir_equipe: {
+        Args: {
+          p_equipe: string
+          p_gestor: boolean
+          p_org: string
+          p_usuario: string
+        }
         Returns: undefined
       }
       membro_definir_financeiro: {
@@ -5652,18 +5717,24 @@ export type Database = {
           tipo_id: string
         }[]
       }
-      painel_filtro_vendedor: {
-        Args: { p_org: string; p_vendedor: string }
-        Returns: string
+      painel_membros: {
+        Args: { p_equipe: string; p_org: string; p_vendedor: string }
+        Returns: string[]
       }
       painel_pendencias: {
-        Args: { p_canal?: string; p_org: string; p_vendedor?: string }
+        Args: {
+          p_canal?: string
+          p_equipe?: string
+          p_org: string
+          p_vendedor?: string
+        }
         Returns: Json
       }
       painel_perdas: {
         Args: {
           p_ate: string
           p_de: string
+          p_equipe?: string
           p_org: string
           p_vendedor?: string
         }
@@ -5674,8 +5745,8 @@ export type Database = {
           p_ate: string
           p_canal: string
           p_de: string
+          p_membros: string[]
           p_org: string
-          p_vendedor: string
         }
         Returns: Json
       }
@@ -5685,6 +5756,7 @@ export type Database = {
           p_ate: string
           p_canal?: string
           p_de: string
+          p_equipe?: string
           p_org: string
           p_vendedor?: string
         }
