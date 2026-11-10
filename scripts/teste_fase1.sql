@@ -6643,5 +6643,51 @@ begin
   insert into resultado (teste, ok) values ('pagamento Meta: recusa depois do "Já cadastrei" fica mais nova que a confirmação',
     (select meta_pagamento_falha_em >= meta_pagamento_ok_em from public.canais where id = v_canal));
 end $$;
+
+-- Número novo herda a configuração completa do agente da empresa (migration 20261110200000).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_cli uuid := current_setting('teste.cli')::uuid;
+  v_canal uuid;
+  v_novo public.agentes;
+begin
+  update public.agentes
+     set saudacao = 'Olá! Aqui é a loja.', horario = '{"1":["08:00","18:00"]}', mensagem_fora_horario = 'Voltamos às 8h.',
+         identificar_cliente = true, prompt = 'instruções da empresa (herança)'
+   where canal_id = (select id from public.canais where instance_id = 'INST-F7');
+
+  -- Como o whatsapp-conexao faz hoje: manda só alguns campos.
+  insert into public.canais (org_id, nome, telefone, instance_id)
+  values (v_org, 'Vendedor novo', '5541955556666', 'INST-HERDA') returning id into v_canal;
+  insert into public.agentes (org_id, canal_id, ativo, prompt) values (v_org, v_canal, false, 'qualquer coisa')
+  returning * into v_novo;
+  insert into resultado (teste, ok) values ('herança do agente: número novo nasce com saudação, horário, aviso e identificar cliente',
+    v_novo.saudacao = 'Olá! Aqui é a loja.' and v_novo.horario = '{"1":["08:00","18:00"]}'::jsonb
+    and v_novo.mensagem_fora_horario = 'Voltamos às 8h.' and v_novo.identificar_cliente
+    and v_novo.prompt = 'instruções da empresa (herança)');
+  insert into resultado (teste, ok) values ('herança do agente: número novo nasce desligado (liga/desliga continua por número)',
+    not v_novo.ativo);
+  insert into resultado (teste, ok) values ('herança do agente: todos os números da empresa ficam com a mesma configuração',
+    (select count(distinct (prompt, saudacao, horario::text, mensagem_fora_horario, identificar_cliente))
+       from public.agentes where org_id = v_org) = 1);
+
+  -- Outra empresa, primeiro número: fica com o que foi enviado, sem herdar nada da F7.
+  insert into public.canais (org_id, nome, telefone, instance_id)
+  values (v_cli, 'Cliente X', '5541955557777', 'INST-HERDA-CLI') returning id into v_canal;
+  insert into public.agentes (org_id, canal_id, ativo, prompt) values (v_cli, v_canal, false, 'prompt do cliente X')
+  returning * into v_novo;
+  insert into resultado (teste, ok) values ('herança do agente: primeiro número de outra empresa não herda da F7',
+    v_novo.prompt = 'prompt do cliente X' and v_novo.saudacao is null and not v_novo.identificar_cliente);
+
+  -- Acerto dos dados reais: nenhuma empresa com números de configuração diferente.
+  insert into resultado (teste, ok) values ('herança do agente: nenhuma empresa com números de configuração diferente',
+    not exists (select 1 from public.agentes group by org_id
+                 having count(distinct (prompt, regras_humano, telefone_alerta, modelo, saudacao, horario::text,
+                                        mensagem_fora_horario, identificar_cliente)) > 1));
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;
