@@ -6689,5 +6689,273 @@ begin
                                         mensagem_fora_horario, identificar_cliente)) > 1));
 end $$;
 
+-- Equipes e gestor (migration 20261110210000). Pessoas novas, para não depender do estado dos blocos de cima:
+-- e1 gestor e f1 vendedor da equipe "Loja Castro"; g1 vendedor da "Televendas". Cada vendedor com o seu número.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000e1', 'gestor@f7.teste', '{"nome":"Gestora Castro"}'),
+  ('00000000-0000-0000-0000-0000000000f1', 'vendedor.castro@f7.teste', '{"nome":"Vendedor Castro"}'),
+  ('00000000-0000-0000-0000-0000000000f2', 'vendedor.tele@f7.teste', '{"nome":"Vendedor Televendas"}');
+insert into public.membros_org (org_id, user_id, papel) values
+  (current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000e1', 'atendente'),
+  (current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000f1', 'atendente'),
+  (current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000f2', 'atendente');
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_f1 uuid; v_f2 uuid; v_contato uuid; r jsonb;
+begin
+  insert into public.canais (org_id, nome, telefone, instance_id, responsavel_id)
+  values (v_org, 'Vendedor Castro', '5541944440001', 'INST-EQ-F1', '00000000-0000-0000-0000-0000000000f1') returning id into v_f1;
+  insert into public.canais (org_id, nome, telefone, instance_id, responsavel_id)
+  values (v_org, 'Vendedor Televendas', '5541944440002', 'INST-EQ-F2', '00000000-0000-0000-0000-0000000000f2') returning id into v_f2;
+  insert into public.agentes (org_id, canal_id, ativo) values (v_org, v_f1, false), (v_org, v_f2, false);
+  r := public.registrar_entrada(v_f1, 'EQ-1', '5541966660001', null, 'Cliente de Castro', 'texto', 'Oi', '{}');
+  perform set_config('teste.eq_conv_f1', r ->> 'conversa_id', true);
+  r := public.registrar_entrada(v_f2, 'EQ-2', '5541966660002', null, 'Cliente do televendas', 'texto', 'Oi', '{}');
+  perform set_config('teste.eq_conv_f2', r ->> 'conversa_id', true);
+  -- Contato só na carteira do vendedor de Castro (sem conversa), com um negócio dele.
+  insert into public.contatos (org_id, telefone, nome, responsavel_id)
+  values (v_org, '5541966660003', 'Carteira de Castro', '00000000-0000-0000-0000-0000000000f1') returning id into v_contato;
+  perform set_config('teste.eq_contato_f1', v_contato::text, true);
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, responsavel_id)
+  values (v_org, v_contato, (select id from public.etapas_funil where org_id = v_org and tipo = 'aberta' order by ordem limit 1),
+          'Negócio de Castro', '00000000-0000-0000-0000-0000000000f1');
+  perform set_config('teste.eq_canal_f1', v_f1::text, true);
+  perform set_config('teste.eq_canal_f2', v_f2::text, true);
+end $$;
+
+-- Dono monta as equipes.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_castro uuid; v_tele uuid;
+begin
+  v_castro := public.equipe_salvar(v_org, null, ' Loja Castro ');
+  v_tele := public.equipe_salvar(v_org, null, 'Televendas');
+  perform public.membro_definir_equipe(v_org, '00000000-0000-0000-0000-0000000000e1', v_castro, true);
+  perform public.membro_definir_equipe(v_org, '00000000-0000-0000-0000-0000000000f1', v_castro, false);
+  perform public.membro_definir_equipe(v_org, '00000000-0000-0000-0000-0000000000f2', v_tele, false);
+  perform set_config('teste.eq_castro', v_castro::text, true);
+  perform set_config('teste.eq_tele', v_tele::text, true);
+  insert into resultado (teste, ok) values ('equipes: dono cria a equipe (nome sem espaços nas pontas)',
+    (select nome from public.equipes where id = v_castro) = 'Loja Castro');
+  begin
+    perform public.equipe_salvar(v_org, null, 'loja castro');
+    insert into resultado (teste, ok) values ('equipes: nome repetido é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('equipes: nome repetido é recusado', sqlerrm like 'Já existe uma equipe%');
+  end;
+  begin
+    perform public.membro_definir_equipe(v_org, '00000000-0000-0000-0000-0000000000f1', gen_random_uuid(), false);
+    insert into resultado (teste, ok) values ('equipes: equipe de outra empresa ou inexistente é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('equipes: equipe de outra empresa ou inexistente é recusada', sqlerrm = 'Equipe não encontrada.');
+  end;
+  -- Painel do dono filtrado por equipe: só o vendedor do televendas.
+  insert into resultado (teste, ok) values ('equipes: painel do dono filtra pela equipe',
+    (public.painel_resumo(v_org, now() - interval '7 days', now(), null, null, v_tele) ->> 'vendedor')
+      = '00000000-0000-0000-0000-0000000000f2');
+end $$;
+
+-- Atendente comum e outra empresa não mexem nas equipes.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000f1","role":"authenticated"}', true);
+do $$ begin
+  perform public.equipe_salvar(current_setting('teste.f7')::uuid, null, 'Minha equipe');
+  insert into resultado (teste, ok) values ('equipes: atendente não cria equipe', false);
+exception when others then
+  insert into resultado (teste, ok) values ('equipes: atendente não cria equipe', sqlerrm like 'Só dono e admin%');
+end $$;
+insert into resultado (teste, ok)
+select 'equipes: vendedor (não gestor) não vê a conversa do número do colega de outra equipe',
+  not exists (select 1 from public.conversas where id = current_setting('teste.eq_conv_f2')::uuid);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$ begin
+  perform public.membro_definir_equipe(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000f1', null, false);
+  insert into resultado (teste, ok) values ('equipes: outra empresa não mexe', false);
+exception when others then
+  insert into resultado (teste, ok) values ('equipes: outra empresa não mexe', sqlerrm like 'Só dono e admin%');
+end $$;
+
+-- O gestor.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000e1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'gestor: vê a conversa do número do vendedor da equipe',
+  exists (select 1 from public.conversas where id = current_setting('teste.eq_conv_f1')::uuid)
+  and exists (select 1 from public.mensagens where conversa_id = current_setting('teste.eq_conv_f1')::uuid);
+insert into resultado (teste, ok)
+select 'gestor: não vê a conversa do número de outra equipe',
+  not exists (select 1 from public.conversas where id = current_setting('teste.eq_conv_f2')::uuid);
+insert into resultado (teste, ok)
+select 'gestor: vê o contato e o negócio da carteira do vendedor da equipe',
+  exists (select 1 from public.contatos where id = current_setting('teste.eq_contato_f1')::uuid)
+  and exists (select 1 from public.oportunidades where contato_id = current_setting('teste.eq_contato_f1')::uuid);
+do $$ begin
+  perform public.enviar_mensagem(current_setting('teste.eq_conv_f1')::uuid, 'Oi, aqui é a gestora');
+  insert into resultado (teste, ok) values ('gestor: responde na conversa do vendedor da equipe', true);
+exception when others then
+  insert into resultado (teste, ok) values ('gestor: responde na conversa do vendedor da equipe', false);
+end $$;
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_res jsonb;
+begin
+  perform public.agente_ligar(current_setting('teste.eq_canal_f1')::uuid, true);
+  insert into resultado (teste, ok) values ('gestor: liga o agente do número do vendedor da equipe',
+    (select ativo from public.agentes where canal_id = current_setting('teste.eq_canal_f1')::uuid));
+  begin
+    perform public.agente_ligar(current_setting('teste.eq_canal_f2')::uuid, true);
+    insert into resultado (teste, ok) values ('gestor: não liga o agente de outra equipe', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('gestor: não liga o agente de outra equipe', sqlerrm like 'Só dono, admin ou o gestor%');
+  end;
+  begin
+    perform public.agente_ligar((select id from public.canais where instance_id = 'INST-F7'), false);
+    insert into resultado (teste, ok) values ('gestor: não liga nem desliga o número da empresa', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('gestor: não liga nem desliga o número da empresa', sqlerrm like 'Só dono, admin ou o gestor%');
+  end;
+  begin
+    perform public.equipe_salvar(v_org, current_setting('teste.eq_castro')::uuid, 'Castro renomeada');
+    insert into resultado (teste, ok) values ('gestor: não mexe nas equipes', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('gestor: não mexe nas equipes', sqlerrm like 'Só dono e admin%');
+  end;
+  v_res := public.painel_resumo(v_org, now() - interval '7 days', now());
+  insert into resultado (teste, ok) values ('gestor: o painel abre na equipe dele, com os vendedores dela',
+    v_res ->> 'equipe_gestor' = current_setting('teste.eq_castro')
+    and (v_res -> 'atual' -> 'vendedores') @> '[{"user_id":"00000000-0000-0000-0000-0000000000f1"}]'
+    and not (v_res -> 'atual' -> 'vendedores') @> '[{"user_id":"00000000-0000-0000-0000-0000000000f2"}]');
+  v_res := public.painel_resumo(v_org, now() - interval '7 days', now(), null, '00000000-0000-0000-0000-0000000000f2');
+  insert into resultado (teste, ok) values ('gestor: filtrar vendedor de outra equipe volta para a equipe dele',
+    v_res ->> 'vendedor' is null and (v_res -> 'atual' -> 'vendedores') @> '[{"user_id":"00000000-0000-0000-0000-0000000000f1"}]');
+  v_res := public.painel_resumo(v_org, now() - interval '7 days', now(), null, null, current_setting('teste.eq_tele')::uuid);
+  insert into resultado (teste, ok) values ('gestor: não abre o painel de outra equipe',
+    not (v_res -> 'atual' -> 'vendedores') @> '[{"user_id":"00000000-0000-0000-0000-0000000000f2"}]');
+end $$;
+
+-- Pontos da revisão (revisor-banco, 10/11).
+reset role;
+insert into public.tarefas (org_id, titulo, vence_em, responsavel_id, criado_por)
+values (current_setting('teste.f7')::uuid, 'Tarefa que o vendedor de Castro passou ao televendas', now() + interval '1 day',
+        '00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000f1');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000e1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'gestor: vê a tarefa criada por alguém da equipe',
+  exists (select 1 from public.tarefas where titulo = 'Tarefa que o vendedor de Castro passou ao televendas');
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  perform public.agente_ligar(current_setting('teste.eq_canal_f2')::uuid, true);
+  perform public.agente_ligar(current_setting('teste.eq_canal_f2')::uuid, false);
+  insert into resultado (teste, ok) values ('equipes: dono liga e desliga o agente pela função nova',
+    not (select ativo from public.agentes where canal_id = current_setting('teste.eq_canal_f2')::uuid));
+  -- O dono numa equipe (pode, para o rodízio por equipe) não fica sob o gestor dela.
+  perform public.membro_definir_equipe(v_org, '00000000-0000-0000-0000-0000000000a1', current_setting('teste.eq_castro')::uuid, false);
+  -- Um segundo gestor, no televendas.
+  perform public.membro_definir_equipe(v_org, '00000000-0000-0000-0000-0000000000f2', current_setting('teste.eq_tele')::uuid, true);
+  insert into resultado (teste, ok) values ('equipes: perdas do Painel filtram por equipe',
+    jsonb_typeof(public.painel_perdas(v_org, now() - interval '30 days', now(), null, current_setting('teste.eq_tele')::uuid)) = 'array');
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000e1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'gestor: não enxerga dono ou admin que está na equipe',
+  not public.gestor_ve(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000a1')
+  and public.gestor_ve(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000f1');
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000f2","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'gestor de outra equipe não vê a conversa de Castro',
+  not exists (select 1 from public.conversas where id = current_setting('teste.eq_conv_f1')::uuid)
+  and exists (select 1 from public.conversas where id = current_setting('teste.eq_conv_f2')::uuid);
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000f1","role":"authenticated"}', true);
+do $$ begin
+  perform public.agente_ligar(current_setting('teste.eq_canal_f1')::uuid, false);
+  insert into resultado (teste, ok) values ('equipes: vendedor (não gestor) não liga o agente nem do próprio número', false);
+exception when others then
+  insert into resultado (teste, ok) values ('equipes: vendedor (não gestor) não liga o agente nem do próprio número',
+    sqlerrm like 'Só dono, admin ou o gestor%');
+end $$;
+do $$ begin
+  perform public.equipe_remover(current_setting('teste.eq_castro')::uuid);
+  insert into resultado (teste, ok) values ('equipes: atendente não remove equipe', false);
+exception when others then
+  insert into resultado (teste, ok) values ('equipes: atendente não remove equipe', sqlerrm like 'Só dono e admin%');
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$ begin
+  perform public.agente_ligar(current_setting('teste.eq_canal_f1')::uuid, true);
+  insert into resultado (teste, ok) values ('equipes: outra empresa não liga o agente', false);
+exception when others then
+  insert into resultado (teste, ok) values ('equipes: outra empresa não liga o agente', sqlerrm like 'Só dono, admin ou o gestor%');
+end $$;
+do $$ begin
+  perform public.painel_pendencias(current_setting('teste.f7')::uuid, null, null, current_setting('teste.eq_castro')::uuid);
+  insert into resultado (teste, ok) values ('equipes: outra empresa não abre o Painel da equipe', false);
+exception when others then
+  insert into resultado (teste, ok) values ('equipes: outra empresa não abre o Painel da equipe', sqlerrm = 'sem acesso');
+end $$;
+
+-- Empresa suspensa: o gestor também não liga o agente.
+reset role;
+update public.organizacoes set status = 'suspensa' where id = current_setting('teste.f7')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000e1","role":"authenticated"}', true);
+do $$ begin
+  perform public.agente_ligar(current_setting('teste.eq_canal_f1')::uuid, false);
+  insert into resultado (teste, ok) values ('gestor: com a empresa suspensa, não liga o agente', false);
+exception when others then
+  insert into resultado (teste, ok) values ('gestor: com a empresa suspensa, não liga o agente', sqlerrm like 'Só dono, admin ou o gestor%');
+end $$;
+reset role;
+update public.organizacoes set status = 'ativa' where id = current_setting('teste.f7')::uuid;
+
+-- Vendedor que saiu (desativado) continua visível para o gestor; gestor desativado deixa de ver.
+reset role;
+update public.membros_org set ativo = false
+ where org_id = current_setting('teste.f7')::uuid and user_id = '00000000-0000-0000-0000-0000000000f1';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000e1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'gestor: continua vendo as conversas do vendedor que saiu',
+  exists (select 1 from public.conversas where id = current_setting('teste.eq_conv_f1')::uuid);
+reset role;
+update public.membros_org set ativo = false
+ where org_id = current_setting('teste.f7')::uuid and user_id = '00000000-0000-0000-0000-0000000000e1';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000e1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'gestor desativado não vê mais as conversas da equipe',
+  not exists (select 1 from public.conversas where id = current_setting('teste.eq_conv_f1')::uuid);
+reset role;
+update public.membros_org set ativo = true
+ where org_id = current_setting('teste.f7')::uuid and user_id in ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000f1');
+
+-- Remover a equipe tira as pessoas e o gestor deixa de ver.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+select public.equipe_remover(current_setting('teste.eq_castro')::uuid);
+insert into resultado (teste, ok)
+select 'equipes: remover a equipe tira as pessoas e a marcação de gestor',
+  not exists (select 1 from public.membros_org
+               where org_id = current_setting('teste.f7')::uuid
+                 and user_id in ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000f1')
+                 and (equipe_id is not null or gestor));
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000e1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'equipes: sem equipe, a ex-gestora não vê mais a conversa do vendedor',
+  not exists (select 1 from public.conversas where id = current_setting('teste.eq_conv_f1')::uuid);
+
 reset role;
 select n, teste, ok from resultado order by n;

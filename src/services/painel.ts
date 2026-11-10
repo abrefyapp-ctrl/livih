@@ -33,7 +33,15 @@ export type Periodo = {
     | null
 }
 export type ConfigPainel = { minutos_por_resposta: number; antes_tempo_resposta_min: number | null; piloto_inicio: string | null }
-export type Resumo = { atual: Periodo; anterior: Periodo; gerencia: boolean; vendedor: string | null; config: ConfigPainel | null }
+export type Resumo = {
+  atual: Periodo
+  anterior: Periodo
+  gerencia: boolean
+  /** Equipe que a pessoa gerencia (gestor de equipe, migration 20261110210000); nulo para os outros. */
+  equipe_gestor: string | null
+  vendedor: string | null
+  config: ConfigPainel | null
+}
 export type Pendencias = {
   sem_resposta: { conversa_id: string; contato: string | null; numero: string; desde: string }[]
   sem_retorno: { oportunidade_id: string; titulo: string; contato_id: string; contato: string | null; etapa: string; ultimo_contato: string | null }[]
@@ -58,23 +66,28 @@ export async function listarNumerosAtivos(orgId: string): Promise<{ id: string; 
   return data ?? []
 }
 
-export async function buscarResumo(orgId: string, de: Date, ate: Date, canal: string | null, vendedor: string | null): Promise<Resumo> {
+/** Filtros do Painel: número, vendedor e equipe (o banco limita ao que a pessoa pode ver). */
+export type FiltroPainel = { canal: string | null; vendedor: string | null; equipe: string | null }
+
+export async function buscarResumo(orgId: string, de: Date, ate: Date, f: FiltroPainel): Promise<Resumo> {
   const { data, error } = await supabase.rpc('painel_resumo', {
     p_org: orgId,
     p_de: de.toISOString(),
     p_ate: ate.toISOString(),
-    p_canal: canal ?? undefined,
-    p_vendedor: vendedor ?? undefined,
+    p_canal: f.canal ?? undefined,
+    p_vendedor: f.vendedor ?? undefined,
+    p_equipe: f.equipe ?? undefined,
   })
   if (error) throw error
   return data as unknown as Resumo
 }
 
-export async function buscarPendencias(orgId: string, canal: string | null, vendedor: string | null): Promise<Pendencias> {
+export async function buscarPendencias(orgId: string, f: FiltroPainel): Promise<Pendencias> {
   const { data, error } = await supabase.rpc('painel_pendencias', {
     p_org: orgId,
-    p_canal: canal ?? undefined,
-    p_vendedor: vendedor ?? undefined,
+    p_canal: f.canal ?? undefined,
+    p_vendedor: f.vendedor ?? undefined,
+    p_equipe: f.equipe ?? undefined,
   })
   if (error) throw error
   return data as unknown as Pendencias

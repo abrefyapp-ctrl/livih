@@ -16,7 +16,9 @@ import { quandoCurto } from '../services/formato'
 import { definirVeTodosClientes, listarVeTodosClientes } from '../services/clientes'
 import { definirEmiteNotaFiscal, listarEmiteNotaFiscal } from '../services/nfe'
 import { definirFinanceiro, listarFinanceiro } from '../services/financeiro'
+import { definirEquipeDaPessoa, listarEquipes, listarLugares, type Equipe, type LugarNaEquipe } from '../services/equipes'
 import { Avatar } from './Avatar'
+import { EquipesDeVenda } from './EquipesDeVenda'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
@@ -66,9 +68,18 @@ export function SecaoEquipe() {
   // "Alerta de estoque" (06/11): quem cuida das compras recebe o aviso de produto abaixo do mínimo.
   const comErp = !!modulos?.has('erp')
   const [alertaEstoque, setAlertaEstoque] = useState<Set<string>>(new Set())
+  // Equipes de venda e gestor (docs/equipes-origem-prospeccao.md, entrega 1).
+  const [equipes, setEquipes] = useState<Equipe[]>([])
+  const [lugares, setLugares] = useState<Map<string, LugarNaEquipe>>(new Map())
 
   useEffect(() => {
     let ativo = true
+    listarEquipes(orgId)
+      .then((l) => ativo && setEquipes(l))
+      .catch(() => ativo && setEquipes([]))
+    listarLugares(orgId)
+      .then((l) => ativo && setLugares(l))
+      .catch(() => ativo && setLugares(new Map()))
     listarEquipeCompleta(orgId)
       .then((lista) => ativo && (setEquipe({ orgId, lista }), setErro(null)))
       .catch(() => ativo && setErro('Não foi possível carregar a equipe.'))
@@ -144,6 +155,19 @@ export function SecaoEquipe() {
     }
   }
 
+  async function mudarEquipe(m: MembroEquipe, equipeId: string | null, gestor: boolean) {
+    setSalvando(m.user_id)
+    setErroAcao(null)
+    try {
+      await definirEquipeDaPessoa(orgId, m.user_id, equipeId, gestor)
+      recarregar()
+    } catch (e) {
+      setErroAcao((e as Error).message)
+    } finally {
+      setSalvando(null)
+    }
+  }
+
   async function alternarVeTodos(m: MembroEquipe) {
     setSalvando(m.user_id)
     setErroAcao(null)
@@ -159,6 +183,54 @@ export function SecaoEquipe() {
 
   const lista = equipe?.orgId === orgId ? equipe.lista : null
   const recarregar = () => setVersao((v) => v + 1)
+
+  // Equipe e gestor de cada pessoa: dono e admin escolhem; os outros só veem. Gestor só faz sentido para atendente
+  // (dono e admin já veem tudo).
+  function lugarDaPessoa(m: MembroEquipe) {
+    const lugar = lugares.get(m.user_id)
+    const equipeId = lugar?.equipe_id ?? null
+    const nomeEquipe = equipes.find((e) => e.id === equipeId)?.nome
+    if (!gerencia) {
+      return nomeEquipe ? (
+        <p className="mt-1 text-legenda text-texto-3">
+          {nomeEquipe}
+          {lugar?.gestor && ' · gestor da equipe'}
+        </p>
+      ) : null
+    }
+    return (
+      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-legenda text-texto-2">
+        <label className="inline-flex items-center gap-2">
+          Equipe
+          <select
+            value={equipeId ?? ''}
+            disabled={salvando === m.user_id}
+            onChange={(e) => void mudarEquipe(m, e.target.value || null, !!e.target.value && !!lugar?.gestor)}
+            className="h-7 rounded-md border border-borda bg-superficie px-2 text-legenda disabled:opacity-60"
+          >
+            <option value="">Sem equipe</option>
+            {equipes.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        {m.papel === 'atendente' && equipeId && (
+          <label className="inline-flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={!!lugar?.gestor}
+              disabled={salvando === m.user_id}
+              onChange={(e) => void mudarEquipe(m, equipeId, e.target.checked)}
+              className="size-3.5 accent-primaria"
+            />
+            Gestor da equipe
+          </label>
+        )}
+      </div>
+    )
+  }
 
   // Convite pendente → link novo de convite; já tem senha (esqueceu) → link para criar senha nova.
   async function gerarNovoLink(m: MembroEquipe) {
@@ -306,6 +378,7 @@ export function SecaoEquipe() {
                     ) : (
                       recebe.has(m.user_id) && <p className="mt-1 text-legenda text-texto-3">Recebe contatos novos</p>
                     ))}
+                    {equipes.length > 0 && lugarDaPessoa(m)}
                     {comErp && m.ativo && (gerencia ? (
                       <label
                         className="mt-1 ml-4 inline-flex cursor-pointer items-center gap-2 text-legenda text-texto-2"
@@ -367,6 +440,8 @@ export function SecaoEquipe() {
           </ul>
         )}
       </div>
+
+      <EquipesDeVenda orgId={orgId} gerencia={gerencia} equipes={equipes} lugares={lugares} aoMudar={recarregar} />
 
       <dl className="grid gap-2 text-pequeno text-texto-3 sm:grid-cols-3">
         {(Object.keys(PAPEIS) as Papel[]).map((p) => (

@@ -22,6 +22,7 @@ import {
   type NumeroWhatsapp,
   type PagamentoMetaCanal,
 } from '../services/configuracoes'
+import { equipeQueGerencia, listarLugares, type LugarNaEquipe } from '../services/equipes'
 import { formatarTelefone, haQuanto, quandoCurto } from '../services/formato'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
@@ -159,16 +160,23 @@ export function SecaoWhatsapp() {
     }
   }, [orgId, versao])
 
+  // A equipe (nomes) e as equipes de venda: o gestor de equipe também liga e desliga o agente dos números dos
+  // vendedores dela (migration 20261110210000).
+  const [lugares, setLugares] = useState<Map<string, LugarNaEquipe>>(new Map())
   useEffect(() => {
-    if (!gerencia) return
     let ativo = true
     listarEquipeCompleta(orgId)
       .then((e) => ativo && setEquipe(e.filter((m) => m.ativo)))
       .catch(() => undefined)
+    listarLugares(orgId)
+      .then((l) => ativo && setLugares(l))
+      .catch(() => undefined)
     return () => {
       ativo = false
     }
-  }, [orgId, gerencia])
+  }, [orgId])
+  const minhaEquipe = gerencia ? new Set<string>() : equipeQueGerencia(lugares, eu)
+  const podeLigarAgente = (n: NumeroWhatsapp) => gerencia || (!!n.responsavel_id && minhaEquipe.has(n.responsavel_id))
 
   // Distribuição dos contatos novos (docs/crm-acompanhamento.md, entrega 3): só nos números da empresa.
   const [distribuicao, setDistribuicao] = useState<{ orgId: string; numeros: Set<string>; recebem: number } | null>(null)
@@ -303,7 +311,9 @@ export function SecaoWhatsapp() {
                   <div className="min-w-0 flex-1 space-y-1">
                     <p className="font-medium">{n.nome}</p>
                     <p className="text-legenda text-texto-3">
-                      {n.responsavel_id ? `Número de ${nomeDe(n.responsavel_id)} · só ele(a), dono e admin veem as conversas` : 'Número da empresa · toda a equipe vê'}
+                      {n.responsavel_id
+                        ? `Número de ${nomeDe(n.responsavel_id)} · só ele(a), ${lugares.get(n.responsavel_id)?.equipe_id ? 'o gestor da equipe, ' : ''}dono e admin veem as conversas`
+                        : 'Número da empresa · toda a equipe vê'}
                       {n.tipo === 'meta' && (n.meta_coexistencia ? ' · API oficial, também no app do celular' : ' · API oficial')}
                     </p>
                     <Situacao n={n} />
@@ -315,7 +325,7 @@ export function SecaoWhatsapp() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {gerencia ? (
+                    {podeLigarAgente(n) ? (
                       <label className="flex cursor-pointer items-center gap-2 text-pequeno text-texto-2" title="Agente de IA neste número">
                         <span className="relative inline-flex items-center">
                           <input

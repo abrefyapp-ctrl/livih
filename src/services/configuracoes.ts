@@ -167,9 +167,12 @@ export async function editarNumero(canalId: string, campos: { nome: string; resp
   if (error) throw new Error('Não foi possível salvar o número. Tente de novo.')
 }
 
-/** Liga ou desliga o agente só neste número (as instruções são as mesmas da empresa). */
+/**
+ * Liga ou desliga o agente só neste número (as instruções são as mesmas da empresa). Pela função do banco porque o
+ * gestor da equipe também liga e desliga os números dos vendedores dela (migration 20261110210000).
+ */
 export async function ligarAgenteNoNumero(canalId: string, ativo: boolean) {
-  const { error } = await supabase.from('agentes').update({ ativo }).eq('canal_id', canalId)
+  const { error } = await supabase.rpc('agente_ligar', { p_canal: canalId, p_ativo: ativo })
   if (error) throw new Error('Não foi possível mudar o agente deste número. Tente de novo.')
 }
 

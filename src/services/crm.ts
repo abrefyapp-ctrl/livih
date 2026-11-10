@@ -155,12 +155,19 @@ export async function salvarMotivosPerda(orgId: string, motivos: { id?: string; 
 
 export type PerdaPorMotivo = { motivo: string; quantidade: number; valor: number }
 
-export async function perdasPorMotivo(orgId: string, de: Date, ate: Date, vendedor: string | null): Promise<PerdaPorMotivo[]> {
+export async function perdasPorMotivo(
+  orgId: string,
+  de: Date,
+  ate: Date,
+  vendedor: string | null,
+  equipe: string | null = null,
+): Promise<PerdaPorMotivo[]> {
   const { data, error } = await supabase.rpc('painel_perdas', {
     p_org: orgId,
     p_de: de.toISOString(),
     p_ate: ate.toISOString(),
     p_vendedor: vendedor as string,
+    p_equipe: equipe as string,
   })
   if (error) throw error
   return (data ?? []) as PerdaPorMotivo[]

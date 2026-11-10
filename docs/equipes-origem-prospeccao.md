@@ -45,6 +45,32 @@ Pedido: "o gerente ver só a equipe dele". Já estava no [levantamento](levantam
 - Tela: Configurações → Equipe, com as equipes, quem é de qual e o gestor de cada uma.
 - Tamanho: médio (mexe na RLS de várias tabelas; muito teste de "quem vê o quê").
 
+**Construída em 10/11** (com o Painel por equipe, decisão do usuário): migration `20261110210000_equipes_gestor.sql`.
+- Gestor é **marcação no membro** (`membros_org.gestor`, com `equipe_id`), não papel novo: para a tela ele continua
+  atendente, então não mexe em configuração nem cobrança sem precisar mudar as ~50 conferências de papel do front.
+  (Valor novo no enum `papel_org` também não pode ser usado na mesma transação em que é criado, o que quebraria a
+  bateria de testes.)
+- Regra única `gestor_ve(org, pessoa)` nas 7 funções de "quem vê" e nas policies do funil. O vendedor desativado
+  continua na equipe: o gestor segue vendo o histórico de quem saiu. Gestor desativado deixa de ver.
+- `agente_ligar(canal, ativo)`: dono, admin ou o gestor da equipe do vendedor dono do número (o número da empresa,
+  só dono e admin). A tela de WhatsApp usa esta função para todos.
+- Painel: `painel_membros(org, vendedor, equipe)` devolve o conjunto de pessoas (nulo = empresa toda) e substitui o
+  `painel_filtro_vendedor`; `painel_resumo`, `painel_pendencias` e `painel_perdas` ganharam `p_equipe`. O gestor abre
+  já na equipe dele (`equipe_gestor` no resumo) e só filtra vendedores dela.
+- Telas: Configurações → Equipe ([EquipesDeVenda.tsx](../src/components/EquipesDeVenda.tsx): criar, renomear e remover
+  equipes; em cada pessoa, a equipe e "Gestor da equipe"), WhatsApp (o gestor liga/desliga o agente dos números da
+  equipe; o texto do número diz que o gestor vê) e Painel (filtro "Equipe" para dono e admin; "Vendedor" para o
+  gestor, só com a equipe dele).
+- 32 testes (equipes, recusas, gestor vê/não vê, responde, liga o agente, painel, vendedor que saiu, gestor
+  desativado, remover a equipe e os pontos da revisão do `revisor-banco`: o gestor só "enxerga" os atendentes da
+  equipe, para dono e admin poderem estar numa equipe sem ficar sob o gestor; `agente_ligar` exige empresa ativa;
+  tarefa criada por alguém da equipe; a lista "sem resposta" do Painel só traz conversa que a pessoa consegue abrir).
+- Desempenho a medir com a CEFEQ ligada: `gestor_ve` roda por linha nas listas de contatos e do funil do atendente.
+  Se pesar, trocar por uma lista calculada uma vez por consulta.
+- Fica para depois: aviso no celular para o gestor quando uma conversa da equipe espera atendimento; filtros "Minhas /
+  Toda a equipe" das telas de Tarefas e Conversas pensados para o gestor (hoje ele já vê as linhas da equipe, pela
+  regra do banco).
+
 ### 2. Direcionar por equipe e por cidade
 
 Pedido: "cliente de Castro ou Piraí vai para a loja de Castro"; os contatos do site vão para o televendas.

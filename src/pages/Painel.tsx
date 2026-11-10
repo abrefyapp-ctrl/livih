@@ -8,6 +8,7 @@ import { ModalRelatorioPiloto } from '../components/ModalRelatorioPiloto'
 import { useEquipe } from '../hooks/useEquipe'
 import { useSessao } from '../hooks/useSessao'
 import { perdasPorMotivo, type PerdaPorMotivo } from '../services/crm'
+import { equipeQueGerencia, listarEquipes, listarLugares, type Equipe, type LugarNaEquipe } from '../services/equipes'
 import { moeda } from '../services/formato'
 import {
   buscarPendencias,
@@ -36,16 +37,20 @@ const desde = (iso: string | null) => {
 
 /**
  * Painel: os números da operação no período, comparados com o período anterior (docs/painel-relatorio-piloto.md).
- * Dono/admin veem a empresa e filtram por número e vendedor; atendente vê a própria carteira.
+ * Dono/admin veem a empresa e filtram por número, equipe e vendedor; o gestor de equipe vê a equipe dele e filtra os
+ * vendedores dela; atendente vê a própria carteira.
  */
 export function Painel() {
-  const { orgAtiva, modulos } = useSessao()
+  const { orgAtiva, modulos, sessao } = useSessao()
   const orgId = orgAtiva!.id
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
-  const equipe = useEquipe(orgId)
+  const pessoas = useEquipe(orgId)
   const [dias, setDias] = useState(7)
   const [canal, setCanal] = useState('')
   const [vendedor, setVendedor] = useState('')
+  const [equipeFiltro, setEquipeFiltro] = useState('')
+  const [equipes, setEquipes] = useState<Equipe[]>([])
+  const [lugares, setLugares] = useState<Map<string, LugarNaEquipe>>(new Map())
   const [numeros, setNumeros] = useState<{ id: string; nome: string }[]>([])
   const [dados, setDados] = useState<{ chave: string; resumo: Resumo; pendencias: Pendencias; perdas: PerdaPorMotivo[] } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -57,28 +62,45 @@ export function Painel() {
     listarNumerosAtivos(orgId)
       .then((lista) => ativo && setNumeros(lista))
       .catch(() => undefined)
+    // Equipes (migration 20261110210000); sem elas, o Painel funciona como antes.
+    listarEquipes(orgId)
+      .then((lista) => ativo && setEquipes(lista))
+      .catch(() => undefined)
+    listarLugares(orgId)
+      .then((mapa) => ativo && setLugares(mapa))
+      .catch(() => undefined)
     return () => {
       ativo = false
     }
   }, [orgId])
 
-  const chave = `${orgId}|${dias}|${canal}|${vendedor}|${versao}`
+  // Gestor de equipe: o banco já limita os números à equipe dele; aqui só a lista de vendedores para filtrar.
+  const minhaEquipe = gerencia ? new Set<string>() : equipeQueGerencia(lugares, sessao?.user.id)
+  const gestor = minhaEquipe.size > 0
+  const vendedoresDoFiltro = gerencia
+    ? equipeFiltro
+      ? pessoas.filter((m) => lugares.get(m.user_id)?.equipe_id === equipeFiltro)
+      : pessoas
+    : pessoas.filter((m) => minhaEquipe.has(m.user_id))
+
+  const chave = `${orgId}|${dias}|${canal}|${vendedor}|${equipeFiltro}|${versao}`
   useEffect(() => {
     let ativo = true
     const ate = new Date()
     const de = new Date(ate.getTime() - dias * 864e5)
+    const filtro = { canal: canal || null, vendedor: vendedor || null, equipe: equipeFiltro || null }
     Promise.all([
-      buscarResumo(orgId, de, ate, canal || null, vendedor || null),
-      buscarPendencias(orgId, canal || null, vendedor || null),
+      buscarResumo(orgId, de, ate, filtro),
+      buscarPendencias(orgId, filtro),
       // Perdas por motivo (migration 20261105170000); se falhar, o resto do Painel aparece igual.
-      perdasPorMotivo(orgId, de, ate, vendedor || null).catch(() => []),
+      perdasPorMotivo(orgId, de, ate, filtro.vendedor, filtro.equipe).catch(() => []),
     ])
       .then(([resumo, pendencias, perdas]) => ativo && (setDados({ chave, resumo, pendencias, perdas }), setErro(null)))
       .catch(() => ativo && setErro('Não foi possível carregar o painel.'))
     return () => {
       ativo = false
     }
-  }, [orgId, dias, canal, vendedor, chave])
+  }, [orgId, dias, canal, vendedor, equipeFiltro, chave])
 
   const atual = dados?.chave === chave ? dados : null
   const r = atual?.resumo
@@ -93,7 +115,11 @@ export function Painel() {
           <div>
             <h1 className="text-h1 font-semibold">Painel</h1>
             <p className="text-pequeno text-texto-3">
-              {gerencia ? 'Atendimento, leads e negociações da empresa.' : 'O seu atendimento, os seus leads e as suas negociações.'}{' '}
+              {gerencia
+                ? 'Atendimento, leads e negociações da empresa.'
+                : gestor
+                  ? 'Atendimento, leads e negociações da sua equipe.'
+                  : 'O seu atendimento, os seus leads e as suas negociações.'}{' '}
               Comparado com o período anterior.
             </p>
           </div>
@@ -110,9 +136,14 @@ export function Painel() {
           {numeros.length > 1 && (
             <Seletor rotulo="Número" valor={canal} aoMudar={setCanal} opcoes={[['', 'Todos os números'], ...numeros.map((n) => [n.id, n.nome] as [string, string])]} />
           )}
-          {gerencia && equipe.length > 1 && (
+          {gerencia && equipes.length > 0 && (
+            <Seletor rotulo="Equipe" valor={equipeFiltro} aoMudar={(v) => (setEquipeFiltro(v), setVendedor(''))}
+              opcoes={[['', 'Todas as equipes'], ...equipes.map((e) => [e.id, e.nome] as [string, string])]} />
+          )}
+          {(gerencia || gestor) && vendedoresDoFiltro.length > 1 && (
             <Seletor rotulo="Vendedor" valor={vendedor} aoMudar={setVendedor}
-              opcoes={[['', 'Toda a equipe'], ...equipe.map((m) => [m.user_id, m.nome || m.email] as [string, string])]} />
+              opcoes={[['', gerencia && !equipeFiltro ? 'Toda a empresa' : 'Toda a equipe'],
+                ...vendedoresDoFiltro.map((m) => [m.user_id, m.nome || m.email] as [string, string])]} />
           )}
         </div>
 
