@@ -622,6 +622,8 @@ export type Database = {
           id: string
           instance_id: string | null
           meta_coexistencia: boolean
+          meta_pagamento_falha_em: string | null
+          meta_pagamento_ok_em: string | null
           meta_sync_pedido_em: string | null
           meta_token_expira_em: string | null
           meta_waba_id: string | null
@@ -648,6 +650,8 @@ export type Database = {
           id?: string
           instance_id?: string | null
           meta_coexistencia?: boolean
+          meta_pagamento_falha_em?: string | null
+          meta_pagamento_ok_em?: string | null
           meta_sync_pedido_em?: string | null
           meta_token_expira_em?: string | null
           meta_waba_id?: string | null
@@ -674,6 +678,8 @@ export type Database = {
           id?: string
           instance_id?: string | null
           meta_coexistencia?: boolean
+          meta_pagamento_falha_em?: string | null
+          meta_pagamento_ok_em?: string | null
           meta_sync_pedido_em?: string | null
           meta_token_expira_em?: string | null
           meta_waba_id?: string | null
@@ -4984,8 +4990,16 @@ export type Database = {
         Args: { p_canal: string; p_numero?: string; p_status: string }
         Returns: undefined
       }
+      canal_confirmar_pagamento_meta: {
+        Args: { p_canal: string }
+        Returns: undefined
+      }
       canal_definir_distribuicao: {
         Args: { p_canal: string; p_valor: boolean }
+        Returns: undefined
+      }
+      canal_falha_pagamento_meta: {
+        Args: { p_canal: string }
         Returns: undefined
       }
       canal_por_numero_meta: {
