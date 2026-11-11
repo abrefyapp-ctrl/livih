@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import {
   buscarCep,
   buscarCnpj,
+  buscarInscricaoEstadual,
   documentoValido,
   formatarCep,
   formatarDocumento,
@@ -114,7 +115,21 @@ export function ModalCliente({
     setBuscando(tipo)
     setAvisoBusca(null)
     try {
-      preencher(tipo === 'cnpj' ? await buscarCnpj(docDigitos) : await buscarCep(c.cep))
+      if (tipo === 'cep') return preencher(await buscarCep(c.cep))
+      const d = await buscarCnpj(docDigitos)
+      preencher(d)
+      // A Receita não traz a inscrição estadual: vem do Sintegra pela NFe.io (JoGrampo, 11/11). Só com a IE vazia,
+      // porque cada consulta é paga.
+      const uf = c.uf.trim() || d.uf
+      if (c.tipo === 'pj' && !c.inscricao_estadual.trim() && orgAtiva && uf) {
+        try {
+          const ie = await buscarInscricaoEstadual(orgAtiva.id, docDigitos, uf)
+          if (ie) preencher({ inscricao_estadual: ie })
+          else setAvisoBusca(`Nenhuma inscrição estadual ativa em ${uf.toUpperCase()} para este CNPJ. Se o cliente é isento, escreva ISENTO.`)
+        } catch (e) {
+          setAvisoBusca((e as Error).message)
+        }
+      }
     } catch (e) {
       setAvisoBusca((e as Error).message)
     } finally {

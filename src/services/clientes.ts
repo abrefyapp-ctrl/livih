@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from './supabaseClient'
 import type { Database, Json } from './tiposBanco'
 import type { LinhaCliente } from './planilhaClientes'
@@ -294,7 +295,7 @@ export async function definirVeTodosClientes(orgId: string, userId: string, valo
 
 // ---- BrasilAPI (gratuita, sem chave, direto do navegador) ----
 
-export type DadosBusca = Partial<Pick<Cliente, 'nome' | 'razao_social' | 'cep' | 'logradouro' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'uf' | 'email' | 'telefone'>>
+export type DadosBusca = Partial<Pick<Cliente, 'nome' | 'razao_social' | 'cep' | 'logradouro' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'uf' | 'email' | 'telefone' | 'inscricao_estadual'>>
 
 const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
 /** "RUA DAS FLORES" → "Rua das Flores" (a Receita devolve tudo em maiúsculas). */
@@ -321,6 +322,19 @@ export async function buscarCnpj(cnpj: string): Promise<DadosBusca> {
     email: texto(d.email)?.toLowerCase(),
     telefone: texto(d.ddd_telefone_1),
   }
+}
+
+/**
+ * Inscrição estadual pelo CNPJ e pela UF (função consultar-ie, NFe.io): a Receita não informa a IE. Nulo quando o
+ * estado não tem inscrição ativa para o CNPJ. Cada consulta é paga: só chamar no clique de "Buscar dados".
+ */
+export async function buscarInscricaoEstadual(orgId: string, cnpj: string, uf: string): Promise<string | null> {
+  const { data, error } = await supabase.functions.invoke('consultar-ie', { body: { org_id: orgId, cnpj, uf } })
+  if (error) {
+    const r = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null
+    throw new Error(r?.erro ?? 'A consulta da inscrição estadual falhou. Preencha à mão.')
+  }
+  return (data as { inscricao_estadual: string | null }).inscricao_estadual
 }
 
 export async function buscarCep(cep: string): Promise<DadosBusca> {

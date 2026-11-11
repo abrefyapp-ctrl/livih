@@ -464,6 +464,10 @@ verify_jwt = false
 [functions.indexar-fotos]
 verify_jwt = false
 
+# consultar-ie: Buscar dados do cliente PJ (inscrição estadual pela NFe.io); login e empresa conferidos dentro da função.
+[functions.consultar-ie]
+verify_jwt = false
+
 # nfe-config: Configurações → Empresa → Nota fiscal; login e papel (dono/admin ou plataforma) validados dentro da função.
 [functions.nfe-config]
 verify_jwt = false
