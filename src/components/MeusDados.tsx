@@ -35,13 +35,11 @@ export function MeusDados() {
   }
 
   return (
-    <form onSubmit={salvar} className="space-y-3 rounded-lg border border-borda bg-superficie p-4">
-      <div>
-        <h3 className="font-semibold">Seus dados</h3>
-        <p className="text-pequeno text-texto-3">O telefone sai nos orçamentos em PDF em que você é o responsável.</p>
-      </div>
+    // Mora na janela "Seus dados", aberta pelo nome no alto da tela (Layout).
+    <form onSubmit={salvar} className="space-y-4">
+      <p className="text-pequeno text-texto-3">O telefone sai nos orçamentos em PDF em que você é o responsável.</p>
       {mensagem && <Aviso tom={mensagem.tom}>{mensagem.texto}</Aviso>}
-      <div className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
+      <div className="space-y-4">
         <CampoTexto rotulo="Nome" required maxLength={120} value={nome} onChange={(e) => setNome(e.target.value)} />
         <CampoTexto
           rotulo="Telefone / WhatsApp"
@@ -50,7 +48,7 @@ export function MeusDados() {
           value={telefone}
           onChange={(e) => setTelefone(e.target.value)}
         />
-        <Botao type="submit" variante="secundario" carregando={salvando} disabled={!nome.trim()}>
+        <Botao type="submit" carregando={salvando} disabled={!nome.trim()} className="w-full sm:w-auto">
           Salvar
         </Botao>
       </div>

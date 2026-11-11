@@ -10,6 +10,13 @@ export function formatarTelefone(tel: string | null | undefined): string {
   return `+${tel}`
 }
 
+/** Telefone guardado sem o 55 (dados de cobrança): 41995617336 → (41) 99561-7336; o que não for DDD + número volta como veio. */
+export function formatarTelefoneLocal(v: string | null | undefined): string {
+  const d = (v ?? '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '')
+  const m = d.match(/^(\d{2})(\d{4,5})(\d{4})$/)
+  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : (v ?? '')
+}
+
 export function nomeDoContato(c: { nome: string | null; nome_whatsapp: string | null; telefone: string | null } | null) {
   if (!c) return 'Contato'
   return c.nome?.trim() || c.nome_whatsapp?.trim() || formatarTelefone(c.telefone) || 'Contato sem nome'

@@ -22,22 +22,32 @@ import {
   type NumeroWhatsapp,
   type PagamentoMetaCanal,
 } from '../services/configuracoes'
-import { equipeQueGerencia, listarLugares, type LugarNaEquipe } from '../services/equipes'
+import { equipeQueGerencia, listarEquipes, listarLugares, type Equipe, type LugarNaEquipe } from '../services/equipes'
 import { formatarTelefone, haQuanto, quandoCurto } from '../services/formato'
-import { origensDosNumeros } from '../services/origem'
+import { definirOrigemDoNumero, origensDosNumeros } from '../services/origem'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
 import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { EstadoVazio } from './EstadoVazio'
 import { Icone } from './Icone'
+import { Interruptor } from './Interruptor'
 import { Modal } from './Modal'
-import { OrigemDoNumero, RegrasDeOrigem, SugestoesDeOrigem } from './OrigemDosContatos'
+import { ID_SUGESTOES_ORIGEM, RegrasDeOrigem, SugestoesDeOrigem } from './OrigemDosContatos'
 import { PagamentoMeta } from './PagamentoMeta'
 
-type Edicao = { id: string | null; nome: string; responsavel_id: string }
+type Edicao = { nome: string; responsavel_id: string }
+/** Janela "Configurar": nome, dono, origem e distribuição salvos juntos num botão só. */
+type Configuracao = { numero: NumeroWhatsapp; nome: string; responsavel_id: string; origem: string; distribui: boolean }
 type Portfolio = { nome: string; waba_id: string; phone_number_id: string }
 type Confirmacao = { tipo: 'desconectar' | 'remover' | 'oficial'; numero: NumeroWhatsapp }
+
+const CLASSE_FILTRO = 'h-9 rounded-md border border-borda bg-superficie px-3 text-pequeno focus:border-primaria focus:outline-none'
+
+/** Busca e filtro só aparecem a partir daqui: com 2 ou 3 números, são ruído. */
+const MINIMO_PARA_FILTRAR = 6
+
+const semAcento = (t: string) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
 function Ponto({ cor }: { cor: string }) {
   return <span aria-hidden="true" className={`mt-1.5 size-2.5 shrink-0 rounded-full ${cor}`} />
@@ -75,7 +85,7 @@ function Situacao({ n }: { n: NumeroWhatsapp }) {
       </p>
     )
   return (
-    <p className="flex gap-2 text-pequeno">
+    <p className="flex gap-2 text-pequeno text-erro">
       <Ponto cor="bg-erro" />
       {n.desconectado_em
         ? `Desconectado pela equipe ${haQuanto(n.desconectado_em)}`
@@ -86,6 +96,12 @@ function Situacao({ n }: { n: NumeroWhatsapp }) {
   )
 }
 
+function Etiqueta({ children }: { children: string }) {
+  return <span className="rounded-sm bg-fundo px-1.5 py-0.5 text-legenda font-normal text-texto-2 ring-1 ring-borda ring-inset">{children}</span>
+}
+
+// Uma linha por número (revisão de 11/11): a CEFEQ tem 27 números, e o cartão de antes, com a origem, a distribuição e
+// as ações abertos, dava ~350 px cada um e repetia os mesmos textos 27 vezes. O que muda pouco foi para "Configurar".
 export function SecaoWhatsapp() {
   const { orgAtiva, sessao, adminPlataforma } = useSessao()
   const orgId = orgAtiva!.id
@@ -103,8 +119,12 @@ export function SecaoWhatsapp() {
   const [pareando, setPareando] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [edicao, setEdicao] = useState<Edicao | null>(null)
+  const [config, setConfig] = useState<Configuracao | null>(null)
+  const [erroConfig, setErroConfig] = useState<string | null>(null)
   const [confirmacao, setConfirmacao] = useState<Confirmacao | null>(null)
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
+  const [busca, setBusca] = useState('')
+  const [filtro, setFiltro] = useState('')
 
   const lista = numeros?.orgId === orgId ? numeros.lista : null
   const recarregar = () => setVersao((v) => v + 1)
@@ -165,6 +185,7 @@ export function SecaoWhatsapp() {
   // A equipe (nomes) e as equipes de venda: o gestor de equipe também liga e desliga o agente dos números dos
   // vendedores dela (migration 20261110210000).
   const [lugares, setLugares] = useState<Map<string, LugarNaEquipe>>(new Map())
+  const [equipes, setEquipes] = useState<Equipe[]>([])
   useEffect(() => {
     let ativo = true
     listarEquipeCompleta(orgId)
@@ -173,12 +194,19 @@ export function SecaoWhatsapp() {
     listarLugares(orgId)
       .then((l) => ativo && setLugares(l))
       .catch(() => undefined)
+    listarEquipes(orgId)
+      .then((l) => ativo && setEquipes(l))
+      .catch(() => undefined)
     return () => {
       ativo = false
     }
   }, [orgId])
   const minhaEquipe = gerencia ? new Set<string>() : equipeQueGerencia(lugares, eu)
   const podeLigarAgente = (n: NumeroWhatsapp) => gerencia || (!!n.responsavel_id && minhaEquipe.has(n.responsavel_id))
+  const equipeDo = (n: NumeroWhatsapp) => {
+    const id = n.responsavel_id ? lugares.get(n.responsavel_id)?.equipe_id : null
+    return id ? (equipes.find((e) => e.id === id) ?? null) : null
+  }
 
   // Distribuição dos contatos novos (docs/crm-acompanhamento.md, entrega 3): só nos números da empresa.
   const [distribuicao, setDistribuicao] = useState<{ orgId: string; numeros: Set<string>; recebem: number } | null>(null)
@@ -196,7 +224,6 @@ export function SecaoWhatsapp() {
 
   // Origem dos contatos de cada número (migration 20261111140000): só dono e admin configuram.
   const [origensLidas, setOrigensLidas] = useState<{ orgId: string; mapa: Map<string, string> } | null>(null)
-  const [versaoOrigem, setVersaoOrigem] = useState(0)
   useEffect(() => {
     if (!gerencia) return
     let ativo = true
@@ -206,7 +233,7 @@ export function SecaoWhatsapp() {
     return () => {
       ativo = false
     }
-  }, [orgId, gerencia, versao, versaoOrigem])
+  }, [orgId, gerencia, versao])
   const origens = origensLidas?.orgId === orgId ? origensLidas.mapa : null
 
   // Forma de pagamento da Meta nos números oficiais (06/11): a Meta cobra a empresa direto e a API não diz se há cartão.
@@ -242,18 +269,48 @@ export function SecaoWhatsapp() {
     }
   }
 
-  async function salvar(e: FormEvent) {
+  async function adicionar(e: FormEvent) {
     e.preventDefault()
     if (!edicao) return
-    const responsavel = edicao.responsavel_id || null
     await executar('edicao', async () => {
-      if (edicao.id) await editarNumero(edicao.id, { nome: edicao.nome.trim(), responsavel_id: responsavel })
-      else {
-        const { canal } = await criarNumero(orgId, edicao.nome.trim(), responsavel)
-        setPareando(canal.id)
-      }
+      const { canal } = await criarNumero(orgId, edicao.nome.trim(), edicao.responsavel_id || null)
+      setPareando(canal.id)
       setEdicao(null)
     })
+  }
+
+  function abrirConfiguracao(n: NumeroWhatsapp) {
+    setErroConfig(null)
+    setConfig({ numero: n, nome: n.nome, responsavel_id: n.responsavel_id ?? '', origem: origens?.get(n.id) ?? '', distribui: distribui(n.id) })
+  }
+
+  // Salva só o que mudou. A origem e a distribuição têm funções próprias no banco (cada uma confere o papel).
+  async function salvarConfiguracao(e: FormEvent) {
+    e.preventDefault()
+    if (!config) return
+    const n = config.numero
+    const responsavel = config.responsavel_id || null
+    setOcupado('config')
+    setErroConfig(null)
+    try {
+      if (config.nome.trim() !== n.nome || responsavel !== n.responsavel_id)
+        await editarNumero(n.id, { nome: config.nome.trim(), responsavel_id: responsavel })
+      if (config.origem.trim() !== (origens?.get(n.id) ?? '')) await definirOrigemDoNumero(n.id, config.origem)
+      if (!responsavel && config.distribui !== distribui(n.id)) await definirDistribuicao(n.id, config.distribui)
+      setConfig(null)
+      recarregar()
+    } catch (err) {
+      setErroConfig((err as Error).message)
+    } finally {
+      setOcupado(null)
+    }
+  }
+
+  /** Fecha a janela e pede a confirmação: desconectar, remover e passar para a API oficial. */
+  function confirmar(tipo: Confirmacao['tipo']) {
+    if (!config) return
+    setConfirmacao({ tipo, numero: config.numero })
+    setConfig(null)
   }
 
   async function salvarPortfolio(e: FormEvent) {
@@ -265,19 +322,38 @@ export function SecaoWhatsapp() {
     })
   }
 
+  // Busca por nome, telefone ou dono; filtro por situação, tipo ou equipe do dono do número.
+  const termo = semAcento(busca.trim())
+  const digitos = busca.replace(/\D/g, '')
+  const visiveis = (lista ?? []).filter((n) => {
+    if (filtro === 'desconectados' && n.status_conexao === 'WORKING') return false
+    if (filtro === 'empresa' && n.responsavel_id) return false
+    if (filtro === 'vendedores' && !n.responsavel_id) return false
+    if (filtro.startsWith('equipe:') && equipeDo(n)?.id !== filtro.slice(7)) return false
+    if (!termo) return true
+    const dono = n.responsavel_id ? nomeDe(n.responsavel_id) : ''
+    return (
+      semAcento(`${n.nome} ${dono}`).includes(termo) || (!!digitos && !!n.numero_conectado?.includes(digitos))
+    )
+  })
+  const desconectados = (lista ?? []).filter((n) => n.status_conexao !== 'WORKING').length
+  const filtrando = !!termo || !!filtro
+
   return (
     <section aria-labelledby="titulo-whatsapp" className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="max-w-xl">
           <h2 id="titulo-whatsapp" className="text-h2 font-semibold">
             WhatsApp
           </h2>
-          <p className="max-w-xl text-pequeno text-texto-3">
-            O número da empresa é visto por toda a equipe. O número de um vendedor só por ele, pelo dono e pelos admins.
+          <p className="text-pequeno text-texto-3">
+            As conversas do número da empresa são vistas por toda a equipe. As do número de um vendedor, só por ele, pelo
+            gestor da equipe dele, pelo dono e pelos admins.
           </p>
         </div>
         {gerencia && (
-          <div className="flex flex-wrap gap-2">
+          // No celular, os botões ocupam a largura toda e ficam do mesmo tamanho.
+          <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
             {oficial && (
               <Botao variante="secundario" carregando={ocupado === 'oficial'} onClick={() => conectarPelaApiOficial(null)}>
                 Conectar pela API oficial
@@ -288,7 +364,7 @@ export function SecaoWhatsapp() {
                 Número do portfólio da F7
               </Botao>
             )}
-            <Botao icone="mais" onClick={() => setEdicao({ id: null, nome: '', responsavel_id: '' })}>
+            <Botao icone="mais" onClick={() => setEdicao({ nome: '', responsavel_id: '' })}>
               Adicionar número
             </Botao>
           </div>
@@ -297,6 +373,8 @@ export function SecaoWhatsapp() {
 
       {!gerencia && <Aviso>Só dono e admin conectam, desconectam e mudam os números. Se um cair, avise um deles.</Aviso>}
       {erro && <Aviso tom="erro">{erro}</Aviso>}
+
+      {gerencia && <RegrasDeOrigem orgId={orgId} />}
 
       {!lista ? (
         <p className="text-pequeno text-texto-3" aria-busy="true">
@@ -309,7 +387,7 @@ export function SecaoWhatsapp() {
             titulo="Nenhum número conectado"
             acao={
               gerencia && (
-                <Botao icone="telefone" onClick={() => setEdicao({ id: null, nome: 'Número da empresa', responsavel_id: '' })}>
+                <Botao icone="telefone" onClick={() => setEdicao({ nome: 'Número da empresa', responsavel_id: '' })}>
                   Conectar o número da empresa
                 </Botao>
               )
@@ -319,151 +397,141 @@ export function SecaoWhatsapp() {
           </EstadoVazio>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {lista.map((n) => {
-            const conectado = n.status_conexao === 'WORKING'
-            return (
-              <li key={n.id} className="rounded-lg border border-borda bg-superficie">
-                <div className="flex flex-wrap items-start gap-4 p-4">
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <p className="font-medium">{n.nome}</p>
-                    <p className="text-legenda text-texto-3">
-                      {n.responsavel_id
-                        ? `Número de ${nomeDe(n.responsavel_id)} · só ele(a), ${lugares.get(n.responsavel_id)?.equipe_id ? 'o gestor da equipe, ' : ''}dono e admin veem as conversas`
-                        : 'Número da empresa · toda a equipe vê'}
-                      {n.tipo === 'meta' && (n.meta_coexistencia ? ' · API oficial, também no app do celular' : ' · API oficial')}
-                    </p>
-                    <Situacao n={n} />
+        <div className="space-y-3">
+          {lista.length >= MINIMO_PARA_FILTRAR && (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="relative min-w-0 flex-1 sm:max-w-xs">
+                <span className="sr-only">Buscar número</span>
+                <Icone nome="busca" className="pointer-events-none absolute top-2.5 left-3 size-4 text-texto-3" />
+                <input
+                  type="search"
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar por nome, vendedor ou telefone"
+                  className={`${CLASSE_FILTRO} w-full pl-9`}
+                />
+              </label>
+              <label>
+                <span className="sr-only">Mostrar</span>
+                <select value={filtro} onChange={(e) => setFiltro(e.target.value)} className={CLASSE_FILTRO}>
+                  <option value="">Todos os números</option>
+                  <option value="desconectados">Desconectados ({desconectados})</option>
+                  <option value="empresa">Da empresa</option>
+                  <option value="vendedores">De vendedores</option>
+                  {equipes.map((eq) => (
+                    <option key={eq.id} value={`equipe:${eq.id}`}>
+                      {eq.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-pequeno text-texto-3" aria-live="polite">
+                {filtrando ? `${visiveis.length} de ${lista.length} números` : `${lista.length} números`}
+                {!filtrando && desconectados > 0 && (
+                  <span className="text-erro"> · {desconectados === 1 ? '1 desconectado' : `${desconectados} desconectados`}</span>
+                )}
+              </p>
+            </div>
+          )}
+
+          {!visiveis.length ? (
+            <p className="rounded-lg border border-borda bg-superficie p-5 text-pequeno text-texto-3">
+              Nenhum número com esse filtro.{' '}
+              <button
+                onClick={() => {
+                  setBusca('')
+                  setFiltro('')
+                }}
+                className="font-medium text-primaria underline"
+              >
+                Mostrar todos
+              </button>
+            </p>
+          ) : (
+            <ul className="divide-y divide-borda overflow-hidden rounded-lg border border-borda bg-superficie">
+              {visiveis.map((n) => {
+                const conectado = n.status_conexao === 'WORKING'
+                const origem = origens?.get(n.id)
+                const eq = equipeDo(n)
+                return (
+                  <li key={n.id} className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      {/* Largura mínima: no celular, os controles descem para a linha de baixo em vez de espremer o texto. */}
+                      <div className="min-w-[14rem] flex-1 space-y-0.5">
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
+                          <span className="truncate">{n.nome}</span>
+                          {origem && <Etiqueta>{`Origem: ${origem}`}</Etiqueta>}
+                          {gerencia && !n.responsavel_id && distribui(n.id) && <Etiqueta>Distribui contatos novos</Etiqueta>}
+                        </p>
+                        <p className="text-legenda text-texto-3">
+                          {!n.responsavel_id ? 'Da empresa · toda a equipe vê' : n.responsavel_id === eu ? 'Seu número' : `De ${nomeDe(n.responsavel_id)}`}
+                          {eq && ` · ${eq.nome}`}
+                          {n.tipo === 'meta' && (n.meta_coexistencia ? ' · API oficial, também no app do celular' : ' · API oficial')}
+                        </p>
+                        <Situacao n={n} />
+                      </div>
+
+                      <div className="ml-auto flex flex-wrap items-center gap-3">
+                        {gerencia && !conectado && n.tipo !== 'meta' && (
+                          <Botao
+                            tamanho="sm"
+                            icone="telefone"
+                            carregando={ocupado === n.id}
+                            onClick={() =>
+                              void executar(n.id, async () => {
+                                await iniciarNumero(orgId, n.id)
+                                setPareando(n.id)
+                              })
+                            }
+                          >
+                            Conectar celular
+                          </Botao>
+                        )}
+                        {podeLigarAgente(n) ? (
+                          <Interruptor
+                            ligado={n.agente_ativo}
+                            desabilitado={ocupado === n.id}
+                            aoMudar={(v) => void executar(n.id, () => ligarAgenteNoNumero(n.id, v))}
+                            title="Agente de IA neste número"
+                            className="w-36"
+                          >
+                            Agente {n.agente_ativo ? 'ligado' : 'desligado'}
+                          </Interruptor>
+                        ) : (
+                          <span className="text-pequeno text-texto-3">Agente {n.agente_ativo ? 'ligado' : 'desligado'}</span>
+                        )}
+                        {gerencia && (
+                          <Botao tamanho="sm" variante="secundario" icone="config" onClick={() => abrirConfiguracao(n)}>
+                            Configurar
+                          </Botao>
+                        )}
+                      </div>
+                    </div>
+
                     {n.tipo === 'meta' && pagamentos?.get(n.id) && (
-                      <div className="pt-2">
+                      <div className="pt-3">
                         <PagamentoMeta canal={pagamentos.get(n.id)!} gerencia={gerencia} aoConfirmar={recarregarPagamentos} />
                       </div>
                     )}
-                  </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    {podeLigarAgente(n) ? (
-                      <label className="flex cursor-pointer items-center gap-2 text-pequeno text-texto-2" title="Agente de IA neste número">
-                        <span className="relative inline-flex items-center">
-                          <input
-                            type="checkbox"
-                            role="switch"
-                            checked={n.agente_ativo}
-                            disabled={ocupado === n.id}
-                            onChange={(e) => void executar(n.id, () => ligarAgenteNoNumero(n.id, e.target.checked))}
-                            className="peer sr-only"
-                          />
-                          <span className="h-5 w-9 rounded-full bg-slate-300 transition-colors peer-checked:bg-primaria peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-destaque" />
-                          <span className="absolute left-0.5 size-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
-                        </span>
-                        Agente {n.agente_ativo ? 'ligado' : 'desligado'}
-                      </label>
-                    ) : (
-                      <span className="text-pequeno text-texto-3">Agente {n.agente_ativo ? 'ligado' : 'desligado'}</span>
+                    {gerencia && pareando === n.id && n.status_conexao === 'SCAN_QR_CODE' && (
+                      <div className="mt-3 border-t border-borda pt-4">
+                        <Pareamento orgId={orgId} canalId={n.id} />
+                      </div>
                     )}
-                  </div>
-                </div>
-
-                {gerencia && origens && (
-                  <div className="border-t border-borda px-4 py-3">
-                    <OrigemDoNumero
-                      key={`${n.id}|${origens.get(n.id) ?? ''}`}
-                      canalId={n.id}
-                      origem={origens.get(n.id) ?? ''}
-                      aoSalvar={() => setVersaoOrigem((v) => v + 1)}
-                    />
-                  </div>
-                )}
-
-                {gerencia && !n.responsavel_id && (
-                  <div className="space-y-2 border-t border-borda px-4 py-3">
-                    <label className="flex cursor-pointer items-start gap-2.5">
-                      <input
-                        type="checkbox"
-                        checked={distribui(n.id)}
-                        disabled={ocupado === n.id || !distribuicao}
-                        onChange={(e) => void executar(n.id, () => definirDistribuicao(n.id, e.target.checked))}
-                        className="mt-0.5 size-4 shrink-0 accent-primaria"
-                      />
-                      <span>
-                        <span className="block text-pequeno font-medium text-texto">Distribuir os contatos novos entre a equipe</span>
-                        <span className="block text-legenda text-texto-3">
-                          Quem escreve pela primeira vez e ainda não tem vendedor entra na carteira do próximo da fila, que é
-                          avisado no celular. O agente continua atendendo; quando ele chamar a equipe, o aviso vai para esse
-                          vendedor. Quem já tem vendedor continua com ele.
-                        </span>
-                      </span>
-                    </label>
-                    {distribui(n.id) && distribuicao?.recebem === 0 && (
-                      <Aviso tom="atencao">
-                        Ninguém está marcado para receber contatos novos, então nada é distribuído. Marque as pessoas em
-                        Configurações → Equipe, na opção “Recebe contatos novos”.
-                      </Aviso>
-                    )}
-                  </div>
-                )}
-
-                {gerencia && (
-                  <div className="flex flex-wrap gap-2 border-t border-borda px-4 py-3">
-                    {!conectado && n.tipo !== 'meta' && (
-                      <Botao
-                        tamanho="sm"
-                        icone="telefone"
-                        carregando={ocupado === n.id}
-                        onClick={() =>
-                          void executar(n.id, async () => {
-                            await iniciarNumero(orgId, n.id)
-                            setPareando(n.id)
-                          })
-                        }
-                      >
-                        Conectar celular
-                      </Botao>
-                    )}
-                    <Botao
-                      tamanho="sm"
-                      variante="secundario"
-                      onClick={() => setEdicao({ id: n.id, nome: n.nome, responsavel_id: n.responsavel_id ?? '' })}
-                    >
-                      Editar
-                    </Botao>
-                    {oficial && n.tipo !== 'meta' && (
-                      <Botao tamanho="sm" variante="secundario" onClick={() => setConfirmacao({ tipo: 'oficial', numero: n })}>
-                        Passar para a API oficial
-                      </Botao>
-                    )}
-                    {conectado && n.tipo !== 'meta' && (
-                      <Botao tamanho="sm" variante="fantasma" onClick={() => setConfirmacao({ tipo: 'desconectar', numero: n })}>
-                        Desconectar
-                      </Botao>
-                    )}
-                    <Botao tamanho="sm" variante="fantasma" icone="lixeira" onClick={() => setConfirmacao({ tipo: 'remover', numero: n })}>
-                      Remover
-                    </Botao>
-                  </div>
-                )}
-
-                {gerencia && pareando === n.id && n.status_conexao === 'SCAN_QR_CODE' && (
-                  <div className="border-t border-borda p-4">
-                    <Pareamento orgId={orgId} canalId={n.id} />
-                  </div>
-                )}
-              </li>
-            )
-          })}
-        </ul>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
       )}
 
-      {gerencia && (
-        <>
-          <RegrasDeOrigem orgId={orgId} />
-          <SugestoesDeOrigem />
-        </>
-      )}
+      {gerencia && <SugestoesDeOrigem />}
 
       <Modal
         aberto={!!edicao}
-        titulo={edicao?.id ? 'Editar número' : 'Adicionar número'}
+        titulo="Adicionar número"
         aoFechar={() => setEdicao(null)}
         rodape={
           <>
@@ -471,13 +539,13 @@ export function SecaoWhatsapp() {
               Cancelar
             </Botao>
             <Botao type="submit" form="form-numero" carregando={ocupado === 'edicao'} disabled={!edicao?.nome.trim()}>
-              {edicao?.id ? 'Salvar' : 'Adicionar e conectar'}
+              Adicionar e conectar
             </Botao>
           </>
         }
       >
         {edicao && (
-          <form id="form-numero" onSubmit={salvar} className="space-y-4">
+          <form id="form-numero" onSubmit={adicionar} className="space-y-4">
             <CampoTexto
               rotulo="Nome do número"
               required
@@ -485,29 +553,95 @@ export function SecaoWhatsapp() {
               onChange={(e) => setEdicao({ ...edicao, nome: e.target.value })}
               placeholder="Ex.: Comercial – Ana"
             />
-            <div className="space-y-1.5">
-              <label htmlFor="responsavel" className="block text-pequeno font-medium text-texto-2">
-                De quem é este número
-              </label>
-              <select
-                id="responsavel"
-                value={edicao.responsavel_id}
-                onChange={(e) => setEdicao({ ...edicao, responsavel_id: e.target.value })}
-                className="block h-10 w-full rounded-md border border-borda bg-superficie px-3 focus:border-primaria focus:outline-none"
-              >
-                <option value="">Da empresa — toda a equipe vê</option>
-                {equipe.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    De {m.nome || m.email} — só ele(a), dono e admin veem
-                  </option>
-                ))}
-              </select>
-            </div>
-            {!edicao.id && (
-              <p className="text-legenda text-texto-3">
-                O agente começa desligado neste número. Ele usa as mesmas instruções e a mesma base da empresa.
-              </p>
+            <SeletorDono equipe={equipe} valor={edicao.responsavel_id} aoMudar={(v) => setEdicao({ ...edicao, responsavel_id: v })} />
+            <p className="text-legenda text-texto-3">
+              O agente começa desligado neste número. Ele usa as mesmas instruções e a mesma base da empresa.
+            </p>
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        aberto={!!config}
+        titulo={config ? `Configurar “${config.numero.nome}”` : 'Configurar número'}
+        largura="max-w-xl"
+        aoFechar={() => setConfig(null)}
+        rodape={
+          <>
+            <Botao variante="secundario" onClick={() => setConfig(null)} disabled={ocupado === 'config'}>
+              Cancelar
+            </Botao>
+            <Botao type="submit" form="form-config" carregando={ocupado === 'config'} disabled={!config?.nome.trim()}>
+              Salvar
+            </Botao>
+          </>
+        }
+      >
+        {config && (
+          <form id="form-config" onSubmit={salvarConfiguracao} className="space-y-5">
+            {erroConfig && <Aviso tom="erro">{erroConfig}</Aviso>}
+            <CampoTexto
+              rotulo="Nome do número"
+              required
+              value={config.nome}
+              onChange={(e) => setConfig({ ...config, nome: e.target.value })}
+            />
+            <SeletorDono equipe={equipe} valor={config.responsavel_id} aoMudar={(v) => setConfig({ ...config, responsavel_id: v })} />
+            <CampoTexto
+              rotulo="Origem dos contatos deste número (opcional)"
+              list={ID_SUGESTOES_ORIGEM}
+              maxLength={60}
+              placeholder="Ex.: Google Ads"
+              value={config.origem}
+              onChange={(e) => setConfig({ ...config, origem: e.target.value })}
+              ajuda="Quem escrever neste número depois de 30 dias sem falar com a empresa entra com esta origem no Painel. Deixe em branco se o número não tem uma origem só."
+            />
+            {!config.responsavel_id && (
+              <div className="space-y-2">
+                <label className="flex cursor-pointer items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={config.distribui}
+                    disabled={!distribuicao}
+                    onChange={(e) => setConfig({ ...config, distribui: e.target.checked })}
+                    className="mt-0.5 size-4 shrink-0 accent-primaria"
+                  />
+                  <span>
+                    <span className="block text-pequeno font-medium text-texto">Distribuir os contatos novos entre a equipe</span>
+                    <span className="block text-legenda text-texto-3">
+                      Quem escreve pela primeira vez e ainda não tem vendedor entra na carteira do próximo da fila, que é
+                      avisado no celular. O agente continua atendendo; quando ele chamar a equipe, o aviso vai para esse
+                      vendedor. Quem já tem vendedor continua com ele.
+                    </span>
+                  </span>
+                </label>
+                {config.distribui && distribuicao?.recebem === 0 && (
+                  <Aviso tom="atencao">
+                    Ninguém está marcado para receber contatos novos, então nada é distribuído. Em Configurações → Equipe,
+                    clique em Editar na pessoa e marque “Recebe contatos novos”.
+                  </Aviso>
+                )}
+              </div>
             )}
+
+            <div className="space-y-2 border-t border-borda pt-4">
+              <p className="text-pequeno font-medium text-texto-2">Conexão</p>
+              <div className="flex flex-wrap gap-2">
+                {oficial && config.numero.tipo !== 'meta' && (
+                  <Botao tamanho="sm" variante="secundario" onClick={() => confirmar('oficial')}>
+                    Passar para a API oficial
+                  </Botao>
+                )}
+                {config.numero.status_conexao === 'WORKING' && config.numero.tipo !== 'meta' && (
+                  <Botao tamanho="sm" variante="perigoTexto" onClick={() => confirmar('desconectar')}>
+                    Desconectar
+                  </Botao>
+                )}
+                <Botao tamanho="sm" variante="perigoTexto" icone="lixeira" onClick={() => confirmar('remover')}>
+                  Remover número
+                </Botao>
+              </div>
+            </div>
           </form>
         )}
       </Modal>
@@ -596,6 +730,30 @@ export function SecaoWhatsapp() {
           : `Nada entra ou sai por “${confirmacao?.numero.nome}” até alguém conectar o celular de novo.`}
       </DialogoConfirmacao>
     </section>
+  )
+}
+
+/** De quem é o número: da empresa (toda a equipe vê) ou de um vendedor. */
+function SeletorDono({ equipe, valor, aoMudar }: { equipe: MembroEquipe[]; valor: string; aoMudar: (v: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor="responsavel" className="block text-pequeno font-medium text-texto-2">
+        De quem é este número
+      </label>
+      <select
+        id="responsavel"
+        value={valor}
+        onChange={(e) => aoMudar(e.target.value)}
+        className="block h-10 w-full rounded-md border border-borda bg-superficie px-3 focus:border-primaria focus:outline-none"
+      >
+        <option value="">Da empresa — toda a equipe vê</option>
+        {equipe.map((m) => (
+          <option key={m.user_id} value={m.user_id}>
+            De {m.nome || m.email} — só ele(a), o gestor da equipe, dono e admin veem
+          </option>
+        ))}
+      </select>
+    </div>
   )
 }
 

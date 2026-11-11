@@ -1,3 +1,4 @@
+import { formatarCep, formatarDocumento, formatarTelefoneLocal } from './formato'
 import { supabase } from './supabaseClient'
 
 // Dados de cobrança de cada empresa cliente: quem paga a Livih (migration 20261101140000; docs/cobranca-asaas.md).
@@ -35,7 +36,9 @@ export async function buscarDadosCobranca(orgId: string): Promise<{ dados: Dados
   return {
     sugerido: d.sugerido,
     dados: {
-      nome: texto(d.nome), documento: texto(d.documento), email: texto(d.email), telefone: texto(d.telefone), cep: texto(d.cep),
+      // O banco guarda só os dígitos; na tela, com a pontuação.
+      nome: texto(d.nome), documento: formatarDocumento(d.documento), email: texto(d.email), telefone: formatarTelefoneLocal(d.telefone),
+      cep: formatarCep(d.cep),
       logradouro: texto(d.logradouro), numero: texto(d.numero), complemento: texto(d.complemento), bairro: texto(d.bairro),
       cidade: texto(d.cidade), uf: texto(d.uf),
     },

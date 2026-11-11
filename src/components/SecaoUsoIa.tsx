@@ -41,14 +41,15 @@ export function SecaoUsoIa() {
   const anteriores = meses?.filter((m) => m.mes !== mesAtual()) ?? []
 
   return (
+    // Título como nas outras seções, e o que se consulta todo mês (plano e uso) antes do que se mexe pouco (faturas e
+    // dados de cobrança): antes o formulário de cobrança vinha primeiro (revisão de 11/11).
     <div className="space-y-6">
+      <div>
+        <h2 className="text-h2 font-semibold">Plano e consumo</h2>
+        <p className="text-pequeno text-texto-3">O plano da empresa, o uso do agente no mês, as faturas e quem paga a Livih.</p>
+      </div>
+
       <PlanoDaEmpresa />
-
-      <FaturasDaEmpresa orgId={orgId} />
-
-      <section className="rounded-lg border border-borda bg-superficie p-4">
-        <DadosCobranca orgId={orgId} podeEditar={orgAtiva?.papel === 'dono'} />
-      </section>
 
       <div>
         <h2 className="text-h2 font-semibold">Uso da IA em {nomeDoMes(mesAtual())}</h2>
@@ -108,6 +109,12 @@ export function SecaoUsoIa() {
           )}
         </>
       )}
+
+      <FaturasDaEmpresa orgId={orgId} />
+
+      <section className="rounded-lg border border-borda bg-superficie p-4">
+        <DadosCobranca orgId={orgId} podeEditar={orgAtiva?.papel === 'dono'} />
+      </section>
     </div>
   )
 }

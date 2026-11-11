@@ -3,6 +3,7 @@ import { useSessao } from '../hooks/useSessao'
 import { definirModulo, listarModulos, type Modulo } from '../services/modulos'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
+import { Interruptor } from './Interruptor'
 import { Modal } from './Modal'
 
 /** Painel da plataforma: liga e desliga os módulos de uma empresa (o que ela paga à parte fica marcado). */
@@ -72,21 +73,9 @@ export function ModalModulos({ empresa, aoFechar }: { empresa: { id: string; nom
                     <p className="text-legenda text-texto-3">{m.ativo ? 'Ligado só para esta empresa.' : 'Desligado só para esta empresa.'}</p>
                   )}
                 </div>
-                <label className="flex shrink-0 cursor-pointer items-center gap-2 text-pequeno text-texto-2">
-                  <span className="relative inline-flex items-center">
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      checked={m.ativo}
-                      disabled={ocupado === m.codigo}
-                      onChange={() => void alternar(m)}
-                      className="peer sr-only"
-                    />
-                    <span className="h-5 w-9 rounded-full bg-slate-300 transition-colors peer-checked:bg-primaria peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-destaque" />
-                    <span className="absolute left-0.5 size-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
-                  </span>
+                <Interruptor ligado={m.ativo} desabilitado={ocupado === m.codigo} aoMudar={() => void alternar(m)} className="shrink-0">
                   {m.ativo ? 'Ligado' : 'Desligado'}
-                </label>
+                </Interruptor>
               </li>
             ))}
           </ul>

@@ -48,7 +48,8 @@ export function Configuracoes() {
   if (!secoes.some((s) => s.id === secao)) return <Navigate to="/configuracoes/equipe" replace />
 
   return (
-    <div className="relative h-full overflow-y-auto">
+    // scrollbar-gutter: a barra de rolagem aparecia só nas seções longas e empurrava a tela ~7 px para o lado (11/11).
+    <div className="relative h-full overflow-y-auto [scrollbar-gutter:stable]">
       <div className="mx-auto max-w-6xl px-4 pt-6 lg:px-8">
         <h1 className="text-h1 font-semibold">Configurações</h1>
         {gerencia && orgAtiva && (

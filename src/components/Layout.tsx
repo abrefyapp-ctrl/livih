@@ -9,6 +9,7 @@ import { LogoOrganizacao } from './LogoOrganizacao'
 import { Icone, type NomeIcone } from './Icone'
 import { Logo } from './Logo'
 import { Modal } from './Modal'
+import { MeusDados } from './MeusDados'
 import { useInstalarApp } from '../pwa'
 import { podeFinanceiro } from '../services/financeiro'
 
@@ -49,6 +50,7 @@ export function Layout() {
   const recusadosPorPagamento = gerencia && semPagamento?.orgId === orgAtiva?.id ? semPagamento.nomes : []
   const app = useInstalarApp()
   const [ajudaIos, setAjudaIos] = useState(false)
+  const [meusDados, setMeusDados] = useState(false)
   // Financeiro (docs/financeiro.md): vem com o ERP ou as OS; dono e admin sempre veem, o atendente só com a permissão.
   const comFinanceiro = !!modulos && (modulos.has('erp') || modulos.has('os'))
   const [financeiroAtendente, setFinanceiroAtendente] = useState<{ orgId: string; ok: boolean } | null>(null)
@@ -246,10 +248,17 @@ export function Layout() {
                 <span className="sr-only sm:hidden">Instalar app</span>
               </button>
             )}
-            <span className="hidden items-center gap-2 sm:flex">
+            {/* Seus dados (nome e telefone do orçamento) moravam em Configurações → Equipe, que é da empresa (11/11). */}
+            <button
+              type="button"
+              onClick={() => setMeusDados(true)}
+              title="Seus dados"
+              className="flex items-center gap-2 rounded-md p-1 hover:bg-fundo sm:pr-2"
+            >
               <Avatar nome={meuNome || '?'} tamanho="sm" />
-              <span className="max-w-48 truncate text-pequeno font-medium text-texto-2">{meuNome}</span>
-            </span>
+              <span className="hidden max-w-48 truncate text-pequeno font-medium text-texto-2 sm:inline">{meuNome}</span>
+              <span className="sr-only">Seus dados</span>
+            </button>
             <button
               onClick={() => void sair()}
               aria-label="Sair"
@@ -315,6 +324,11 @@ export function Layout() {
         <main className="min-h-0 flex-1 overflow-hidden">
           <Outlet />
         </main>
+
+        <Modal aberto={meusDados} titulo="Seus dados" aoFechar={() => setMeusDados(false)}>
+          {/* Recria quando o perfil chega, para o formulário abrir já preenchido. */}
+          {meusDados && <MeusDados key={sessao && equipe.has(sessao.user.id) ? 'pronto' : 'carregando'} />}
+        </Modal>
 
         <Modal aberto={ajudaIos} titulo="Instalar a Livih no iPhone" aoFechar={() => setAjudaIos(false)}>
           <ol className="list-decimal space-y-2 pl-5 text-pequeno text-texto-2">

@@ -1,4 +1,5 @@
 import { buscarCep } from '../services/empresa'
+import { formatarCep, formatarDocumento, formatarTelefoneLocal } from '../services/formato'
 import type { DadosCobranca } from '../services/cobranca'
 import { CLASSE_CAMPO, Campo } from './ModaisOs'
 
@@ -21,11 +22,22 @@ export function CamposCobranca({ dados, mudar, desabilitado = false, prefixo }: 
     className: CLASSE_CAMPO,
   })
 
+  // Pontuação ao sair do campo (o banco guarda só os dígitos): "62213016000130" era difícil de conferir (11/11).
+  const pontuar = (c: 'documento' | 'telefone', f: (v: string) => string) => () => {
+    const v = f(dados[c])
+    if (v !== dados[c]) mudar({ ...dados, [c]: v })
+  }
+
   async function completarPeloCep() {
+    const cep = formatarCep(dados.cep)
     const end = await buscarCep(dados.cep)
-    if (!end) return
+    if (!end) {
+      if (cep !== dados.cep) mudar({ ...dados, cep })
+      return
+    }
     mudar({
       ...dados,
+      cep,
       logradouro: dados.logradouro || end.logradouro,
       bairro: dados.bairro || end.bairro,
       cidade: dados.cidade || end.cidade,
@@ -43,12 +55,19 @@ export function CamposCobranca({ dados, mudar, desabilitado = false, prefixo }: 
       <div className="sm:col-span-3">
         <Campo rotulo="CNPJ ou CPF" id={`${prefixo}-documento`}>
           {/* CNPJ pode ter letras (Receita, desde 07/2026): teclado de texto, em maiúsculas. */}
-          <input {...campo('documento')} maxLength={18} autoCapitalize="characters" />
+          <input {...campo('documento')} maxLength={18} autoCapitalize="characters" onBlur={pontuar('documento', formatarDocumento)} />
         </Campo>
       </div>
       <div className="sm:col-span-3">
         <Campo rotulo="Telefone (opcional)" id={`${prefixo}-telefone`}>
-          <input {...campo('telefone')} maxLength={20} inputMode="tel" autoComplete="tel" placeholder="(41) 99999-9999" />
+          <input
+            {...campo('telefone')}
+            maxLength={20}
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="(41) 99999-9999"
+            onBlur={pontuar('telefone', formatarTelefoneLocal)}
+          />
         </Campo>
       </div>
       <div className="sm:col-span-6">

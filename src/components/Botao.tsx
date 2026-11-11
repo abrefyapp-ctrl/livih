@@ -1,13 +1,15 @@
 import type { ButtonHTMLAttributes } from 'react'
 import { Icone, type NomeIcone } from './Icone'
 
-type Variante = 'primario' | 'secundario' | 'fantasma' | 'perigo'
+type Variante = 'primario' | 'secundario' | 'fantasma' | 'perigo' | 'perigoTexto'
 
 const VARIANTES: Record<Variante, string> = {
   primario: 'bg-primaria text-white hover:bg-primaria-hover',
   secundario: 'bg-superficie text-texto ring-1 ring-borda ring-inset hover:bg-fundo',
   fantasma: 'text-texto-2 hover:bg-fundo hover:text-texto',
   perigo: 'bg-erro text-white hover:bg-red-800',
+  // Ação que apaga ou desliga, ao lado de ações comuns: vermelha, mas sem o peso do botão cheio (a confirmação vem depois).
+  perigoTexto: 'text-erro hover:bg-erro-suave',
 }
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
