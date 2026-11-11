@@ -2816,6 +2816,7 @@ export type Database = {
           ref: string
           serie: number | null
           status: string
+          transporte: Json | null
           valor: number
           xml_cancelamento_path: string | null
           xml_path: string | null
@@ -2845,6 +2846,7 @@ export type Database = {
           ref: string
           serie?: number | null
           status?: string
+          transporte?: Json | null
           valor?: number
           xml_cancelamento_path?: string | null
           xml_path?: string | null
@@ -2874,6 +2876,7 @@ export type Database = {
           ref?: string
           serie?: number | null
           status?: string
+          transporte?: Json | null
           valor?: number
           xml_cancelamento_path?: string | null
           xml_path?: string | null
@@ -4545,6 +4548,50 @@ export type Database = {
           },
           {
             foreignKeyName: "tarefas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transportadoras: {
+        Row: {
+          documento: string
+          endereco: string | null
+          id: string
+          inscricao_estadual: string | null
+          municipio: string | null
+          nome: string
+          org_id: string
+          uf: string | null
+          usada_em: string
+        }
+        Insert: {
+          documento: string
+          endereco?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          municipio?: string | null
+          nome: string
+          org_id: string
+          uf?: string | null
+          usada_em?: string
+        }
+        Update: {
+          documento?: string
+          endereco?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          municipio?: string | null
+          nome?: string
+          org_id?: string
+          uf?: string | null
+          usada_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transportadoras_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizacoes"
