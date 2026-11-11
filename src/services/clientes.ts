@@ -325,7 +325,7 @@ export async function buscarCnpj(cnpj: string): Promise<DadosBusca> {
 }
 
 /**
- * Inscrição estadual pelo CNPJ e pela UF (função consultar-ie, NFe.io): a Receita não informa a IE. Nulo quando o
+ * Inscrição estadual pelo CNPJ e pela UF (função consultar-ie, Sintegra pela Infosimples): a Receita não informa a IE. Nulo quando o
  * estado não tem inscrição ativa para o CNPJ. Cada consulta é paga: só chamar no clique de "Buscar dados".
  */
 export async function buscarInscricaoEstadual(orgId: string, cnpj: string, uf: string): Promise<string | null> {

@@ -118,7 +118,7 @@ export function ModalCliente({
       if (tipo === 'cep') return preencher(await buscarCep(c.cep))
       const d = await buscarCnpj(docDigitos)
       preencher(d)
-      // A Receita não traz a inscrição estadual: vem do Sintegra pela NFe.io (JoGrampo, 11/11). Só com a IE vazia,
+      // A Receita não traz a inscrição estadual: vem do Sintegra pela Infosimples (JoGrampo, 11/11). Só com a IE vazia,
       // porque cada consulta é paga.
       const uf = c.uf.trim() || d.uf
       if (c.tipo === 'pj' && !c.inscricao_estadual.trim() && orgAtiva && uf) {

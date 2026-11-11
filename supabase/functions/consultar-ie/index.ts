@@ -1,11 +1,11 @@
 // Inscrição estadual pelo CNPJ (pedido da JoGrampo em 11/11): a Receita (BrasilAPI) não informa a IE, que fica no
 // cadastro de cada estado (Sintegra), e o Eduardo tinha de consultar no Sintegra para cada cliente novo. A consulta é
-// da NFe.io (chave NFEIO_API_KEY nos secrets), paga por consulta: só sai quando a pessoa clica em "Buscar dados" num
-// cliente PJ sem IE.
+// a "SINTEGRA / Unificada" da Infosimples (token INFOSIMPLES_TOKEN nos secrets; conta criada em 11/11), paga por
+// consulta: só sai quando a pessoa clica em "Buscar dados" num cliente PJ sem IE.
 //
 //   { org_id, cnpj, uf } → { inscricao_estadual, situacao, inscricoes[] } | { erro }
 //
-// Quem pode: membro ativo da empresa (quem cadastra cliente). A chave da NFe.io nunca sai daqui.
+// Quem pode: membro ativo da empresa (quem cadastra cliente). O token da Infosimples nunca sai daqui.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -21,16 +21,13 @@ const CORS = {
 const json = (status: number, corpo: unknown) =>
   new Response(JSON.stringify(corpo), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
-// A NFe.io pede o código IBGE do estado, não a sigla.
-const IBGE: Record<string, number> = {
-  RO: 11, AC: 12, AM: 13, RR: 14, PA: 15, AP: 16, TO: 17, MA: 21, PI: 22, CE: 23, RN: 24, PB: 25, PE: 26, AL: 27,
-  SE: 28, BA: 29, MG: 31, ES: 32, RJ: 33, SP: 35, PR: 41, SC: 42, RS: 43, MS: 50, MT: 51, GO: 52, DF: 53,
-};
+const UFS = ["AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MS", "MT", "PA", "PB", "PE", "PI", "PR", "RJ",
+  "RN", "RO", "RR", "RS", "SC", "SE", "SP", "TO"];
 
 type Inscricao = { numero: string; situacao: string | null };
 
 /** Situação que não serve para a nota (baixada, suspensa, cancelada, não habilitada). */
-const inativa = (s: string | null) => !!s && /unabl|inativ|baix|suspen|cancel|n[aã]o habil|nul/i.test(s);
+const inativa = (s: string | null) => !!s && /inativ|baix|suspen|cancel|n[aã]o habil|nul|inapt/i.test(s);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -54,33 +51,36 @@ Deno.serve(async (req) => {
   const cnpj = String(p.cnpj ?? "").toUpperCase().replace(/[^0-9A-Z]/g, "");
   const uf = String(p.uf ?? "").trim().toUpperCase();
   if (!/^[0-9A-Z]{12}[0-9]{2}$/.test(cnpj)) return json(400, { erro: "Informe o CNPJ completo." });
-  if (!IBGE[uf]) return json(400, { erro: "Informe a UF do cliente para buscar a inscrição estadual." });
+  if (!UFS.includes(uf)) return json(400, { erro: "Informe a UF do cliente para buscar a inscrição estadual." });
 
-  const chave = Deno.env.get("NFEIO_API_KEY");
-  if (!chave) return json(503, { erro: "A busca da inscrição estadual ainda não está ligada. Preencha à mão." });
+  const tokenInfosimples = Deno.env.get("INFOSIMPLES_TOKEN");
+  if (!tokenInfosimples) return json(503, { erro: "A busca da inscrição estadual ainda não está ligada. Preencha à mão." });
 
+  // API v2 da Infosimples: POST com os parâmetros em formulário; a consulta ao Sintegra do estado leva alguns segundos.
   let r: Response;
   try {
-    r = await fetch(`https://legalentity.api.nfe.io/v3/legalentities/stateTaxInfo/${IBGE[uf]}/${cnpj}`, {
-      headers: { Authorization: chave, Accept: "application/json" },
-      signal: AbortSignal.timeout(20000),
+    r = await fetch("https://api.infosimples.com/api/v2/consultas/sintegra/unificada", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token: tokenInfosimples, cnpj, uf, timeout: "50" }),
+      signal: AbortSignal.timeout(55000),
     });
   } catch (e) {
-    console.error("nfeio", String(e).slice(0, 200));
+    console.error("infosimples", String(e).slice(0, 200));
     return json(502, { erro: "A consulta da inscrição estadual não respondeu. Preencha à mão ou tente de novo." });
   }
-  if (r.status === 404) return json(200, { inscricao_estadual: null, situacao: null, inscricoes: [] });
   const d = await r.json().catch(() => null);
-  if (!r.ok) {
-    console.error("nfeio", r.status, JSON.stringify(d).slice(0, 300));
+  // code 200: achou; 612: o estado não tem cadastro para o CNPJ. O resto é falha (token, saldo, Sintegra fora do ar).
+  if (d?.code === 612) return json(200, { inscricao_estadual: null, situacao: null, inscricoes: [] });
+  if (!r.ok || d?.code !== 200) {
+    console.error("infosimples", r.status, d?.code, String(d?.code_message ?? "").slice(0, 200), JSON.stringify(d?.errors ?? "").slice(0, 200));
     return json(502, { erro: "A consulta da inscrição estadual falhou. Preencha à mão ou tente de novo." });
   }
 
-  // Resposta: { legalEntity: { stateTaxes: [{ taxNumber, status, ... }] } } (formato da v2; a v3 é igual no que usamos).
-  const lista = (d?.legalEntity?.stateTaxes ?? d?.stateTaxes ?? []) as { taxNumber?: string; status?: string }[];
+  const lista = (Array.isArray(d.data) ? d.data : []) as { inscricao_estadual?: string; situacao_cadastral?: string }[];
   const inscricoes: Inscricao[] = lista
-    .filter((x) => x?.taxNumber)
-    .map((x) => ({ numero: String(x.taxNumber).replace(/\D/g, ""), situacao: x.status ?? null }))
+    .filter((x) => x?.inscricao_estadual)
+    .map((x) => ({ numero: String(x.inscricao_estadual).replace(/\D/g, ""), situacao: x.situacao_cadastral ?? null }))
     .filter((x) => x.numero);
   const ativa = inscricoes.find((x) => !inativa(x.situacao)) ?? null;
   return json(200, { inscricao_estadual: ativa?.numero ?? null, situacao: ativa?.situacao ?? null, inscricoes });

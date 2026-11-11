@@ -464,7 +464,7 @@ verify_jwt = false
 [functions.indexar-fotos]
 verify_jwt = false
 
-# consultar-ie: Buscar dados do cliente PJ (inscrição estadual pela NFe.io); login e empresa conferidos dentro da função.
+# consultar-ie: Buscar dados do cliente PJ (inscrição estadual pelo Sintegra, Infosimples); login e empresa conferidos dentro da função.
 [functions.consultar-ie]
 verify_jwt = false
 
