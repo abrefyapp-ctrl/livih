@@ -117,11 +117,12 @@ export type NotaFiscal = {
   xml_path: string | null; danfe_path: string | null; xml_cancelamento_path: string | null; emissora_id: string;
   autorizada_em: string | null; cancelada_em: string | null; criado_em: string;
   modelo: 'nfe' | 'nfse'; descricao: string | null; pedido_id: string | null; os_id: string | null;
+  transporte: TransporteNota | null;
 }
 
 const CAMPOS_NOTA =
   'id, status, ambiente, numero, serie, chave, valor, mensagem, xml_path, danfe_path, xml_cancelamento_path, emissora_id, ' +
-  'autorizada_em, cancelada_em, criado_em, modelo, descricao, pedido_id, os_id'
+  'autorizada_em, cancelada_em, criado_em, modelo, descricao, pedido_id, os_id, transporte'
 
 export const NOME_MODELO = { nfe: 'NF-e', nfse: 'NFS-e' } as const
 
@@ -179,7 +180,46 @@ export const PRESENCAS: { valor: number; rotulo: string }[] = [
   { valor: 9, rotulo: 'Outros, não presencial' },
 ]
 
-export type PedidoEmissao = { pedido_id: string; emissora_id: string; forma_pagamento: string; a_prazo: boolean; presenca: number; informacoes: string }
+// ---- transporte da NF-e (migration 20261111170000) ----
+
+export type TransportadoraNota = { documento: string; nome: string; inscricao_estadual: string; endereco: string; municipio: string; uf: string }
+export type VolumeNota = {
+  quantidade: number | null; especie: string; marca: string; numero: string; peso_liquido: number | null; peso_bruto: number | null
+}
+/** O que vai na nota e fica gravado nela (notas_fiscais.transporte), para o "Emitir de novo" vir preenchido. */
+export type TransporteNota = { modalidade: number; transportadora: TransportadoraNota | null; volume: VolumeNota | null }
+
+/** modFrete aceito pela Focus. A transportadora só aparece nas três primeiras. */
+export const MODALIDADES_FRETE: { valor: number; rotulo: string }[] = [
+  { valor: 0, rotulo: 'Remetente (CIF): a empresa paga o frete' },
+  { valor: 1, rotulo: 'Destinatário (FOB): o cliente paga o frete' },
+  { valor: 2, rotulo: 'Terceiros' },
+  { valor: 9, rotulo: 'Sem frete (o cliente retira ou não há transporte)' },
+]
+export const COM_TRANSPORTADORA = [0, 1, 2]
+
+/** Transportadoras já usadas em notas da empresa, a mais recente primeiro (a função nfe-emitir grava). */
+export async function listarTransportadoras(orgId: string): Promise<TransportadoraNota[]> {
+  const { data, error } = await supabase
+    .from('transportadoras')
+    .select('documento, nome, inscricao_estadual, endereco, municipio, uf')
+    .eq('org_id', orgId)
+    .order('usada_em', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map((t) => ({
+    documento: t.documento,
+    nome: t.nome,
+    inscricao_estadual: t.inscricao_estadual ?? '',
+    endereco: t.endereco ?? '',
+    municipio: t.municipio ?? '',
+    uf: t.uf ?? '',
+  }))
+}
+
+export type PedidoEmissao = {
+  pedido_id: string; emissora_id: string; forma_pagamento: string; a_prazo: boolean; presenca: number; informacoes: string
+  transporte: TransporteNota
+}
 export class FaltaParaEmitir extends Error {
   faltando: string[]
   constructor(mensagem: string, faltando: string[]) {

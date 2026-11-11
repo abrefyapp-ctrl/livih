@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { listarEmissoras, type Emissora } from '../services/empresa'
 import type { Pedido } from '../services/erp'
 import { formatarCnpj, moeda } from '../services/formato'
+import { transporteInicial, transporteParaEnvio } from '../services/transporteNota'
 import {
   emitirNota,
   emitirNotaServico,
@@ -17,6 +18,7 @@ import {
   PRESENCAS,
   urlArquivoNota,
   type NotaFiscal,
+  type TransporteNota,
 } from '../services/nfe'
 import { Aviso } from './Aviso'
 import { CredenciamentoSefaz } from './CredenciamentoSefaz'
@@ -24,6 +26,7 @@ import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
 import { Campo, CLASSE_CAMPO } from './ModaisOs'
 import { Modal } from './Modal'
+import { SecaoTransporte } from './TransporteNota'
 
 // Nota fiscal (docs/nfe.md e docs/nfse.md): o bloco que aparece no pedido (NF-e ou NFS-e), na OS (NFS-e) e no perfil
 // do cliente (notas dele e a nota de serviço avulsa). Emitir: dono, admin e quem tem "Emite nota fiscal".
@@ -168,7 +171,15 @@ export function BlocoNota({ orgId, alvo }: { orgId: string; alvo: Extract<Alvo, 
           {status === 'rascunho' ? 'Confirme o pedido para emitir a nota.' : status === 'cancelado' ? 'Pedido cancelado.' : 'Nenhuma nota emitida.'}
         </p>
       )}
-      {emitindo && <ModalEmitirNota orgId={orgId} alvo={alvo} aoFechar={() => setEmitindo(false)} aoEmitir={() => (setEmitindo(false), setVersao((v) => v + 1))} />}
+      {emitindo && (
+        <ModalEmitirNota
+          orgId={orgId}
+          alvo={alvo}
+          anterior={atual?.transporte}
+          aoFechar={() => setEmitindo(false)}
+          aoEmitir={() => (setEmitindo(false), setVersao((v) => v + 1))}
+        />
+      )}
     </section>
   )
 }
@@ -235,7 +246,20 @@ export function NotasDoCliente({ orgId, clienteId, nome }: { orgId: string; clie
   )
 }
 
-function ModalEmitirNota({ orgId, alvo, aoFechar, aoEmitir }: { orgId: string; alvo: Alvo; aoFechar: () => void; aoEmitir: () => void }) {
+function ModalEmitirNota({
+  orgId,
+  alvo,
+  anterior,
+  aoFechar,
+  aoEmitir,
+}: {
+  orgId: string
+  alvo: Alvo
+  /** Transporte da última nota do pedido: depois de uma recusa, o "Emitir de novo" vem preenchido. */
+  anterior?: TransporteNota | null
+  aoFechar: () => void
+  aoEmitir: () => void
+}) {
   const [modelo, setModelo] = useState<'nfe' | 'nfse'>(alvo.tipo === 'pedido' ? 'nfe' : 'nfse')
   const [emissoras, setEmissoras] = useState<Emissora[] | null>(null)
   const [emissora, setEmissora] = useState('')
@@ -244,6 +268,7 @@ function ModalEmitirNota({ orgId, alvo, aoFechar, aoEmitir }: { orgId: string; a
   const [forma, setForma] = useState((pagamentoPedido?.pagamento_forma && FORMA_SEFAZ[pagamentoPedido.pagamento_forma]) || '15')
   const [aPrazo, setAPrazo] = useState(!!pagamentoPedido?.pagamento_prazos?.some((d) => d > 0))
   const [presenca, setPresenca] = useState(9)
+  const [transporte, setTransporte] = useState(() => transporteInicial(anterior, Number(pagamentoPedido?.frete) || 0))
   const [informacoes, setInformacoes] = useState('')
   // null = ainda não mexeu: na avulsa, vale a descrição padrão do CNPJ.
   const [descricaoDigitada, setDescricao] = useState<string | null>(null)
@@ -278,7 +303,10 @@ function ModalEmitirNota({ orgId, alvo, aoFechar, aoEmitir }: { orgId: string; a
     setErro(null)
     try {
       if (modelo === 'nfe' && alvo.tipo === 'pedido') {
-        await emitirNota({ pedido_id: alvo.pedido.id, emissora_id: escolhida!.id, forma_pagamento: forma, a_prazo: aPrazo, presenca, informacoes })
+        await emitirNota({
+          pedido_id: alvo.pedido.id, emissora_id: escolhida!.id, forma_pagamento: forma, a_prazo: aPrazo, presenca, informacoes,
+          transporte: transporteParaEnvio(transporte),
+        })
       } else {
         await emitirNotaServico({
           ...(alvo.tipo === 'pedido' ? { pedido_id: alvo.pedido.id } : alvo.tipo === 'os' ? { os_id: alvo.osId } : { cliente_id: alvo.clienteId, valor: valorNum }),
@@ -385,6 +413,7 @@ function ModalEmitirNota({ orgId, alvo, aoFechar, aoEmitir }: { orgId: string; a
               <input type="checkbox" checked={aPrazo} onChange={(e) => setAPrazo(e.target.checked)} className="size-4 accent-primaria" />
               Pagamento a prazo
             </label>
+            <SecaoTransporte orgId={orgId} valor={transporte} mudar={setTransporte} />
           </>
         ) : (
           <>

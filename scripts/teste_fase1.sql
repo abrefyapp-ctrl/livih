@@ -7498,5 +7498,81 @@ exception when others then
   insert into resultado (teste, ok) values ('origem: outra empresa não remove a regra da F7', sqlerrm like 'Só dono e admin%');
 end $$;
 
+
+-- Transporte na NF-e (migration 20261111170000): cadastro de transportadoras gravado pela chave de serviço e lido só
+-- por quem emite nota.
+reset role;
+set local role service_role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_f7 uuid := current_setting('teste.f7')::uuid;
+  v_cli uuid := current_setting('teste.cli')::uuid;
+begin
+  -- Como a função nfe-emitir: upsert por empresa e documento.
+  insert into public.transportadoras (org_id, documento, nome, inscricao_estadual, municipio, uf) values
+    (v_f7, '11222333000181', 'Transportes Teste Ltda', '1234567890', 'Curitiba', 'PR'),
+    (v_cli, '11444777000161', 'Outra Transportadora', null, 'Castro', 'PR')
+    on conflict (org_id, documento) do update set nome = excluded.nome;
+  insert into public.transportadoras (org_id, documento, nome) values (v_f7, '11222333000181', 'Transportes Teste S/A')
+    on conflict (org_id, documento) do update set nome = excluded.nome, usada_em = now();
+  -- b1 sem "Emite nota fiscal" (algum bloco anterior pode ter ligado).
+  update public.membros_org set emite_nota_fiscal = false
+   where org_id = v_f7 and user_id = '00000000-0000-0000-0000-0000000000b1';
+  insert into resultado (teste, ok) values ('transporte: a chave de serviço atualiza sem apagar a IE',
+    (select nome = 'Transportes Teste S/A' and inscricao_estadual = '1234567890' from public.transportadoras
+      where org_id = v_f7 and documento = '11222333000181'));
+  begin
+    insert into public.transportadoras (org_id, documento, nome) values (v_f7, '11.222.333/0001-81', 'Pontuada');
+    insert into resultado (teste, ok) values ('transporte: documento com pontuação é recusado', false);
+  exception when check_violation then
+    insert into resultado (teste, ok) values ('transporte: documento com pontuação é recusado', true);
+  end;
+  begin
+    insert into public.transportadoras (org_id, documento, nome) values (v_f7, '11222333000181', 'Repetida');
+    insert into resultado (teste, ok) values ('transporte: mesmo CNPJ não repete na empresa', false);
+  exception when unique_violation then
+    insert into resultado (teste, ok) values ('transporte: mesmo CNPJ não repete na empresa', true);
+  end;
+end $$;
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+begin
+  insert into resultado (teste, ok) values ('transporte: o dono vê as transportadoras da empresa',
+    (select count(*) from public.transportadoras where documento = '11222333000181') = 1);
+  begin
+    insert into public.transportadoras (org_id, documento, nome)
+      values (current_setting('teste.f7')::uuid, '99888777000100', 'Pela tela');
+    insert into resultado (teste, ok) values ('transporte: a tela não grava transportadora', false);
+  exception when insufficient_privilege then
+    insert into resultado (teste, ok) values ('transporte: a tela não grava transportadora', true);
+  end;
+  begin
+    update public.transportadoras set nome = 'Mudada pela tela' where documento = '11222333000181';
+    insert into resultado (teste, ok) values ('transporte: a tela não altera transportadora', false);
+  exception when insufficient_privilege then
+    insert into resultado (teste, ok) values ('transporte: a tela não altera transportadora', true);
+  end;
+  begin
+    delete from public.transportadoras where documento = '11222333000181';
+    insert into resultado (teste, ok) values ('transporte: a tela não apaga transportadora', false);
+  exception when insufficient_privilege then
+    insert into resultado (teste, ok) values ('transporte: a tela não apaga transportadora', true);
+  end;
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+begin
+  insert into resultado (teste, ok) values ('transporte: atendente sem "Emite nota fiscal" não vê a lista',
+    (select count(*) from public.transportadoras) = 0);
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$
+begin
+  insert into resultado (teste, ok) values ('transporte: outra empresa não vê as transportadoras da F7',
+    (select count(*) from public.transportadoras where documento = '11222333000181') = 0);
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

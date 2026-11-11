@@ -1,6 +1,7 @@
 // NF-e pela Focus NFe, entrega 2 (docs/nfe.md): emite a nota de um pedido (de qualquer canal).
 //
-//   { pedido_id, emissora_id?, forma_pagamento?, a_prazo?, presenca?, informacoes? } → { nota } | { erro, faltando[] }
+//   { pedido_id, emissora_id?, forma_pagamento?, a_prazo?, presenca?, informacoes?, transporte? }
+//     → { nota } | { erro, faltando[] }
 //
 // Quem pode: dono, admin e quem tem "Emite nota fiscal", para pedido que a pessoa vê (a RLS do pedido, lida com o
 // login dela). Antes de enviar, confere o que falta (cliente sem CNPJ/CPF ou endereço, produto sem NCM, CNPJ sem
@@ -67,6 +68,108 @@ function fatura(numeroPedido: number, parcelas: { valor: number | string; vencim
   };
 }
 
+type Transportadora = { documento?: string; nome?: string; inscricao_estadual?: string; endereco?: string; municipio?: string; uf?: string };
+type Volume = { quantidade?: number | null; especie?: string; marca?: string; numero?: string; peso_liquido?: number | null; peso_bruto?: number | null };
+type Transporte = { modalidade?: number; transportadora?: Transportadora | null; volume?: Volume | null };
+
+// modFrete aceito pela Focus: 0 por conta do emitente (CIF), 1 do destinatário (FOB), 2 de terceiros, 9 sem frete.
+const MODALIDADES = [0, 1, 2, 9];
+// A transportadora (grupo transporta) só nas modalidades com transportadora contratada.
+const COM_TRANSPORTADORA = [0, 1, 2];
+const t = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+/** IE: ISENTO, ou só os números (cortar antes de limpar perdia o último dígito da IE formatada: 110.042.490.114). */
+const ieLimpa = (v: unknown) => (typeof v !== "string" || !v.trim() ? "" : /isent/i.test(v) ? "ISENTO" : so(v).slice(0, 14));
+
+/**
+ * Dígito verificador do CNPJ (14, letras valem código ASCII − 48, regra da Receita de 07/2026) ou do CPF (11). Sem
+ * isso, um CNPJ errado ia para o cadastro de transportadoras antes da recusa da SEFAZ (revisão de 11/11).
+ */
+function documentoValido(d: string): boolean {
+  const v = (c: string) => c.charCodeAt(0) - 48;
+  const dv = (base: string, pesos: number[]) => {
+    const resto = [...base].reduce((a, c, i) => a + v(c) * pesos[i], 0) % 11;
+    return resto < 2 ? 0 : 11 - resto;
+  };
+  if (/^[0-9A-Z]{12}[0-9]{2}$/.test(d)) {
+    if (/^(\d)\1{13}$/.test(d)) return false;
+    const p1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    const d1 = dv(d.slice(0, 12), p1);
+    const d2 = dv(d.slice(0, 12) + d1, [6, ...p1]);
+    return d1 === Number(d[12]) && d2 === Number(d[13]);
+  }
+  if (/^\d{11}$/.test(d)) {
+    if (/^(\d)\1{10}$/.test(d)) return false;
+    const d1 = dv(d.slice(0, 9), [10, 9, 8, 7, 6, 5, 4, 3, 2]);
+    const d2 = dv(d.slice(0, 9) + d1, [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]);
+    return d1 === Number(d[9]) && d2 === Number(d[10]);
+  }
+  return false;
+}
+
+const kg = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.round(v * 1000) / 1000 : null);
+
+/**
+ * Transporte da nota (JoGrampo, 11/11): quem paga o frete, a transportadora e o volume. Sem nada informado, vale o de
+ * antes: frete no pedido = por conta do remetente; sem frete = sem transporte. Devolve os campos da Focus, o que falta
+ * arrumar e o transporte limpo, que fica gravado na nota.
+ */
+function transporte(t0: Transporte | undefined, frete: number) {
+  const modalidade = MODALIDADES.includes(Number(t0?.modalidade)) ? Number(t0!.modalidade) : frete > 0 ? 0 : 9;
+  const faltando: string[] = [];
+  const campos: Record<string, unknown> = { modalidade_frete: modalidade };
+
+  const tr = t0?.transportadora;
+  const doc = (tr?.documento ?? "").toUpperCase().replace(/[^0-9A-Z]/g, "");
+  const transportadora = COM_TRANSPORTADORA.includes(modalidade) && (doc || t(tr?.nome, 60))
+    ? {
+      documento: doc, nome: t(tr?.nome, 60), inscricao_estadual: ieLimpa(tr?.inscricao_estadual),
+      endereco: t(tr?.endereco, 60), municipio: t(tr?.municipio, 60), uf: t(tr?.uf, 2).toUpperCase(),
+    }
+    : null;
+  if (transportadora) {
+    if (doc && !documentoValido(doc)) faltando.push("Transportadora: confira o CNPJ ou CPF (está incompleto ou com o dígito errado).");
+    if (transportadora.nome.length < 2) faltando.push("Transportadora: informe o nome ou a razão social.");
+    if (transportadora.uf && !/^[A-Z]{2}$/.test(transportadora.uf)) faltando.push("Transportadora: a UF tem 2 letras (ex.: PR).");
+    if (transportadora.municipio && !transportadora.uf) faltando.push("Transportadora: informe a UF junto com a cidade.");
+    Object.assign(campos, {
+      ...(doc.length === 14 ? { cnpj_transportador: doc } : doc.length === 11 ? { cpf_transportador: doc } : {}),
+      nome_transportador: transportadora.nome,
+      // IE: números, ou ISENTO.
+      ...(transportadora.inscricao_estadual ? { inscricao_estadual_transportador: transportadora.inscricao_estadual } : {}),
+      ...(transportadora.endereco ? { endereco_transportador: transportadora.endereco } : {}),
+      ...(transportadora.municipio ? { municipio_transportador: transportadora.municipio } : {}),
+      ...(transportadora.uf ? { uf_transportador: transportadora.uf } : {}),
+    });
+  }
+
+  const v = t0?.volume;
+  const volume = v
+    ? {
+      quantidade: typeof v.quantidade === "number" && Number.isInteger(v.quantidade) && v.quantidade > 0 ? v.quantidade : null,
+      especie: t(v.especie, 60), marca: t(v.marca, 60), numero: t(v.numero, 60),
+      peso_liquido: kg(v.peso_liquido), peso_bruto: kg(v.peso_bruto),
+    }
+    : null;
+  const temVolume = !!volume && (volume.quantidade != null || !!volume.especie || !!volume.marca || !!volume.numero ||
+    volume.peso_liquido != null || volume.peso_bruto != null);
+  // A SEFAZ exige a quantidade (qVol) sempre que algum campo do volume vem preenchido.
+  if (temVolume && volume!.quantidade == null) faltando.push("Volumes: informe a quantidade de embalagens.");
+  if (temVolume && volume!.peso_liquido != null && volume!.peso_bruto != null && volume!.peso_bruto < volume!.peso_liquido) {
+    faltando.push("Volumes: o peso bruto (com a embalagem) não pode ser menor que o peso líquido.");
+  }
+  if (temVolume) {
+    campos.volumes = [{
+      ...(volume!.quantidade != null ? { quantidade: volume!.quantidade } : {}),
+      ...(volume!.especie ? { especie: volume!.especie } : {}),
+      ...(volume!.marca ? { marca: volume!.marca } : {}),
+      ...(volume!.numero ? { numero: volume!.numero } : {}),
+      ...(volume!.peso_liquido != null ? { peso_liquido: volume!.peso_liquido } : {}),
+      ...(volume!.peso_bruto != null ? { peso_bruto: volume!.peso_bruto } : {}),
+    }];
+  }
+  return { campos, faltando, gravar: { modalidade, transportadora, volume: temVolume ? volume : null } };
+}
+
 /** Data e hora de Brasília com fuso (formato da SEFAZ). */
 function agoraBrasilia() {
   const d = new Date(Date.now() - 3 * 3600_000);
@@ -77,7 +180,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json(405, { erro: "use POST" });
 
-  let p: { pedido_id?: string; emissora_id?: string; forma_pagamento?: string; a_prazo?: boolean; presenca?: number; informacoes?: string };
+  let p: {
+    pedido_id?: string; emissora_id?: string; forma_pagamento?: string; a_prazo?: boolean; presenca?: number; informacoes?: string;
+    transporte?: Transporte;
+  };
   try {
     p = await req.json();
   } catch {
@@ -156,6 +262,8 @@ Deno.serve(async (req) => {
     if (!(Number(i.quantidade) > 0) || !(Number(i.preco_unitario) > 0)) faltando.push(`Item ${n + 1} (${i.descricao}): quantidade e preço precisam ser maiores que zero.`);
   });
   const forma = p.forma_pagamento && FORMAS.includes(p.forma_pagamento) ? p.forma_pagamento : "99";
+  const transp = transporte(p.transporte, Number(ped.frete) || 0);
+  faltando.push(...transp.faltando);
   if (faltando.length) return json(422, { erro: "Falta arrumar antes de emitir:", faltando });
 
   const ambiente = emi!.nfe_ambiente as Ambiente;
@@ -184,7 +292,7 @@ Deno.serve(async (req) => {
     local_destino: interna ? 1 : 2,
     consumidor_final: indicadorIe === 9 ? 1 : 0,
     presenca_comprador: [1, 2, 3, 4, 9].includes(Number(p.presenca)) ? Number(p.presenca) : 9,
-    modalidade_frete: Number(ped.frete) > 0 ? 0 : 9,
+    ...transp.campos,
     cnpj_emitente: emi!.cnpj,
     // A do cadastro da Livih (a API de empresas da Focus só guarda IE numérica).
     inscricao_estadual_emitente: so(emi!.inscricao_estadual) || "ISENTO",
@@ -246,11 +354,24 @@ Deno.serve(async (req) => {
   const ref = `lvh${id.replace(/-/g, "")}`;
   const { data: nota, error: erroNota } = await admin.from("notas_fiscais").insert({
     id, org_id: ped.org_id, emissora_id: emi!.id, pedido_id: ped.id, cliente_id: cli!.id, ref, ambiente,
-    valor: valorTotal, criado_por: quem.user.id,
+    valor: valorTotal, criado_por: quem.user.id, transporte: transp.gravar,
   }).select("*").single();
   if (erroNota) {
     console.error("nota", erroNota.message);
     return json(erroNota.code === "23505" ? 409 : 500, { erro: erroNota.code === "23505" ? "A nota deste pedido já está sendo processada." : "Não foi possível registrar a nota." });
+  }
+
+  // A transportadora fica no cadastro da empresa para a próxima nota (a mais recente vem primeiro na lista). Só os
+  // campos preenchidos: digitar só CNPJ e nome não apaga a IE e o endereço que já estavam guardados.
+  const tr = transp.gravar.transportadora;
+  if (tr?.documento) {
+    const preenchidos = Object.fromEntries(
+      (["inscricao_estadual", "endereco", "municipio", "uf"] as const).filter((c) => tr[c]).map((c) => [c, tr[c]]),
+    );
+    const { error: erroTr } = await admin.from("transportadoras").upsert({
+      org_id: ped.org_id, documento: tr.documento, nome: tr.nome, ...preenchidos, usada_em: new Date().toISOString(),
+    }, { onConflict: "org_id,documento" });
+    if (erroTr) console.error("transportadora", erroTr.message);
   }
 
   let r: Response;

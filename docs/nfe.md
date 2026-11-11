@@ -157,6 +157,8 @@ diverge do cadastrado".
   - CNPJ do Paraná: o aviso com o passo a passo aparece na configuração da nota;
   - nota recusada com 974 ou 203 (emissor não habilitado): o mesmo passo a passo aparece no lugar do texto da SEFAZ.
 - **Na implantação** de cliente do Paraná: mandar o passo a passo ao contador junto com o pedido do certificado A1.
+- **Resolvido em 04/11** para a FIXOTEC (CNPJ 43.147.741/0001-02): registro na Receita/PR e aceite da Focus feitos.
+  Ainda não se sabe quais outros estados exigem o mesmo cadastro.
 
 ## Entregas
 
@@ -181,6 +183,15 @@ diverge do cadastrado".
    do cliente e **Baixar XMLs do mês** (.zip por CNPJ, para a contabilidade).
 4. **Faturamento por CNPJ:** sugestão, "CNPJ do balcão" e aviso de certificado vencendo.
 5. **Produção:** passar o primeiro cliente (JoGrampo) para produção, acompanhando as primeiras notas reais.
+6. **Transporte (pedido da JoGrampo em 11/11):** seção "Transporte" na janela de emitir: quem paga o frete (CIF, FOB,
+   terceiros ou sem frete, os quatro que a Focus aceita), a transportadora (CNPJ/CPF com busca na Receita, nome, IE,
+   endereço, cidade e UF; só em CIF, FOB e terceiros) e um volume (quantidade, espécie, marca, numeração, peso líquido e
+   bruto, digitados na nota: o produto não tem peso). A quantidade é obrigatória quando algum dado do volume vem
+   preenchido (regra da SEFAZ). A transportadora usada fica em `transportadoras` (gravada pela `nfe-emitir`) para
+   escolher na próxima nota, e o transporte enviado fica em `notas_fiscais.transporte`, que preenche o "Emitir de novo".
+   Migration `20261111170000_transporte_nfe.sql`.
+   No mesmo dia: a nota à vista deixou de levar duplicatas (rejeição 853, pedido em PIX antecipado com a parcela
+   vencendo no dia); as duplicatas só vão com "Pagamento a prazo" marcado.
 
 Esforço estimado: 4 a 6 dias de construção, sem contar o tempo da conta na Focus e dos testes com a contabilidade do
 cliente.
