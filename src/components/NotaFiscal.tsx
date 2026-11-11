@@ -151,7 +151,9 @@ export function BlocoNota({ orgId, alvo }: { orgId: string; alvo: Extract<Alvo, 
   if (atual === undefined) return null
   if (!atual && !pode) return null
   const status = alvo.tipo === 'pedido' ? alvo.pedido.status : null
-  const livre = !atual || atual.status === 'rejeitada' || atual.status === 'cancelada'
+  // A nota de teste (homologação) autorizada não trava: dá para testar de novo no mesmo pedido (11/11).
+  const livre =
+    !atual || atual.status === 'rejeitada' || atual.status === 'cancelada' || (atual.status === 'autorizada' && atual.ambiente === 'homologacao')
   const podeEmitir = pode && livre && status !== 'rascunho' && status !== 'cancelado'
 
   return (

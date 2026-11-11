@@ -209,7 +209,9 @@ Deno.serve(async (req) => {
   const [{ data: ped }, { data: itens }, { data: viva }, { data: parcelas }] = await Promise.all([
     admin.from("pedidos").select("*").eq("id", p.pedido_id).single(),
     admin.from("pedido_itens").select("*").eq("pedido_id", p.pedido_id).order("ordem"),
-    admin.from("notas_fiscais").select("id, status").eq("pedido_id", p.pedido_id).in("status", ["processando", "autorizada"]).maybeSingle(),
+    // Viva: processando ou autorizada em produção. A de teste (homologação) não impede emitir de novo (11/11).
+    admin.from("notas_fiscais").select("id, status").eq("pedido_id", p.pedido_id)
+      .or("status.eq.processando,and(status.eq.autorizada,ambiente.eq.producao)").limit(1).maybeSingle(),
     // Parcelas a receber do pedido (geradas ao confirmar, docs/financeiro.md): viram as duplicatas da nota.
     admin.from("fin_lancamentos").select("valor, vencimento, parcela").eq("pedido_id", p.pedido_id).eq("tipo", "receber")
       .is("cancelado_em", null).order("vencimento").order("parcela"),

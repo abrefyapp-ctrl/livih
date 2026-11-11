@@ -7574,5 +7574,38 @@ begin
   insert into resultado (teste, ok) values ('transporte: outra empresa não vê as transportadoras da F7',
     (select count(*) from public.transportadoras where documento = '11222333000181') = 0);
 end $$;
+
+-- Nota de teste não trava o pedido (migration 20261111190000).
+reset role;
+set local role service_role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_emi uuid := (select id from public.emissoras where org_id = current_setting('teste.f7')::uuid and cnpj = '11222333000181');
+  v_ped uuid := current_setting('teste.pedido_nf')::uuid;
+begin
+  -- O pedido já tem uma NF-e autorizada em homologação (bloco "NF-e, emissão").
+  insert into public.notas_fiscais (org_id, emissora_id, pedido_id, ref, ambiente) values (v_org, v_emi, v_ped, 'lvhdenovo1', 'homologacao');
+  update public.notas_fiscais set status = 'autorizada', numero = 2, serie = 1, chave = repeat('2', 44), autorizada_em = now()
+   where ref = 'lvhdenovo1';
+  insert into resultado (teste, ok) values ('nota de teste: autorizada em homologação deixa emitir de novo', true);
+  begin
+    insert into public.notas_fiscais (org_id, emissora_id, pedido_id, ref, ambiente) values (v_org, v_emi, v_ped, 'lvhdenovo2', 'producao');
+    insert into public.notas_fiscais (org_id, emissora_id, pedido_id, ref, ambiente) values (v_org, v_emi, v_ped, 'lvhdenovo3', 'producao');
+    insert into resultado (teste, ok) values ('nota de teste: duas processando no mesmo pedido continuam barradas', false);
+  exception when unique_violation then
+    insert into resultado (teste, ok) values ('nota de teste: duas processando no mesmo pedido continuam barradas', true);
+  end;
+  insert into public.notas_fiscais (org_id, emissora_id, pedido_id, ref, ambiente) values (v_org, v_emi, v_ped, 'lvhdenovo4', 'producao');
+  update public.notas_fiscais set status = 'autorizada', numero = 3, serie = 1, chave = repeat('3', 44), autorizada_em = now()
+   where ref = 'lvhdenovo4';
+  begin
+    insert into public.notas_fiscais (org_id, emissora_id, pedido_id, ref, ambiente) values (v_org, v_emi, v_ped, 'lvhdenovo5', 'homologacao');
+    insert into resultado (teste, ok) values ('nota de teste: com nota de produção autorizada, não emite outra', false);
+  exception when unique_violation then
+    insert into resultado (teste, ok) values ('nota de teste: com nota de produção autorizada, não emite outra', true);
+  end;
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

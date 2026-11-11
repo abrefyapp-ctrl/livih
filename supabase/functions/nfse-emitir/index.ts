@@ -124,8 +124,9 @@ Deno.serve(async (req) => {
       : admin.from("emissoras").select("*").eq("org_id", orgId).eq("padrao", true).maybeSingle(),
     clienteId ? admin.from("clientes").select("*").eq("id", clienteId).maybeSingle() : { data: null },
     p.pedido_id || p.os_id
+      // Viva: processando ou autorizada em produção. A de teste (homologação) não impede emitir de novo (11/11).
       ? admin.from("notas_fiscais").select("id, status").eq(p.pedido_id ? "pedido_id" : "os_id", (p.pedido_id ?? p.os_id)!)
-          .in("status", ["processando", "autorizada"]).maybeSingle()
+          .or("status.eq.processando,and(status.eq.autorizada,ambiente.eq.producao)").limit(1).maybeSingle()
       : { data: null },
   ]);
   if (viva) return json(409, { erro: viva.status === "autorizada" ? "Já existe nota autorizada para isto." : "A nota já está sendo processada." });
