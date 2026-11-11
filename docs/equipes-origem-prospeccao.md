@@ -98,6 +98,36 @@ Pedido: saber de onde veio o contato (site, Google Ads, campanha, status) e se v
   para a integração.
 - Tamanho: pequeno a médio.
 
+**Construída em 11/11:** migration `20261111140000_origem_do_lead.sql`.
+- **Ciclo:** a origem é gravada na primeira mensagem com o contato depois de 30 dias sem nenhuma, em qualquer número
+  (a mesma régua dos contatos ativos). Cada ciclo é uma linha em `origem_ciclos`, que só recebe acréscimos: quem volta
+  meses depois por outro caminho ganha um ciclo novo, e o Painel de um mês fechado não muda. O ciclo guarda a mensagem
+  que o abriu; se ela deu erro de envio (a saída nasce "pendente" e vira "erro" depois), o Painel e a oportunidade a
+  ignoram, e ela não segura o ciclo de quem chega depois.
+- **De onde vem a origem**, nesta ordem: mensagem de campanha → "Campanha"; mensagem que a equipe mandou primeiro →
+  "Prospecção ativa"; mensagem do contato com o texto de uma regra (a mensagem pronta do site ou do anúncio) → a origem
+  da regra; a origem do número (`canais.origem`, ex.: o número do Google Ads); senão, "Direto no WhatsApp". Mensagem
+  do agente ou automática não abre ciclo. Resposta a status fica para a entrega 4.
+- **Contato e oportunidade:** o contato recebe a origem só quando ele escreveu primeiro (número ou regra) e não tinha
+  uma de verdade (`'whatsapp'` e `'manual'` só diziam como foi criado). "Campanha" e "Prospecção ativa" ficam só no
+  ciclo: dizem como a conversa começou, e nos primeiros 30 dias de um número marcariam a carteira antiga do vendedor.
+  A oportunidade criada em até 30 dias do ciclo nasce com a origem dele.
+- Nomes que a Livih usa ("Campanha", "Prospecção ativa", "Direto no WhatsApp", "whatsapp", "manual", "importacao")
+  são recusados como origem configurada.
+- Sem dados de antes: o Painel mostra "Medido desde DD/MM" (o primeiro ciclo da empresa).
+- Revisão do `revisor-banco` (11/11) aplicada: tabela só de acréscimo no lugar de sobrescrever a conversa, mensagem
+  com erro, contato só com origem de entrada, nomes reservados, índice do período e trava do contato na entrada (dois
+  números ao mesmo tempo não abrem dois ciclos).
+- **Configuração** (dono e admin), em Configurações → WhatsApp: "Origem dos contatos deste número" em cada número e
+  "Origem pela mensagem pronta" (regras de texto, sem acento e sem diferenciar maiúsculas; o texto mais longo vence).
+- **Painel**, bloco "De onde vêm os contatos": por origem, contatos que começaram no período, sem resposta e tempo de
+  resposta (só dos que escreveram primeiro), oportunidades criadas, ganhas e valor ganho. Mesmos filtros do Painel.
+- Para a CEFEQ: marcar a origem do número do site e do Google Ads **antes** de conectar os números; o que chegar
+  antes fica sem origem.
+- Para depois: o anúncio de clique para o WhatsApp da Meta manda a referência do anúncio no webhook (`referral`); dá
+  para gravar a campanha do anúncio como origem sem regra de texto.
+- 33 testes.
+
 ### 4. Status do WhatsApp
 
 Pedidos: quantos contatos reagiram aos status de cada vendedor; o marketing postar o status de todos de uma vez.

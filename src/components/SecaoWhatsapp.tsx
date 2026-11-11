@@ -24,6 +24,7 @@ import {
 } from '../services/configuracoes'
 import { equipeQueGerencia, listarLugares, type LugarNaEquipe } from '../services/equipes'
 import { formatarTelefone, haQuanto, quandoCurto } from '../services/formato'
+import { origensDosNumeros } from '../services/origem'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
@@ -31,6 +32,7 @@ import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { EstadoVazio } from './EstadoVazio'
 import { Icone } from './Icone'
 import { Modal } from './Modal'
+import { OrigemDoNumero, RegrasDeOrigem, SugestoesDeOrigem } from './OrigemDosContatos'
 import { PagamentoMeta } from './PagamentoMeta'
 
 type Edicao = { id: string | null; nome: string; responsavel_id: string }
@@ -192,6 +194,21 @@ export function SecaoWhatsapp() {
   }, [orgId, gerencia, versao])
   const distribui = (id: string) => distribuicao?.orgId === orgId && distribuicao.numeros.has(id)
 
+  // Origem dos contatos de cada número (migration 20261111140000): só dono e admin configuram.
+  const [origensLidas, setOrigensLidas] = useState<{ orgId: string; mapa: Map<string, string> } | null>(null)
+  const [versaoOrigem, setVersaoOrigem] = useState(0)
+  useEffect(() => {
+    if (!gerencia) return
+    let ativo = true
+    origensDosNumeros(orgId)
+      .then((mapa) => ativo && setOrigensLidas({ orgId, mapa }))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [orgId, gerencia, versao, versaoOrigem])
+  const origens = origensLidas?.orgId === orgId ? origensLidas.mapa : null
+
   // Forma de pagamento da Meta nos números oficiais (06/11): a Meta cobra a empresa direto e a API não diz se há cartão.
   const [pagamentoLido, setPagamentoLido] = useState<{ orgId: string; mapa: Map<string, PagamentoMetaCanal> } | null>(null)
   const [versaoPagamento, setVersaoPagamento] = useState(0)
@@ -347,6 +364,17 @@ export function SecaoWhatsapp() {
                   </div>
                 </div>
 
+                {gerencia && origens && (
+                  <div className="border-t border-borda px-4 py-3">
+                    <OrigemDoNumero
+                      key={`${n.id}|${origens.get(n.id) ?? ''}`}
+                      canalId={n.id}
+                      origem={origens.get(n.id) ?? ''}
+                      aoSalvar={() => setVersaoOrigem((v) => v + 1)}
+                    />
+                  </div>
+                )}
+
                 {gerencia && !n.responsavel_id && (
                   <div className="space-y-2 border-t border-borda px-4 py-3">
                     <label className="flex cursor-pointer items-start gap-2.5">
@@ -424,6 +452,13 @@ export function SecaoWhatsapp() {
             )
           })}
         </ul>
+      )}
+
+      {gerencia && (
+        <>
+          <RegrasDeOrigem orgId={orgId} />
+          <SugestoesDeOrigem />
+        </>
       )}
 
       <Modal

@@ -7191,5 +7191,312 @@ exception when others then
   insert into resultado (teste, ok) values ('prospecção: outra empresa não abre', sqlerrm = 'sem acesso');
 end $$;
 
+-- Origem do lead (migration 20261111140000). Números novos: G (Google Ads), H (sem origem) e B (do atendente b1).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_g uuid; v_h uuid; v_b uuid;
+begin
+  insert into public.canais (org_id, nome, telefone, instance_id) values (v_org, 'Google Ads', '5541944440021', 'INST-ORIG-G')
+  returning id into v_g;
+  insert into public.canais (org_id, nome, telefone, instance_id) values (v_org, 'Loja', '5541944440022', 'INST-ORIG-H')
+  returning id into v_h;
+  insert into public.canais (org_id, nome, telefone, instance_id, responsavel_id)
+  values (v_org, 'Do atendente', '5541944440023', 'INST-ORIG-B', '00000000-0000-0000-0000-0000000000b1') returning id into v_b;
+  insert into public.agentes (org_id, canal_id, ativo) values (v_org, v_g, false), (v_org, v_h, false), (v_org, v_b, false);
+  perform set_config('teste.orig_g', v_g::text, true);
+  perform set_config('teste.orig_h', v_h::text, true);
+  perform set_config('teste.orig_b', v_b::text, true);
+end $$;
+
+-- Dono configura a origem do número e as regras da mensagem pronta.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  perform public.canal_definir_origem(current_setting('teste.orig_g')::uuid, '  Google Ads ');
+  perform set_config('teste.orig_regra',
+    public.origem_regra_salvar(v_org, null, 'Olá, vim pelo site', 'Site')::text, true);
+  perform public.origem_regra_salvar(v_org, null, 'Olá, vim pelo site pelo anúncio', 'Anúncio do site');
+  insert into resultado (teste, ok) values ('origem: dono define a origem do número e as regras de texto',
+    (select origem from public.canais where id = current_setting('teste.orig_g')::uuid) = 'Google Ads'
+    and (select count(*) from public.origem_regras where org_id = v_org) = 2);
+  begin
+    perform public.origem_regra_salvar(v_org, null, 'OLA, VIM PELO SITE', 'Outra');
+    insert into resultado (teste, ok) values ('origem: regra com o mesmo texto (sem acento, maiúsculas) é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('origem: regra com o mesmo texto (sem acento, maiúsculas) é recusada',
+      sqlerrm like 'Já existe uma regra%');
+  end;
+  begin
+    perform public.origem_regra_salvar(v_org, null, 'oi', 'Site');
+    insert into resultado (teste, ok) values ('origem: texto curto demais é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('origem: texto curto demais é recusado', sqlerrm like 'O texto da mensagem%');
+  end;
+  begin
+    perform public.origem_regra_salvar(v_org, null, 'vim pela promo', 'Campanha');
+    insert into resultado (teste, ok) values ('origem: nome que a Livih usa é recusado na regra e no número', false);
+  exception when others then
+    begin
+      perform public.canal_definir_origem(current_setting('teste.orig_h')::uuid, 'WhatsApp');
+      insert into resultado (teste, ok) values ('origem: nome que a Livih usa é recusado na regra e no número', false);
+    exception when others then
+      insert into resultado (teste, ok) values ('origem: nome que a Livih usa é recusado na regra e no número',
+        sqlerrm like 'A origem "WhatsApp" é usada pela Livih%');
+    end;
+  end;
+end $$;
+
+-- As mensagens chegam pelos caminhos de verdade (webhook, celular) e por insert direto quando precisa de data antiga.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_g uuid := current_setting('teste.orig_g')::uuid;
+  v_h uuid := current_setting('teste.orig_h')::uuid;
+  v_ct uuid; v_cv uuid; v_camp uuid; v_msg uuid; r jsonb;
+begin
+  -- O1: escreve no número do Google Ads, e escreve de novo (mesmo ciclo).
+  r := public.registrar_entrada(v_g, 'ORIG-1', '5541912359001', null, 'Lead Ads', 'texto', 'Oi, quero um orçamento', '{}');
+  perform set_config('teste.orig_c1', r ->> 'conversa_id', true);
+  perform public.registrar_entrada(v_g, 'ORIG-1B', '5541912359001', null, 'Lead Ads', 'texto', 'Olá, vim pelo site', '{}');
+  insert into resultado (teste, ok) values ('origem: pelo número; a segunda mensagem não abre outro ciclo',
+    (select count(*) = 1 and bool_and(origem = 'Google Ads' and recebido) from public.origem_ciclos
+      where conversa_id = current_setting('teste.orig_c1')::uuid)
+    and (select ct.origem from public.contatos ct join public.conversas c on c.contato_id = ct.id
+          where c.id = current_setting('teste.orig_c1')::uuid) = 'Google Ads');
+  -- O2: mensagem pronta do site no número do Google Ads: a regra vence o número (sem acento e sem maiúsculas).
+  r := public.registrar_entrada(v_g, 'ORIG-2', '5541912359002', null, 'Lead Site', 'texto', 'OLA, vim pelo SITE! Quero preço', '{}');
+  perform set_config('teste.orig_c2', r ->> 'conversa_id', true);
+  -- O2b: casa com as duas regras: a de texto mais longo vence.
+  r := public.registrar_entrada(v_g, 'ORIG-2B', '5541912359022', null, 'Lead Anúncio', 'texto', 'Olá, vim pelo site pelo anúncio', '{}');
+  insert into resultado (teste, ok) values ('origem: a regra de texto vence o número, e a mais longa vence a curta',
+    (select origem from public.origem_ciclos where conversa_id = current_setting('teste.orig_c2')::uuid) = 'Site'
+    and (select origem from public.origem_ciclos where conversa_id = (r ->> 'conversa_id')::uuid) = 'Anúncio do site');
+  -- O3: número sem origem.
+  r := public.registrar_entrada(v_h, 'ORIG-3', '5541912359003', null, 'Direto', 'texto', 'Bom dia', '{}');
+  insert into resultado (teste, ok) values ('origem: número sem origem abre ciclo direto',
+    (select origem is null and recebido from public.origem_ciclos where conversa_id = (r ->> 'conversa_id')::uuid));
+
+  -- O5: falou há 40 dias; volta pelo Google Ads: ciclo novo.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912359005', 'Voltou') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_h, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'entrada', 'contato', 'Oi', 'recebida', now() - interval '40 days');
+  r := public.registrar_entrada(v_g, 'ORIG-5', '5541912359005', null, 'Voltou', 'texto', 'Oi de novo', '{}');
+  insert into resultado (teste, ok) values ('origem: quem volta depois de 30 dias abre ciclo novo com a origem nova',
+    (select origem from public.origem_ciclos where conversa_id = (r ->> 'conversa_id')::uuid) = 'Google Ads'
+    and (select count(*) from public.origem_ciclos where contato_id = v_ct) = 2);
+
+  -- O6: falou há 10 dias em outro número; escreve no Google Ads: mesmo ciclo.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912359006', 'Recente') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_h, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'entrada', 'contato', 'Oi', 'recebida', now() - interval '10 days');
+  r := public.registrar_entrada(v_g, 'ORIG-6', '5541912359006', null, 'Recente', 'texto', 'Oi', '{}');
+  insert into resultado (teste, ok) values ('origem: dentro dos 30 dias, outro número não abre ciclo',
+    not exists (select 1 from public.origem_ciclos where conversa_id = (r ->> 'conversa_id')::uuid));
+
+  -- O7: o vendedor puxa a conversa pelo celular: prospecção, e o contato não ganha origem por isso.
+  r := public.registrar_saida_celular(v_h, 'ORIG-7', '5541912359007', null, 'texto', 'Bom dia, temos novidade', '{}');
+  insert into resultado (teste, ok) values ('origem: mensagem da equipe pelo celular abre prospecção ativa sem marcar o contato',
+    (select origem = 'Prospecção ativa' and not recebido from public.origem_ciclos where conversa_id = (r ->> 'conversa_id')::uuid)
+    and (select origem from public.contatos where org_id = v_org and telefone = '5541912359007') = 'whatsapp');
+
+  -- O8: campanha, e a resposta não abre outro ciclo; O9: o agente puxa (não abre).
+  insert into public.campanhas (org_id, canal_id, nome, modelo, status)
+  values (v_org, v_h, 'Campanha da origem', '{"nome":"promo","idioma":"pt_BR"}', 'concluida') returning id into v_camp;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912359008', 'Da campanha') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_h, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, modelo)
+  values (v_org, v_cv, 'saida', 'atendente', 'Promoção', 'pendente', jsonb_build_object('nome', 'promo', 'campanha_id', v_camp));
+  perform public.registrar_entrada(v_h, 'ORIG-8', '5541912359008', null, 'Da campanha', 'texto', 'Quero', '{}');
+  insert into resultado (teste, ok) values ('origem: campanha abre ciclo e a resposta não abre outro',
+    (select count(*) = 1 and bool_and(origem = 'Campanha') from public.origem_ciclos where conversa_id = v_cv));
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912359009', 'Do agente') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_h, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_cv, 'saida', 'bot', 'Oi, posso ajudar?', 'pendente');
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, automatica)
+  values (v_org, v_cv, 'saida', 'atendente', 'Mensagem automática', 'enviada', true);
+  insert into resultado (teste, ok) values ('origem: mensagem do agente ou automática não abre ciclo',
+    not exists (select 1 from public.origem_ciclos where conversa_id = v_cv));
+
+  -- O10: contato importado não perde a origem; O11: o 'manual' é trocado.
+  insert into public.contatos (org_id, telefone, nome, origem) values (v_org, '5541912359010', 'Importado', 'importacao');
+  perform public.registrar_entrada(v_g, 'ORIG-10', '5541912359010', null, 'Importado', 'texto', 'Oi', '{}');
+  insert into public.contatos (org_id, telefone, nome, origem) values (v_org, '5541912359011', 'Cadastrado à mão', 'manual');
+  perform public.registrar_entrada(v_g, 'ORIG-11', '5541912359011', null, 'Cadastrado à mão', 'texto', 'Oi', '{}');
+  insert into resultado (teste, ok) values ('origem: contato importado continua importado; o cadastrado à mão ganha a origem',
+    (select origem from public.contatos where org_id = v_org and telefone = '5541912359010') = 'importacao'
+    and (select origem from public.contatos where org_id = v_org and telefone = '5541912359011') = 'Google Ads');
+
+  -- O12: a prospecção que deu erro não segura o ciclo: o contato que chega pelo Google Ads abre o dele.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912359012', 'Sem WhatsApp antes') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_h, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_cv, 'saida', 'atendente', 'Oi!', 'pendente') returning id into v_msg;
+  update public.mensagens set status_entrega = 'erro' where id = v_msg;
+  perform set_config('teste.orig_c12', v_cv::text, true);
+  perform public.registrar_entrada(v_g, 'ORIG-12', '5541912359012', null, 'Sem WhatsApp antes', 'texto', 'Oi', '{}');
+  insert into resultado (teste, ok) values ('origem: mensagem com erro não segura o ciclo de quem chega depois',
+    (select count(*) from public.origem_ciclos where contato_id = v_ct) = 2
+    and (select origem from public.contatos where id = v_ct) = 'Google Ads');
+
+  -- O13: ciclo de 50 dias atrás e outro hoje, na mesma conversa (o antigo continua no Painel do mês dele).
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912359013', 'Dois ciclos') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_g, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'entrada', 'contato', 'Oi', 'recebida', now() - interval '50 days');
+  perform public.registrar_entrada(v_g, 'ORIG-13', '5541912359013', null, 'Dois ciclos', 'texto', 'Voltei', '{}');
+  insert into resultado (teste, ok) values ('origem: ciclos em sequência ficam os dois guardados',
+    (select count(*) from public.origem_ciclos where conversa_id = v_cv) = 2);
+
+  -- Oportunidades: pegam a origem do ciclo (inclusive 'manual'); respeitam a informada; ciclo de mais de 30 dias não vale.
+  select contato_id into v_ct from public.conversas where id = current_setting('teste.orig_c1')::uuid;
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, origem, valor_estimado)
+  values (v_org, v_ct, (select id from public.etapas_funil where org_id = v_org and tipo = 'aberta' order by ordem limit 1),
+          'Negócio do Ads', 'whatsapp', 1000);
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, origem)
+  values (v_org, v_ct, (select id from public.etapas_funil where org_id = v_org and tipo = 'aberta' order by ordem limit 1),
+          'Indicado', 'Indicação');
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, origem)
+  select v_org, c.contato_id, (select id from public.etapas_funil where org_id = v_org and tipo = 'aberta' order by ordem limit 1),
+         'Do site', 'manual'
+    from public.conversas c where c.id = current_setting('teste.orig_c2')::uuid;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912359014', 'Ciclo velho') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_g, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'entrada', 'contato', 'Oi', 'recebida', now() - interval '35 days');
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, origem)
+  values (v_org, v_ct, (select id from public.etapas_funil where org_id = v_org and tipo = 'aberta' order by ordem limit 1),
+          'Ciclo velho', 'whatsapp');
+  insert into resultado (teste, ok) values ('origem: oportunidade nasce com a origem do ciclo, respeita a informada e ignora ciclo velho',
+    exists (select 1 from public.oportunidades where titulo = 'Negócio do Ads' and origem = 'Google Ads')
+    and exists (select 1 from public.oportunidades where titulo = 'Indicado' and origem = 'Indicação')
+    and exists (select 1 from public.oportunidades where titulo = 'Do site' and origem = 'Site')
+    and exists (select 1 from public.oportunidades where titulo = 'Ciclo velho' and origem = 'whatsapp'));
+  update public.oportunidades set etapa_id = (select id from public.etapas_funil where org_id = v_org and tipo = 'ganho' limit 1)
+   where org_id = v_org and titulo = 'Negócio do Ads';
+
+  -- B: conversa no número do atendente b1.
+  perform public.registrar_entrada(current_setting('teste.orig_b')::uuid, 'ORIG-B', '5541912359015', null, 'Do b1', 'texto', 'Oi', '{}');
+end $$;
+
+-- Painel por origem.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_ate timestamptz := clock_timestamp() + interval '1 minute';
+  v_r jsonb;
+begin
+  v_r := public.painel_origens(v_org, now() - interval '7 days', v_ate, current_setting('teste.orig_g')::uuid);
+  insert into resultado (teste, ok) values ('origem: painel conta contatos por origem no número',
+    v_r -> 'linhas' @> '[{"origem":"Google Ads","contatos":6},{"origem":"Site","contatos":1},{"origem":"Anúncio do site","contatos":1}]'
+    and v_r ->> 'desde' is not null);
+  insert into resultado (teste, ok) values ('origem: painel conta oportunidade e venda ganha da origem',
+    v_r -> 'linhas' @> '[{"origem":"Google Ads","oportunidades":1,"ganhas":1,"valor_ganho":1000}]');
+  v_r := public.painel_origens(v_org, now() - interval '7 days', v_ate, current_setting('teste.orig_h')::uuid);
+  insert into resultado (teste, ok) values ('origem: painel mostra direto, prospecção e campanha, sem a prospecção que deu erro',
+    v_r -> 'linhas' @> '[{"origem":"Direto no WhatsApp"},{"origem":"Prospecção ativa","contatos":1,"recebidos":0},{"origem":"Campanha","contatos":1}]');
+  v_r := public.painel_origens(v_org, now() - interval '60 days', now() - interval '40 days', current_setting('teste.orig_g')::uuid);
+  insert into resultado (teste, ok) values ('origem: o ciclo antigo continua no período dele',
+    v_r -> 'linhas' @> '[{"origem":"Google Ads","contatos":1}]');
+  perform public.origem_regra_remover(current_setting('teste.orig_regra')::uuid);
+  insert into resultado (teste, ok) values ('origem: dono remove a regra',
+    not exists (select 1 from public.origem_regras where id = current_setting('teste.orig_regra')::uuid));
+end $$;
+
+-- Atendente: vê as regras, não muda nada e no Painel só vê o próprio número.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'origem: atendente lê as regras da empresa', count(*) = 1
+  from public.origem_regras where org_id = current_setting('teste.f7')::uuid;
+insert into resultado (teste, ok)
+select 'origem: atendente vê no painel só o que é dele',
+  r -> 'linhas' @> '[{"origem":"Direto no WhatsApp"}]' and not (r -> 'linhas' @> '[{"origem":"Google Ads"}]')
+  from (select public.painel_origens(current_setting('teste.f7')::uuid, now() - interval '7 days',
+                                     clock_timestamp() + interval '1 minute') r) x;
+do $$ begin
+  perform public.canal_definir_origem(current_setting('teste.orig_g')::uuid, 'Instagram');
+  insert into resultado (teste, ok) values ('origem: atendente não muda a origem do número', false);
+exception when others then
+  insert into resultado (teste, ok) values ('origem: atendente não muda a origem do número', sqlerrm like 'Só dono e admin%');
+end $$;
+do $$ begin
+  perform public.origem_regra_salvar(current_setting('teste.f7')::uuid, null, 'vim pelo instagram', 'Instagram');
+  insert into resultado (teste, ok) values ('origem: atendente não cria regra', false);
+exception when others then
+  insert into resultado (teste, ok) values ('origem: atendente não cria regra', sqlerrm like 'Só dono e admin%');
+end $$;
+do $$ begin
+  perform public.origem_regra_remover((select id from public.origem_regras where org_id = current_setting('teste.f7')::uuid limit 1));
+  insert into resultado (teste, ok) values ('origem: atendente não remove regra', false);
+exception when others then
+  insert into resultado (teste, ok) values ('origem: atendente não remove regra', sqlerrm like 'Só dono e admin%');
+end $$;
+insert into resultado (teste, ok)
+select 'origem: ninguém grava direto nas tabelas da origem',
+  not has_table_privilege('authenticated', 'public.origem_regras', 'insert')
+  and not has_table_privilege('authenticated', 'public.origem_ciclos', 'select')
+  and not has_function_privilege('anon', 'public.painel_origens(uuid, timestamptz, timestamptz, uuid, uuid, uuid)', 'execute');
+
+-- Outra empresa.
+reset role;
+select set_config('teste.orig_regra2', (select id::text from public.origem_regras where org_id = current_setting('teste.f7')::uuid limit 1), true);
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'origem: outra empresa não vê as regras da F7',
+  not exists (select 1 from public.origem_regras where org_id = current_setting('teste.f7')::uuid);
+do $$ begin
+  perform public.painel_origens(current_setting('teste.f7')::uuid, now() - interval '7 days', now());
+  insert into resultado (teste, ok) values ('origem: outra empresa não abre o painel', false);
+exception when others then
+  insert into resultado (teste, ok) values ('origem: outra empresa não abre o painel', sqlerrm = 'sem acesso');
+end $$;
+do $$ begin
+  perform public.canal_definir_origem(current_setting('teste.orig_h')::uuid, 'Instagram');
+  insert into resultado (teste, ok) values ('origem: outra empresa não muda a origem do número', false);
+exception when others then
+  insert into resultado (teste, ok) values ('origem: outra empresa não muda a origem do número', sqlerrm like 'Só dono e admin%');
+end $$;
+do $$ begin
+  perform public.origem_regra_salvar(current_setting('teste.f7')::uuid, null, 'vim pelo instagram', 'Instagram');
+  insert into resultado (teste, ok) values ('origem: outra empresa não cria regra na F7', false);
+exception when others then
+  insert into resultado (teste, ok) values ('origem: outra empresa não cria regra na F7', sqlerrm like 'Só dono e admin%');
+end $$;
+-- A empresa do c1 está suspensa desde o bloco da plataforma: reativa só aqui, para o teste chegar à trava por empresa.
+reset role;
+update public.organizacoes set status = 'ativa' where id = current_setting('teste.cli')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$ begin
+  perform public.origem_regra_salvar(current_setting('teste.cli')::uuid, current_setting('teste.orig_regra2')::uuid, 'trocado', 'Outra');
+  insert into resultado (teste, ok) values ('origem: outra empresa não edita a regra da F7 pela própria empresa', false);
+exception when others then
+  insert into resultado (teste, ok) values ('origem: outra empresa não edita a regra da F7 pela própria empresa',
+    sqlerrm = 'Regra não encontrada.');
+end $$;
+reset role;
+update public.organizacoes set status = 'suspensa' where id = current_setting('teste.cli')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$ begin
+  perform public.origem_regra_remover(current_setting('teste.orig_regra2')::uuid);
+  insert into resultado (teste, ok) values ('origem: outra empresa não remove a regra da F7', false);
+exception when others then
+  insert into resultado (teste, ok) values ('origem: outra empresa não remove a regra da F7', sqlerrm like 'Só dono e admin%');
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

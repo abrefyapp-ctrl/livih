@@ -119,6 +119,34 @@ export async function buscarProspeccao(orgId: string, de: Date, ate: Date, f: Fi
   return data as unknown as Prospeccao
 }
 
+/** Por origem (migration 20261111140000): ciclos de conversa que começaram no período e oportunidades dessa origem. */
+export type OrigemPainel = {
+  origem: string
+  contatos: number
+  recebidos: number
+  sem_resposta: number
+  mediana_resposta_seg: number | null
+  oportunidades: number
+  ganhas: number
+  valor_ganho: number
+}
+
+/** desde = primeiro ciclo gravado na empresa (não há dados de antes da migration). */
+export type OrigensPainel = { desde: string | null; linhas: OrigemPainel[] }
+
+export async function buscarOrigens(orgId: string, de: Date, ate: Date, f: FiltroPainel): Promise<OrigensPainel> {
+  const { data, error } = await supabase.rpc('painel_origens', {
+    p_org: orgId,
+    p_de: de.toISOString(),
+    p_ate: ate.toISOString(),
+    p_canal: f.canal ?? undefined,
+    p_vendedor: f.vendedor ?? undefined,
+    p_equipe: f.equipe ?? undefined,
+  })
+  if (error) throw error
+  return data as unknown as OrigensPainel
+}
+
 export async function buscarRelatorio(orgId: string): Promise<Relatorio> {
   const { data, error } = await supabase.rpc('painel_relatorio', { p_org: orgId })
   if (error) throw error

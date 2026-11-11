@@ -11,6 +11,7 @@ import { perdasPorMotivo, type PerdaPorMotivo } from '../services/crm'
 import { equipeQueGerencia, listarEquipes, listarLugares, type Equipe, type LugarNaEquipe } from '../services/equipes'
 import { moeda } from '../services/formato'
 import {
+  buscarOrigens,
   buscarPendencias,
   buscarProspeccao,
   buscarResumo,
@@ -20,6 +21,7 @@ import {
   MINUTOS_PADRAO,
   porcentagem,
   salvarConfig,
+  type OrigensPainel,
   type Pendencias,
   type Prospeccao,
   type Resumo,
@@ -60,6 +62,7 @@ export function Painel() {
     pendencias: Pendencias
     perdas: PerdaPorMotivo[]
     prospeccao: Prospeccao | null
+    origens: OrigensPainel | null
   } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [relatorio, setRelatorio] = useState(false)
@@ -104,9 +107,11 @@ export function Painel() {
       perdasPorMotivo(orgId, de, ate, filtro.vendedor, filtro.equipe).catch(() => []),
       // Contatos ativos (migration 20261111100000); se falhar, o resto do Painel aparece igual.
       buscarProspeccao(orgId, de, ate, filtro).catch(() => null),
+      // Origem dos contatos (migration 20261111140000); idem.
+      buscarOrigens(orgId, de, ate, filtro).catch(() => null),
     ])
-      .then(([resumo, pendencias, perdas, prospeccao]) =>
-        ativo && (setDados({ chave, resumo, pendencias, perdas, prospeccao }), setErro(null)))
+      .then(([resumo, pendencias, perdas, prospeccao, origens]) =>
+        ativo && (setDados({ chave, resumo, pendencias, perdas, prospeccao, origens }), setErro(null)))
       .catch(() => ativo && setErro('Não foi possível carregar o painel.'))
     return () => {
       ativo = false
@@ -292,6 +297,8 @@ export function Painel() {
               </Secao>
             </div>
 
+            {atual!.origens && <Origens dados={atual!.origens} gerencia={gerencia} />}
+
             {atual!.prospeccao && <ContatosAtivos p={atual!.prospeccao} dias={dias} />}
 
             {a.vendedores && a.vendedores.length > 0 && (
@@ -327,6 +334,62 @@ export function Painel() {
       </div>
       {relatorio && <ModalRelatorioPiloto orgId={orgId} config={r?.config ?? null} aoFechar={() => (setRelatorio(false), setVersao((v) => v + 1))} />}
     </div>
+  )
+}
+
+/**
+ * De onde vêm os contatos (pedido da CEFEQ, docs/equipes-origem-prospeccao.md, entrega 3). "Ganhas" é a oportunidade
+ * ganha na Livih; a venda no ERP do cliente fica para a integração.
+ */
+function Origens({ dados, gerencia }: { dados: OrigensPainel; gerencia: boolean }) {
+  const linhas = dados.linhas
+  const desde = dados.desde ? new Date(dados.desde).toLocaleDateString('pt-BR') : null
+  return (
+    <Secao
+      titulo="De onde vêm os contatos"
+      subtitulo={`Contatos que começaram a conversar no período (depois de 30 dias sem falar com a empresa), pela origem, e as oportunidades de cada origem. ${desde ? `Medido desde ${desde}.` : 'A medição começa com a próxima conversa.'}`}
+    >
+      {linhas.length ? (
+        <div className="overflow-x-auto rounded-md border border-borda">
+          <table className="w-full text-pequeno">
+            <thead className="bg-fundo text-left text-legenda text-texto-3 uppercase">
+              <tr>
+                <th className="px-3 py-1.5 font-medium">Origem</th>
+                <th className="px-3 py-1.5 text-right font-medium">Contatos</th>
+                <th className="px-3 py-1.5 text-right font-medium">Sem resposta</th>
+                <th className="px-3 py-1.5 text-right font-medium">Tempo de resposta</th>
+                <th className="px-3 py-1.5 text-right font-medium">Oportunidades</th>
+                <th className="px-3 py-1.5 text-right font-medium">Ganhas</th>
+                <th className="px-3 py-1.5 text-right font-medium">Valor ganho</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-borda">
+              {linhas.map((l) => (
+                <tr key={l.origem}>
+                  <td className="px-3 py-1.5">{l.origem}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{l.contatos}</td>
+                  <td className={`px-3 py-1.5 text-right tabular-nums ${l.sem_resposta ? 'text-atencao' : ''}`}>
+                    {l.recebidos ? l.sem_resposta : '—'}
+                  </td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{l.recebidos ? duracao(l.mediana_resposta_seg) : '—'}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{l.oportunidades}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{l.ganhas}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{l.valor_ganho ? moeda(l.valor_ganho) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-pequeno text-texto-3">Nenhum contato novo no período.</p>
+      )}
+      {gerencia && (
+        <p className="text-legenda text-texto-3">
+          A origem vem do número (ex.: o número do Google Ads), da mensagem pronta do site ou do anúncio, da campanha ou
+          da mensagem que a equipe mandou primeiro. Configure em Configurações → WhatsApp.
+        </p>
+      )}
+    </Secao>
   )
 }
 
