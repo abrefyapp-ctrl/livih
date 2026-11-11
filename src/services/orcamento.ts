@@ -1,4 +1,4 @@
-import { enviarArquivo } from './atendimento'
+import { enviarArquivo, iniciarConversa, listarNumerosVisiveis, type NumeroVisivel } from './atendimento'
 import { listarEquipeCompleta } from './configuracoes'
 import { listarEmissoras, urlLogo, type Emissora } from './empresa'
 import { buscarPedido, type ItemPedido, type Pedido } from './erp'
@@ -142,6 +142,29 @@ export async function conversaDoCliente(contatoId: string): Promise<ConversaEnvi
     janelaFechada = !ultima || Date.now() - new Date(ultima.criado_em).getTime() > 24 * 3600_000
   }
   return { id: data.id, numero: canal?.nome ?? 'WhatsApp', oficial, janelaFechada }
+}
+
+/**
+ * Sem conversa (cliente que ligou ou falou no WhatsApp particular, docs/envio-orcamento.md parte 1, JoGrampo 03/11 e
+ * 11/11): os números por onde o PDF pode abrir uma. A API oficial fica fora: sem conversa, a Meta só aceita modelo.
+ */
+export async function numerosParaAbrirConversa(orgId: string): Promise<NumeroVisivel[]> {
+  return (await listarNumerosVisiveis(orgId)).filter((n) => n.tipo !== 'meta')
+}
+
+/** O número padrão de saída: o do próprio vendedor; senão o primeiro (mesma regra da Nova conversa, decisão de 03/11). */
+export const numeroPadrao = (numeros: NumeroVisivel[], eu: string | undefined) =>
+  numeros.find((n) => n.responsavel_id === eu)?.id ?? numeros[0].id
+
+/**
+ * Abre a conversa com o contato pelo número escolhido e devolve o id. iniciar_conversa já confere a carteira e deixa a
+ * conversa em atendimento com quem enviou (o agente não responde por cima).
+ */
+export async function abrirConversaDoContato(canalId: string, contatoId: string): Promise<string> {
+  const { data, error } = await supabase.from('contatos').select('telefone').eq('id', contatoId).maybeSingle()
+  if (error) throw new Error('Não foi possível ler o contato. Tente de novo.')
+  if (!data?.telefone) throw new Error('O cliente não tem WhatsApp no cadastro. Cadastre o número dele e tente de novo.')
+  return iniciarConversa(canalId, data.telefone, null, null)
 }
 
 /** Gera o PDF e manda na conversa (fica no histórico imutável, como qualquer arquivo enviado). */

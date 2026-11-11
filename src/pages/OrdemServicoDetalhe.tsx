@@ -20,7 +20,13 @@ import {
   type Ordem,
   type PassoOs,
 } from '../services/os'
-import { conversaDoCliente, type ConversaEnvio } from '../services/orcamento'
+import {
+  abrirConversaDoContato,
+  conversaDoCliente,
+  numeroPadrao,
+  numerosParaAbrirConversa,
+  type ConversaEnvio,
+} from '../services/orcamento'
 import { enviarPdfOsWhatsapp, gerarPdfOs, montarPdfOs, nomeArquivoOs, type DadosPdfOs } from '../services/orcamentoOs'
 import { VisualizadorPdf } from '../components/VisualizadorPdf'
 import { BlocoNota } from '../components/NotaFiscal'
@@ -31,6 +37,7 @@ import { DialogoConfirmacao } from '../components/DialogoConfirmacao'
 import type { ReactNode } from 'react'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { Icone } from '../components/Icone'
+import { NumeroDeSaida, type SemConversa } from '../components/NumeroDeSaida'
 import { ModalDesfecho, ModalFaturar, ModalItem, ModalMover, ModalOrdem, ModalPagamento } from '../components/ModaisOs'
 
 type Dados = {
@@ -52,7 +59,7 @@ type Acao =
 
 export function OrdemServicoDetalhe() {
   const { id } = useParams()
-  const { orgAtiva, modulos, equipe } = useSessao()
+  const { orgAtiva, modulos, equipe, sessao } = useSessao()
   const navegar = useNavigate()
   const orgId = orgAtiva!.id
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
@@ -65,7 +72,9 @@ export function OrdemServicoDetalhe() {
   const [pdf, setPdf] = useState<{ dados: DadosPdfOs | null; arquivo: Blob | null; erro: string | null } | null>(null)
   // Conversa do cliente buscada ao abrir a OS (como no pedido): o clique em Enviar não espera o banco.
   const [conversa, setConversa] = useState<{ contatoId: string; info: ConversaEnvio | null } | null>(null)
-  const [paraEnviar, setParaEnviar] = useState<{ dados: DadosPdfOs; arquivo: Blob; conversa: ConversaEnvio } | null>(null)
+  // conversa nula: o cliente ainda não tem conversa, e o envio abre uma pelo número escolhido (semConversa).
+  const [paraEnviar, setParaEnviar] = useState<{ dados: DadosPdfOs; arquivo: Blob; conversa: ConversaEnvio | null } | null>(null)
+  const [semConversa, setSemConversa] = useState<SemConversa | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState<string | null>(null)
 
@@ -156,14 +165,27 @@ export function OrdemServicoDetalhe() {
 
   // Fecha a prévia antes de tudo: erro mostrado na página ficava escondido atrás dela e o botão parecia travado.
   // Depois explica por que não dá (sem contato, sem conversa, janela da API oficial) ou pede a confirmação.
-  function pedirEnvio() {
+  // Sem conversa, o envio abre uma pelo número do vendedor (docs/envio-orcamento.md parte 1).
+  async function pedirEnvio() {
     if (!pdf?.dados || !pdf.arquivo) return
     const pronto = { dados: pdf.dados, arquivo: pdf.arquivo }
     setPdf(null)
+    setSemConversa(null)
     if (!contatoId) return setErro('O cliente desta OS não é um contato da Livih: baixe o PDF e mande por outro canal.')
     const info = conversa?.contatoId === contatoId ? conversa.info : undefined
     if (info === undefined) return setErro('Procurando a conversa do cliente. Tente de novo em instantes.')
-    if (!info) return setErro('O cliente ainda não tem conversa na Livih. Comece uma em Conversas → Nova conversa, ou baixe o PDF.')
+    if (!info) {
+      const numeros = await numerosParaAbrirConversa(orgId).catch(() => null)
+      if (!numeros) return setErro('Não foi possível ler os números de WhatsApp. Tente de novo.')
+      if (!numeros.length)
+        return setErro(
+          'O cliente ainda não tem conversa na Livih, e o número da empresa é da API oficial: a Meta só aceita começar com um modelo aprovado. Baixe o PDF e mande por outro canal.',
+        )
+      setErro(null)
+      setSemConversa({ numeros, canalId: numeroPadrao(numeros, sessao?.user.id) })
+      setParaEnviar({ ...pronto, conversa: null })
+      return
+    }
     if (info.janelaFechada)
       return setErro(
         `Faz mais de 24 horas que o cliente escreveu no número ${info.numero} (API oficial): só dá para retomar com um modelo aprovado. Depois que o cliente responder, o PDF pode ir.`,
@@ -176,14 +198,23 @@ export function OrdemServicoDetalhe() {
   async function enviarWhatsapp() {
     if (!paraEnviar) return
     setEnviando(true)
+    let conversaId = paraEnviar.conversa?.id ?? null
     try {
-      await enviarPdfOsWhatsapp(orgId, paraEnviar.conversa.id, paraEnviar.dados, paraEnviar.arquivo)
-      setEnviado(paraEnviar.conversa.id)
-    } catch {
-      setErro('O PDF não foi enviado. Confira a conexão e tente de novo.')
+      // A mensagem de iniciar_conversa já diz o que fazer (cliente de outro vendedor, sem WhatsApp, número inválido).
+      if (!conversaId && semConversa && contatoId) {
+        conversaId = await abrirConversaDoContato(semConversa.canalId, contatoId)
+        const canal = semConversa.numeros.find((n) => n.id === semConversa.canalId)
+        setConversa({ contatoId, info: { id: conversaId, numero: canal?.nome ?? 'WhatsApp', oficial: false, janelaFechada: false } })
+      }
+      if (!conversaId) return
+      await enviarPdfOsWhatsapp(orgId, conversaId, paraEnviar.dados, paraEnviar.arquivo)
+      setEnviado(conversaId)
+    } catch (e) {
+      setErro(conversaId ? 'O PDF não foi enviado. Confira a conexão e tente de novo.' : (e as Error).message)
     } finally {
       setEnviando(false)
       setParaEnviar(null)
+      setSemConversa(null)
     }
   }
 
@@ -433,7 +464,7 @@ export function OrdemServicoDetalhe() {
             <Botao variante="secundario" icone="baixar" disabled={!pdf?.arquivo} onClick={baixarPdf}>
               Baixar
             </Botao>
-            <Botao icone="enviar" disabled={!pdf?.arquivo} onClick={pedirEnvio}>
+            <Botao icone="enviar" disabled={!pdf?.arquivo} onClick={() => void pedirEnvio()}>
               Enviar pelo WhatsApp
             </Botao>
           </>
@@ -445,10 +476,16 @@ export function OrdemServicoDetalhe() {
         rotuloConfirmar="Enviar PDF"
         carregando={enviando}
         aoConfirmar={() => void enviarWhatsapp()}
-        aoCancelar={() => setParaEnviar(null)}
+        aoCancelar={() => (setParaEnviar(null), setSemConversa(null))}
       >
-        {paraEnviar?.dados.tipo} da OS nº {o?.numero} vai para {o?.cliente_nome ?? 'o cliente'} pelo número {paraEnviar?.conversa.numero}.
-        Fica no histórico da conversa e você assume o atendimento.
+        {semConversa ? (
+          <NumeroDeSaida cliente={o?.cliente_nome ?? 'O cliente'} valor={semConversa} mudar={setSemConversa} />
+        ) : (
+          <>
+            {paraEnviar?.dados.tipo} da OS nº {o?.numero} vai para {o?.cliente_nome ?? 'o cliente'} pelo número {paraEnviar?.conversa?.numero}.
+            Fica no histórico da conversa e você assume o atendimento.
+          </>
+        )}
       </DialogoConfirmacao>
 
       {atual && acao?.tipo === 'mover' && <ModalMover itens={acao.itens} etapas={atual.cfg.etapas} aoFechar={() => setAcao(null)} aoSalvar={recarregar} />}

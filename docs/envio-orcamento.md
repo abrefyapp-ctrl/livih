@@ -6,7 +6,7 @@ com a empresa pela Livih, o botão "Enviar pelo WhatsApp" pede para abrir uma co
 antes. Eles estão cadastrando WhatsApp **e** e-mail de todos os clientes e querem escolher, na hora de enviar, WhatsApp,
 e-mail ou os dois.
 
-**Status: plano, falta decidir os pontos do fim.**
+**Status:** parte 1 feita em 11/11 (o Eduardo pediu de novo). Partes 2 e 3: plano, falta decidir os pontos do fim.
 
 ## Como é hoje
 
@@ -22,6 +22,10 @@ e-mail ou os dois.
   oficial.
 
 ## Parte 1: WhatsApp sem conversa aberta (pequena, só front)
+
+**Feita em 11/11:** `numerosParaAbrirConversa` e `abrirConversaDoContato` em `services/orcamento.ts`, a escolha do
+número em `components/NumeroDeSaida.tsx`, no pedido e na OS. Sem número que não seja da API oficial, explica e pede
+para baixar o PDF.
 
 O botão "Enviar pelo WhatsApp" passa a abrir a conversa sozinho quando ela não existe.
 
