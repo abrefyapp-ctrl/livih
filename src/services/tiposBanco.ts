@@ -5750,6 +5750,28 @@ export type Database = {
         }
         Returns: Json
       }
+      painel_prospeccao: {
+        Args: {
+          p_ate: string
+          p_canal?: string
+          p_de: string
+          p_equipe?: string
+          p_org: string
+          p_vendedor?: string
+        }
+        Returns: Json
+      }
+      painel_prospeccao_periodo: {
+        Args: {
+          p_ate: string
+          p_canal: string
+          p_de: string
+          p_detalhe: boolean
+          p_membros: string[]
+          p_org: string
+        }
+        Returns: Json
+      }
       painel_relatorio: { Args: { p_org: string }; Returns: Json }
       painel_resumo: {
         Args: {
