@@ -46,6 +46,8 @@ function ratear(total: number, bases: number[]): number[] {
  * para 28 dias, e a nota saía só com o prazo no texto das informações complementares.
  * A SEFAZ recusa vencimento antes da emissão e soma das duplicatas diferente do valor líquido: com alguma parcela já
  * vencida (nota emitida depois do vencimento), a nota sai sem duplicatas; o valor da fatura é a soma das parcelas.
+ * Só na venda a prazo: à vista, a SEFAZ recusa o grupo de cobrança (rejeição 853; JoGrampo em 11/11, pedido em PIX
+ * antecipado com a parcela única vencendo no dia da nota).
  */
 function fatura(numeroPedido: number, parcelas: { valor: number | string; vencimento: string }[]) {
   const hoje = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
@@ -207,7 +209,7 @@ Deno.serve(async (req) => {
     formas_pagamento: [{
       indicador_pagamento: p.a_prazo ? 1 : 0, forma_pagamento: forma, valor_pagamento: forma === "90" ? 0 : valorTotal,
     }],
-    ...fatura(ped.numero, parcelas ?? []),
+    ...(p.a_prazo ? fatura(ped.numero, parcelas ?? []) : {}),
     informacoes_adicionais_contribuinte: [`Pedido nº ${ped.numero}`, (p.informacoes ?? "").trim()].filter(Boolean).join(". ").slice(0, 5000),
     items: (itens ?? []).map((i, n) => {
       const pr = porId.get(i.produto_id!)!;
