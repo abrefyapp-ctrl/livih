@@ -630,6 +630,7 @@ export type Database = {
           nome: string
           numero_conectado: string | null
           org_id: string
+          origem: string | null
           responsavel_id: string | null
           status_atualizado_em: string | null
           status_conexao: string | null
@@ -658,6 +659,7 @@ export type Database = {
           nome: string
           numero_conectado?: string | null
           org_id: string
+          origem?: string | null
           responsavel_id?: string | null
           status_atualizado_em?: string | null
           status_conexao?: string | null
@@ -686,6 +688,7 @@ export type Database = {
           nome?: string
           numero_conectado?: string | null
           org_id?: string
+          origem?: string | null
           responsavel_id?: string | null
           status_atualizado_em?: string | null
           status_conexao?: string | null
@@ -3210,6 +3213,100 @@ export type Database = {
           },
         ]
       }
+      origem_ciclos: {
+        Row: {
+          contato_id: string
+          conversa_id: string
+          em: string
+          id: number
+          mensagem_id: string
+          org_id: string
+          origem: string | null
+          recebido: boolean
+        }
+        Insert: {
+          contato_id: string
+          conversa_id: string
+          em: string
+          id?: never
+          mensagem_id: string
+          org_id: string
+          origem?: string | null
+          recebido: boolean
+        }
+        Update: {
+          contato_id?: string
+          conversa_id?: string
+          em?: string
+          id?: never
+          mensagem_id?: string
+          org_id?: string
+          origem?: string | null
+          recebido?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "origem_ciclos_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "origem_ciclos_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "origem_ciclos_mensagem_id_fkey"
+            columns: ["mensagem_id"]
+            isOneToOne: false
+            referencedRelation: "mensagens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "origem_ciclos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      origem_regras: {
+        Row: {
+          criado_em: string
+          id: string
+          org_id: string
+          origem: string
+          texto: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          org_id: string
+          origem: string
+          texto: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          org_id?: string
+          origem?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "origem_regras_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       os_config: {
         Row: {
           alerta_fator: number
@@ -5044,6 +5141,10 @@ export type Database = {
         Args: { p_canal: string; p_valor: boolean }
         Returns: undefined
       }
+      canal_definir_origem: {
+        Args: { p_canal: string; p_origem: string }
+        Returns: undefined
+      }
       canal_falha_pagamento_meta: {
         Args: { p_canal: string }
         Returns: undefined
@@ -5635,6 +5736,12 @@ export type Database = {
           whatsapp: boolean
         }[]
       }
+      origem_regra_remover: { Args: { p_id: string }; Returns: undefined }
+      origem_regra_salvar: {
+        Args: { p_id: string; p_org: string; p_origem: string; p_texto: string }
+        Returns: string
+      }
+      origem_reservada: { Args: { p: string }; Returns: boolean }
       os_conferir_itens: {
         Args: { p_gerente: boolean; p_itens: string[] }
         Returns: string
@@ -5720,6 +5827,17 @@ export type Database = {
       painel_membros: {
         Args: { p_equipe: string; p_org: string; p_vendedor: string }
         Returns: string[]
+      }
+      painel_origens: {
+        Args: {
+          p_ate: string
+          p_canal?: string
+          p_de: string
+          p_equipe?: string
+          p_org: string
+          p_vendedor?: string
+        }
+        Returns: Json
       }
       painel_pendencias: {
         Args: {

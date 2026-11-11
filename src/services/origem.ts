@@ -30,7 +30,9 @@ export async function listarRegrasOrigem(orgId: string): Promise<RegraOrigem[]> 
 export async function salvarRegraOrigem(orgId: string, regra: { id: string | null; texto: string; origem: string }) {
   const { error } = await supabase.rpc('origem_regra_salvar', {
     p_org: orgId,
-    p_id: regra.id ?? undefined,
+    // Regra nova vai com p_id nulo: o parâmetro não tem padrão, e sem ele o PostgREST não acha a função.
+    // Os tipos gerados não aceitam null nos argumentos, mas o banco aceita.
+    p_id: regra.id ?? (null as unknown as string),
     p_texto: regra.texto,
     p_origem: regra.origem,
   })
