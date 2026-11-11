@@ -125,6 +125,28 @@ Pedido: quantos contatos cada vendedor fez no dia (ativo, não receptivo).
   parte (já tem relatório próprio).
 - Tamanho: pequeno.
 
+**Construída em 11/11:** migration `20261111100000_painel_prospeccao.sql`, função `painel_prospeccao` (mesmos filtros
+do Painel: número, equipe e vendedor, pelo `painel_membros`).
+- Ativo = mensagem escrita por uma pessoa (não o agente, não automática, não de campanha, não com erro de envio) para
+  um contato sem nenhuma mensagem com a empresa, em qualquer número, nos 30 dias anteriores (nota interna não conta).
+  Rajada conta uma vez. Vendedor = autor da mensagem (tela) ou responsável pelo número (celular).
+- Respondeu = o contato escreveu em até 7 dias; virou oportunidade = oportunidade criada em até 30 dias (com folga de
+  1 hora antes, para quem abre o negócio e manda a mensagem logo depois).
+- Painel, seção "Contatos ativos": no período, hoje, por dia, % que respondeu e % que virou oportunidade, comparado ao
+  período anterior; tabela por vendedor (quem tem número, inclusive em zero; no filtro de número, só o dono dele; quem
+  saiu aparece com o que fez); campanhas à parte (só para quem vê a empresa); aviso quando há mensagem de número sem
+  responsável.
+- Revisão do `revisor-banco` (11/11) aplicada: filtro de número na lista, quem saiu, erro de envio, campanha pelo
+  `modelo.campanha_id` (sem ler a tabela de destinatários inteira), limites absolutos nas subconsultas, e o
+  `painel_membros` deixando dono e admin fora da equipe do gestor (vale para o Painel todo, como o `gestor_ve`).
+- Limites conhecidos:
+  - nos primeiros 30 dias de um número na Livih não há o histórico de antes, então mensagem para cliente que já
+    falava com o vendedor pelo celular conta como ativa (a tela avisa);
+  - mensagem pelo celular vale para o responsável pelo número **hoje**: se o número passar para outro vendedor, o
+    histórico do anterior vai junto (resolver gravando o responsável na mensagem, se incomodar);
+  - "respondeu" conta qualquer resposta, inclusive a saudação automática do WhatsApp Business do cliente.
+- 19 testes.
+
 ## Decisões de 10/11 (usuário)
 
 | Pergunta | Decisão |

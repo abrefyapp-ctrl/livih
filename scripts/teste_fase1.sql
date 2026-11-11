@@ -6957,5 +6957,239 @@ insert into resultado (teste, ok)
 select 'equipes: sem equipe, a ex-gestora não vê mais a conversa do vendedor',
   not exists (select 1 from public.conversas where id = current_setting('teste.eq_conv_f1')::uuid);
 
+-- Prospecção ativa no Painel (migration 20261111100000). Nos números do bloco de equipes: f1 (Castro) e f2
+-- (Televendas, gestor da equipe dele), mais um número sem responsável. Contas exatas filtrando pelo número, porque os
+-- blocos de cima também mandam mensagens na empresa.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_f1 uuid := current_setting('teste.eq_canal_f1')::uuid;
+  v_f2 uuid := current_setting('teste.eq_canal_f2')::uuid;
+  v_f3 uuid;
+  v_etapa uuid := (select id from public.etapas_funil where org_id = current_setting('teste.f7')::uuid and tipo = 'aberta'
+                    order by ordem limit 1);
+  v_ct uuid; v_cv uuid; v_msg uuid; v_camp uuid;
+begin
+  -- C1: novo, mensagem pelo celular (sem autor) há 2 dias, rajada de 2; respondeu e virou oportunidade.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348001', 'Prospect 1') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f1, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em) values
+    (v_org, v_cv, 'saida', 'atendente', 'Bom dia, temos novidade', 'enviada', now() - interval '2 days'),
+    (v_org, v_cv, 'saida', 'atendente', 'Posso mandar o catálogo?', 'enviada', now() - interval '2 days' + interval '1 minute'),
+    (v_org, v_cv, 'entrada', 'contato', 'Pode', 'enviada', now() - interval '2 days' + interval '1 hour');
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, criado_em)
+  values (v_org, v_ct, v_etapa, 'Negócio do prospect 1', now() - interval '1 day');
+  -- C2: falou com a empresa há 10 dias: não é ativo.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348002', 'Cliente recente') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f1, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em) values
+    (v_org, v_cv, 'entrada', 'contato', 'Oi', 'enviada', now() - interval '10 days'),
+    (v_org, v_cv, 'saida', 'atendente', 'Voltando ao assunto', 'enviada', now() - interval '2 days');
+  -- C3: falou há 40 dias; o vendedor f1 retoma pela tela há 2 dias (ativo), sem resposta. A oportunidade é de antes.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348003', 'Cliente sumido') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f1, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, autor_id, texto, status_entrega, criado_em) values
+    (v_org, v_cv, 'entrada', 'contato', null, 'Oi', 'enviada', now() - interval '40 days'),
+    (v_org, v_cv, 'saida', 'atendente', '00000000-0000-0000-0000-0000000000f1', 'Sumiu!', 'enviada', now() - interval '2 days');
+  insert into public.oportunidades (org_id, contato_id, etapa_id, titulo, criado_em)
+  values (v_org, v_ct, v_etapa, 'Negócio antigo do sumido', now() - interval '3 days');
+  -- C4: novo, no número do televendas, hoje.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348004', 'Prospect tele') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f2, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'saida', 'atendente', 'Olá!', 'enviada', now());
+  -- C5: mensagem de campanha (o id da campanha no modelo): conta só na campanha.
+  insert into public.campanhas (org_id, canal_id, nome, modelo, status)
+  values (v_org, v_f1, 'Campanha de teste da prospecção', '{"nome":"promo","idioma":"pt_BR"}', 'concluida') returning id into v_camp;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348005', 'Da campanha') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f1, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em, modelo)
+  values (v_org, v_cv, 'saida', 'atendente', 'Promoção', 'enviada', now() - interval '1 day',
+          jsonb_build_object('nome', 'promo', 'campanha_id', v_camp)) returning id into v_msg;
+  insert into public.campanha_destinatarios (org_id, campanha_id, contato_id, conversa_id, mensagem_id, status, enviado_em)
+  values (v_org, v_camp, v_ct, v_cv, v_msg, 'enviado', now() - interval '1 day');
+  -- C6: mensagem automática para contato novo: não conta.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348006', 'Automática') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f1, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em, automatica)
+  values (v_org, v_cv, 'saida', 'atendente', 'Mensagem automática', 'enviada', now() - interval '1 day', true);
+  -- C7: o agente puxa conversa com contato novo: não conta.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348007', 'Do agente') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f1, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'saida', 'bot', 'Oi, aqui é a assistente', 'enviada', now() - interval '1 day');
+  -- C8: falou no número do televendas há 5 dias; o de Castro escreve há 2 dias: não é ativo (a regra cruza números).
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348008', 'Cliente do tele') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f2, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'entrada', 'contato', 'Oi', 'enviada', now() - interval '5 days');
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f1, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'saida', 'atendente', 'Sou de Castro', 'enviada', now() - interval '2 days');
+  -- C9: só uma nota (sistema) há 5 dias; o vendedor escreve há 2 dias: é ativo.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348009', 'Com nota') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f1, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em) values
+    (v_org, v_cv, 'saida', 'sistema', 'Nota interna', 'enviada', now() - interval '5 days'),
+    (v_org, v_cv, 'saida', 'atendente', 'Olá, tudo bem?', 'enviada', now() - interval '2 days');
+  -- C10: ativo há 20 dias, resposta 10 dias depois: não conta como respondeu.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348010', 'Respondeu tarde') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f1, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em) values
+    (v_org, v_cv, 'saida', 'atendente', 'Oi!', 'enviada', now() - interval '20 days'),
+    (v_org, v_cv, 'entrada', 'contato', 'Só vi agora', 'enviada', now() - interval '10 days');
+  -- C11: ativo há 35 dias (entra no período anterior de uma janela de 30).
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348011', 'Do mês passado') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f1, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'saida', 'atendente', 'Oi!', 'enviada', now() - interval '35 days');
+  -- C12: mensagem que não saiu (erro): não conta.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348012', 'Sem WhatsApp') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f1, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'saida', 'atendente', 'Oi!', 'erro', now() - interval '1 day');
+  -- C13: número sem responsável, mandada pelo celular: entra sem vendedor.
+  insert into public.canais (org_id, nome, telefone, instance_id)
+  values (v_org, 'Número da loja', '5541944440009', 'INST-PROSP-F3') returning id into v_f3;
+  perform set_config('teste.prosp_f3', v_f3::text, true);
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348013', 'Da loja') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_f3, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'saida', 'atendente', 'Oi!', 'enviada', now() - interval '1 day');
+end $$;
+
+insert into resultado (teste, ok)
+select 'prospecção: a função interna (aceita a empresa toda) não abre para usuário logado',
+  not has_function_privilege('authenticated',
+        'public.painel_prospeccao_periodo(uuid, timestamptz, timestamptz, uuid, uuid[], boolean)', 'execute')
+  and not has_function_privilege('anon', 'public.painel_prospeccao(uuid, timestamptz, timestamptz, uuid, uuid, uuid)', 'execute');
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_f1 uuid := current_setting('teste.eq_canal_f1')::uuid;
+  v_f3 uuid := current_setting('teste.prosp_f3')::uuid;
+  v_ate timestamptz := now() + interval '1 second';
+  v_r jsonb;
+begin
+  v_r := public.painel_prospeccao(v_org, now() - interval '7 days', v_ate, v_f1);
+  insert into resultado (teste, ok) values ('prospecção: conta os ativos do número (novo, sumido há 40 dias, só com nota; rajada uma vez)',
+    (v_r -> 'atual' ->> 'total')::int = 3);
+  insert into resultado (teste, ok) values ('prospecção: respondeu em até 7 dias e oportunidade criada depois',
+    (v_r -> 'atual' ->> 'responderam')::int = 1 and (v_r -> 'atual' ->> 'oportunidades')::int = 1);
+  insert into resultado (teste, ok) values ('prospecção: campanha conta à parte',
+    (v_r -> 'atual' -> 'campanha' ->> 'enviadas')::int = 1);
+  insert into resultado (teste, ok) values ('prospecção: vendedor pelo autor ou pelo dono do número; no filtro de número, só quem é dele',
+    v_r -> 'atual' -> 'vendedores' = '[{"user_id":"00000000-0000-0000-0000-0000000000f1","nome":"Vendedor Castro","total":3,"hoje":0,"responderam":1,"oportunidades":1}]'::jsonb);
+  v_r := public.painel_prospeccao(v_org, now() - interval '30 days', v_ate, v_f1);
+  insert into resultado (teste, ok) values ('prospecção: resposta depois de 7 dias não conta; o período anterior também conta',
+    (v_r -> 'atual' ->> 'total')::int = 4 and (v_r -> 'atual' ->> 'responderam')::int = 1
+    and (v_r -> 'anterior' ->> 'total')::int = 1);
+  v_r := public.painel_prospeccao(v_org, now() - interval '7 days', v_ate, v_f3);
+  insert into resultado (teste, ok) values ('prospecção: número sem responsável entra sem vendedor',
+    (v_r -> 'atual' ->> 'total')::int = 1 and (v_r -> 'atual' ->> 'sem_vendedor')::int = 1);
+  v_r := public.painel_prospeccao(v_org, now() - interval '7 days', v_ate);
+  insert into resultado (teste, ok) values ('prospecção: o de hoje no número do televendas',
+    (v_r -> 'atual' -> 'vendedores') @> '[{"user_id":"00000000-0000-0000-0000-0000000000f2","total":1,"hoje":1}]');
+  v_r := public.painel_prospeccao(v_org, now() - interval '7 days', v_ate, null, '00000000-0000-0000-0000-0000000000f1');
+  insert into resultado (teste, ok) values ('prospecção: dono filtra um vendedor',
+    (v_r -> 'atual' ->> 'total')::int = 3 and v_r -> 'atual' -> 'vendedores' = 'null'::jsonb);
+  v_r := public.painel_prospeccao(v_org, now() - interval '7 days', v_ate, null, null, current_setting('teste.eq_tele')::uuid);
+  insert into resultado (teste, ok) values ('prospecção: dono filtra uma equipe',
+    (v_r -> 'atual' ->> 'total')::int = 1 and v_r -> 'atual' -> 'campanha' = 'null'::jsonb);
+  v_r := public.painel_prospeccao(v_org, now() - interval '7 days', v_ate, null, null, gen_random_uuid());
+  insert into resultado (teste, ok) values ('prospecção: equipe que não existe na empresa dá zero',
+    (v_r -> 'atual' ->> 'total')::int = 0);
+  begin
+    perform public.painel_prospeccao(v_org, now(), now() - interval '1 day');
+    insert into resultado (teste, ok) values ('prospecção: período invertido é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('prospecção: período invertido é recusado', sqlerrm = 'período inválido');
+  end;
+end $$;
+
+-- Vendedor que saiu: continua na lista com o que fez, para a soma bater.
+reset role;
+update public.membros_org set ativo = false
+ where org_id = current_setting('teste.f7')::uuid and user_id = '00000000-0000-0000-0000-0000000000f1';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'prospecção: vendedor que saiu continua na lista com os contatos dele',
+  (r -> 'atual' -> 'vendedores') @> '[{"user_id":"00000000-0000-0000-0000-0000000000f1","total":3}]'
+  from (select public.painel_prospeccao(current_setting('teste.f7')::uuid, now() - interval '7 days', now() + interval '1 second',
+                                        current_setting('teste.eq_canal_f1')::uuid) r) x;
+reset role;
+update public.membros_org set ativo = true
+ where org_id = current_setting('teste.f7')::uuid and user_id = '00000000-0000-0000-0000-0000000000f1';
+
+-- Atendente só vê o próprio, mesmo pedindo outro vendedor ou o número de outro.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000f1","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'prospecção: atendente vê só os próprios contatos ativos, sem campanha nem "sem vendedor"',
+  (r -> 'atual' ->> 'total')::int = 3 and r -> 'atual' -> 'campanha' = 'null'::jsonb
+  and r -> 'atual' -> 'sem_vendedor' = 'null'::jsonb
+  from (select public.painel_prospeccao(current_setting('teste.f7')::uuid, now() - interval '7 days', now() + interval '1 second',
+                                        null, '00000000-0000-0000-0000-0000000000f2') r) x;
+insert into resultado (teste, ok)
+select 'prospecção: atendente no número de outro vendedor vê zero',
+  (r -> 'atual' ->> 'total')::int = 0
+  from (select public.painel_prospeccao(current_setting('teste.f7')::uuid, now() - interval '7 days', now() + interval '1 second',
+                                        current_setting('teste.eq_canal_f2')::uuid) r) x;
+
+-- Gestor do televendas vê a equipe dele, mesmo pedindo vendedor de fora.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000f2","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'prospecção: gestor vê a equipe dele, sem campanha nem "sem vendedor"',
+  (r -> 'atual' ->> 'total')::int = 1 and r -> 'atual' -> 'campanha' = 'null'::jsonb
+  and r -> 'atual' -> 'sem_vendedor' = 'null'::jsonb
+  from (select public.painel_prospeccao(current_setting('teste.f7')::uuid, now() - interval '7 days', now() + interval '1 second') r) x;
+insert into resultado (teste, ok)
+select 'prospecção: gestor pedindo vendedor de fora continua na equipe dele',
+  (r -> 'atual' ->> 'total')::int = 1
+  from (select public.painel_prospeccao(current_setting('teste.f7')::uuid, now() - interval '7 days', now() + interval '1 second',
+                                        null, '00000000-0000-0000-0000-0000000000f1') r) x;
+
+-- Dono numa equipe não fica sob o gestor dela no Painel (painel_membros como o gestor_ve).
+reset role;
+update public.membros_org set equipe_id = current_setting('teste.eq_tele')::uuid
+ where org_id = current_setting('teste.f7')::uuid and user_id = '00000000-0000-0000-0000-0000000000a1';
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid; v_ct uuid; v_cv uuid;
+begin
+  insert into public.canais (org_id, nome, telefone, instance_id, responsavel_id)
+  values (v_org, 'Número do dono', '5541944440010', 'INST-PROSP-A1', '00000000-0000-0000-0000-0000000000a1') returning id into v_canal;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541912348014', 'Prospect do dono') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_cv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_cv, 'saida', 'atendente', 'Oi!', 'enviada', now() - interval '1 day');
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000f2","role":"authenticated"}', true);
+insert into resultado (teste, ok)
+select 'prospecção: o painel do gestor não traz o dono que está na equipe',
+  not coalesce((r -> 'atual' -> 'vendedores') @> '[{"user_id":"00000000-0000-0000-0000-0000000000a1"}]', false)
+  and (r -> 'atual' ->> 'total')::int = 1
+  from (select public.painel_prospeccao(current_setting('teste.f7')::uuid, now() - interval '7 days', now() + interval '1 second') r) x;
+reset role;
+update public.membros_org set equipe_id = null
+ where org_id = current_setting('teste.f7')::uuid and user_id = '00000000-0000-0000-0000-0000000000a1';
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$ begin
+  perform public.painel_prospeccao(current_setting('teste.f7')::uuid, now() - interval '7 days', now());
+  insert into resultado (teste, ok) values ('prospecção: outra empresa não abre', false);
+exception when others then
+  insert into resultado (teste, ok) values ('prospecção: outra empresa não abre', sqlerrm = 'sem acesso');
+end $$;
+
 reset role;
 select n, teste, ok from resultado order by n;

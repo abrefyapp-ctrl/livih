@@ -12,6 +12,7 @@ import { equipeQueGerencia, listarEquipes, listarLugares, type Equipe, type Luga
 import { moeda } from '../services/formato'
 import {
   buscarPendencias,
+  buscarProspeccao,
   buscarResumo,
   listarNumerosAtivos,
   duracao,
@@ -20,6 +21,7 @@ import {
   porcentagem,
   salvarConfig,
   type Pendencias,
+  type Prospeccao,
   type Resumo,
 } from '../services/painel'
 
@@ -52,7 +54,13 @@ export function Painel() {
   const [equipes, setEquipes] = useState<Equipe[]>([])
   const [lugares, setLugares] = useState<Map<string, LugarNaEquipe>>(new Map())
   const [numeros, setNumeros] = useState<{ id: string; nome: string }[]>([])
-  const [dados, setDados] = useState<{ chave: string; resumo: Resumo; pendencias: Pendencias; perdas: PerdaPorMotivo[] } | null>(null)
+  const [dados, setDados] = useState<{
+    chave: string
+    resumo: Resumo
+    pendencias: Pendencias
+    perdas: PerdaPorMotivo[]
+    prospeccao: Prospeccao | null
+  } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [relatorio, setRelatorio] = useState(false)
   const [versao, setVersao] = useState(0)
@@ -94,8 +102,11 @@ export function Painel() {
       buscarPendencias(orgId, filtro),
       // Perdas por motivo (migration 20261105170000); se falhar, o resto do Painel aparece igual.
       perdasPorMotivo(orgId, de, ate, filtro.vendedor, filtro.equipe).catch(() => []),
+      // Contatos ativos (migration 20261111100000); se falhar, o resto do Painel aparece igual.
+      buscarProspeccao(orgId, de, ate, filtro).catch(() => null),
     ])
-      .then(([resumo, pendencias, perdas]) => ativo && (setDados({ chave, resumo, pendencias, perdas }), setErro(null)))
+      .then(([resumo, pendencias, perdas, prospeccao]) =>
+        ativo && (setDados({ chave, resumo, pendencias, perdas, prospeccao }), setErro(null)))
       .catch(() => ativo && setErro('Não foi possível carregar o painel.'))
     return () => {
       ativo = false
@@ -281,6 +292,8 @@ export function Painel() {
               </Secao>
             </div>
 
+            {atual!.prospeccao && <ContatosAtivos p={atual!.prospeccao} dias={dias} />}
+
             {a.vendedores && a.vendedores.length > 0 && (
               <Secao titulo="Por vendedor">
                 <div className="overflow-x-auto rounded-md border border-borda">
@@ -314,6 +327,65 @@ export function Painel() {
       </div>
       {relatorio && <ModalRelatorioPiloto orgId={orgId} config={r?.config ?? null} aoFechar={() => (setRelatorio(false), setVersao((v) => v + 1))} />}
     </div>
+  )
+}
+
+/**
+ * Contatos ativos: o vendedor puxou a conversa com quem não falava com a empresa havia 30 dias (pedido da CEFEQ,
+ * docs/equipes-origem-prospeccao.md, entrega 5). A campanha fica à parte, porque é envio em massa.
+ */
+function ContatosAtivos({ p, dias }: { p: Prospeccao; dias: number }) {
+  const a = p.atual
+  const v = variacao(a.total, p.anterior.total, 'maior')
+  const porDia = (n: number) => (n / dias).toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+  return (
+    <Secao
+      titulo="Contatos ativos"
+      subtitulo="Mensagens que a equipe mandou primeiro, pelo celular ou pela Livih, para quem não falava com a empresa havia 30 dias. Nos primeiros 30 dias de um número na Livih, entra também quem já falava com o vendedor antes."
+    >
+      <div className="grid gap-3 text-pequeno sm:grid-cols-4">
+        <Mini rotulo="No período" valor={String(a.total)} detalhe={`${a.hoje} hoje · ${porDia(a.total)} por dia${v ? ` · ${v.texto}` : ''}`} />
+        <Mini rotulo="Responderam" valor={`${porcentagem(a.responderam, a.total) ?? 0}%`} detalhe={`${a.responderam} em até 7 dias`} />
+        <Mini rotulo="Viraram oportunidade" valor={`${porcentagem(a.oportunidades, a.total) ?? 0}%`} detalhe={`${a.oportunidades} em até 30 dias`} />
+        {a.campanha && a.campanha.enviadas > 0 && (
+          <Mini rotulo="Campanhas (à parte)" valor={String(a.campanha.enviadas)} detalhe={`enviadas · ${a.campanha.responderam} responderam`} />
+        )}
+      </div>
+      {a.vendedores && a.vendedores.length > 0 && (
+        <div className="overflow-x-auto rounded-md border border-borda">
+          <table className="w-full text-pequeno">
+            <thead className="bg-fundo text-left text-legenda text-texto-3 uppercase">
+              <tr>
+                <th className="px-3 py-1.5 font-medium">Pessoa</th>
+                <th className="px-3 py-1.5 text-right font-medium">Hoje</th>
+                <th className="px-3 py-1.5 text-right font-medium">No período</th>
+                <th className="px-3 py-1.5 text-right font-medium">Por dia</th>
+                <th className="px-3 py-1.5 text-right font-medium">Responderam</th>
+                <th className="px-3 py-1.5 text-right font-medium">Viraram oportunidade</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-borda">
+              {a.vendedores.map((x) => (
+                <tr key={x.user_id}>
+                  <td className="px-3 py-1.5">{x.nome}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{x.hoje}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{x.total}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{porDia(x.total)}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{x.responderam}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{x.oportunidades}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {!!a.sem_vendedor && (
+        <p className="text-legenda text-texto-3">
+          {a.sem_vendedor} pelo celular de um número sem responsável (entram no total, sem vendedor). Defina o responsável do
+          número em WhatsApp.
+        </p>
+      )}
+    </Secao>
   )
 }
 

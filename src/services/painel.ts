@@ -93,6 +93,32 @@ export async function buscarPendencias(orgId: string, f: FiltroPainel): Promise<
   return data as unknown as Pendencias
 }
 
+/** Contatos ativos (migration 20261111100000): mensagem nossa, escrita por alguém da equipe, para quem não falou
+ * com a empresa nos 30 dias anteriores. Campanha e vendedores só vêm no período atual. */
+export type ProspeccaoPeriodo = {
+  total: number
+  hoje: number
+  responderam: number
+  oportunidades: number
+  sem_vendedor: number | null
+  campanha: { enviadas: number; responderam: number } | null
+  vendedores: { user_id: string; nome: string; total: number; hoje: number; responderam: number; oportunidades: number }[] | null
+}
+export type Prospeccao = { atual: ProspeccaoPeriodo; anterior: ProspeccaoPeriodo }
+
+export async function buscarProspeccao(orgId: string, de: Date, ate: Date, f: FiltroPainel): Promise<Prospeccao> {
+  const { data, error } = await supabase.rpc('painel_prospeccao', {
+    p_org: orgId,
+    p_de: de.toISOString(),
+    p_ate: ate.toISOString(),
+    p_canal: f.canal ?? undefined,
+    p_vendedor: f.vendedor ?? undefined,
+    p_equipe: f.equipe ?? undefined,
+  })
+  if (error) throw error
+  return data as unknown as Prospeccao
+}
+
 export async function buscarRelatorio(orgId: string): Promise<Relatorio> {
   const { data, error } = await supabase.rpc('painel_relatorio', { p_org: orgId })
   if (error) throw error
