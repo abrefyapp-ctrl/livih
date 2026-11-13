@@ -619,6 +619,7 @@ export type Database = {
           desconectado_em: string | null
           desconectado_por: string | null
           distribuir: boolean
+          equipe_id: string | null
           id: string
           instance_id: string | null
           meta_coexistencia: boolean
@@ -648,6 +649,7 @@ export type Database = {
           desconectado_em?: string | null
           desconectado_por?: string | null
           distribuir?: boolean
+          equipe_id?: string | null
           id?: string
           instance_id?: string | null
           meta_coexistencia?: boolean
@@ -677,6 +679,7 @@ export type Database = {
           desconectado_em?: string | null
           desconectado_por?: string | null
           distribuir?: boolean
+          equipe_id?: string | null
           id?: string
           instance_id?: string | null
           meta_coexistencia?: boolean
@@ -698,6 +701,13 @@ export type Database = {
           webhook_segredo_hash?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "canais_equipe_fk"
+            columns: ["equipe_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "equipes"
+            referencedColumns: ["id", "org_id"]
+          },
           {
             foreignKeyName: "canais_org_id_fkey"
             columns: ["org_id"]
@@ -917,6 +927,7 @@ export type Database = {
           criado_em: string
           dados: Json
           descadastrado_em: string | null
+          distribuido_em: string | null
           email: string | null
           empresa: string | null
           id: string
@@ -936,6 +947,7 @@ export type Database = {
           criado_em?: string
           dados?: Json
           descadastrado_em?: string | null
+          distribuido_em?: string | null
           email?: string | null
           empresa?: string | null
           id?: string
@@ -955,6 +967,7 @@ export type Database = {
           criado_em?: string
           dados?: Json
           descadastrado_em?: string | null
+          distribuido_em?: string | null
           email?: string | null
           empresa?: string | null
           id?: string
@@ -1100,6 +1113,7 @@ export type Database = {
           canal_id: string
           contato_id: string
           criado_em: string
+          distribuir_pendente_em: string | null
           estado: Database["public"]["Enums"]["estado_conversa"]
           id: string
           motivo_humano: string | null
@@ -1114,6 +1128,7 @@ export type Database = {
           canal_id: string
           contato_id: string
           criado_em?: string
+          distribuir_pendente_em?: string | null
           estado?: Database["public"]["Enums"]["estado_conversa"]
           id?: string
           motivo_humano?: string | null
@@ -1128,6 +1143,7 @@ export type Database = {
           canal_id?: string
           contato_id?: string
           criado_em?: string
+          distribuir_pendente_em?: string | null
           estado?: Database["public"]["Enums"]["estado_conversa"]
           id?: string
           motivo_humano?: string | null
@@ -1624,6 +1640,48 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "equipes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      equipes_cidades: {
+        Row: {
+          chave: string
+          cidade: string
+          criado_em: string
+          equipe_id: string
+          id: string
+          org_id: string
+        }
+        Insert: {
+          chave: string
+          cidade: string
+          criado_em?: string
+          equipe_id: string
+          id?: string
+          org_id: string
+        }
+        Update: {
+          chave?: string
+          cidade?: string
+          criado_em?: string
+          equipe_id?: string
+          id?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipes_cidades_equipe_id_org_id_fkey"
+            columns: ["equipe_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "equipes"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "equipes_cidades_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizacoes"
@@ -2379,6 +2437,8 @@ export type Database = {
       membros_org: {
         Row: {
           ativo: boolean
+          ausente: boolean
+          ausente_ate: string | null
           criado_em: string
           emite_nota_fiscal: boolean
           equipe_id: string | null
@@ -2394,6 +2454,8 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          ausente?: boolean
+          ausente_ate?: string | null
           criado_em?: string
           emite_nota_fiscal?: boolean
           equipe_id?: string | null
@@ -2409,6 +2471,8 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          ausente?: boolean
+          ausente_ate?: string | null
           criado_em?: string
           emite_nota_fiscal?: boolean
           equipe_id?: string | null
@@ -3166,6 +3230,7 @@ export type Database = {
         Row: {
           ao_passar_franquia: string
           criado_em: string
+          distribuicao_janela_dias: number
           id: string
           motivo_suspensao: string | null
           nome: string
@@ -3178,6 +3243,7 @@ export type Database = {
         Insert: {
           ao_passar_franquia?: string
           criado_em?: string
+          distribuicao_janela_dias?: number
           id?: string
           motivo_suspensao?: string | null
           nome: string
@@ -3190,6 +3256,7 @@ export type Database = {
         Update: {
           ao_passar_franquia?: string
           criado_em?: string
+          distribuicao_janela_dias?: number
           id?: string
           motivo_suspensao?: string | null
           nome?: string
@@ -5188,6 +5255,10 @@ export type Database = {
         Args: { p_canal: string; p_valor: boolean }
         Returns: undefined
       }
+      canal_definir_equipe: {
+        Args: { p_canal: string; p_equipe: string }
+        Returns: undefined
+      }
       canal_definir_origem: {
         Args: { p_canal: string; p_origem: string }
         Returns: undefined
@@ -5217,6 +5288,8 @@ export type Database = {
         Args: { p_corpo?: Json; p_funcao: string }
         Returns: number
       }
+      cidade_chave: { Args: { p: string }; Returns: string }
+      cidade_do_contato: { Args: { p_contato: string }; Returns: string }
       clientes_importar: {
         Args: { p_linhas: Json; p_org: string }
         Returns: Json
@@ -5332,7 +5405,11 @@ export type Database = {
         Args: { p_canal: string; p_token: string }
         Returns: undefined
       }
-      distribuir_contato: { Args: { p_conversa: string }; Returns: string }
+      distribuir_contato: {
+        Args: { p_conversa: string; p_mensagem?: string }
+        Returns: string
+      }
+      distribuir_pendentes: { Args: never; Returns: undefined }
       documento_cliente: {
         Args: { p: string }
         Returns: Record<string, unknown>
@@ -5376,6 +5453,10 @@ export type Database = {
           p_texto: string
         }
         Returns: string
+      }
+      equipe_definir_cidades: {
+        Args: { p_cidades: string[]; p_equipe: string }
+        Returns: undefined
       }
       equipe_listar: {
         Args: { p_org: string }
@@ -5663,6 +5744,7 @@ export type Database = {
         Returns: Json
       }
       hoje_brasil: { Args: never; Returns: string }
+      hoje_brasilia: { Args: never; Returns: string }
       iniciar_conversa: {
         Args: {
           p_canal: string
@@ -5673,8 +5755,21 @@ export type Database = {
         Returns: string
       }
       limpar_documento: { Args: { p: string }; Returns: string }
+      membro_ausente: {
+        Args: { p_org: string; p_usuario: string }
+        Returns: boolean
+      }
       membro_definir_alerta_estoque: {
         Args: { p_org: string; p_usuario: string; p_valor: boolean }
+        Returns: undefined
+      }
+      membro_definir_ausencia: {
+        Args: {
+          p_ate: string
+          p_ausente: boolean
+          p_org: string
+          p_usuario: string
+        }
         Returns: undefined
       }
       membro_definir_emite_nota_fiscal: {
@@ -5701,6 +5796,14 @@ export type Database = {
       membro_definir_ve_todos_clientes: {
         Args: { p_org: string; p_usuario: string; p_valor: boolean }
         Returns: undefined
+      }
+      membro_disponivel: {
+        Args: { p_org: string; p_usuario: string }
+        Returns: boolean
+      }
+      membro_presente: {
+        Args: { p_org: string; p_usuario: string }
+        Returns: boolean
       }
       mes_brasilia: { Args: never; Returns: string }
       meses_entre: { Args: { p_ate: string; p_de: string }; Returns: number }
@@ -5761,6 +5864,10 @@ export type Database = {
         Returns: number
       }
       numero_br: { Args: { p: number }; Returns: string }
+      org_definir_janela_distribuicao: {
+        Args: { p_dias: number; p_org: string }
+        Returns: undefined
+      }
       org_do_caminho: { Args: { p_nome: string }; Returns: string }
       org_modulos: {
         Args: { p_org: string }
@@ -6270,6 +6377,14 @@ export type Database = {
         }[]
       }
       ve_todos_clientes: { Args: { p_org: string }; Returns: boolean }
+      vendedor_do_rodizio: {
+        Args: { p_equipe: string; p_org: string }
+        Returns: string
+      }
+      vendedor_que_mais_atendeu: {
+        Args: { p_contato: string; p_org: string }
+        Returns: string
+      }
       verificar_segredo_interno: {
         Args: { p_segredo: string }
         Returns: boolean
