@@ -1,5 +1,6 @@
 import { NavLink, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useSessao } from '../hooks/useSessao'
+import { CabecalhoPagina } from '../components/CabecalhoPagina'
 import { PrimeirosPassos } from '../components/PrimeirosPassos'
 import { Icone, type NomeIcone } from '../components/Icone'
 import { CLASSE_CAMPO } from '../components/ModaisOs'
@@ -48,80 +49,84 @@ export function Configuracoes() {
   if (!secoes.some((s) => s.id === secao)) return <Navigate to="/configuracoes/equipe" replace />
 
   return (
-    // scrollbar-gutter: a barra de rolagem aparecia só nas seções longas e empurrava a tela ~7 px para o lado (11/11).
-    <div className="relative h-full overflow-y-auto [scrollbar-gutter:stable]">
-      <div className="mx-auto max-w-6xl px-4 pt-6 lg:px-8">
-        <h1 className="text-h1 font-semibold">Configurações</h1>
-        {gerencia && orgAtiva && (
-          <div className="mt-4">
-            <PrimeirosPassos orgId={orgAtiva.id} atualizar={secao} />
-          </div>
-        )}
+    // Tela larga (13/11): barra de título no alto, menu encostado à esquerda com rolagem própria e o conteúdo usando a
+    // largura que sobra. Antes tudo ficava numa coluna central de 1.152 px, com vazio dos dois lados no monitor largo.
+    <div className="relative flex h-full flex-col">
+      <CabecalhoPagina
+        titulo="Configurações"
+        descricao={`Como ${orgAtiva?.nome ?? 'a empresa'} usa a Livih: equipe, números de WhatsApp, agente e módulos.`}
+      />
 
-        {/* Celular e tablet: uma lista de escolha, que deixa claro que há outras seções. */}
-        <div className="mt-4 lg:hidden">
-          <label htmlFor="secao-config" className="sr-only">
-            Seção
-          </label>
-          <select id="secao-config" value={secao} onChange={(e) => navegar(`/configuracoes/${e.target.value}`)} className={CLASSE_CAMPO}>
+      <div className="flex min-h-0 flex-1">
+        {/* Computador: menu lateral com todas as seções. */}
+        <nav aria-label="Seções" className="hidden w-56 shrink-0 overflow-y-auto border-r border-borda bg-superficie px-2 py-4 lg:block">
+          <div className="space-y-4">
             {GRUPOS.map((g) => {
               const doGrupo = secoes.filter((s) => s.grupo === g)
-              return doGrupo.length ? (
-                <optgroup key={g} label={g}>
+              if (!doGrupo.length) return null
+              return (
+                <div key={g} role="group" aria-label={g} className="space-y-0.5">
+                  <p className="px-3 pb-1 text-legenda font-semibold tracking-wide text-texto-3 uppercase">{g}</p>
                   {doGrupo.map((s) => (
-                    <option key={s.id} value={s.id}>
+                    <NavLink
+                      key={s.id}
+                      to={`/configuracoes/${s.id}`}
+                      className={({ isActive }) =>
+                        `flex items-center gap-2 rounded-md px-3 py-2 text-pequeno font-medium transition-colors ${
+                          isActive ? 'bg-primaria-suave text-primaria' : 'text-texto-2 hover:bg-fundo hover:text-texto'
+                        }`
+                      }
+                    >
+                      <Icone nome={s.icone} className="size-4" />
                       {s.rotulo}
-                    </option>
+                    </NavLink>
                   ))}
-                </optgroup>
-              ) : null
+                </div>
+              )
             })}
-          </select>
-        </div>
+          </div>
+        </nav>
 
-        <div className="lg:mt-6 lg:grid lg:grid-cols-[13rem_1fr] lg:gap-8">
-          {/* Computador: menu lateral com todas as seções. */}
-          <nav aria-label="Seções" className="hidden lg:block">
-            <div className="sticky top-6 space-y-4">
-              {GRUPOS.map((g) => {
-                const doGrupo = secoes.filter((s) => s.grupo === g)
-                if (!doGrupo.length) return null
-                return (
-                  <div key={g} role="group" aria-label={g} className="space-y-0.5">
-                    <p className="px-3 pb-1 text-legenda font-semibold tracking-wide text-texto-3 uppercase">{g}</p>
-                    {doGrupo.map((s) => (
-                      <NavLink
-                        key={s.id}
-                        to={`/configuracoes/${s.id}`}
-                        className={({ isActive }) =>
-                          `flex items-center gap-2 rounded-md px-3 py-2 text-pequeno font-medium transition-colors ${
-                            isActive ? 'bg-primaria-suave text-primaria' : 'text-texto-2 hover:bg-fundo hover:text-texto'
-                          }`
-                        }
-                      >
-                        <Icone nome={s.icone} className="size-4" />
-                        {s.rotulo}
-                      </NavLink>
-                    ))}
-                  </div>
-                )
-              })}
+        {/* scrollbar-gutter: a barra de rolagem aparecia só nas seções longas e empurrava a tela ~7 px (11/11). */}
+        <div className="min-w-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+          <div className="max-w-7xl space-y-4 px-4 py-6 lg:px-8">
+            {gerencia && orgAtiva && <PrimeirosPassos orgId={orgAtiva.id} atualizar={secao} />}
+
+            {/* Celular e tablet: uma lista de escolha, que deixa claro que há outras seções. */}
+            <div className="lg:hidden">
+              <label htmlFor="secao-config" className="sr-only">
+                Seção
+              </label>
+              <select id="secao-config" value={secao} onChange={(e) => navegar(`/configuracoes/${e.target.value}`)} className={CLASSE_CAMPO}>
+                {GRUPOS.map((g) => {
+                  const doGrupo = secoes.filter((s) => s.grupo === g)
+                  return doGrupo.length ? (
+                    <optgroup key={g} label={g}>
+                      {doGrupo.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.rotulo}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null
+                })}
+              </select>
             </div>
-          </nav>
 
-          <div className="min-w-0 py-6 lg:pt-0">
-            {secao === 'equipe' && <SecaoEquipe />}
-            {secao === 'empresa' && <SecaoEmpresa />}
-            {secao === 'whatsapp' && <SecaoWhatsapp />}
-            {secao === 'modelos' && <SecaoModelos />}
-            {secao === 'respostas' && <SecaoRespostas />}
-            {secao === 'agente' && <SecaoAgente />}
-            {secao === 'base' && <SecaoBase />}
-            {secao === 'documentos' && <SecaoDocumentos />}
-            {secao === 'uso' && <SecaoUsoIa />}
-            {secao === 'notificacoes' && <SecaoNotificacoes />}
-            {secao === 'pedidos' && <SecaoAvisosPedido />}
-            {secao === 'os' && <SecaoOrdensServico />}
+            <div className="min-w-0">
+              {secao === 'equipe' && <SecaoEquipe />}
+              {secao === 'empresa' && <SecaoEmpresa />}
+              {secao === 'whatsapp' && <SecaoWhatsapp />}
+              {secao === 'modelos' && <SecaoModelos />}
+              {secao === 'respostas' && <SecaoRespostas />}
+              {secao === 'agente' && <SecaoAgente />}
+              {secao === 'base' && <SecaoBase />}
+              {secao === 'documentos' && <SecaoDocumentos />}
+              {secao === 'uso' && <SecaoUsoIa />}
+              {secao === 'notificacoes' && <SecaoNotificacoes />}
+              {secao === 'pedidos' && <SecaoAvisosPedido />}
+              {secao === 'os' && <SecaoOrdensServico />}
+            </div>
           </div>
         </div>
       </div>

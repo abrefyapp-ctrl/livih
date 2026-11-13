@@ -17,6 +17,7 @@ import { useSessao } from '../hooks/useSessao'
 import { Avatar } from '../components/Avatar'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
+import { CabecalhoPagina } from '../components/CabecalhoPagina'
 import { DialogoConfirmacao } from '../components/DialogoConfirmacao'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { Icone } from '../components/Icone'
@@ -151,163 +152,166 @@ export function Empresas() {
   }
 
   return (
-    <div className="relative h-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl space-y-5 px-4 py-6 lg:px-8">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-h1 font-semibold">Empresas</h1>
-            <p className="text-pequeno text-texto-3">Clientes da Livih. Só a equipe da plataforma vê esta tela.</p>
-          </div>
+    // Tela larga (13/11), como Configurações: barra de título no alto e a lista usando a largura toda.
+    <div className="relative flex h-full flex-col">
+      <CabecalhoPagina
+        titulo="Empresas"
+        descricao="Clientes da Livih. Só a equipe da plataforma vê esta tela."
+        acoes={
           <Botao icone="mais" onClick={() => setModal({ tipo: 'nova' })}>
             Nova empresa
           </Botao>
-        </div>
+        }
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+        <div className="space-y-5 px-4 py-6 lg:px-6">
 
-        {erro && <Aviso tom="erro">{erro}</Aviso>}
+          {erro && <Aviso tom="erro">{erro}</Aviso>}
 
-        {!!dados?.pedidos.length && (
-          <section aria-labelledby="pedidos" className="rounded-lg border border-atencao/30 bg-atencao-suave">
-            <h2 id="pedidos" className="flex items-center gap-2 px-4 pt-3 font-semibold">
-              <Icone nome="alerta" className="size-4 text-atencao" />
-              {plural(dados.pedidos.length, 'pedido de acesso pelo site', 'pedidos de acesso pelo site')}
-            </h2>
-            <ul className="divide-y divide-atencao/20">
-              {dados.pedidos.map((p) => (
-                <li key={p.id} className="flex flex-wrap items-start gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="font-medium">
-                      {p.empresa} <span className="font-normal text-texto-3">· {haQuanto(p.criado_em)}</span>
-                    </p>
-                    <p className="text-pequeno text-texto-2">
-                      {p.nome} · {p.email}
-                      {p.telefone && ` · ${p.telefone}`}
-                    </p>
-                    {p.mensagem && <p className="text-pequeno text-texto-3">“{p.mensagem}”</p>}
-                  </div>
-                  <div className="flex gap-2">
-                    <Botao tamanho="sm" variante="secundario" onClick={() => setRecusar(p)}>
-                      Recusar
-                    </Botao>
-                    <Botao tamanho="sm" onClick={() => setModal({ tipo: 'nova', pedido: p })}>
-                      Criar empresa
-                    </Botao>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {dados && (
-          <p className="text-pequeno text-texto-2">
-            {plural(ativas, 'empresa ativa', 'empresas ativas')}
-            {empresas.length > ativas && ` · ${plural(empresas.length - ativas, 'suspensa', 'suspensas')}`}
-            {semAcesso > 0 && ` · ${plural(semAcesso, 'dono ainda sem acesso', 'donos ainda sem acesso')}`}
-            {` · IA em ${nomeDoMes(mesAtual())}: ${dolar(custoIaMes)}`}
-          </p>
-        )}
-
-        <label className="relative block sm:max-w-sm">
-          <span className="sr-only">Buscar empresas</span>
-          <Icone nome="busca" className="pointer-events-none absolute top-3 left-3 size-4 text-texto-3" />
-          <input
-            type="search"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por empresa ou dono"
-            className="h-10 w-full rounded-md border border-borda bg-superficie pr-3 pl-9 placeholder:text-texto-3 focus:border-primaria focus:outline-none"
-          />
-        </label>
-
-        {!dados ? (
-          !erro && <p className="text-pequeno text-texto-3">Carregando empresas…</p>
-        ) : !visiveis.length ? (
-          <EstadoVazio icone="empresa" titulo={busca ? 'Nada encontrado' : 'Nenhuma empresa ainda'}>
-            {busca ? 'Nenhuma empresa com esse nome ou dono.' : 'Crie a primeira empresa e mande o link de acesso para o dono.'}
-          </EstadoVazio>
-        ) : (
-          <ul className="divide-y divide-borda rounded-lg border border-borda bg-superficie">
-            {visiveis.map((e) => {
-              const suspensa = e.status !== 'ativa'
-              return (
-                <li key={e.id} className="grid gap-x-4 gap-y-2 p-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_auto] lg:items-center">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <Avatar nome={e.nome} tamanho="sm" tom="organizacao" />
-                    <div className="min-w-0">
-                      <p className="flex items-center gap-2 font-medium">
-                        <span className="truncate">{e.nome}</span>
-                        {suspensa && (
-                          <span className="rounded-sm bg-erro-suave px-1.5 py-0.5 text-legenda font-medium text-erro">
-                            {e.motivo_suspensao === 'inadimplencia' ? 'Suspensa por atraso' : 'Suspensa'}
-                          </span>
-                        )}
+          {!!dados?.pedidos.length && (
+            <section aria-labelledby="pedidos" className="rounded-lg border border-atencao/30 bg-atencao-suave">
+              <h2 id="pedidos" className="flex items-center gap-2 px-4 pt-3 font-semibold">
+                <Icone nome="alerta" className="size-4 text-atencao" />
+                {plural(dados.pedidos.length, 'pedido de acesso pelo site', 'pedidos de acesso pelo site')}
+              </h2>
+              <ul className="divide-y divide-atencao/20">
+                {dados.pedidos.map((p) => (
+                  <li key={p.id} className="flex flex-wrap items-start gap-3 px-4 py-3">
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <p className="font-medium">
+                        {p.empresa} <span className="font-normal text-texto-3">· {haQuanto(p.criado_em)}</span>
                       </p>
-                      <p className="text-legenda text-texto-3">Desde {desde(e.criado_em)}</p>
+                      <p className="text-pequeno text-texto-2">
+                        {p.nome} · {p.email}
+                        {p.telefone && ` · ${p.telefone}`}
+                      </p>
+                      {p.mensagem && <p className="text-pequeno text-texto-3">“{p.mensagem}”</p>}
                     </div>
-                  </div>
+                    <div className="flex gap-2">
+                      <Botao tamanho="sm" variante="secundario" onClick={() => setRecusar(p)}>
+                        Recusar
+                      </Botao>
+                      <Botao tamanho="sm" onClick={() => setModal({ tipo: 'nova', pedido: p })}>
+                        Criar empresa
+                      </Botao>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
-                  <div className="min-w-0 text-pequeno">
-                    {e.dono_email ? (
-                      <>
-                        <p className="truncate text-texto-2">{e.dono_nome || e.dono_email}</p>
-                        {e.dono_senha_definida ? (
-                          <p className="truncate text-legenda text-texto-3">{e.dono_email}</p>
-                        ) : (
-                          <p className="flex items-center gap-1 text-legenda font-medium text-atencao">
-                            <Icone nome="relogio" className="size-3" /> Ainda não criou a senha
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="flex items-center gap-1 font-medium text-atencao">
-                        <Icone nome="alerta" className="size-4" /> Sem dono
+          {dados && (
+            <p className="text-pequeno text-texto-2">
+              {plural(ativas, 'empresa ativa', 'empresas ativas')}
+              {empresas.length > ativas && ` · ${plural(empresas.length - ativas, 'suspensa', 'suspensas')}`}
+              {semAcesso > 0 && ` · ${plural(semAcesso, 'dono ainda sem acesso', 'donos ainda sem acesso')}`}
+              {` · IA em ${nomeDoMes(mesAtual())}: ${dolar(custoIaMes)}`}
+            </p>
+          )}
+
+          <label className="relative block sm:max-w-sm">
+            <span className="sr-only">Buscar empresas</span>
+            <Icone nome="busca" className="pointer-events-none absolute top-3 left-3 size-4 text-texto-3" />
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por empresa ou dono"
+              className="h-10 w-full rounded-md border border-borda bg-superficie pr-3 pl-9 placeholder:text-texto-3 focus:border-primaria focus:outline-none"
+            />
+          </label>
+
+          {!dados ? (
+            !erro && <p className="text-pequeno text-texto-3">Carregando empresas…</p>
+          ) : !visiveis.length ? (
+            <EstadoVazio icone="empresa" titulo={busca ? 'Nada encontrado' : 'Nenhuma empresa ainda'}>
+              {busca ? 'Nenhuma empresa com esse nome ou dono.' : 'Crie a primeira empresa e mande o link de acesso para o dono.'}
+            </EstadoVazio>
+          ) : (
+            <ul className="divide-y divide-borda rounded-lg border border-borda bg-superficie">
+              {visiveis.map((e) => {
+                const suspensa = e.status !== 'ativa'
+                return (
+                  <li key={e.id} className="grid gap-x-4 gap-y-2 p-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_auto] lg:items-center">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar nome={e.nome} tamanho="sm" tom="organizacao" />
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-2 font-medium">
+                          <span className="truncate">{e.nome}</span>
+                          {suspensa && (
+                            <span className="rounded-sm bg-erro-suave px-1.5 py-0.5 text-legenda font-medium text-erro">
+                              {e.motivo_suspensao === 'inadimplencia' ? 'Suspensa por atraso' : 'Suspensa'}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-legenda text-texto-3">Desde {desde(e.criado_em)}</p>
+                      </div>
+                    </div>
+
+                    <div className="min-w-0 text-pequeno">
+                      {e.dono_email ? (
+                        <>
+                          <p className="truncate text-texto-2">{e.dono_nome || e.dono_email}</p>
+                          {e.dono_senha_definida ? (
+                            <p className="truncate text-legenda text-texto-3">{e.dono_email}</p>
+                          ) : (
+                            <p className="flex items-center gap-1 text-legenda font-medium text-atencao">
+                              <Icone nome="relogio" className="size-3" /> Ainda não criou a senha
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="flex items-center gap-1 font-medium text-atencao">
+                          <Icone nome="alerta" className="size-4" /> Sem dono
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="text-pequeno text-texto-2">
+                      <p>
+                        {e.numeros ? `${e.numeros_conectados} de ${plural(e.numeros, 'número conectado', 'números conectados')}` : 'Nenhum WhatsApp'}
                       </p>
-                    )}
-                  </div>
+                      <p className="text-legenda text-texto-3">
+                        {plural(e.conversas_30d, 'conversa', 'conversas')} em 30 dias
+                        {e.ultima_mensagem_em && ` · última ${haQuanto(e.ultima_mensagem_em)}`}
+                      </p>
+                      <UsoIaEmpresa uso={dados?.uso.get(e.id)} />
+                      <PlanoEmpresa consumo={dados?.planos.get(e.id)} />
+                      {dados?.comCobranca && !dados.comCobranca.has(e.id) && (
+                        <p className="text-legenda font-medium text-atencao">Faltam os dados de cobrança (botão Plano)</p>
+                      )}
+                    </div>
 
-                  <div className="text-pequeno text-texto-2">
-                    <p>
-                      {e.numeros ? `${e.numeros_conectados} de ${plural(e.numeros, 'número conectado', 'números conectados')}` : 'Nenhum WhatsApp'}
-                    </p>
-                    <p className="text-legenda text-texto-3">
-                      {plural(e.conversas_30d, 'conversa', 'conversas')} em 30 dias
-                      {e.ultima_mensagem_em && ` · última ${haQuanto(e.ultima_mensagem_em)}`}
-                    </p>
-                    <UsoIaEmpresa uso={dados?.uso.get(e.id)} />
-                    <PlanoEmpresa consumo={dados?.planos.get(e.id)} />
-                    {dados?.comCobranca && !dados.comCobranca.has(e.id) && (
-                      <p className="text-legenda font-medium text-atencao">Faltam os dados de cobrança (botão Plano)</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 lg:max-w-80 lg:justify-end">
-                    <Botao tamanho="sm" icone="olho" onClick={() => acessar(e)} title="Abrir a empresa em modo suporte">
-                      Acessar
-                    </Botao>
-                    <Botao tamanho="sm" variante="secundario" icone="link" carregando={ocupado === e.id && !suspender} onClick={() => void acessoDoDono(e)}>
-                      {!e.dono_email ? 'Definir dono' : e.dono_senha_definida ? 'Senha do dono' : 'Link do dono'}
-                    </Botao>
-                    <Botao tamanho="sm" variante="secundario" icone="painel" onClick={() => setModulosDe(e)}>
-                      Módulos
-                    </Botao>
-                    <Botao tamanho="sm" variante="secundario" onClick={() => setPlanoDe(e)}>
-                      Plano
-                    </Botao>
-                    {suspensa ? (
-                      <Botao tamanho="sm" variante="secundario" onClick={() => void mudarStatus(e, 'ativa')} disabled={ocupado === e.id}>
-                        Reativar
+                    <div className="flex flex-wrap gap-2 lg:max-w-80 lg:justify-end">
+                      <Botao tamanho="sm" icone="olho" onClick={() => acessar(e)} title="Abrir a empresa em modo suporte">
+                        Acessar
                       </Botao>
-                    ) : (
-                      <Botao tamanho="sm" variante="fantasma" onClick={() => setSuspender(e)}>
-                        Suspender
+                      <Botao tamanho="sm" variante="secundario" icone="link" carregando={ocupado === e.id && !suspender} onClick={() => void acessoDoDono(e)}>
+                        {!e.dono_email ? 'Definir dono' : e.dono_senha_definida ? 'Senha do dono' : 'Link do dono'}
                       </Botao>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
+                      <Botao tamanho="sm" variante="secundario" icone="painel" onClick={() => setModulosDe(e)}>
+                        Módulos
+                      </Botao>
+                      <Botao tamanho="sm" variante="secundario" onClick={() => setPlanoDe(e)}>
+                        Plano
+                      </Botao>
+                      {suspensa ? (
+                        <Botao tamanho="sm" variante="secundario" onClick={() => void mudarStatus(e, 'ativa')} disabled={ocupado === e.id}>
+                          Reativar
+                        </Botao>
+                      ) : (
+                        <Botao tamanho="sm" variante="fantasma" onClick={() => setSuspender(e)}>
+                          Suspender
+                        </Botao>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
       </div>
 
       {modulosDe && <ModalModulos empresa={modulosDe} aoFechar={() => setModulosDe(null)} />}
