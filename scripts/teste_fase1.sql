@@ -6132,6 +6132,9 @@ begin
   for i in 1..3 loop
     insert into public.contatos (org_id, telefone, nome) values (v_org, '554190003310' || i, 'Lead ' || i) returning id into v_id;
     insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_id) returning id into v_conv;
+    -- Desde 20261113120000 quem distribui é a mensagem do contato, não a criação da conversa.
+    insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+    values (v_org, v_conv, 'entrada', 'contato', 'Oi', 'recebida');
     v_ct := v_ct || v_id;
     v_resp := v_resp || (select responsavel_id from public.contatos where id = v_id);
     if i = 1 then perform set_config('teste.dist_conv', v_conv::text, true); end if;
@@ -6141,7 +6144,7 @@ begin
     and v_resp[1] in ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000b1'));
   insert into resultado (teste, ok) values ('distribuição: a conversa mostra para quem foi e a pessoa é avisada',
     exists (select 1 from public.mensagens where conversa_id = current_setting('teste.dist_conv')::uuid
-             and autor_tipo = 'sistema' and texto like 'Contato novo distribuído para%')
+             and autor_tipo = 'sistema' and texto like 'Contato distribuído para%')
     and (public.agente_contexto(current_setting('teste.dist_conv')::uuid) is not null));
   insert into resultado (teste, ok) values ('distribuição: o aviso de "aguardando" vai só para o vendedor do contato',
     public.push_destino_conversa(current_setting('teste.dist_conv')::uuid) = array[v_resp[1]]);
@@ -6173,7 +6176,7 @@ begin
   update public.canais set responsavel_id = null where id = v_canal;
 end $$;
 insert into resultado (teste, ok) select 'distribuição: rodízio fechado para o login',
-  not has_function_privilege('authenticated', 'public.distribuir_contato(uuid)', 'execute')
+  not has_function_privilege('authenticated', 'public.distribuir_contato(uuid, uuid)', 'execute')
   and has_function_privilege('authenticated', 'public.canal_definir_distribuicao(uuid, boolean)', 'execute');
 
 -- Importar contatos e motivo de perda em lista (migration 20261105170000).
@@ -7607,5 +7610,434 @@ begin
     insert into resultado (teste, ok) values ('nota de teste: com nota de produção autorizada, não emite outra', true);
   end;
 end $$;
+
+-- Distribuição sem carteira: mais atendeu, cidade, equipe do número e ausência (migration 20261113120000).
+-- Televendas = d1 (equipe do número INST-F7); Loja Castro = b1 (Castro e Piraí do Sul). a1 fora do rodízio.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_tele uuid; v_castro uuid;
+begin
+  insert into public.equipes (org_id, nome) values (v_org, 'Televendas D2') returning id into v_tele;
+  insert into public.equipes (org_id, nome) values (v_org, 'Loja Castro D2') returning id into v_castro;
+  perform set_config('teste.eq_tele', v_tele::text, true);
+  perform set_config('teste.eq_castro', v_castro::text, true);
+  insert into public.equipes (org_id, nome) values (current_setting('teste.cli')::uuid, 'Equipe de fora D2') returning id into v_castro;
+  perform set_config('teste.eq_fora', v_castro::text, true);
+  v_castro := current_setting('teste.eq_castro')::uuid;
+  update public.membros_org set recebe_contatos = false, ausente = false, ausente_ate = null, gestor = false, equipe_id = null
+   where org_id = v_org;
+  update public.membros_org set recebe_contatos = true, equipe_id = v_tele
+   where org_id = v_org and user_id = '00000000-0000-0000-0000-0000000000d1';
+  update public.membros_org set recebe_contatos = true, equipe_id = v_castro
+   where org_id = v_org and user_id = '00000000-0000-0000-0000-0000000000b1';
+  update public.canais set responsavel_id = null, distribuir = true where instance_id = 'INST-F7';
+  update public.agentes set ativo = true where canal_id = (select id from public.canais where instance_id = 'INST-F7');
+end $$;
+
+-- Configuração pelo dono.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  perform public.canal_definir_equipe((select id from public.canais where instance_id = 'INST-F7'), current_setting('teste.eq_tele')::uuid);
+  perform public.equipe_definir_cidades(current_setting('teste.eq_castro')::uuid, array['Castro', 'Piraí do Sul', 'castro/PR', ' ']);
+  insert into resultado (teste, ok) values ('distribuição 2: dono escolhe a equipe do número e as cidades da equipe (sem repetir)',
+    (select equipe_id from public.canais where instance_id = 'INST-F7') = current_setting('teste.eq_tele')::uuid
+    and (select count(*) from public.equipes_cidades where equipe_id = current_setting('teste.eq_castro')::uuid) = 2
+    and exists (select 1 from public.equipes_cidades where chave = 'pirai do sul'));
+  begin
+    perform public.equipe_definir_cidades(current_setting('teste.eq_tele')::uuid, array['CASTRO - PR']);
+    insert into resultado (teste, ok) values ('distribuição 2: a mesma cidade não fica em duas equipes', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('distribuição 2: a mesma cidade não fica em duas equipes', sqlerrm like 'A cidade CASTRO - PR já é da equipe Loja Castro D2%');
+  end;
+  begin
+    perform public.org_definir_janela_distribuicao(v_org, 3);
+    insert into resultado (teste, ok) values ('distribuição 2: janela entre 7 e 365 dias', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('distribuição 2: janela entre 7 e 365 dias', sqlerrm like 'Escolha entre 7 e 365%');
+  end;
+  perform public.org_definir_janela_distribuicao(v_org, 90);
+  begin
+    perform public.canal_definir_equipe((select id from public.canais where instance_id = 'INST-F7'), current_setting('teste.eq_fora')::uuid);
+    insert into resultado (teste, ok) values ('distribuição 2: equipe de outra empresa não entra no número', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('distribuição 2: equipe de outra empresa não entra no número', sqlerrm like 'Equipe não encontrada%');
+  end;
+  begin
+    perform public.membro_definir_ausencia(v_org, '00000000-0000-0000-0000-0000000000d1', true, (now() at time zone 'America/Sao_Paulo')::date - 1);
+    insert into resultado (teste, ok) values ('distribuição 2: ausência com volta no passado é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('distribuição 2: ausência com volta no passado é recusada', sqlerrm like 'A data de volta já passou%');
+  end;
+  perform public.membro_definir_ausencia(v_org, '00000000-0000-0000-0000-0000000000d1', true, (now() at time zone 'America/Sao_Paulo')::date + 10);
+  insert into resultado (teste, ok) values ('distribuição 2: dono marca ausência e ela fica na auditoria',
+    (select ausente from public.membros_org where org_id = v_org and user_id = '00000000-0000-0000-0000-0000000000d1')
+    and exists (select 1 from public.auditoria where org_id = v_org and acao = 'membro_ausencia'));
+  perform public.membro_definir_ausencia(v_org, '00000000-0000-0000-0000-0000000000d1', false, (now() at time zone 'America/Sao_Paulo')::date + 10);
+  insert into resultado (teste, ok) values ('distribuição 2: desmarcar a ausência apaga a data',
+    (select not ausente and ausente_ate is null from public.membros_org
+      where org_id = v_org and user_id = '00000000-0000-0000-0000-0000000000d1'));
+end $$;
+
+-- Atendente comum não configura nem marca ausência.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  begin
+    perform public.membro_definir_ausencia(v_org, '00000000-0000-0000-0000-0000000000d1', true, null);
+    insert into resultado (teste, ok) values ('distribuição 2: atendente não marca ausência de outro', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('distribuição 2: atendente não marca ausência de outro', sqlerrm like 'Só dono, admin ou o gestor%');
+  end;
+  begin
+    perform public.canal_definir_equipe((select id from public.canais where instance_id = 'INST-F7'), null);
+    insert into resultado (teste, ok) values ('distribuição 2: atendente não muda a equipe do número', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('distribuição 2: atendente não muda a equipe do número', sqlerrm like 'Só dono e admin%');
+  end;
+  begin
+    perform public.org_definir_janela_distribuicao(v_org, 30);
+    insert into resultado (teste, ok) values ('distribuição 2: atendente não muda a janela', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('distribuição 2: atendente não muda a janela', sqlerrm like 'Só dono e admin%');
+  end;
+  begin
+    perform public.equipe_definir_cidades(current_setting('teste.eq_castro')::uuid, array['Ponta Grossa']);
+    insert into resultado (teste, ok) values ('distribuição 2: atendente não muda as cidades', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('distribuição 2: atendente não muda as cidades', sqlerrm like 'Só dono e admin%');
+  end;
+end $$;
+
+-- Gestor: marca quem é da equipe dele, não os outros.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+update public.membros_org set equipe_id = current_setting('teste.eq_tele')::uuid, gestor = true
+ where org_id = current_setting('teste.f7')::uuid and user_id = '00000000-0000-0000-0000-0000000000b1';
+update public.membros_org set equipe_id = current_setting('teste.eq_tele')::uuid
+ where org_id = current_setting('teste.f7')::uuid and user_id = '00000000-0000-0000-0000-0000000000a1';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  perform public.membro_definir_ausencia(v_org, '00000000-0000-0000-0000-0000000000d1', true, null);
+  insert into resultado (teste, ok) values ('distribuição 2: gestor marca ausência de quem é da equipe dele',
+    (select ausente from public.membros_org where org_id = v_org and user_id = '00000000-0000-0000-0000-0000000000d1'));
+  begin
+    perform public.membro_definir_ausencia(v_org, '00000000-0000-0000-0000-0000000000a1', true, null);
+    insert into resultado (teste, ok) values ('distribuição 2: gestor não marca ausência do dono, nem sendo da equipe', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('distribuição 2: gestor não marca ausência do dono, nem sendo da equipe', sqlerrm like 'Só dono, admin ou o gestor%');
+  end;
+end $$;
+
+-- Outra empresa não mexe.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$ begin
+  perform public.canal_definir_equipe((select id from public.canais where instance_id = 'INST-F7'), null);
+  insert into resultado (teste, ok) values ('distribuição 2: outra empresa não muda a equipe do número', false);
+exception when others then
+  insert into resultado (teste, ok) values ('distribuição 2: outra empresa não muda a equipe do número', sqlerrm like 'Só dono e admin%');
+end $$;
+do $$ begin
+  perform public.membro_definir_ausencia(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000d1', false, null);
+  insert into resultado (teste, ok) values ('distribuição 2: outra empresa não marca ausência', false);
+exception when others then
+  insert into resultado (teste, ok) values ('distribuição 2: outra empresa não marca ausência', sqlerrm like 'Só dono, admin ou o gestor%');
+end $$;
+do $$ begin
+  perform public.equipe_definir_cidades(current_setting('teste.eq_castro')::uuid, array['Curitiba']);
+  insert into resultado (teste, ok) values ('distribuição 2: outra empresa não muda as cidades', false);
+exception when others then
+  insert into resultado (teste, ok) values ('distribuição 2: outra empresa não muda as cidades', sqlerrm like 'Só dono e admin%');
+end $$;
+do $$ begin
+  perform public.org_definir_janela_distribuicao(current_setting('teste.f7')::uuid, 30);
+  insert into resultado (teste, ok) values ('distribuição 2: outra empresa não muda a janela', false);
+exception when others then
+  insert into resultado (teste, ok) values ('distribuição 2: outra empresa não muda a janela', sqlerrm like 'Só dono e admin%');
+end $$;
+
+-- A distribuição.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select id from public.canais where instance_id = 'INST-F7');
+  v_a1 uuid := '00000000-0000-0000-0000-0000000000a1';
+  v_b1 uuid := '00000000-0000-0000-0000-0000000000b1';
+  v_d1 uuid := '00000000-0000-0000-0000-0000000000d1';
+  v_ct uuid; v_id2 uuid; v_conv uuid; v_avisos int;
+begin
+  -- Volta ao arranjo: b1 na Loja Castro sem ser gestor, ninguém ausente.
+  update public.membros_org set equipe_id = current_setting('teste.eq_castro')::uuid, gestor = false
+   where org_id = v_org and user_id = v_b1;
+  update public.membros_org set equipe_id = null where org_id = v_org and user_id = v_a1;
+  update public.membros_org set ausente = false, ausente_ate = null where org_id = v_org;
+
+  -- Cliente antigo que volta depois de 40 dias, com cidade sem equipe: deixa o vendedor antigo (sem carteira) e vai
+  -- para a equipe do número.
+  insert into public.contatos (org_id, telefone, nome, responsavel_id, dados)
+  values (v_org, '5541907772101', 'Volta Curitiba', v_a1, '{"cidade":"Curitiba"}') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi (antiga)', 'recebida', now() - interval '40 days');
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Voltei', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: ciclo novo redistribui; cidade sem equipe vai para a equipe do número',
+    (select responsavel_id from public.contatos where id = v_ct) = v_d1
+    and exists (select 1 from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema'
+                 and texto like 'Contato distribuído para % (equipe do número, Televendas D2).'));
+  select count(*) into v_avisos from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema';
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Mais uma', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: no meio do ciclo, com o vendedor disponível, não redistribui',
+    (select responsavel_id from public.contatos where id = v_ct) = v_d1
+    and (select count(*) from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema') = v_avisos);
+
+  -- Quem mais atendeu vale acima da cidade e da equipe do número.
+  insert into public.contatos (org_id, telefone, nome, dados)
+  values (v_org, '5541907772102', 'Cliente do Bruno', '{"cidade":"Ponta Grossa"}') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  perform set_config('teste.dist2_conv', v_conv::text, true);
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, autor_id, texto, status_entrega, criado_em)
+  select v_org, v_conv, 'saida', 'atendente', v_b1, 'Resposta ' || i, 'enviada', now() - interval '45 days' + i * interval '1 minute'
+    from generate_series(1, 3) i;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, autor_id, texto, status_entrega, criado_em)
+  values (v_org, v_conv, 'saida', 'atendente', v_d1, 'Outra', 'enviada', now() - interval '44 days');
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi de novo', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: cliente antigo vai para quem mais atendeu',
+    (select responsavel_id from public.contatos where id = v_ct) = v_b1
+    and exists (select 1 from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema'
+                 and texto like '%quem mais atendeu nos últimos 90 dias%'));
+
+  -- Ausente: perde a preferência na hora, sem esperar o próximo ciclo, e não recebe aviso.
+  update public.membros_org set ausente = true where org_id = v_org and user_id = v_b1;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Alguém?', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: vendedor ausente, o próximo que mais atendeu assume',
+    (select responsavel_id from public.contatos where id = v_ct) = v_d1);
+  insert into resultado (teste, ok) values ('distribuição 2: ausente não recebe aviso de conversa aguardando',
+    not (v_b1 = any (public.push_equipe_do_canal(v_canal))) and v_d1 = any (public.push_equipe_do_canal(v_canal)));
+  update public.membros_org set ausente_ate = public.hoje_brasilia() - 1 where org_id = v_org and user_id = v_b1;
+  insert into resultado (teste, ok) values ('distribuição 2: depois da data de volta, a pessoa volta sozinha',
+    public.membro_disponivel(v_org, v_b1));
+
+  -- Cidade conhecida: rodízio da equipe da cidade ("castro/pr" bate com Castro).
+  insert into public.contatos (org_id, telefone, nome, dados)
+  values (v_org, '5541907772103', 'Lead de Castro', '{"cidade":"castro/pr"}') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Bom dia', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: contato de cidade com equipe vai para o rodízio dela',
+    (select responsavel_id from public.contatos where id = v_ct) = v_b1
+    and exists (select 1 from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema'
+                 and texto like '%(cidade Castro, equipe Loja Castro D2).'));
+
+  -- Sem cidade e o agente atendendo: espera; distribui quando o agente grava a cidade.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907772104', 'Lead sem cidade') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Quero um orçamento', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: sem cidade e com o agente, espera a cidade',
+    (select responsavel_id from public.contatos where id = v_ct) is null
+    and (select distribuir_pendente_em from public.conversas where id = v_conv) is not null);
+  update public.contatos set dados = dados || '{"cidade":"Piraí do Sul"}' where id = v_ct;
+  insert into resultado (teste, ok) values ('distribuição 2: a cidade chega e o contato vai para a equipe dela',
+    (select responsavel_id from public.contatos where id = v_ct) = v_b1
+    and (select distribuir_pendente_em from public.conversas where id = v_conv) is null);
+
+  -- Sem cidade e a conversa passa para a equipe antes: vai para a equipe do número.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907772105', 'Lead apressado') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Quero falar com alguém', 'recebida');
+  update public.conversas set estado = 'aguardando_humano' where id = v_conv;
+  insert into resultado (teste, ok) values ('distribuição 2: passou para a equipe sem cidade, vai para a equipe do número',
+    (select responsavel_id from public.contatos where id = v_ct) = v_d1
+    and (select distribuir_pendente_em from public.conversas where id = v_conv) is null);
+
+  -- O cron solta quem esperou mais de 15 minutos.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907772106', 'Lead calado') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi', 'recebida');
+  update public.conversas set distribuir_pendente_em = now() - interval '20 minutes' where id = v_conv;
+  perform public.distribuir_pendentes();
+  insert into resultado (teste, ok) values ('distribuição 2: depois de 15 minutos sem cidade, o cron distribui',
+    (select responsavel_id from public.contatos where id = v_ct) = v_d1
+    and (select distribuir_pendente_em from public.conversas where id = v_conv) is null);
+
+  -- Número de vendedor não distribui.
+  insert into public.contatos (org_id, telefone, nome, dados)
+  values (v_org, '5541907772107', 'Cliente do Vítor', '{"cidade":"Castro"}') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id)
+  values (v_org, (select id from public.canais where instance_id = 'INST-VITOR'), v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi Vítor', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: número de vendedor continua sem distribuir',
+    (select responsavel_id from public.contatos where id = v_ct) is null);
+
+  -- Passo 0: no meio do ciclo, quem está atendendo (mesmo fora do rodízio, como o dono) recebe; sem aviso repetido.
+  insert into public.contatos (org_id, telefone, nome, dados)
+  values (v_org, '5541907772108', 'Atendido pelo dono', '{"cidade":"Castro"}') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado, atribuida_a)
+  values (v_org, v_canal, v_ct, 'humano', v_a1) returning id into v_conv;
+  update public.canais set distribuir = false where id = v_canal;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega, criado_em)
+  values (v_org, v_conv, 'entrada', 'contato', 'Ontem', 'recebida', now() - interval '1 day');
+  update public.canais set distribuir = true where id = v_canal;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Hoje', 'recebida');
+  select count(*) into v_avisos from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema';
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Mais uma', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: no meio do ciclo fica com quem está atendendo, sem repetir o aviso',
+    (select responsavel_id from public.contatos where id = v_ct) = v_a1 and v_avisos = 1
+    and (select count(*) from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema') = 1);
+
+  -- Conversa em atendimento com quem ficou ausente: passa para quem recebeu, e os avisos também.
+  insert into public.contatos (org_id, telefone, nome, responsavel_id, distribuido_em)
+  values (v_org, '5541907772109', 'Com o Vítor', v_d1, now()) returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado, atribuida_a)
+  values (v_org, v_canal, v_ct, 'humano', v_d1) returning id into v_conv;
+  update public.membros_org set ausente = true, ausente_ate = null where org_id = v_org and user_id = v_d1;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Vítor?', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: atendente ausente, a conversa passa para quem recebeu',
+    (select responsavel_id from public.contatos where id = v_ct) = v_b1
+    and (select atribuida_a from public.conversas where id = v_conv) = v_b1);
+  update public.conversas set estado = 'aguardando_humano', atribuida_a = null where id = v_conv;
+  update public.contatos set responsavel_id = v_d1 where id = v_ct;
+  insert into resultado (teste, ok) values ('distribuição 2: aviso de aguardando não vai para o vendedor ausente',
+    not (v_d1 = any (public.push_destino_conversa(v_conv))));
+  update public.membros_org set ausente = false where org_id = v_org and user_id = v_d1;
+
+  -- "Mais atendeu" ignora automáticas, com erro e fora da janela; e não gasta a vez no rodízio.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907772110', 'Contagem') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, autor_id, texto, status_entrega, automatica, criado_em)
+  select v_org, v_conv, 'saida', 'atendente', v_d1, 'Automática', 'enviada', true, now() - interval '50 days' from generate_series(1, 5);
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, autor_id, texto, status_entrega, criado_em)
+  select v_org, v_conv, 'saida', 'atendente', v_d1, 'Com erro', 'erro', now() - interval '50 days' from generate_series(1, 5);
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, autor_id, texto, status_entrega, criado_em)
+  select v_org, v_conv, 'saida', 'atendente', v_d1, 'Antiga', 'enviada', now() - interval '120 days' from generate_series(1, 5);
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, autor_id, texto, status_entrega, criado_em)
+  values (v_org, v_conv, 'saida', 'atendente', v_b1, 'Valendo', 'enviada', now() - interval '50 days');
+  perform set_config('teste.dist2_ultima', coalesce((select ultima_distribuicao_em from public.membros_org
+                                                     where org_id = v_org and user_id = v_b1)::text, 'nunca'), true);
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: mais atendeu ignora automáticas, erros e o que está fora da janela',
+    (select responsavel_id from public.contatos where id = v_ct) = v_b1);
+  insert into resultado (teste, ok) values ('distribuição 2: mais atendeu não gasta a vez no rodízio',
+    coalesce((select ultima_distribuicao_em from public.membros_org where org_id = v_org and user_id = v_b1)::text, 'nunca')
+      = current_setting('teste.dist2_ultima'));
+
+  -- Rodízio na equipe: dois contatos seguidos caem em pessoas diferentes.
+  -- (now() não anda dentro da transação: zera a vez para não empatar.)
+  update public.membros_org set recebe_contatos = true, equipe_id = current_setting('teste.eq_castro')::uuid
+   where org_id = v_org and user_id = v_a1;
+  update public.membros_org set ultima_distribuicao_em = null where org_id = v_org and user_id in (v_a1, v_b1);
+  insert into public.contatos (org_id, telefone, nome, dados)
+  values (v_org, '5541907772111', 'Castro 1', '{"cidade":"Castro"}') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi', 'recebida');
+  insert into public.contatos (org_id, telefone, nome, dados)
+  values (v_org, '5541907772112', 'Castro 2', '{"cidade":"Castro"}') returning id into v_id2;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_id2) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: rodízio da equipe alterna as pessoas',
+    (select responsavel_id from public.contatos where id = v_ct) is not null
+    and (select responsavel_id from public.contatos where id = v_ct) <> (select responsavel_id from public.contatos where id = v_id2));
+  update public.membros_org set recebe_contatos = false, equipe_id = null where org_id = v_org and user_id = v_a1;
+
+  -- Agente desligado: não espera a cidade.
+  update public.agentes set ativo = false where canal_id = v_canal;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907772113', 'Sem agente') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição 2: com o agente desligado não espera a cidade',
+    (select responsavel_id from public.contatos where id = v_ct) = v_d1
+    and (select distribuir_pendente_em from public.conversas where id = v_conv) is null);
+  update public.agentes set ativo = true where canal_id = v_canal;
+
+  -- A cidade vem do cliente ligado ao contato.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907772114', 'Da empresa de Castro') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi', 'recebida');
+  insert into public.clientes (org_id, tipo, nome, cidade) values (v_org, 'pf', 'Cliente de Castro D2', 'Castro') returning id into v_id2;
+  update public.contatos set cliente_id = v_id2 where id = v_ct;
+  insert into resultado (teste, ok) values ('distribuição 2: a cidade do cliente ligado ao contato vale',
+    (select responsavel_id from public.contatos where id = v_ct) = v_b1);
+
+  -- Ninguém disponível: não distribui e limpa a espera.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907772115', 'Ninguém') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi', 'recebida');
+  update public.membros_org set recebe_contatos = false where org_id = v_org;
+  update public.conversas set distribuir_pendente_em = now() - interval '20 minutes' where id = v_conv;
+  perform public.distribuir_pendentes();
+  insert into resultado (teste, ok) values ('distribuição 2: sem ninguém disponível, fica sem vendedor e a espera acaba',
+    (select responsavel_id from public.contatos where id = v_ct) is null
+    and (select distribuir_pendente_em from public.conversas where id = v_conv) is null);
+  update public.membros_org set recebe_contatos = true where org_id = v_org and user_id in (v_b1, v_d1);
+
+  -- Número que deixa de distribuir com conversa esperando: a espera acaba.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907772116', 'Esperando') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi', 'recebida');
+  update public.canais set distribuir = false where id = v_canal;
+  update public.conversas set distribuir_pendente_em = now() - interval '20 minutes' where id = v_conv;
+  perform public.distribuir_pendentes();
+  insert into resultado (teste, ok) values ('distribuição 2: número que deixa de distribuir solta a conversa que esperava',
+    (select distribuir_pendente_em from public.conversas where id = v_conv) is null
+    and (select responsavel_id from public.contatos where id = v_ct) is null);
+  update public.canais set distribuir = true where id = v_canal;
+  perform set_config('teste.dist2_contato', v_ct::text, true);
+
+  -- Apagar a equipe solta o número e as cidades.
+  update public.membros_org set equipe_id = null where org_id = v_org and equipe_id = current_setting('teste.eq_castro')::uuid;
+  delete from public.equipes where id = current_setting('teste.eq_castro')::uuid;
+  insert into resultado (teste, ok) values ('distribuição 2: equipe apagada leva as cidades junto',
+    not exists (select 1 from public.equipes_cidades where equipe_id = current_setting('teste.eq_castro')::uuid));
+  update public.membros_org set equipe_id = null where org_id = v_org and equipe_id = current_setting('teste.eq_tele')::uuid;
+  delete from public.equipes where id = current_setting('teste.eq_tele')::uuid;
+  insert into resultado (teste, ok) values ('distribuição 2: equipe apagada deixa o número sem equipe',
+    (select equipe_id from public.canais where id = v_canal) is null);
+  update public.canais set distribuir = false where id = v_canal;
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+update public.contatos set responsavel_id = '00000000-0000-0000-0000-0000000000b1', distribuido_em = '2099-01-01'
+ where id = current_setting('teste.dist2_contato')::uuid;
+reset role;
+insert into resultado (teste, ok) select 'distribuição 2: atendente não grava a data da distribuição para fixar o contato',
+  (select distribuido_em is null from public.contatos where id = current_setting('teste.dist2_contato')::uuid);
+insert into resultado (teste, ok) select 'distribuição 2: motor fechado para o login, configuração aberta',
+  not has_function_privilege('authenticated', 'public.distribuir_pendentes()', 'execute')
+  and not has_function_privilege('authenticated', 'public.membro_disponivel(uuid, uuid)', 'execute')
+  and not has_function_privilege('authenticated', 'public.vendedor_que_mais_atendeu(uuid, uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.membro_definir_ausencia(uuid, uuid, boolean, date)', 'execute')
+  and has_function_privilege('authenticated', 'public.equipe_definir_cidades(uuid, text[])', 'execute')
+  and not has_table_privilege('authenticated', 'public.equipes_cidades', 'insert');
 reset role;
 select n, teste, ok from resultado order by n;

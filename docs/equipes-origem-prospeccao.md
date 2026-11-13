@@ -80,7 +80,57 @@ Pedido: "cliente de Castro ou Piraí vai para a loja de Castro"; os contatos do 
 - **Por cidade:** em Configurações → Equipe, as cidades de cada equipe (Castro, Piraí do Sul → Loja Castro). No número
   da empresa, com contato novo, o agente pergunta a cidade quando precisar e a distribuição usa a equipe da cidade;
   cidade sem equipe vai para a equipe padrão do número.
+- **Cliente antigo (decidido em 12/11):** vai para o vendedor que **mais atendeu** o cliente. Não é carteira: o
+  cliente é da CEFEQ, e esse vendedor só tem a preferência. Se ele estiver de férias, de folga ou fora do horário,
+  qualquer outro vendedor atende: o contato segue o rodízio normal e não espera por ele.
 - Depende da entrega 1. Tamanho: médio.
+
+**Plano detalhado (13/11), enquanto o Diego responde.** As respostas dele viram configuração na tela (cidades,
+equipe de cada número, janela), não código.
+
+- **O que muda no rodízio de hoje** (`20261105160000_distribuicao_contatos.sql`): ele grava o vendedor como dono fixo
+  (`contatos.responsavel_id`) só na criação da conversa, e o contato fica com ele para sempre. Para a CEFEQ isso é a
+  carteira que eles não têm: quem volta meses depois continua com o vendedor de férias ou que saiu, e o "mais atendeu"
+  nunca é recalculado. Em 13/11 nenhuma empresa usava a distribuição (`canais.distribuir` desligado em todas), então
+  dá para mudar sem afetar ninguém.
+- **Quando distribui:** na mensagem do contato num número da empresa que distribui, se o contato está sem vendedor ou
+  se começou um ciclo novo (30 dias sem conversa, a mesma régua de `origem_ciclos`) depois da última distribuição
+  (`contatos.distribuido_em`, novo). Também redistribui se o vendedor atual está ausente, desativado ou fora do
+  rodízio. `responsavel_id` continua sendo "o vendedor do contato agora" (a visibilidade e os avisos no celular
+  dependem dele), mas é reescrito a cada ciclo. Número de vendedor (`canais.responsavel_id`) não distribui: o
+  contato fica com o dono do número (pergunta 5 ao Diego, a confirmar).
+- **Quem recebe, em ordem** (só quem está ativo, com "Recebe contatos novos" e não ausente):
+  1. quem **mais atendeu** o contato na janela (padrão 90 dias, configurável): mais mensagens escritas por ele
+     (`autor_tipo = 'atendente'`, sem as automáticas) em qualquer número; empate, a mais recente. Vale acima da
+     cidade e da equipe do número;
+  2. rodízio na **equipe da cidade** do contato;
+  3. rodízio na **equipe do número**;
+  4. rodízio entre todos (o de hoje).
+- **Ausência (decidido em 13/11):** "Ausente até DD/MM" em cada pessoa (`membros_org.ausente_ate`, novo; sem data =
+  até desmarcar). Marcam dono e admin (qualquer pessoa) e o gestor (as da equipe dele, pela regra de `gestor_ve`).
+  Ausente não recebe contato novo, perde a preferência do "mais atendeu" e não recebe aviso no celular. Volta sozinho
+  depois da data. Separado de "Recebe contatos novos", que é um papel fixo (quem entra no rodízio).
+- **Fora do horário (decidido em 13/11):** sem regra nova. A Livih não tem horário por pessoa; o agente atende fora
+  do horário e a conversa já está com quem vai atender de manhã.
+- **Cidade:** o agente já grava a cidade em `contatos.dados ->> 'cidade'` (`agente_atualizar_contato`); sem ela, vale
+  a do cliente ligado ao contato. Sem coluna nova. Cidades de cada equipe numa tabela (`equipes_cidades`, comparação
+  sem acento e sem a UF: "Castro - PR" = "castro/pr" = "Castro"). Com equipes por cidade cadastradas e cidade
+  desconhecida, a distribuição espera: distribui quando a cidade chega; se a conversa passar para a equipe antes, ou
+  depois de 15 minutos (cron), vai para a equipe do número. Com o agente desligado não espera (pergunta 6 ao Diego
+  decide se o agente pergunta sempre).
+- **Telas:** em Configurações → WhatsApp, a equipe que recebe em cada número que distribui; em Configurações →
+  Equipe, as cidades de cada equipe, a janela do "mais atendeu" e "Ausente até" em cada pessoa (o gestor vê o botão
+  só nas pessoas da equipe dele). O aviso de sistema na conversa diz por quê: "mais atendeu", "cidade Castro",
+  "equipe do número" ou "rodízio".
+- **Agente (n8n):** pergunta a cidade quando a conversa está esperando a distribuição
+  (`conversas.distribuir_pendente_em`); grava pela ferramenta `atualizar_contato`, que já existe. Mexe no gerador e
+  nos dois workflows.
+
+**Banco construído em 13/11:** migration `20261113120000_distribuicao_sem_carteira.sql`, 28 testes (configuração e
+permissões, gestor, outra empresa, ciclo novo, meio do ciclo, mais atendeu, ausente, volta automática, cidade, espera
+da cidade, passagem para a equipe, cron, número de vendedor, equipe apagada). Os testes antigos do rodízio passaram a
+mandar uma mensagem do contato, que é o novo gatilho. Falta: aplicar, as telas (equipe do número, cidades, janela,
+"Ausente até") e o agente perguntar a cidade.
 
 ### 3. Origem do lead e resultado
 
@@ -186,14 +236,22 @@ do Painel: número, equipe e vendedor, pelo `painel_membros`).
 | Carteira | **A CEFEQ não trabalha com carteira.** O que eles querem é o agente encaminhar o cliente para o vendedor que **mais vendeu** para ele ou que **mais o atendeu**. Sem o Sollus, "mais atendeu" sai das conversas na Livih (últimos 90 dias) e "mais vendeu" das oportunidades ganhas e pedidos na Livih; com o Sollus, das notas. Entra na entrega 2 |
 | Teste do status no WAHA | Depois; o agente do número "Teste CEFEQ" foi desligado pelo usuário em 10/11. **Avisar antes de testar**, para ele ligar |
 
+## Decisões de 12/11 (usuário)
+
+| Pergunta | Decisão |
+|---|---|
+| Vendedor tem carteira de clientes? | **Não.** Os clientes são da CEFEQ, não do vendedor. Nada de gravar o vendedor como dono do cliente |
+| Cliente antigo vai para quem? | Para o vendedor que **mais atendeu** o cliente (não o que mais vendeu) |
+| E se esse vendedor estiver de férias, de folga ou fora do horário? | **Qualquer outro vendedor atende**: o contato segue o rodízio normal, sem esperar por ele |
+
 ## Perguntas em aberto (usuário)
 
 | Pergunta | Opções |
 |---|---|
 | Uma pessoa em mais de uma equipe? | Uma só (mais simples) ou várias |
 | Gestor liga/desliga o agente e mexe nas instruções dos números da equipe? | Só liga/desliga, ou também as instruções |
-| Contato que escreve no número de um vendedor entra na carteira dele? | Hoje não: fica sem responsável, e o vendedor vê porque a conversa é no número dele. Com gestor por equipe e "quem mais atendeu", vale gravar o vendedor na carteira na primeira conversa |
-| Cliente que fala com 2 vendedores: de quem é a carteira? | Quem falou primeiro, quem falou por último, ou o dono escolhe |
-| "Vendedor que mais atendeu em 90 dias" com os dados da Livih, sem esperar o Sollus? | Sim, pela quantidade de conversas e pedidos na Livih; ou esperar o Sollus |
+| ~~Contato que escreve no número de um vendedor entra na carteira dele?~~ | Resolvida em 12/11: não há carteira |
+| ~~Cliente que fala com 2 vendedores: de quem é a carteira?~~ | Resolvida em 12/11: não há carteira; vai para quem mais atendeu |
+| "Vendedor que mais atendeu em 90 dias" com os dados da Livih, sem esperar o Sollus? | Critério decidido em 12/11 (mais atendeu). Falta confirmar a janela de 90 dias com o Diego |
 | Testar postar status pelo WAHA? | Sim, com o número de teste; ou deixar de fora |
 | Ordem | Sugestão: 0 → 1 → 3 → 5 → 2 → 4 |
