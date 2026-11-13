@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useSessao } from '../hooks/useSessao'
 import {
   alterarMembro,
@@ -9,6 +9,7 @@ import {
   listarEquipeCompleta,
   listarAlertaEstoque,
   listarRecebeContatos,
+  numerosQueDistribuem,
   type MembroEquipe,
   type Papel,
 } from '../services/configuracoes'
@@ -16,8 +17,22 @@ import { quandoCurto } from '../services/formato'
 import { definirVeTodosClientes, listarVeTodosClientes } from '../services/clientes'
 import { definirEmiteNotaFiscal, listarEmiteNotaFiscal } from '../services/nfe'
 import { definirFinanceiro, listarFinanceiro } from '../services/financeiro'
-import { definirEquipeDaPessoa, listarEquipes, listarLugares, type Equipe, type LugarNaEquipe } from '../services/equipes'
+import {
+  ausenteAgora,
+  definirAusencia,
+  definirEquipeDaPessoa,
+  equipeQueGerencia,
+  lerJanelaDistribuicao,
+  listarCidades,
+  listarEquipes,
+  listarLugares,
+  rotuloAusencia,
+  type Equipe,
+  type LugarNaEquipe,
+} from '../services/equipes'
+import { AusenciaPessoa } from './AusenciaPessoa'
 import { Avatar } from './Avatar'
+import { DistribuicaoContatos } from './DistribuicaoContatos'
 import { EquipesDeVenda } from './EquipesDeVenda'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
@@ -81,9 +96,25 @@ export function SecaoEquipe() {
   // Equipes de venda e gestor (docs/equipes-origem-prospeccao.md, entrega 1).
   const [equipes, setEquipes] = useState<Equipe[]>([])
   const [lugares, setLugares] = useState<Map<string, LugarNaEquipe>>(new Map())
+  // Distribuição sem carteira (entrega 2, 13/11): cidades de cada equipe, período do "mais atendeu" e ausência.
+  const [cidades, setCidades] = useState<Map<string, string[]>>(new Map())
+  const [janela, setJanela] = useState<number | null>(null)
+  const [janelaFalhou, setJanelaFalhou] = useState(false)
+  // O bloco que explica a distribuição só aparece para quem usa: algum número distribuindo ou equipes criadas.
+  const [distribuiAlgum, setDistribuiAlgum] = useState(false)
+  const [ausenciaDe, setAusenciaDe] = useState<string | null>(null)
 
   useEffect(() => {
     let ativo = true
+    listarCidades(orgId)
+      .then((c) => ativo && setCidades(c))
+      .catch(() => ativo && setCidades(new Map()))
+    numerosQueDistribuem(orgId)
+      .then((m) => ativo && setDistribuiAlgum(m.size > 0))
+      .catch(() => ativo && setDistribuiAlgum(false))
+    lerJanelaDistribuicao(orgId)
+      .then((j) => ativo && (setJanela(j), setJanelaFalhou(false)))
+      .catch(() => ativo && (setJanela(null), setJanelaFalhou(true)))
     listarEquipes(orgId)
       .then((l) => ativo && setEquipes(l))
       .catch(() => ativo && setEquipes([]))
@@ -178,6 +209,19 @@ export function SecaoEquipe() {
     }
   }
 
+  async function marcarAusencia(m: MembroEquipe, ausente: boolean, ate: string | null) {
+    setSalvando(m.user_id)
+    setErroAcao(null)
+    try {
+      await definirAusencia(orgId, m.user_id, ausente, ate)
+      recarregar()
+    } catch (e) {
+      setErroAcao((e as Error).message)
+    } finally {
+      setSalvando(null)
+    }
+  }
+
   async function alternarVeTodos(m: MembroEquipe) {
     setSalvando(m.user_id)
     setErroAcao(null)
@@ -239,6 +283,7 @@ export function SecaoEquipe() {
     const eq = nomeEquipe(lugar?.equipe_id)
     if (eq) e.push(lugar?.gestor ? `${eq} · gestor` : eq)
     if (!m.ativo) return e
+    if (ausenteAgora(lugar)) e.push(rotuloAusencia(lugar!))
     if (recebe.has(m.user_id)) e.push('Recebe contatos novos')
     if (m.papel === 'atendente' && veTodos.has(m.user_id)) e.push('Vê todos os clientes')
     if (m.papel === 'atendente' && emiteNota.has(m.user_id)) e.push('Emite nota fiscal')
@@ -270,6 +315,11 @@ export function SecaoEquipe() {
   const desativados = (lista ?? []).filter((m) => !m.ativo).length
   const filtrando = !!termo || !!filtro
   const editada = editando ? (lista?.find((m) => m.user_id === editando) ?? null) : null
+  // O gestor (que não é dono nem admin) marca a ausência das pessoas da equipe dele, pela mesma regra do banco
+  // (gestor_ve: atendentes da equipe e ele mesmo).
+  const daMinhaEquipe = gerencia ? new Set<string>() : equipeQueGerencia(lugares, eu)
+  const gestorMarca = (m: MembroEquipe) => daMinhaEquipe.has(m.user_id) && (m.papel === 'atendente' || m.user_id === eu)
+  const ausenciaPessoa = ausenciaDe ? (lista?.find((m) => m.user_id === ausenciaDe) ?? null) : null
 
   function linha(m: MembroEquipe) {
     const nome = m.nome || m.email
@@ -303,6 +353,11 @@ export function SecaoEquipe() {
               Editar
             </Botao>
           )}
+          {!gerencia && m.ativo && gestorMarca(m) && (
+            <Botao tamanho="sm" variante="secundario" onClick={() => (setErroAcao(null), setAusenciaDe(m.user_id))}>
+              Ausência
+            </Botao>
+          )}
           {souDono && !m.ativo && m.user_id !== eu && (
             <Botao tamanho="sm" variante="secundario" carregando={salvando === m.user_id} onClick={() => void alterar(m, { ativo: true })}>
               Reativar
@@ -333,7 +388,7 @@ export function SecaoEquipe() {
       </div>
 
       {!souDono && <Aviso>Só o dono da organização convida pessoas e muda papéis.</Aviso>}
-      {erroAcao && !editada && <Aviso tom="erro">{erroAcao}</Aviso>}
+      {erroAcao && !editada && !ausenciaPessoa && <Aviso tom="erro">{erroAcao}</Aviso>}
       {erro && (
         <Aviso tom="erro" acao={<button onClick={recarregar} className="font-semibold underline">Tentar de novo</button>}>
           {erro}
@@ -341,7 +396,10 @@ export function SecaoEquipe() {
       )}
 
       {/* Antes da lista: com muitas pessoas, ficava lá embaixo. */}
-      <EquipesDeVenda orgId={orgId} gerencia={gerencia} equipes={equipes} lugares={lugares} aoMudar={recarregar} />
+      <EquipesDeVenda orgId={orgId} gerencia={gerencia} equipes={equipes} lugares={lugares} cidades={cidades} aoMudar={recarregar} />
+      {gerencia && (distribuiAlgum || equipes.length > 0) && (
+        <DistribuicaoContatos orgId={orgId} janela={janela} falhou={janelaFalhou} aoMudar={recarregar} />
+      )}
 
       <div className="space-y-3">
         {lista && lista.length >= MINIMO_PARA_FILTRAR && (
@@ -437,7 +495,7 @@ export function SecaoEquipe() {
             opcoes={[
               {
                 rotulo: 'Recebe contatos novos',
-                descricao: 'Entra no rodízio dos contatos novos dos números da empresa que distribuem.',
+                descricao: 'Pode receber os clientes que escrevem nos números da empresa que distribuem (novos e os que voltam).',
                 ligada: recebe.has(editada.user_id),
                 alternar: alternarRecebe,
               },
@@ -479,6 +537,13 @@ export function SecaoEquipe() {
                   ]
                 : []),
             ]}
+            ausencia={
+              <AusenciaPessoa
+                lugar={lugares.get(editada.user_id)}
+                ocupado={salvando === editada.user_id}
+                aoMarcar={(ausente, ate) => void marcarAusencia(editada, ausente, ate)}
+              />
+            }
             mudarPapel={(p) => void alterar(editada, { papel: p })}
             mudarEquipe={(equipeId, gestor) => void mudarEquipe(editada, equipeId, gestor)}
             novoLink={() => {
@@ -490,6 +555,24 @@ export function SecaoEquipe() {
               setDesativar(editada)
             }}
           />
+        )}
+      </Modal>
+
+      <Modal
+        aberto={!!ausenciaPessoa}
+        titulo={ausenciaPessoa ? `Ausência de ${ausenciaPessoa.nome || ausenciaPessoa.email}` : 'Ausência'}
+        aoFechar={() => setAusenciaDe(null)}
+        rodape={<Botao onClick={() => setAusenciaDe(null)}>Concluir</Botao>}
+      >
+        {ausenciaPessoa && (
+          <div className="space-y-3">
+            {erroAcao && <Aviso tom="erro">{erroAcao}</Aviso>}
+            <AusenciaPessoa
+              lugar={lugares.get(ausenciaPessoa.user_id)}
+              ocupado={salvando === ausenciaPessoa.user_id}
+              aoMarcar={(ausente, ate) => void marcarAusencia(ausenciaPessoa, ausente, ate)}
+            />
+          </div>
         )}
       </Modal>
 
@@ -542,6 +625,7 @@ function EdicaoPessoa({
   equipes,
   lugar,
   opcoes,
+  ausencia,
   mudarPapel,
   mudarEquipe,
   novoLink,
@@ -555,6 +639,7 @@ function EdicaoPessoa({
   equipes: Equipe[]
   lugar: LugarNaEquipe | undefined
   opcoes: Opcao[]
+  ausencia: ReactNode
   mudarPapel: (p: Papel) => void
   mudarEquipe: (equipeId: string | null, gestor: boolean) => void
   novoLink: () => void
@@ -648,6 +733,8 @@ function EdicaoPessoa({
           </label>
         ))}
       </fieldset>
+
+      {m.ativo && <div className="border-t border-borda pt-4">{ausencia}</div>}
 
       {editaPapel && (
         <div className="space-y-2 border-t border-borda pt-4">

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { removerEquipe, salvarEquipe, type Equipe, type LugarNaEquipe } from '../services/equipes'
+import { definirCidades, removerEquipe, salvarEquipe, type Equipe, type LugarNaEquipe } from '../services/equipes'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { DialogoConfirmacao } from './DialogoConfirmacao'
@@ -7,23 +7,28 @@ import { DialogoConfirmacao } from './DialogoConfirmacao'
 /**
  * Equipes de venda (loja, televendas, externas…): docs/equipes-origem-prospeccao.md, entrega 1. Dono e admin criam,
  * renomeiam e removem; quem é de qual equipe e quem é gestor se escolhe na lista de pessoas, logo abaixo.
+ * As cidades de cada equipe (entrega 2, 13/11): o contato dessas cidades que escreve no número da empresa vai para o
+ * rodízio da equipe.
  */
 export function EquipesDeVenda({
   orgId,
   gerencia,
   equipes,
   lugares,
+  cidades,
   aoMudar,
 }: {
   orgId: string
   gerencia: boolean
   equipes: Equipe[]
   lugares: Map<string, LugarNaEquipe>
+  cidades: Map<string, string[]>
   aoMudar: () => void
 }) {
   const [nova, setNova] = useState('')
   const [editando, setEditando] = useState<{ id: string; nome: string } | null>(null)
   const [remover, setRemover] = useState<Equipe | null>(null)
+  const [editandoCidades, setEditandoCidades] = useState<{ id: string; texto: string } | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -53,6 +58,17 @@ export function EquipesDeVenda({
   async function renomear(e: FormEvent) {
     e.preventDefault()
     if (editando && (await executar(() => salvarEquipe(orgId, editando.id, editando.nome)))) setEditando(null)
+  }
+
+  async function salvarCidades(e: FormEvent) {
+    e.preventDefault()
+    if (!editandoCidades) return
+    // Vírgula separa as cidades; "Castro, PR" não vira uma cidade "PR".
+    const lista = editandoCidades.texto
+      .split(/[,;\n]/)
+      .map((c) => c.trim())
+      .filter((c) => c && !/^[A-Za-z]{2}$/.test(c))
+    if (await executar(() => definirCidades(editandoCidades.id, lista))) setEditandoCidades(null)
   }
 
   if (!gerencia && !equipes.length) return null
@@ -98,9 +114,42 @@ export function EquipesDeVenda({
                       Cancelar
                     </Botao>
                   </form>
+                ) : editandoCidades?.id === eq.id ? (
+                  <form onSubmit={salvarCidades} className="flex-1 space-y-2">
+                    <label htmlFor={`cidades-equipe-${eq.id}`} className="block font-medium">
+                      Cidades de {eq.nome}
+                    </label>
+                    <input
+                      id={`cidades-equipe-${eq.id}`}
+                      value={editandoCidades.texto}
+                      onChange={(e) => setEditandoCidades({ id: eq.id, texto: e.target.value })}
+                      placeholder="Ex.: Castro, Piraí do Sul"
+                      autoFocus
+                      className="h-8 w-full rounded-md border border-borda bg-superficie px-2 focus:border-primaria focus:outline-none"
+                    />
+                    <p className="text-legenda text-texto-3">
+                      Separe por vírgula. Nos números da empresa que distribuem, o cliente dessas cidades vai para esta
+                      equipe, a não ser que alguém já o tenha atendido no período escolhido em Distribuição dos contatos.
+                    </p>
+                    <div className="flex gap-2">
+                      <Botao tamanho="sm" type="submit" carregando={ocupado}>
+                        Salvar
+                      </Botao>
+                      <Botao tamanho="sm" variante="fantasma" onClick={() => setEditandoCidades(null)} disabled={ocupado}>
+                        Cancelar
+                      </Botao>
+                    </div>
+                  </form>
                 ) : (
                   <>
-                    <span className="flex-1 font-medium">{eq.nome}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium">{eq.nome}</span>
+                      {(cidades.get(eq.id)?.length ?? 0) > 0 ? (
+                        <span className="block text-legenda text-texto-3">Cidades: {cidades.get(eq.id)!.join(', ')}</span>
+                      ) : (
+                        gerencia && <span className="block text-legenda text-texto-3">Sem cidades</span>
+                      )}
+                    </span>
                     <span className="text-texto-3">
                       {n === 1 ? '1 pessoa' : `${n} pessoas`}
                       {' · '}
@@ -108,6 +157,13 @@ export function EquipesDeVenda({
                     </span>
                     {gerencia && (
                       <span className="flex gap-1">
+                        <Botao
+                          tamanho="sm"
+                          variante="fantasma"
+                          onClick={() => setEditandoCidades({ id: eq.id, texto: (cidades.get(eq.id) ?? []).join(', ') })}
+                        >
+                          Cidades
+                        </Botao>
                         <Botao tamanho="sm" variante="fantasma" onClick={() => setEditando({ id: eq.id, nome: eq.nome })}>
                           Renomear
                         </Botao>
@@ -152,8 +208,8 @@ export function EquipesDeVenda({
         aoConfirmar={() => remover && void executar(() => removerEquipe(remover.id)).then(() => setRemover(null))}
         aoCancelar={() => setRemover(null)}
       >
-        As pessoas de {remover?.nome} ficam sem equipe, e o gestor deixa de ver as conversas dos vendedores dela. As conversas e
-        os contatos não mudam.
+        As pessoas de {remover?.nome} ficam sem equipe, e o gestor deixa de ver as conversas dos vendedores dela. As cidades
+        da equipe deixam de valer na distribuição. As conversas e os contatos não mudam.
       </DialogoConfirmacao>
     </section>
   )

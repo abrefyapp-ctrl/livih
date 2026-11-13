@@ -129,8 +129,17 @@ equipe de cada número, janela), não código.
 **Banco construído em 13/11:** migration `20261113120000_distribuicao_sem_carteira.sql`, 28 testes (configuração e
 permissões, gestor, outra empresa, ciclo novo, meio do ciclo, mais atendeu, ausente, volta automática, cidade, espera
 da cidade, passagem para a equipe, cron, número de vendedor, equipe apagada). Os testes antigos do rodízio passaram a
-mandar uma mensagem do contato, que é o novo gatilho. Falta: aplicar, as telas (equipe do número, cidades, janela,
-"Ausente até") e o agente perguntar a cidade.
+mandar uma mensagem do contato, que é o novo gatilho. Aplicada em 13/11.
+
+**Telas e agente (13/11):**
+- Configurações → Equipe: em "Equipes de venda", o botão "Cidades" em cada equipe (separadas por vírgula; "Castro, PR"
+  não vira a cidade "PR"); o bloco "Distribuição dos contatos" (dono e admin) explica a ordem e escolhe o período do
+  "quem mais atendeu" (30 a 365 dias); "Ausência" na janela Editar (dono e admin) e num botão próprio para o gestor,
+  nas pessoas da equipe dele; etiqueta "Ausente até DD/MM" na lista.
+- Configurações → WhatsApp → Configurar: com "Distribuir os contatos entre a equipe" ligado, "Equipe que recebe".
+- Agente: migration `20261113150000_agente_perguntar_cidade.sql` (o contexto ganha `perguntar_cidade`) e o bloco
+  "CIDADE DO CLIENTE" no prompt (`n8n/gerar_workflow.py`): pergunta a cidade numa frase curta e grava com
+  `atualizar_contato`. Vai ao ar reimportando os dois workflows na VPS.
 
 ### 3. Origem do lead e resultado
 

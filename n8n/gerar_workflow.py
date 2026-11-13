@@ -173,7 +173,9 @@ ${blocoAbertura}
 - E-mail: ${contato.email || 'não informado'}
 - Outros dados: ${Object.keys(contato.dados || {}).length ? JSON.stringify(contato.dados) : 'nenhum'}
 - Oportunidade aberta: ${op ? `"${op.titulo}" — etapa ${op.etapa}${op.resumo ? `. Resumo: ${op.resumo}` : ''}` : 'nenhuma ainda'}
-
+${c.perguntar_cidade ? `
+CIDADE DO CLIENTE: ainda não sabemos de qual cidade este cliente fala, e a empresa usa a cidade para passar o atendimento à equipe certa. Na sua resposta, junto com o que for responder, pergunte a cidade numa frase curta (é a exceção à regra de não perguntar só para preencher cadastro). Pergunte uma vez só: se ele não responder, siga o atendimento sem insistir. Assim que o cliente disser, grave com atualizar_contato no campo cidade. Se ele já disse a cidade nesta conversa, só grave, sem perguntar de novo. Não diga ao cliente quem vai atendê-lo.
+` : ''}
 Data e hora agora: ${agora} (horário de Brasília).`;
 
 // Ponto de retomada (migration 20261009130000): a conversa voltou para o agente (devolvida pela equipe, reaberta

@@ -7851,13 +7851,15 @@ begin
   insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
   insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
   values (v_org, v_conv, 'entrada', 'contato', 'Quero um orçamento', 'recebida');
-  insert into resultado (teste, ok) values ('distribuição 2: sem cidade e com o agente, espera a cidade',
+  insert into resultado (teste, ok) values ('distribuição 2: sem cidade e com o agente, espera a cidade e o agente sabe que deve perguntar',
     (select responsavel_id from public.contatos where id = v_ct) is null
-    and (select distribuir_pendente_em from public.conversas where id = v_conv) is not null);
+    and (select distribuir_pendente_em from public.conversas where id = v_conv) is not null
+    and (public.agente_contexto(v_conv) ->> 'perguntar_cidade')::boolean);
   update public.contatos set dados = dados || '{"cidade":"Piraí do Sul"}' where id = v_ct;
   insert into resultado (teste, ok) values ('distribuição 2: a cidade chega e o contato vai para a equipe dela',
     (select responsavel_id from public.contatos where id = v_ct) = v_b1
-    and (select distribuir_pendente_em from public.conversas where id = v_conv) is null);
+    and (select distribuir_pendente_em from public.conversas where id = v_conv) is null
+    and not (public.agente_contexto(v_conv) ->> 'perguntar_cidade')::boolean);
 
   -- Sem cidade e a conversa passa para a equipe antes: vai para a equipe do número.
   insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907772105', 'Lead apressado') returning id into v_ct;

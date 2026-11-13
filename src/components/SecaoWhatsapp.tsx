@@ -7,6 +7,7 @@ import {
   conectarOficial,
   criarNumero,
   definirDistribuicao,
+  definirEquipeDoNumero,
   desconectarNumero,
   editarNumero,
   iniciarNumero,
@@ -38,7 +39,15 @@ import { PagamentoMeta } from './PagamentoMeta'
 
 type Edicao = { nome: string; responsavel_id: string }
 /** Janela "Configurar": nome, dono, origem e distribuição salvos juntos num botão só. */
-type Configuracao = { numero: NumeroWhatsapp; nome: string; responsavel_id: string; origem: string; distribui: boolean }
+type Configuracao = {
+  numero: NumeroWhatsapp
+  nome: string
+  responsavel_id: string
+  origem: string
+  distribui: boolean
+  /** Equipe que recebe os contatos ('' = todos do rodízio). */
+  equipe_id: string
+}
 type Portfolio = { nome: string; waba_id: string; phone_number_id: string }
 type Confirmacao = { tipo: 'desconectar' | 'remover' | 'oficial'; numero: NumeroWhatsapp }
 
@@ -209,7 +218,7 @@ export function SecaoWhatsapp() {
   }
 
   // Distribuição dos contatos novos (docs/crm-acompanhamento.md, entrega 3): só nos números da empresa.
-  const [distribuicao, setDistribuicao] = useState<{ orgId: string; numeros: Set<string>; recebem: number } | null>(null)
+  const [distribuicao, setDistribuicao] = useState<{ orgId: string; numeros: Map<string, string | null>; recebem: number } | null>(null)
   useEffect(() => {
     if (!gerencia) return
     let ativo = true
@@ -221,6 +230,7 @@ export function SecaoWhatsapp() {
     }
   }, [orgId, gerencia, versao])
   const distribui = (id: string) => distribuicao?.orgId === orgId && distribuicao.numeros.has(id)
+  const equipeQueRecebe = (id: string) => (distribui(id) ? (distribuicao?.numeros.get(id) ?? null) : null)
 
   // Origem dos contatos de cada número (migration 20261111140000): só dono e admin configuram.
   const [origensLidas, setOrigensLidas] = useState<{ orgId: string; mapa: Map<string, string> } | null>(null)
@@ -281,7 +291,14 @@ export function SecaoWhatsapp() {
 
   function abrirConfiguracao(n: NumeroWhatsapp) {
     setErroConfig(null)
-    setConfig({ numero: n, nome: n.nome, responsavel_id: n.responsavel_id ?? '', origem: origens?.get(n.id) ?? '', distribui: distribui(n.id) })
+    setConfig({
+      numero: n,
+      nome: n.nome,
+      responsavel_id: n.responsavel_id ?? '',
+      origem: origens?.get(n.id) ?? '',
+      distribui: distribui(n.id),
+      equipe_id: equipeQueRecebe(n.id) ?? '',
+    })
   }
 
   // Salva só o que mudou. A origem e a distribuição têm funções próprias no banco (cada uma confere o papel).
@@ -297,6 +314,8 @@ export function SecaoWhatsapp() {
         await editarNumero(n.id, { nome: config.nome.trim(), responsavel_id: responsavel })
       if (config.origem.trim() !== (origens?.get(n.id) ?? '')) await definirOrigemDoNumero(n.id, config.origem)
       if (!responsavel && config.distribui !== distribui(n.id)) await definirDistribuicao(n.id, config.distribui)
+      if (!responsavel && config.distribui && (config.equipe_id || null) !== equipeQueRecebe(n.id))
+        await definirEquipeDoNumero(n.id, config.equipe_id || null)
       setConfig(null)
       recarregar()
     } catch (err) {
@@ -461,7 +480,11 @@ export function SecaoWhatsapp() {
                         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">
                           <span className="truncate">{n.nome}</span>
                           {origem && <Etiqueta>{`Origem: ${origem}`}</Etiqueta>}
-                          {gerencia && !n.responsavel_id && distribui(n.id) && <Etiqueta>Distribui contatos novos</Etiqueta>}
+                          {gerencia && !n.responsavel_id && distribui(n.id) && (
+                            <Etiqueta>
+                              {`Distribui contatos${equipeQueRecebe(n.id) ? ` · ${equipes.find((e) => e.id === equipeQueRecebe(n.id))?.nome ?? 'equipe'}` : ''}`}
+                            </Etiqueta>
+                          )}
                         </p>
                         <p className="text-legenda text-texto-3">
                           {!n.responsavel_id ? 'Da empresa · toda a equipe vê' : n.responsavel_id === eu ? 'Seu número' : `De ${nomeDe(n.responsavel_id)}`}
@@ -607,14 +630,39 @@ export function SecaoWhatsapp() {
                     className="mt-0.5 size-4 shrink-0 accent-primaria"
                   />
                   <span>
-                    <span className="block text-pequeno font-medium text-texto">Distribuir os contatos novos entre a equipe</span>
+                    <span className="block text-pequeno font-medium text-texto">Distribuir os contatos entre a equipe</span>
                     <span className="block text-legenda text-texto-3">
-                      Quem escreve pela primeira vez e ainda não tem vendedor entra na carteira do próximo da fila, que é
-                      avisado no celular. O agente continua atendendo; quando ele chamar a equipe, o aviso vai para esse
-                      vendedor. Quem já tem vendedor continua com ele.
+                      Quando o cliente escreve pela primeira vez, volta depois de 30 dias sem conversa ou quem o atendia
+                      está ausente, a Livih escolhe quem atende: quem mais atendeu esse cliente; senão, a equipe da cidade
+                      dele; senão, a equipe que recebe deste número ou todos marcados com “Recebe contatos novos”, na vez
+                      de cada um. Quem recebe é avisado no celular. O agente continua atendendo até chamar a equipe.
                     </span>
                   </span>
                 </label>
+                {config.distribui && equipes.length > 0 && (
+                  <div className="space-y-1.5 pl-6.5">
+                    <label htmlFor="equipe-recebe" className="block text-pequeno font-medium text-texto-2">
+                      Equipe que recebe
+                    </label>
+                    <select
+                      id="equipe-recebe"
+                      value={config.equipe_id}
+                      onChange={(e) => setConfig({ ...config, equipe_id: e.target.value })}
+                      className="block h-10 w-full rounded-md border border-borda bg-superficie px-3 focus:border-primaria focus:outline-none"
+                    >
+                      <option value="">Todos marcados com “Recebe contatos novos”</option>
+                      {equipes.map((eq) => (
+                        <option key={eq.id} value={eq.id}>
+                          {eq.nome}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-legenda text-texto-3">
+                      Vale quando ninguém atendeu esse cliente no período escolhido e a cidade dele não tem equipe (ou
+                      ainda não se sabe a cidade). As cidades de cada equipe ficam em Configurações → Equipe.
+                    </p>
+                  </div>
+                )}
                 {config.distribui && distribuicao?.recebem === 0 && (
                   <Aviso tom="atencao">
                     Ninguém está marcado para receber contatos novos, então nada é distribuído. Em Configurações → Equipe,

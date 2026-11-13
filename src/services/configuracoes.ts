@@ -178,11 +178,16 @@ export async function ligarAgenteNoNumero(canalId: string, ativo: boolean) {
 
 // ---- distribuição dos contatos novos (migration 20261105160000, docs/crm-acompanhamento.md entrega 3) ----
 
-/** Números da empresa com a distribuição ligada. */
-export async function numerosQueDistribuem(orgId: string): Promise<Set<string>> {
-  const { data, error } = await supabase.from('canais').select('id').eq('org_id', orgId).eq('distribuir', true)
+/** Números da empresa com a distribuição ligada → equipe que recebe (nulo = todos do rodízio; migration 20261113120000). */
+export async function numerosQueDistribuem(orgId: string): Promise<Map<string, string | null>> {
+  const { data, error } = await supabase.from('canais').select('id, equipe_id').eq('org_id', orgId).eq('distribuir', true)
   if (error) throw error
-  return new Set((data ?? []).map((c) => c.id))
+  return new Map((data ?? []).map((c) => [c.id, c.equipe_id]))
+}
+
+export async function definirEquipeDoNumero(canalId: string, equipeId: string | null) {
+  const { error } = await supabase.rpc('canal_definir_equipe', { p_canal: canalId, p_equipe: equipeId as string })
+  if (error) throw new Error(error.message || 'Não foi possível mudar a equipe que recebe. Tente de novo.')
 }
 
 export async function definirDistribuicao(canalId: string, valor: boolean) {
