@@ -37,6 +37,21 @@ async function chamarConvite(corpo: Record<string, unknown>): Promise<RespostaCo
   return data as RespostaConvite
 }
 
+export type TipoLink = 'convite' | 'senha' | 'dono'
+
+/** Mensagem pronta para mandar o link pelo WhatsApp (também usada no convite em lote). */
+export function mensagemDoLink(link: string, nome: string, nomeOrg: string, tipo: TipoLink = 'convite') {
+  const primeiroNome = nome.includes('@') ? '' : nome.split(' ')[0]
+  const oi = `Oi${primeiroNome ? `, ${primeiroNome}` : ''}!`
+  return tipo === 'senha'
+    ? `${oi} Este é o link para você criar uma senha nova na Livih (vale por 24 horas): ${link}`
+    : tipo === 'dono'
+      ? `${oi} A conta da ${nomeOrg} na Livih está pronta. Crie sua senha por este link (vale por 24 horas) ` +
+        `e siga os primeiros passos para conectar o WhatsApp e configurar o agente: ${link}`
+      : `${oi} Você foi convidado(a) para atender as conversas da ${nomeOrg} na Livih. ` +
+        `Crie sua senha por este link (vale por 24 horas): ${link}`
+}
+
 /** Link de convite (conta nova ou ainda sem senha); link null = já tinha conta (aviso explica se houver). */
 export const convidarMembro = (orgId: string, dados: { email: string; nome: string; papel: Exclude<Papel, 'dono'> }) =>
   chamarConvite({ org_id: orgId, ...dados })

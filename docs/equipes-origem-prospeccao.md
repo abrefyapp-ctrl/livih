@@ -236,6 +236,24 @@ do Painel: número, equipe e vendedor, pelo `painel_membros`).
   - "respondeu" conta qualquer resposta, inclusive a saudação automática do WhatsApp Business do cliente.
 - 19 testes.
 
+## Implantação (16/11)
+
+Começou na tarde de 16/11, sem as respostas do Diego (entrega 2 fica para configurar depois). Adiantado de manhã:
+
+- **Convidar várias pessoas** (Configurações → Equipe, só o dono): cola as linhas da planilha (Nome, E-mail,
+  Telefone, Equipe, Gestor e Papel; com a linha de títulos a ordem não importa). Cria as equipes que faltam, convida,
+  põe cada pessoa na equipe, marca o gestor e, se pedido, "Recebe contatos novos" em quem não é gestor. Cada linha sai
+  com o link pronto para o WhatsApp da pessoa (vale 24 horas) e "Copiar nome, telefone e link de todos" para colar na
+  planilha. Quem já está na equipe só muda de equipe. Sem migration: usa o `convidar-membro` e as funções de equipe.
+- **Textos da distribuição** (migration `20261116120000_distribuicao_textos.sql`): o aviso na conversa diz o porquê
+  numa frase ("Contato distribuído para Ana: foi quem mais atendeu este cliente nos últimos 90 dias."), quem não tem
+  nome aparece pelo começo do e-mail (não o e-mail inteiro: o agente lê os avisos) e os erros de ausência, cidade e
+  equipe dizem o que fazer. Revisada pelo `revisor-banco` e pelo `revisor-textos`.
+- **Plano da CEFEQ:** durante o teste ela fica no plano "Sem plano definido" (sem limite de números nem de
+  atendimentos, sem cobrança). Falta o plano só dela (27 números, 4.000 atendimentos, excedente de R$ 0,40) antes da
+  primeira cobrança, ao fim dos 30 dias: a tabela `planos` aparece para todas as empresas e o dono troca para
+  qualquer plano dela, então precisa de um plano visível só para uma empresa.
+
 ## Decisões de 10/11 (usuário)
 
 | Pergunta | Decisão |

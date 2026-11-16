@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Botao } from './Botao'
 import { Icone } from './Icone'
+import { mensagemDoLink, type TipoLink } from '../services/configuracoes'
 
 /** Link de acesso (convite, dono de empresa nova ou senha nova) com botões de copiar e mandar pelo WhatsApp. */
 export function LinkConvite({
@@ -12,19 +13,10 @@ export function LinkConvite({
   link: string
   nome: string
   nomeOrg: string
-  tipo?: 'convite' | 'senha' | 'dono'
+  tipo?: TipoLink
 }) {
   const [copiado, setCopiado] = useState(false)
-  const primeiroNome = nome.includes('@') ? '' : nome.split(' ')[0]
-  const oi = `Oi${primeiroNome ? `, ${primeiroNome}` : ''}!`
-  const mensagem =
-    tipo === 'senha'
-      ? `${oi} Este é o link para você criar uma senha nova na Livih (vale por 24 horas): ${link}`
-      : tipo === 'dono'
-        ? `${oi} A conta da ${nomeOrg} na Livih está pronta. Crie sua senha por este link (vale por 24 horas) ` +
-          `e siga os primeiros passos para conectar o WhatsApp e configurar o agente: ${link}`
-        : `${oi} Você foi convidado(a) para atender as conversas da ${nomeOrg} na Livih. ` +
-        `Crie sua senha por este link (vale por 24 horas): ${link}`
+  const mensagem = mensagemDoLink(link, nome, nomeOrg, tipo)
 
   async function copiar() {
     try {

@@ -37,6 +37,7 @@ import { EquipesDeVenda } from './EquipesDeVenda'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
+import { ConviteEmLote } from './ConviteEmLote'
 import { DialogoConfirmacao } from './DialogoConfirmacao'
 import { Icone } from './Icone'
 import { LinkConvite } from './LinkConvite'
@@ -72,6 +73,7 @@ export function SecaoEquipe() {
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
   const [convidando, setConvidando] = useState(false)
+  const [convidandoLote, setConvidandoLote] = useState(false)
   const [desativar, setDesativar] = useState<MembroEquipe | null>(null)
   const [salvando, setSalvando] = useState<string | null>(null)
   const [erroAcao, setErroAcao] = useState<string | null>(null)
@@ -381,9 +383,14 @@ export function SecaoEquipe() {
           </p>
         </div>
         {souDono && (
-          <Botao icone="mais" onClick={() => setConvidando(true)}>
-            Convidar pessoa
-          </Botao>
+          <div className="flex flex-wrap gap-2">
+            <Botao variante="secundario" icone="equipe" onClick={() => setConvidandoLote(true)}>
+              Convidar várias
+            </Botao>
+            <Botao icone="mais" onClick={() => setConvidando(true)}>
+              Convidar pessoa
+            </Botao>
+          </div>
         )}
       </div>
 
@@ -581,6 +588,16 @@ export function SecaoEquipe() {
         orgId={orgId}
         nomeOrg={orgAtiva?.nome ?? ''}
         aoFechar={() => setConvidando(false)}
+        aoConvidar={recarregar}
+      />
+
+      <ConviteEmLote
+        aberto={convidandoLote}
+        orgId={orgId}
+        nomeOrg={orgAtiva?.nome ?? ''}
+        membros={lista ?? []}
+        equipes={equipes}
+        aoFechar={() => setConvidandoLote(false)}
         aoConvidar={recarregar}
       />
 

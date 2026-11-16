@@ -17,7 +17,7 @@ export function Modal({
   aoFechar: () => void
   children: ReactNode
   rodape?: ReactNode
-  largura?: 'max-w-md' | 'max-w-xl' | 'max-w-2xl'
+  largura?: 'max-w-md' | 'max-w-xl' | 'max-w-2xl' | 'max-w-4xl'
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   const idTitulo = useId()

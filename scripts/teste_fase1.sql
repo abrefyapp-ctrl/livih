@@ -7654,7 +7654,7 @@ begin
     perform public.equipe_definir_cidades(current_setting('teste.eq_tele')::uuid, array['CASTRO - PR']);
     insert into resultado (teste, ok) values ('distribuição 2: a mesma cidade não fica em duas equipes', false);
   exception when others then
-    insert into resultado (teste, ok) values ('distribuição 2: a mesma cidade não fica em duas equipes', sqlerrm like 'A cidade CASTRO - PR já é da equipe Loja Castro D2%');
+    insert into resultado (teste, ok) values ('distribuição 2: a mesma cidade não fica em duas equipes', sqlerrm like 'CASTRO - PR já está na equipe Loja Castro D2. Tire a cidade de lá%');
   end;
   begin
     perform public.org_definir_janela_distribuicao(v_org, 3);
@@ -7667,13 +7667,13 @@ begin
     perform public.canal_definir_equipe((select id from public.canais where instance_id = 'INST-F7'), current_setting('teste.eq_fora')::uuid);
     insert into resultado (teste, ok) values ('distribuição 2: equipe de outra empresa não entra no número', false);
   exception when others then
-    insert into resultado (teste, ok) values ('distribuição 2: equipe de outra empresa não entra no número', sqlerrm like 'Equipe não encontrada%');
+    insert into resultado (teste, ok) values ('distribuição 2: equipe de outra empresa não entra no número', sqlerrm like 'Esta equipe foi removida%');
   end;
   begin
     perform public.membro_definir_ausencia(v_org, '00000000-0000-0000-0000-0000000000d1', true, (now() at time zone 'America/Sao_Paulo')::date - 1);
     insert into resultado (teste, ok) values ('distribuição 2: ausência com volta no passado é recusada', false);
   exception when others then
-    insert into resultado (teste, ok) values ('distribuição 2: ausência com volta no passado é recusada', sqlerrm like 'A data de volta já passou%');
+    insert into resultado (teste, ok) values ('distribuição 2: ausência com volta no passado é recusada', sqlerrm like 'O último dia de ausência já passou%');
   end;
   perform public.membro_definir_ausencia(v_org, '00000000-0000-0000-0000-0000000000d1', true, (now() at time zone 'America/Sao_Paulo')::date + 10);
   insert into resultado (teste, ok) values ('distribuição 2: dono marca ausência e ela fica na auditoria',
@@ -7695,7 +7695,7 @@ begin
     perform public.membro_definir_ausencia(v_org, '00000000-0000-0000-0000-0000000000d1', true, null);
     insert into resultado (teste, ok) values ('distribuição 2: atendente não marca ausência de outro', false);
   exception when others then
-    insert into resultado (teste, ok) values ('distribuição 2: atendente não marca ausência de outro', sqlerrm like 'Só dono, admin ou o gestor%');
+    insert into resultado (teste, ok) values ('distribuição 2: atendente não marca ausência de outro', sqlerrm like 'Só o dono, o admin ou o gestor da equipe desta pessoa%');
   end;
   begin
     perform public.canal_definir_equipe((select id from public.canais where instance_id = 'INST-F7'), null);
@@ -7737,7 +7737,7 @@ begin
     perform public.membro_definir_ausencia(v_org, '00000000-0000-0000-0000-0000000000a1', true, null);
     insert into resultado (teste, ok) values ('distribuição 2: gestor não marca ausência do dono, nem sendo da equipe', false);
   exception when others then
-    insert into resultado (teste, ok) values ('distribuição 2: gestor não marca ausência do dono, nem sendo da equipe', sqlerrm like 'Só dono, admin ou o gestor%');
+    insert into resultado (teste, ok) values ('distribuição 2: gestor não marca ausência do dono, nem sendo da equipe', sqlerrm like 'Só o dono, o admin ou o gestor da equipe desta pessoa%');
   end;
 end $$;
 
@@ -7753,7 +7753,7 @@ do $$ begin
   perform public.membro_definir_ausencia(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000d1', false, null);
   insert into resultado (teste, ok) values ('distribuição 2: outra empresa não marca ausência', false);
 exception when others then
-  insert into resultado (teste, ok) values ('distribuição 2: outra empresa não marca ausência', sqlerrm like 'Só dono, admin ou o gestor%');
+  insert into resultado (teste, ok) values ('distribuição 2: outra empresa não marca ausência', sqlerrm like 'Só o dono, o admin ou o gestor da equipe desta pessoa%');
 end $$;
 do $$ begin
   perform public.equipe_definir_cidades(current_setting('teste.eq_castro')::uuid, array['Curitiba']);
@@ -7798,7 +7798,7 @@ begin
   insert into resultado (teste, ok) values ('distribuição 2: ciclo novo redistribui; cidade sem equipe vai para a equipe do número',
     (select responsavel_id from public.contatos where id = v_ct) = v_d1
     and exists (select 1 from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema'
-                 and texto like 'Contato distribuído para % (equipe do número, Televendas D2).'));
+                 and texto like 'Contato distribuído para %: é da equipe Televendas D2, que recebe os contatos deste número.'));
   select count(*) into v_avisos from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema';
   insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
   values (v_org, v_conv, 'entrada', 'contato', 'Mais uma', 'recebida');
@@ -7821,7 +7821,7 @@ begin
   insert into resultado (teste, ok) values ('distribuição 2: cliente antigo vai para quem mais atendeu',
     (select responsavel_id from public.contatos where id = v_ct) = v_b1
     and exists (select 1 from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema'
-                 and texto like '%quem mais atendeu nos últimos 90 dias%'));
+                 and texto like 'Contato distribuído para %: foi quem mais atendeu este cliente nos últimos 90 dias.'));
 
   -- Ausente: perde a preferência na hora, sem esperar o próximo ciclo, e não recebe aviso.
   update public.membros_org set ausente = true where org_id = v_org and user_id = v_b1;
@@ -7844,7 +7844,7 @@ begin
   insert into resultado (teste, ok) values ('distribuição 2: contato de cidade com equipe vai para o rodízio dela',
     (select responsavel_id from public.contatos where id = v_ct) = v_b1
     and exists (select 1 from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema'
-                 and texto like '%(cidade Castro, equipe Loja Castro D2).'));
+                 and texto like '%: é da equipe Loja Castro D2, que atende a cidade Castro.'));
 
   -- Sem cidade e o agente atendendo: espera; distribui quando o agente grava a cidade.
   insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907772104', 'Lead sem cidade') returning id into v_ct;
@@ -8041,5 +8041,27 @@ insert into resultado (teste, ok) select 'distribuição 2: motor fechado para o
   and has_function_privilege('authenticated', 'public.membro_definir_ausencia(uuid, uuid, boolean, date)', 'execute')
   and has_function_privilege('authenticated', 'public.equipe_definir_cidades(uuid, text[])', 'execute')
   and not has_table_privilege('authenticated', 'public.equipes_cidades', 'insert');
+
+-- Textos da distribuição (migration 20261116120000): quem não tem nome aparece pelo começo do e-mail, e o aviso diz o porquê.
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select id from public.canais where instance_id = 'INST-F7');
+  v_ct uuid; v_conv uuid;
+begin
+  update public.perfis set nome = null where user_id = '00000000-0000-0000-0000-0000000000d1';
+  update public.membros_org set recebe_contatos = (user_id = '00000000-0000-0000-0000-0000000000d1'), ausente = false, ausente_ate = null
+   where org_id = v_org;
+  update public.canais set distribuir = true, equipe_id = null where id = v_canal;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907772199', 'Sem nome no perfil') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, texto, status_entrega)
+  values (v_org, v_conv, 'entrada', 'contato', 'Oi', 'recebida');
+  insert into resultado (teste, ok) values ('distribuição: pessoa sem nome aparece pelo começo do e-mail no aviso, com o motivo',
+    exists (select 1 from public.mensagens where conversa_id = v_conv and autor_tipo = 'sistema'
+             and texto = 'Contato distribuído para vendedor: era a vez no rodízio entre quem recebe contatos novos.'));
+  update public.canais set distribuir = false where id = v_canal;
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;
