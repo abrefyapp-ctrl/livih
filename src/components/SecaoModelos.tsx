@@ -14,6 +14,7 @@ import {
   ROTULO_IDIOMA,
   ROTULO_STATUS,
   variaveisDe,
+  motivoRecusa,
 } from '../services/modelos'
 import { formatarTelefone } from '../services/formato'
 import { Aviso } from './Aviso'
@@ -301,7 +302,7 @@ export function SecaoModelos() {
                   </div>
                   <p className="mt-2 line-clamp-3 text-pequeno whitespace-pre-wrap text-texto-2">{corpoDe(m)}</p>
                   {m.status === 'REJECTED' && m.rejected_reason && m.rejected_reason !== 'NONE' && (
-                    <p className="mt-2 text-legenda text-erro">Motivo da Meta: {m.rejected_reason}</p>
+                    <p className="mt-2 text-legenda text-erro">Motivo da Meta: {motivoRecusa(m.rejected_reason)}</p>
                   )}
                 </li>
               ))}

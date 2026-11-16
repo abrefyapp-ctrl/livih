@@ -335,13 +335,13 @@ export function Layout() {
             <span className="font-semibold">
               {caidos.length === 1 ? `O WhatsApp “${caidos[0]}” está desconectado.` : `${caidos.length} números de WhatsApp estão desconectados.`}
             </span>
-            <span>Nenhuma mensagem entra ou sai por ele até reconectar.</span>
+            <span>Nenhuma mensagem entra ou sai {caidos.length === 1 ? 'por ele' : 'por eles'} até reconectar.</span>
             {gerencia ? (
               <Link to="/configuracoes/whatsapp" className="font-semibold underline">
                 Reconectar
               </Link>
             ) : (
-              <span>Avise um administrador.</span>
+              <span>Avise o dono ou um admin.</span>
             )}
           </div>
         )}

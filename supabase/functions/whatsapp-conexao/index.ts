@@ -331,7 +331,20 @@ async function agendaDoCelular(sessao: string, eu: string | null) {
 
 async function listar(orgId: string, userId: string, gerencia: boolean) {
   let consulta = admin.from("canais").select(CAMPOS).eq("org_id", orgId).eq("ativo", true).order("criado_em");
-  if (!gerencia) consulta = consulta.or(`responsavel_id.is.null,responsavel_id.eq.${userId}`);
+  if (!gerencia) {
+    // O gestor vê também os números dos atendentes da equipe dele (a mesma regra de gestor_ve): é por esta lista que
+    // ele liga e desliga o agente deles, o que o banco já permitia (agente_ligar). Antes a lista só trazia os números
+    // da empresa e o próprio, e os da equipe não apareciam (revisão do manual de WhatsApp, 16/11).
+    const ids = [userId];
+    const { data: eu } = await admin.from("membros_org").select("equipe_id, gestor, ativo")
+      .eq("org_id", orgId).eq("user_id", userId).maybeSingle();
+    if (eu?.gestor && eu.ativo && eu.equipe_id) {
+      const { data: equipe } = await admin.from("membros_org").select("user_id")
+        .eq("org_id", orgId).eq("equipe_id", eu.equipe_id).eq("papel", "atendente");
+      for (const m of equipe ?? []) if (!ids.includes(m.user_id)) ids.push(m.user_id);
+    }
+    consulta = consulta.or(`responsavel_id.is.null,responsavel_id.in.(${ids.join(",")})`);
+  }
   const { data } = await consulta;
   const canais = (data ?? []) as Canal[];
   await registrarCanais(canais);

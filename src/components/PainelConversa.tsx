@@ -173,7 +173,7 @@ export function PainelConversa({
   const janelaFechada =
     oficial && !carregando && (!ultimaEntrada || agora - new Date(ultimaEntrada.criado_em).getTime() > 24 * 3600_000)
   const botaoModelo = oficial && (
-    <Botao variante="secundario" icone="arquivo" onClick={() => setEnviandoModelo(true)}>
+    <Botao variante="secundario" icone="arquivo" title="Enviar modelo" onClick={() => setEnviandoModelo(true)}>
       <span className={janelaFechada ? '' : 'sr-only'}>Enviar modelo</span>
     </Botao>
   )

@@ -71,8 +71,9 @@ export function ModalEnviarModelo({
       const parametros = variaveis.map((n) => valores[n - 1].trim())
       await enviarModelo(conversaId, modelo.name, modelo.language, parametros, textoEnviado(modelo, valores))
       fechar()
-    } catch {
-      setErro('O modelo não foi enviado. Confira a conexão e tente de novo.')
+    } catch (e) {
+      // Só a das variáveis diz o que fazer; as outras do banco (conversa não encontrada, mensagem vazia…) não ajudam.
+      setErro(/^preencha/i.test((e as Error).message ?? '') ? 'Preencha todas as variáveis do modelo.' : 'O modelo não foi enviado. Confira a internet e tente de novo.')
     } finally {
       setEnviando(false)
     }
@@ -146,7 +147,7 @@ export function ModalEnviarModelo({
 
             {modelo && (
               <p className="text-legenda text-texto-3">
-                O modelo é cobrado pela Meta por conversa iniciada. Quando {nomeContato} responder, a conversa volta a aceitar
+                A Meta cobra pelos modelos entregues: os de Marketing sempre; os de Utilidade, só fora das 24 horas. A cobrança vai direto para a conta do WhatsApp Business da empresa. Quando {nomeContato} responder, a conversa volta a aceitar
                 texto livre por 24 horas.
               </p>
             )}

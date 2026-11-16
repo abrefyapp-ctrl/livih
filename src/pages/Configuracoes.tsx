@@ -29,10 +29,10 @@ const SECOES: { id: string; rotulo: string; icone: NomeIcone; grupo: Grupo; modu
   { id: 'notificacoes', rotulo: 'Notificações', icone: 'sino', grupo: 'Empresa', manual: 'notificacoes' },
   // O plano mora na mesma seção do uso da IA (id 'uso' mantido: os avisos de franquia apontam para /configuracoes/uso).
   { id: 'uso', rotulo: 'Plano e consumo', icone: 'painel', grupo: 'Empresa', manual: 'plano' },
-  { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone', grupo: 'WhatsApp' },
+  { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone', grupo: 'WhatsApp', manual: 'whatsapp' },
   // Modelos só existem na API oficial (liberada para todas as empresas em 26/10).
-  { id: 'modelos', rotulo: 'Modelos', icone: 'arquivo', grupo: 'WhatsApp' },
-  { id: 'respostas', rotulo: 'Respostas rápidas', icone: 'raio', grupo: 'WhatsApp' },
+  { id: 'modelos', rotulo: 'Modelos', icone: 'arquivo', grupo: 'WhatsApp', manual: 'modelos' },
+  { id: 'respostas', rotulo: 'Respostas rápidas', icone: 'raio', grupo: 'WhatsApp', manual: 'respostas' },
   { id: 'agente', rotulo: 'Agente', icone: 'agente', grupo: 'Agente' },
   { id: 'base', rotulo: 'Base de conhecimento', icone: 'livro', grupo: 'Agente' },
   { id: 'documentos', rotulo: 'Documentos', icone: 'arquivo', grupo: 'Agente' },

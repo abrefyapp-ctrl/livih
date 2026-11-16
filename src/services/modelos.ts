@@ -21,6 +21,27 @@ export type Modelo = {
   rejected_reason?: string
 }
 
+/**
+ * Motivo da recusa em português (16/11; antes a tela mostrava o código da Meta, como "INVALID_FORMAT"). Os códigos são
+ * os do webhook message_template_status_update da Meta; código desconhecido aparece como veio.
+ */
+const MOTIVOS_RECUSA: Record<string, string> = {
+  INVALID_FORMAT:
+    'o formato não foi aceito. Confira as partes que mudam: {{1}}, {{2}} na ordem, sem duas coladas, sem começar ou terminar o texto com uma delas, e com exemplo em todas.',
+  INCORRECT_CATEGORY:
+    'o texto não combina com a categoria escolhida (por exemplo, oferta ou desconto marcado como Utilidade). Crie de novo na categoria certa.',
+  TAG_CONTENT_MISMATCH:
+    'o texto não combina com a categoria escolhida (por exemplo, oferta ou desconto marcado como Utilidade). Crie de novo na categoria certa.',
+  PROMOTIONAL: 'a Meta considerou o texto promocional e fora das regras dela. Reescreva com menos apelo de venda ou use a categoria Marketing.',
+  ABUSIVE_CONTENT: 'o texto vai contra as regras da Meta (conteúdo proibido ou ofensivo). Reescreva sem essa parte.',
+  SCAM: 'a Meta achou que o texto pode enganar o cliente (promessa exagerada, prêmio, link suspeito). Reescreva de forma clara e direta.',
+  CATEGORY_NOT_AVAILABLE: 'essa categoria não está disponível para o país do número. Escolha outra categoria.',
+}
+
+export function motivoRecusa(codigo: string): string {
+  return MOTIVOS_RECUSA[codigo] ?? codigo
+}
+
 export type ModeloNovo = {
   nome: string
   categoria: 'UTILITY' | 'MARKETING'

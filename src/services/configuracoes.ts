@@ -188,7 +188,12 @@ export async function editarNumero(canalId: string, campos: { nome: string; resp
  */
 export async function ligarAgenteNoNumero(canalId: string, ativo: boolean) {
   const { error } = await supabase.rpc('agente_ligar', { p_canal: canalId, p_ativo: ativo })
-  if (error) throw new Error('Não foi possível mudar o agente deste número. Tente de novo.')
+  // "Só dono, admin ou o gestor…" e "Este número ainda não tem agente…" já dizem o que fazer (revisão de 16/11).
+  if (error) {
+    throw new Error(
+      /^(Só |Este número)/.test(error.message) ? error.message : 'Não foi possível mudar o agente deste número. Tente de novo.',
+    )
+  }
 }
 
 // ---- distribuição dos contatos novos (migration 20261105160000, docs/crm-acompanhamento.md entrega 3) ----

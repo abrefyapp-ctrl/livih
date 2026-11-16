@@ -51,8 +51,12 @@ export async function apagarRespostaRapida(id: string) {
 /**
  * Texto pronto para a caixa da conversa: "{nome}" vira o primeiro nome do cliente. Sem nome conhecido (só o celular),
  * some a variável com a vírgula e o espaço antes dela ("Olá, {nome}!" → "Olá!"; "Oi {nome}, tudo bem?" → "Oi, tudo bem?").
+ * No começo de uma frase, sai com a pontuação depois e a frase começa em maiúscula ("{nome}, tudo bem?" → "Tudo bem?";
+ * antes virava ", tudo bem?", revisão de 16/11).
  */
 export function preencherResposta(texto: string, primeiroNome: string | null) {
   if (primeiroNome) return texto.replace(/\{nome\}/gi, primeiroNome)
-  return texto.replace(/,? ?\{nome\}/gi, '')
+  return texto
+    .replace(/(^|[.!?]\s+)\{nome\}[,!]?\s*(\p{L}?)/giu, (_, inicio: string, letra: string) => inicio + letra.toUpperCase())
+    .replace(/,? ?\{nome\}/gi, '')
 }

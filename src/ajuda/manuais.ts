@@ -4,7 +4,10 @@ import { ManualCampanhas, SECOES_CAMPANHAS } from './ManualCampanhas'
 import { ManualEmpresa, SECOES_EMPRESA } from './ManualEmpresa'
 import { ManualEquipe, SECOES_EQUIPE } from './ManualEquipe'
 import { ManualNotificacoes, SECOES_NOTIFICACOES } from './ManualNotificacoes'
+import { ManualModelos, SECOES_MODELOS } from './ManualModelos'
 import { ManualPlano, SECOES_PLANO } from './ManualPlano'
+import { ManualRespostas, SECOES_RESPOSTAS } from './ManualRespostas'
+import { ManualWhatsapp, SECOES_WHATSAPP } from './ManualWhatsapp'
 
 // Manuais da Ajuda (menu Ajuda, /ajuda/<id>). Manual novo: um componente em src/ajuda/, as imagens em
 // public/ajuda/<id>/ (sem dados reais de clientes) e uma linha aqui.
@@ -61,6 +64,36 @@ export const MANUAIS: Manual[] = [
     secoes: SECOES_PLANO,
     Conteudo: ManualPlano,
     para: 'Dono e admin',
+    atualizado: '16/11/2026',
+  },
+  {
+    id: 'whatsapp',
+    titulo: 'WhatsApp',
+    resumo: 'Conectar os números (pelo celular ou pela API oficial), ligar o agente, distribuir os contatos e a origem.',
+    icone: 'telefone',
+    secoes: SECOES_WHATSAPP,
+    Conteudo: ManualWhatsapp,
+    para: 'Dono e admin',
+    atualizado: '16/11/2026',
+  },
+  {
+    id: 'modelos',
+    titulo: 'Modelos de mensagem',
+    resumo: 'Criar os modelos que a Meta aprova, para escrever ao cliente depois de 24 horas e nas campanhas.',
+    icone: 'arquivo',
+    secoes: SECOES_MODELOS,
+    Conteudo: ManualModelos,
+    para: 'Toda a equipe',
+    atualizado: '16/11/2026',
+  },
+  {
+    id: 'respostas',
+    titulo: 'Respostas rápidas',
+    resumo: 'Mensagens prontas para usar na conversa com "/", como chave Pix, prazo e endereço.',
+    icone: 'raio',
+    secoes: SECOES_RESPOSTAS,
+    Conteudo: ManualRespostas,
+    para: 'Toda a equipe',
     atualizado: '16/11/2026',
   },
   {

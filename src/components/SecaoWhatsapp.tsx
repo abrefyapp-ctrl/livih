@@ -37,7 +37,7 @@ import { Modal } from './Modal'
 import { ID_SUGESTOES_ORIGEM, RegrasDeOrigem, SugestoesDeOrigem } from './OrigemDosContatos'
 import { PagamentoMeta } from './PagamentoMeta'
 
-type Edicao = { nome: string; responsavel_id: string }
+type Edicao = { nome: string; responsavel_id: string; origem?: string }
 /** Janela "Configurar": nome, dono, origem e distribuição salvos juntos num botão só. */
 type Configuracao = {
   numero: NumeroWhatsapp
@@ -284,6 +284,9 @@ export function SecaoWhatsapp() {
     if (!edicao) return
     await executar('edicao', async () => {
       const { canal } = await criarNumero(orgId, edicao.nome.trim(), edicao.responsavel_id || null)
+      // Origem já na criação (16/11): antes só dava em Configurar, e "Adicionar e conectar" abria o QR na hora; o que
+      // chegasse entre a conexão e a origem ficava sem ela no Painel.
+      if (!edicao.responsavel_id && edicao.origem?.trim()) await definirOrigemDoNumero(canal.id, edicao.origem)
       setPareando(canal.id)
       setEdicao(null)
     })
@@ -577,6 +580,17 @@ export function SecaoWhatsapp() {
               placeholder="Ex.: Comercial – Ana"
             />
             <SeletorDono equipe={equipe} valor={edicao.responsavel_id} aoMudar={(v) => setEdicao({ ...edicao, responsavel_id: v })} />
+            {!edicao.responsavel_id && (
+              <CampoTexto
+                rotulo="Origem dos contatos deste número (opcional)"
+                list={ID_SUGESTOES_ORIGEM}
+                maxLength={60}
+                placeholder="Ex.: Google Ads"
+                value={edicao.origem ?? ''}
+                onChange={(e) => setEdicao({ ...edicao, origem: e.target.value })}
+                ajuda="Para o número do site ou de um anúncio: quem escrever nele entra no Painel com esta origem. Preencha agora: a origem não vale para quem escreveu antes."
+              />
+            )}
             <p className="text-legenda text-texto-3">
               O agente começa desligado neste número. Ele usa as mesmas instruções e a mesma base da empresa.
             </p>

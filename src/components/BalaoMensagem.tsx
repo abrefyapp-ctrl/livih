@@ -207,7 +207,7 @@ export function BalaoMensagem({ m, nomeAutor }: { m: Mensagem; nomeAutor?: strin
           <p className="mt-1 rounded-sm bg-erro-suave px-2 py-1 text-legenda text-erro">
             {m.erro.startsWith('A Meta não entregou')
               ? m.erro
-              : `${m.erro.replace(/\.$/, '')}. O sistema tenta de novo automaticamente.`}
+              : `${m.erro.replace(/\.$/, '')}. A Livih tentou várias vezes e não conseguiu enviar. Resolva isso e mande de novo.`}
           </p>
         )}
       </div>

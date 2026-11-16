@@ -220,7 +220,7 @@ export function ManualPlano() {
           itens={[
             <>
               <strong className="text-texto">O plano novo tem menos números de WhatsApp do que a empresa usa.</strong> Remova
-              os que sobram em <Caminho>Configurações → WhatsApp</Caminho>, com o botão Remover, e tente de novo.
+              os que sobram em <Caminho>Configurações → WhatsApp</Caminho>, em Configurar → Remover número, e tente de novo.
               Desconectar não libera a vaga.
             </>,
             <>
@@ -463,7 +463,7 @@ export function ManualPlano() {
             [
               '“O plano … permite … de WhatsApp, e a empresa tem … em Configurações → WhatsApp…”',
               'O plano escolhido tem menos números do que a empresa usa',
-              'Em Configurações → WhatsApp, remova os que sobram (botão Remover; Desconectar não libera a vaga) e tente de novo',
+              'Em Configurações → WhatsApp, remova os que sobram (Configurar → Remover número; só desconectar não libera a vaga) e tente de novo',
             ],
             [
               '“O plano Essencial não inclui ERP nem Ordens de serviço. Para descer, desligue antes estes módulos…”',

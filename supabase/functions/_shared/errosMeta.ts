@@ -14,7 +14,7 @@ export const ERROS_META: Record<number, string> = {
   130497: "Envio bloqueado para o país deste número.",
   190: "O acesso ao WhatsApp oficial expirou. Conecte o número de novo em Configurações → WhatsApp.",
   131042:
-    "Falta configurar a forma de pagamento na conta do WhatsApp Business. O administrador cadastra um cartão no Meta Business Suite → Configurações → Cobrança e pagamentos.",
+    "Falta a forma de pagamento na conta do WhatsApp Business. Veja o passo a passo em Configurações → WhatsApp, no número.",
   131049:
     "Mensagem de marketing segurada pela Meta para não cansar o cliente (limite por pessoa). Tente mais tarde ou em outra campanha.",
   131050: "O cliente pediu ao WhatsApp para não receber mensagens de marketing desta empresa.",
