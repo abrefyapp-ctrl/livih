@@ -248,7 +248,7 @@ export async function listarOportunidades(orgId: string, contatoId?: string): Pr
 
 export async function criarOportunidade(
   orgId: string,
-  dados: { contato_id: string; etapa_id: string; titulo: string; valor_estimado: number | null; responsavel_id: string | null },
+  dados: { contato_id: string; etapa_id: string; titulo: string; valor_estimado: number | null; responsavel_id: string | null; origem?: string },
 ) {
   const { error } = await supabase.from('oportunidades').insert({ org_id: orgId, origem: 'manual', ...dados })
   if (error) throw erroAmigavel(error, 'Não foi possível criar a oportunidade. Tente de novo.')
@@ -256,10 +256,23 @@ export async function criarOportunidade(
 
 export async function atualizarOportunidade(
   id: string,
-  campos: Partial<Pick<Oportunidade, 'titulo' | 'resumo' | 'valor_estimado' | 'responsavel_id' | 'etapa_id' | 'motivo_perda' | 'motivo_perda_id'>>,
+  campos: Partial<Pick<Oportunidade, 'titulo' | 'resumo' | 'valor_estimado' | 'responsavel_id' | 'etapa_id' | 'motivo_perda' | 'motivo_perda_id' | 'origem'>>,
 ) {
   const { error } = await supabase.from('oportunidades').update(campos).eq('id', id)
   if (error) throw erroAmigavel(error, 'Não foi possível salvar a oportunidade. Tente de novo.')
+}
+
+/** Conversa mais recente do contato que a pessoa consegue ver (qualquer número); nula se não houver. */
+export async function ultimaConversaDoContato(contatoId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('conversas')
+    .select('id')
+    .eq('contato_id', contatoId)
+    .order('ultima_mensagem_em', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data?.id ?? null
 }
 
 export async function historicoOportunidade(id: string): Promise<PassoFunil[]> {

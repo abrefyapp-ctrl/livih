@@ -176,11 +176,24 @@ export async function buscarPedido(id: string): Promise<{ pedido: Pedido; itens:
   return pedido ? { pedido: pedido as unknown as Pedido, itens: itens ?? [] } : null
 }
 
-export async function criarPedido(orgId: string, contatoId: string | null): Promise<string> {
+/** Orçamentos e pedidos ligados a uma oportunidade (pedidos.oportunidade_id), do mais novo ao mais antigo. */
+export async function listarPedidosDaOportunidade(oportunidadeId: string): Promise<Pick<Pedido, 'id' | 'numero' | 'status' | 'total' | 'criado_em'>[]> {
+  const { data, error } = await supabase
+    .from('pedidos')
+    .select('id, numero, status, total, criado_em')
+    .eq('oportunidade_id', oportunidadeId)
+    .order('numero', { ascending: false })
+    .limit(50)
+  if (error) throw error
+  return (data ?? []) as Pick<Pedido, 'id' | 'numero' | 'status' | 'total' | 'criado_em'>[]
+}
+
+/** oportunidadeId liga o orçamento ao negócio (o banco confere que é do mesmo cliente). */
+export async function criarPedido(orgId: string, contatoId: string | null, oportunidadeId: string | null = null): Promise<string> {
   // numero: 0 só satisfaz o tipo; o número de verdade vem do banco (gatilho pedido_preparar).
   const { data, error } = await supabase
     .from('pedidos')
-    .insert({ org_id: orgId, contato_id: contatoId, numero: 0 })
+    .insert({ org_id: orgId, contato_id: contatoId, numero: 0, ...(oportunidadeId ? { oportunidade_id: oportunidadeId } : {}) })
     .select('id')
     .single()
   if (error) throw amigavel(error.message, 'Não foi possível criar o pedido.')

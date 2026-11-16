@@ -15,7 +15,16 @@ type Contato = { id: string; nome: string | null; nome_whatsapp: string | null; 
  * Orçamento a partir da conversa: cria o pedido (rascunho) já com o cliente e abre. Sem nome ou telefone no
  * cadastro, pede antes (saem no PDF). Se o cliente já tem rascunho, mostra para abrir em vez de duplicar.
  */
-export function ModalNovoOrcamento({ contato, aoFechar }: { contato: Contato; aoFechar: () => void }) {
+export function ModalNovoOrcamento({
+  contato,
+  oportunidadeId = null,
+  aoFechar,
+}: {
+  contato: Contato
+  /** Aberto de uma oportunidade: o orçamento nasce ligado a ela. */
+  oportunidadeId?: string | null
+  aoFechar: () => void
+}) {
   const { orgAtiva } = useSessao()
   const orgId = orgAtiva!.id
   const navegar = useNavigate()
@@ -50,7 +59,7 @@ export function ModalNovoOrcamento({ contato, aoFechar }: { contato: Contato; ao
     setErro(null)
     try {
       if (faltaDados) await atualizarContato(contato.id, { nome: nome.trim(), telefone: tel })
-      navegar(`/pedidos/${await criarPedido(orgId, contato.id)}`)
+      navegar(`/pedidos/${await criarPedido(orgId, contato.id, oportunidadeId)}`)
     } catch (err) {
       setErro((err as Error).message)
       setCriando(false)

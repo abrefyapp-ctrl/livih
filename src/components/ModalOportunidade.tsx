@@ -11,16 +11,27 @@ import {
   type MotivoPerda,
   type Oportunidade,
   type PassoFunil,
+  ultimaConversaDoContato,
 } from '../services/crm'
+import { listarPedidosDaOportunidade, ROTULO_STATUS, type Pedido } from '../services/erp'
 import { moeda, nomeDoContato, quandoCurto } from '../services/formato'
+import { ORIGENS_SUGERIDAS } from '../services/origem'
 import { useSessao } from '../hooks/useSessao'
 import { useEquipe } from '../hooks/useEquipe'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
 import { EtiquetaEtapa } from './EtiquetaEtapa'
+import { Icone } from './Icone'
 import { Modal } from './Modal'
+import { ModalNovoOrcamento } from './ModalNovoOrcamento'
 import { TarefasDoContato } from './TarefasDoContato'
+
+// 'whatsapp' e 'manual' só dizem como a oportunidade foi criada, não de onde o cliente veio (migration 20261111140000):
+// na tela aparecem como campo vazio, e o Painel conta como "Direto no WhatsApp".
+const semOrigem = (o: string | null | undefined) => !o || o === 'whatsapp' || o === 'manual'
+const ORIGENS = [...ORIGENS_SUGERIDAS, 'Campanha', 'Prospecção ativa']
+type PedidoDaOportunidade = Pick<Pedido, 'id' | 'numero' | 'status' | 'total' | 'criado_em'>
 
 const paraNumero = (v: string): number | null | undefined => {
   const limpo = v.replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')
@@ -50,7 +61,7 @@ export function ModalOportunidade({
   aoFechar: () => void
   aoSalvar: () => void
 }) {
-  const { orgAtiva, sessao, equipe: perfis } = useSessao()
+  const { orgAtiva, sessao, equipe: perfis, modulos } = useSessao()
   const equipe = useEquipe(orgAtiva?.id)
   const existente = !!oportunidade
   const abertas = etapas.filter((e) => e.tipo === 'aberta')
@@ -63,6 +74,13 @@ export function ModalOportunidade({
     oportunidade ? (oportunidade.responsavel_id ?? '') : orgAtiva?.suporte ? '' : (sessao?.user.id ?? ''),
   )
   const [resumo, setResumo] = useState(oportunidade?.resumo ?? '')
+  // Origem (16/11): a Livih grava sozinha (número, mensagem pronta, campanha); aqui a equipe vê e corrige.
+  const [origem, setOrigem] = useState(semOrigem(oportunidade?.origem) ? '' : (oportunidade?.origem ?? ''))
+  // Atalhos (16/11): a conversa do cliente e os orçamentos/pedidos ligados a este negócio (com o ERP).
+  const [conversaId, setConversaId] = useState<string | null>(null)
+  const comErp = !!modulos?.has('erp')
+  const [pedidos, setPedidos] = useState<PedidoDaOportunidade[] | null>(null)
+  const [novoOrcamento, setNovoOrcamento] = useState(false)
   const [motivoPerda, setMotivoPerda] = useState(oportunidade?.motivo_perda ?? '')
   // Motivo da lista da empresa (motivos_perda, migration 20261105170000); o texto acima vira o detalhe.
   const [motivoId, setMotivoId] = useState(oportunidade?.motivo_perda_id ?? '')
@@ -110,6 +128,29 @@ export function ModalOportunidade({
     }
   }, [oportunidadeId])
 
+  const contatoDaOportunidade = oportunidade?.contato_id
+  useEffect(() => {
+    if (!contatoDaOportunidade) return
+    let ativo = true
+    ultimaConversaDoContato(contatoDaOportunidade)
+      .then((id) => ativo && setConversaId(id))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [contatoDaOportunidade])
+
+  useEffect(() => {
+    if (!oportunidadeId || !comErp) return
+    let ativo = true
+    listarPedidosDaOportunidade(oportunidadeId)
+      .then((l) => ativo && setPedidos(l))
+      .catch(() => ativo && setPedidos([]))
+    return () => {
+      ativo = false
+    }
+  }, [oportunidadeId, comErp])
+
   const filtrados = useMemo(() => {
     const t = busca.trim().toLowerCase()
     const lista = t
@@ -143,15 +184,19 @@ export function ModalOportunidade({
         valor_estimado: valorNum,
         responsavel_id: responsavel || null,
       }
+      // Origem vazia: a que não diz de onde veio ('whatsapp'/'manual') fica; uma de verdade apagada vira nula.
+      const origemNova = origem.trim() || (semOrigem(oportunidade?.origem) ? (oportunidade?.origem ?? null) : null)
       if (existente) {
         await atualizarOportunidade(oportunidade!.id, {
           ...campos,
+          ...(origemNova !== oportunidade!.origem ? { origem: origemNova } : {}),
           resumo: resumo.trim() || null,
           motivo_perda: etapas.find((x) => x.id === destino)?.tipo === 'perdido' ? motivoPerda.trim() || null : null,
           motivo_perda_id: etapas.find((x) => x.id === destino)?.tipo === 'perdido' ? motivoId || null : null,
         })
       } else {
-        await criarOportunidade(orgAtiva.id, { ...campos, contato_id: contatoId })
+        // Sem origem digitada, o banco põe a do ciclo do contato (gatilho oportunidade_origem).
+        await criarOportunidade(orgAtiva.id, { ...campos, contato_id: contatoId, ...(origem.trim() ? { origem: origem.trim() } : {}) })
       }
       aoSalvar()
     } catch (err) {
@@ -204,12 +249,23 @@ export function ModalOportunidade({
         {erro && <Aviso tom="erro">{erro}</Aviso>}
 
         {existente && oportunidade?.contato && (
-          <p className="text-pequeno">
-            Cliente:{' '}
-            <Link to={`/contatos/${oportunidade.contato.id}`} className="font-medium text-primaria hover:underline">
-              {nomeDoContato(oportunidade.contato)}
-            </Link>
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-pequeno">
+              Cliente:{' '}
+              <Link to={`/contatos/${oportunidade.contato.id}`} className="font-medium text-primaria hover:underline">
+                {nomeDoContato(oportunidade.contato)}
+              </Link>
+            </p>
+            {conversaId && (
+              <Link
+                to={`/conversas/${conversaId}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-pequeno font-medium text-texto ring-1 ring-borda ring-inset hover:bg-fundo"
+              >
+                <Icone nome="conversas" className="size-4" />
+                Abrir conversa
+              </Link>
+            )}
+          </div>
         )}
         {contatoFixo && <p className="text-pequeno">Cliente: <strong>{contatoFixo.nome}</strong></p>}
 
@@ -314,23 +370,40 @@ export function ModalOportunidade({
           />
         )}
 
-        <div className="space-y-1.5">
-          <label htmlFor="oport-responsavel" className="block text-pequeno font-medium text-texto-2">
-            Responsável
-          </label>
-          <select
-            id="oport-responsavel"
-            value={responsavel}
-            onChange={(e) => setResponsavel(e.target.value)}
-            className="block h-10 w-full rounded-md border border-borda bg-superficie px-3 focus:border-primaria focus:outline-none"
-          >
-            <option value="">Ninguém</option>
-            {equipe.map((m) => (
-              <option key={m.user_id} value={m.user_id}>
-                {m.nome || m.email}
-              </option>
-            ))}
-          </select>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor="oport-responsavel" className="block text-pequeno font-medium text-texto-2">
+              Responsável
+            </label>
+            <select
+              id="oport-responsavel"
+              value={responsavel}
+              onChange={(e) => setResponsavel(e.target.value)}
+              className="block h-10 w-full rounded-md border border-borda bg-superficie px-3 focus:border-primaria focus:outline-none"
+            >
+              <option value="">Ninguém</option>
+              {equipe.map((m) => (
+                <option key={m.user_id} value={m.user_id}>
+                  {m.nome || m.email}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <CampoTexto
+              rotulo="Origem"
+              list="oport-origens"
+              maxLength={60}
+              value={origem}
+              onChange={(e) => setOrigem(e.target.value)}
+              placeholder={existente ? 'Direto no WhatsApp' : 'Em branco, a Livih preenche'}
+            />
+            <datalist id="oport-origens">
+              {ORIGENS.map((o) => (
+                <option key={o} value={o} />
+              ))}
+            </datalist>
+          </div>
         </div>
 
         {existente && (
@@ -373,6 +446,46 @@ export function ModalOportunidade({
           </p>
         )}
       </form>
+      {/* Fora do form: a janela do orçamento tem o form dela (o Modal não usa portal). */}
+      {existente && oportunidade?.contato && comErp && (
+        <div className="mt-4 border-t border-borda pt-4">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <p className="text-pequeno font-medium text-texto-2">Orçamentos e pedidos</p>
+            {!oportunidade.fechada_em && (
+              <Botao variante="secundario" tamanho="sm" icone="mais" onClick={() => setNovoOrcamento(true)}>
+                Novo orçamento
+              </Botao>
+            )}
+          </div>
+          {!pedidos ? (
+            <p className="text-legenda text-texto-3">Carregando…</p>
+          ) : pedidos.length ? (
+            <ul className="divide-y divide-borda rounded-md border border-borda">
+              {pedidos.map((p) => (
+                <li key={p.id}>
+                  <Link to={`/pedidos/${p.id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-pequeno hover:bg-fundo">
+                    <span>
+                      <span className="font-medium text-primaria">
+                        {p.status === 'rascunho' ? 'Orçamento' : 'Pedido'} nº {p.numero}
+                      </span>
+                      <span className="text-texto-3">
+                        {' · '}
+                        {ROTULO_STATUS[p.status]} · {quandoCurto(p.criado_em).toLowerCase()}
+                      </span>
+                    </span>
+                    <span className="text-texto-2 tabular-nums">{moeda(Number(p.total), true)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-pequeno text-texto-3">Nenhum orçamento ligado a este negócio.</p>
+          )}
+          {novoOrcamento && (
+            <ModalNovoOrcamento contato={oportunidade.contato} oportunidadeId={oportunidade.id} aoFechar={() => setNovoOrcamento(false)} />
+          )}
+        </div>
+      )}
       {/* Fora do form: a janela da tarefa tem o form dela (o Modal não usa portal). */}
       {existente && oportunidade && !oportunidade.fechada_em && (
         <div className="mt-4 border-t border-borda pt-4">
