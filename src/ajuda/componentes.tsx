@@ -33,11 +33,29 @@ export function Lista({ itens, numerada = false }: { itens: ReactNode[]; numerad
   )
 }
 
-/** Tabela simples: a primeira coluna em destaque. Rola na horizontal no celular. */
+/**
+ * Tabela simples: a primeira coluna em destaque. Em espaço estreito (painel da Ajuda, celular) vira cartões, um por
+ * linha, com o nome de cada coluna; antes rolava de lado (16/11). A troca vai pela largura do espaço (container query
+ * @lg = 32rem), não da tela: na página /ajuda larga continua tabela.
+ */
 export function Tabela({ colunas, linhas }: { colunas: string[]; linhas: ReactNode[][] }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-borda">
-      <table className="w-full min-w-[32rem] text-left text-pequeno">
+    <div className="@container">
+      <ul className="space-y-2 @lg:hidden">
+        {linhas.map((l, i) => (
+          <li key={i} className="space-y-1 rounded-lg border border-borda p-3 text-pequeno">
+            <p className="font-medium text-texto">{l[0]}</p>
+            {l.slice(1).map((celula, j) => (
+              <p key={j} className="text-texto-2">
+                <span className="font-medium text-texto-3">{colunas[j + 1]}: </span>
+                {celula}
+              </p>
+            ))}
+          </li>
+        ))}
+      </ul>
+    <div className="hidden overflow-hidden rounded-lg border border-borda @lg:block">
+      <table className="w-full text-left text-pequeno">
         <thead className="bg-fundo text-texto-2">
           <tr>
             {colunas.map((c) => (
@@ -59,6 +77,7 @@ export function Tabela({ colunas, linhas }: { colunas: string[]; linhas: ReactNo
           ))}
         </tbody>
       </table>
+    </div>
     </div>
   )
 }
