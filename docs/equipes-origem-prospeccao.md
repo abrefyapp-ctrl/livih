@@ -249,6 +249,14 @@ Começou na tarde de 16/11, sem as respostas do Diego (entrega 2 fica para confi
   numa frase ("Contato distribuído para Ana: foi quem mais atendeu este cliente nos últimos 90 dias."), quem não tem
   nome aparece pelo começo do e-mail (não o e-mail inteiro: o agente lê os avisos) e os erros de ausência, cidade e
   equipe dizem o que fazer. Revisada pelo `revisor-banco` e pelo `revisor-textos`.
+- **Alerta no WhatsApp de quem vai atender** (migration `20261116150000_alerta_quem_atende.sql`): quando o agente
+  chama a equipe, o alerta (cliente, motivo e o link da conversa) vai para o telefone de "Seus dados" de quem atende:
+  o dono do número de vendedor ou o vendedor do contato no número da empresa que distribui; com ele ausente ou
+  desativado, para os gestores da equipe. Sai por outro número da empresa, nunca o da pessoa. O "WhatsApp para
+  alertas" do agente virou **cópia** opcional de todos. O aviso no celular vai para quem atende e, na passagem, para o
+  gestor; dono e admin deixaram de receber o de cada número de vendedor. Número da empresa sem distribuição: todos que
+  veem o número, como antes. O "Convidar várias" grava o telefone da planilha em quem ainda não tem.
+  Precisa estar no ar antes de ligar o agente (semana 3).
 - **Plano da CEFEQ:** durante o teste ela fica no plano "Sem plano definido" (sem limite de números nem de
   atendimentos, sem cobrança). Falta o plano só dela (27 números, 4.000 atendimentos, excedente de R$ 0,40) antes da
   primeira cobrança, ao fim dos 30 dias: a tabela `planos` aparece para todas as empresas e o dono troca para

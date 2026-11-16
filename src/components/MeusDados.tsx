@@ -37,7 +37,10 @@ export function MeusDados() {
   return (
     // Mora na janela "Seus dados", aberta pelo nome no alto da tela (Layout).
     <form onSubmit={salvar} className="space-y-4">
-      <p className="text-pequeno text-texto-3">O telefone sai nos orçamentos em PDF em que você é o responsável.</p>
+      <p className="text-pequeno text-texto-3">
+        Este telefone sai nos orçamentos em PDF em que você é o responsável. Nele você também recebe, pelo WhatsApp, os
+        avisos de cliente aguardando atendimento e os lembretes de tarefas e compromissos.
+      </p>
       {mensagem && <Aviso tom={mensagem.tom}>{mensagem.texto}</Aviso>}
       <div className="space-y-4">
         <CampoTexto rotulo="Nome" required maxLength={120} value={nome} onChange={(e) => setNome(e.target.value)} />

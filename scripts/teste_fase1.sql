@@ -8063,5 +8063,191 @@ begin
              and texto = 'Contato distribuído para vendedor: era a vez no rodízio entre quem recebe contatos novos.'));
   update public.canais set distribuir = false where id = v_canal;
 end $$;
+
+-- Alerta do agente no WhatsApp de quem atende (migration 20261116150000).
+-- b1 (Ana) é a vendedora do contato no número da empresa que distribui; d1 (Vítor) tem número próprio e vira gestor.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select id from public.canais where instance_id = 'INST-F7');
+  v_vitor uuid := (select id from public.canais where instance_id = 'INST-VITOR');
+  v_b1 uuid := '00000000-0000-0000-0000-0000000000b1';
+  v_d1 uuid := '00000000-0000-0000-0000-0000000000d1';
+  v_a1 uuid := '00000000-0000-0000-0000-0000000000a1';
+  v_eq uuid; v_ct uuid; v_conv uuid; x jsonb;
+begin
+  update public.perfis set telefone = '5541911110002' where user_id = v_b1;
+  update public.perfis set telefone = '5541911110001' where user_id = v_d1;
+  update public.agentes set telefone_alerta = '5541911119999' where canal_id = v_canal;
+  update public.membros_org set ausente = false, ausente_ate = null, gestor = false, equipe_id = null where org_id = v_org;
+  update public.canais set distribuir = true, equipe_id = null, responsavel_id = null where id = v_canal;
+
+  -- Número da empresa que distribui: alerta para a vendedora do contato + cópia para o número da empresa.
+  insert into public.contatos (org_id, telefone, nome, responsavel_id, distribuido_em)
+  values (v_org, '5541907773001', 'Lead Quente', v_b1, now()) returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  x := public.agente_chamar_humano(v_conv, 'quer fechar 3 furadeiras');
+  insert into resultado (teste, ok) values ('alerta: vai para o WhatsApp da vendedora do contato, com o link da conversa',
+    exists (select 1 from public.alertas where conversa_id = v_conv and telefone = '5541911110002'
+             and texto like '%cliente aguardando você%' and texto like '%Motivo: quer fechar 3 furadeiras%'
+             and texto like '%https://app.livih.com.br/conversas/' || v_conv || '%'));
+  insert into resultado (teste, ok) values ('alerta: o número da empresa recebe cópia dizendo com quem está',
+    exists (select 1 from public.alertas where conversa_id = v_conv and telefone = '5541911119999' and texto like '%Vendedor: Ana%')
+    and (select count(*) from public.alertas where conversa_id = v_conv) = 2 and (x ->> 'equipe_avisada')::boolean);
+  insert into resultado (teste, ok) values ('alerta: aviso no celular só para a vendedora (sem dono e admin)',
+    public.push_destino_conversa(v_conv) = array[v_b1]);
+
+  -- Vendedora ausente: o gestor da equipe que recebe o número.
+  insert into public.equipes (org_id, nome) values (v_org, 'Equipe Alerta') returning id into v_eq;
+  update public.canais set equipe_id = v_eq where id = v_canal;
+  update public.membros_org set equipe_id = v_eq, gestor = true where org_id = v_org and user_id = v_d1;
+  update public.membros_org set ausente = true where org_id = v_org and user_id = v_b1;
+  update public.agentes set telefone_alerta = null where canal_id = v_canal;
+  insert into public.contatos (org_id, telefone, nome, responsavel_id, distribuido_em)
+  values (v_org, '5541907773002', 'Lead Sem Vendedor', v_b1, now()) returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  x := public.agente_chamar_humano(v_conv, 'pediu orçamento');
+  insert into resultado (teste, ok) values ('alerta: vendedora ausente, vai para o gestor da equipe do número',
+    (select count(*) from public.alertas where conversa_id = v_conv) = 1
+    and exists (select 1 from public.alertas where conversa_id = v_conv and telefone = '5541911110001'
+                 and texto like '%sem vendedor disponível*%Equipe: Equipe Alerta%Abra e passe para alguém da equipe:%'));
+  insert into resultado (teste, ok) values ('alerta: o aviso ao gestor não sai pelo número dele',
+    (select canal_id from public.alertas where conversa_id = v_conv) <> v_vitor);
+  update public.membros_org set ausente = false where org_id = v_org and user_id = v_b1;
+
+  -- Número do vendedor: ele recebe; o aviso no celular não vai mais para o dono.
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907773003', 'Cliente Direto') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_vitor, v_ct) returning id into v_conv;
+  insert into resultado (teste, ok) values ('alerta: no número do vendedor, quem atende é ele (o dono não recebe o aviso)',
+    public.quem_atende_conversa(v_conv) = array[v_d1] and not v_a1 = any(public.push_destino_conversa(v_conv)));
+
+  -- Número da empresa sem distribuição: ninguém em especial; o aviso no celular vai para todos, como antes.
+  update public.canais set distribuir = false where id = v_canal;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907773004', 'Cliente Geral') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  insert into resultado (teste, ok) values ('alerta: número da empresa sem distribuição avisa todos que veem o número',
+    public.quem_atende_conversa(v_conv) = '{}' and v_a1 = any(public.push_destino_conversa(v_conv))
+    and v_b1 = any(public.push_destino_conversa(v_conv)));
+  x := public.agente_chamar_humano(v_conv, 'dúvida');
+  insert into resultado (teste, ok) values ('alerta: sem quem atende e sem cópia, não manda WhatsApp',
+    not exists (select 1 from public.alertas where conversa_id = v_conv) and not (x ->> 'equipe_avisada')::boolean);
+
+  update public.membros_org set equipe_id = null, gestor = false where org_id = v_org and user_id = v_d1;
+  update public.perfis set telefone = null where user_id = v_b1;
+end $$;
+
+-- Telefone da planilha no perfil (convite em lote). f9: convidada agora, só na f7 e sem nunca ter entrado.
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000f9', 'novo.vendedor@f7.teste', '{"nome":"Nova Vendedora"}');
+insert into public.membros_org (org_id, user_id, papel)
+values (current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000f9', 'atendente');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  insert into resultado (teste, ok) values ('telefone da equipe: dono grava em quem não tem',
+    public.membro_definir_telefone(v_org, '00000000-0000-0000-0000-0000000000f9', '5541922223333'));
+  insert into resultado (teste, ok) values ('telefone da equipe: não troca o que a pessoa já preencheu',
+    not public.membro_definir_telefone(v_org, '00000000-0000-0000-0000-0000000000d1', '5541900000000'));
+  begin
+    perform public.membro_definir_telefone(v_org, '00000000-0000-0000-0000-0000000000b1', '123');
+    insert into resultado (teste, ok) values ('telefone da equipe: telefone inválido é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('telefone da equipe: telefone inválido é recusado', sqlerrm like 'Telefone inválido%');
+  end;
+  begin
+    perform public.membro_definir_telefone(v_org, '00000000-0000-0000-0000-0000000000c1', '5541922224444');
+    insert into resultado (teste, ok) values ('telefone da equipe: pessoa de outra empresa é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('telefone da equipe: pessoa de outra empresa é recusada', sqlerrm like 'Esta pessoa não faz parte%');
+  end;
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.membro_definir_telefone(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000d1', '5541922225555');
+  insert into resultado (teste, ok) values ('telefone da equipe: atendente não grava', false);
+exception when others then
+  insert into resultado (teste, ok) values ('telefone da equipe: atendente não grava', sqlerrm like 'Só o dono e o admin%');
+end $$;
+reset role;
+insert into resultado (teste, ok) select 'telefone da equipe: ficou gravado só o da convidada; quem decide o alerta é fechado para o login',
+  (select telefone from public.perfis where user_id = '00000000-0000-0000-0000-0000000000f9') = '5541922223333'
+  and (select telefone from public.perfis where user_id = '00000000-0000-0000-0000-0000000000d1') = '5541911110001'
+  and not has_function_privilege('authenticated', 'public.quem_atende_conversa(uuid)', 'execute')
+  and not has_function_privilege('authenticated', 'public.canal_para_avisar(uuid, uuid)', 'execute');
+
+-- Alerta: pontos da revisão do revisor-banco (migration 20261116150000).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_canal uuid := (select id from public.canais where instance_id = 'INST-F7');
+  v_vitor uuid := (select id from public.canais where instance_id = 'INST-VITOR');
+  v_b1 uuid := '00000000-0000-0000-0000-0000000000b1';
+  v_d1 uuid := '00000000-0000-0000-0000-0000000000d1';
+  v_a1 uuid := '00000000-0000-0000-0000-0000000000a1';
+  v_eq uuid; v_ct uuid; v_conv uuid; x jsonb;
+begin
+  update public.membros_org set ausente = false, ausente_ate = null, gestor = false, equipe_id = null where org_id = v_org;
+  update public.canais set distribuir = true, equipe_id = null, responsavel_id = null where id = v_canal;
+  update public.agentes set telefone_alerta = null where canal_id = v_canal;
+
+  -- O telefone da vendedora é um número ligado à Livih: não manda (um agente responderia ao outro).
+  update public.perfis set telefone = (select telefone from public.canais where id = v_canal) where user_id = v_b1;
+  insert into public.contatos (org_id, telefone, nome, responsavel_id, distribuido_em)
+  values (v_org, '5541907773011', 'Lead Número Livih', v_b1, now()) returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  x := public.agente_chamar_humano(v_conv, 'quer comprar');
+  insert into resultado (teste, ok) values ('alerta: telefone que é número ligado à Livih não recebe',
+    not exists (select 1 from public.alertas where conversa_id = v_conv)
+    and (select estado from public.conversas where id = v_conv) = 'aguardando_humano');
+
+  -- Motivo nulo não desfaz a passagem.
+  update public.perfis set telefone = '5541911110002' where user_id = v_b1;
+  insert into public.contatos (org_id, telefone, nome, responsavel_id, distribuido_em)
+  values (v_org, '5541907773012', 'Lead Sem Motivo', v_b1, now()) returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_canal, v_ct) returning id into v_conv;
+  x := public.agente_chamar_humano(v_conv, null);
+  insert into resultado (teste, ok) values ('alerta: sem motivo, a passagem acontece e o alerta diz "não informado"',
+    (select estado from public.conversas where id = v_conv) = 'aguardando_humano'
+    and exists (select 1 from public.alertas where conversa_id = v_conv and texto like '%Motivo: não informado%'));
+
+  -- Número do vendedor com ele ausente: o gestor da equipe dele; sem gestor, o aviso no celular volta para dono e admin.
+  insert into public.equipes (org_id, nome) values (v_org, 'Equipe do Vítor') returning id into v_eq;
+  update public.membros_org set equipe_id = v_eq where org_id = v_org and user_id in (v_d1, v_b1);
+  update public.membros_org set gestor = true where org_id = v_org and user_id = v_b1;
+  update public.membros_org set ausente = true where org_id = v_org and user_id = v_d1;
+  insert into public.contatos (org_id, telefone, nome) values (v_org, '5541907773013', 'Cliente do Vítor Ausente') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id) values (v_org, v_vitor, v_ct) returning id into v_conv;
+  insert into resultado (teste, ok) values ('alerta: vendedor do número ausente, vai para o gestor da equipe dele',
+    public.quem_atende_conversa(v_conv) = array[v_b1]);
+  update public.membros_org set gestor = false where org_id = v_org and user_id = v_b1;
+  insert into resultado (teste, ok) values ('alerta: sem gestor, o aviso no celular volta para dono e admin',
+    public.quem_atende_conversa(v_conv) = '{}' and v_a1 = any(public.push_destino_conversa(v_conv))
+    and not v_d1 = any(public.push_destino_conversa(v_conv)));
+
+  update public.membros_org set ausente = false, equipe_id = null, gestor = false where org_id = v_org;
+  update public.canais set distribuir = false where id = v_canal;
+  update public.perfis set telefone = null where user_id = v_b1;
+  -- Para o teste do telefone: c1 (dono de outra empresa) também entra na f7.
+  insert into public.membros_org (org_id, user_id, papel) values (v_org, '00000000-0000-0000-0000-0000000000c1', 'atendente')
+  on conflict do nothing;
+  update public.perfis set telefone = null where user_id = '00000000-0000-0000-0000-0000000000c1';
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$ begin
+  insert into resultado (teste, ok) values ('telefone da equipe: não grava em quem também é de outra empresa',
+    not public.membro_definir_telefone(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000c1', '5541922226666'));
+end $$;
+reset role;
+insert into resultado (teste, ok) select 'telefone da equipe: o telefone de quem é de outra empresa ficou como estava',
+  (select telefone from public.perfis where user_id = '00000000-0000-0000-0000-0000000000c1') is null;
+delete from public.membros_org where org_id = current_setting('teste.f7')::uuid and user_id = '00000000-0000-0000-0000-0000000000c1';
 reset role;
 select n, teste, ok from resultado order by n;

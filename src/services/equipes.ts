@@ -57,6 +57,16 @@ export async function definirEquipeDaPessoa(orgId: string, userId: string, equip
   if (error) throw new Error('Não foi possível mudar a equipe. Tente de novo.')
 }
 
+/**
+ * Telefone de quem ainda não preencheu "Seus dados" (convite em lote, 16/11): é por ele que chega o alerta de cliente
+ * aguardando. Não troca o que a pessoa já preencheu; devolve se gravou. telefone = só dígitos, com 55.
+ */
+export async function definirTelefoneDaPessoa(orgId: string, userId: string, telefone: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('membro_definir_telefone', { p_org: orgId, p_usuario: userId, p_telefone: telefone })
+  if (error) throw new Error(error.message || 'Não foi possível salvar o telefone. Tente de novo.')
+  return !!data
+}
+
 // ---- distribuição sem carteira (migration 20261113120000, docs/equipes-origem-prospeccao.md, entrega 2) ----
 
 const hojeBrasilia = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })

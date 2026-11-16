@@ -334,12 +334,12 @@ export function SecaoAgente() {
         )}
 
         <CampoTexto
-          rotulo="WhatsApp para alertas"
+          rotulo="Cópia dos alertas (opcional)"
           inputMode="tel"
           value={form.telefone}
           onChange={(e) => mudar({ telefone: e.target.value })}
           placeholder="(41) 99999-8888"
-          ajuda="Recebe uma mensagem sempre que o agente chamar a equipe. Deixe vazio para não avisar."
+          ajuda="Quando o agente chama a equipe, o alerta vai para o WhatsApp de quem vai atender (o telefone que cada pessoa cadastra em Seus dados). Este número recebe uma cópia de todos os alertas. Deixe vazio se não quiser cópia."
           erro={telefoneInvalido ? 'Informe DDD + número, por exemplo (41) 99999-8888.' : undefined}
           className="max-w-sm"
         />

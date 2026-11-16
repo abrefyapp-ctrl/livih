@@ -6,7 +6,7 @@ import {
   listarEquipeCompleta,
   type MembroEquipe,
 } from '../services/configuracoes'
-import { definirEquipeDaPessoa, salvarEquipe, type Equipe } from '../services/equipes'
+import { definirEquipeDaPessoa, definirTelefoneDaPessoa, salvarEquipe, type Equipe } from '../services/equipes'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { Icone } from './Icone'
@@ -156,7 +156,7 @@ export function ConviteEmLote({
           saida.push({ linha: l, link: null, nota: (e as Error).message, erro: true })
         }
       }
-      // 3. Equipe, gestor e "Recebe contatos novos", com o id de cada pessoa já na empresa.
+      // 3. Equipe, gestor, "Recebe contatos novos" e telefone, com o id de cada pessoa já na empresa.
       setProgresso('Colocando cada pessoa na equipe…')
       const idPorEmail = new Map((await listarEquipeCompleta(orgId)).map((m) => [m.email.toLowerCase(), m.user_id]))
       for (const r of saida) {
@@ -175,6 +175,14 @@ export function ConviteEmLote({
         } catch (e) {
           r.erro = true
           extras.push(`não entrou na equipe: ${(e as Error).message}`)
+        }
+        // Telefone para os alertas (16/11): só em quem ainda não tem; o que a pessoa preencheu fica.
+        if (r.linha.telefone) {
+          try {
+            if (await definirTelefoneDaPessoa(orgId, id, r.linha.telefone)) extras.push('telefone salvo para os alertas')
+          } catch {
+            extras.push('telefone não salvo: a pessoa cadastra em Seus dados')
+          }
         }
         if (extras.length) r.nota += ` · ${extras.join(', ')}`
       }
