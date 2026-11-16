@@ -53,10 +53,10 @@ const FILTROS: { id: FiltroLancamentos; rotulo: string }[] = [
 
 /** Financeiro (docs/financeiro.md): vem com o ERP ou as OS; dono, admin e quem tem a permissão Financeiro. */
 export function Financeiro() {
-  const { orgAtiva, modulos } = useSessao()
+  const { orgAtiva, modulos, financeiroOculto } = useSessao()
   const orgId = orgAtiva!.id
   const [acesso, setAcesso] = useState<{ orgId: string; ok: boolean; erro?: string } | null>(null)
-  const ligado = !modulos || modulos.has('erp') || modulos.has('os')
+  const ligado = (!modulos || modulos.has('erp') || modulos.has('os')) && !financeiroOculto
 
   useEffect(() => {
     if (!ligado) return

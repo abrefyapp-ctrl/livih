@@ -65,7 +65,7 @@ function Situacao({ m }: { m: MembroEquipe }) {
 }
 
 export function SecaoEquipe() {
-  const { orgAtiva, sessao, modulos } = useSessao()
+  const { orgAtiva, sessao, modulos, financeiroOculto } = useSessao()
   const orgId = orgAtiva!.id
   const souDono = orgAtiva?.papel === 'dono'
   const eu = sessao?.user.id
@@ -88,7 +88,7 @@ export function SecaoEquipe() {
   // "Emite nota fiscal" (docs/nfe.md): desligada por padrão; dono e admin ligam.
   const [emiteNota, setEmiteNota] = useState<Set<string>>(new Set())
   // "Financeiro" (docs/financeiro.md): só aparece com o ERP ou as OS ligados, que é quando o financeiro existe.
-  const comFinanceiro = !!modulos && (modulos.has('erp') || modulos.has('os'))
+  const comFinanceiro = !!modulos && (modulos.has('erp') || modulos.has('os')) && !financeiroOculto
   const [financeiro, setFinanceiro] = useState<Set<string>>(new Set())
   // "Recebe contatos novos" (docs/crm-acompanhamento.md, entrega 3): rodízio dos números da empresa que distribuem.
   const [recebe, setRecebe] = useState<Set<string>>(new Set())

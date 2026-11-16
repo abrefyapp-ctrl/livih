@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSessao } from '../hooks/useSessao'
-import { definirModulo, listarModulos, type Modulo } from '../services/modulos'
+import { definirFinanceiroOculto, definirModulo, lerFinanceiroOculto, listarModulos, type Modulo } from '../services/modulos'
 import { Aviso } from './Aviso'
 import { Botao } from './Botao'
 import { Interruptor } from './Interruptor'
@@ -22,6 +22,32 @@ export function ModalModulos({ empresa, aoFechar }: { empresa: { id: string; nom
       ativo = false
     }
   }, [empresa.id])
+
+  const [oculto, setOculto] = useState<boolean | null>(null)
+  useEffect(() => {
+    let ativo = true
+    lerFinanceiroOculto(empresa.id)
+      .then((v) => ativo && setOculto(v))
+      .catch(() => ativo && setErro('Não foi possível carregar a opção do Financeiro. Feche e abra de novo.'))
+    return () => {
+      ativo = false
+    }
+  }, [empresa.id])
+
+  async function alternarFinanceiro() {
+    if (oculto === null) return
+    setOcupado('financeiro')
+    setErro(null)
+    try {
+      await definirFinanceiroOculto(empresa.id, !oculto)
+      setOculto(!oculto)
+      recarregarModulos()
+    } catch (e) {
+      setErro((e as Error).message)
+    } finally {
+      setOcupado(null)
+    }
+  }
 
   async function alternar(m: Modulo) {
     setOcupado(m.codigo)
@@ -78,6 +104,22 @@ export function ModalModulos({ empresa, aoFechar }: { empresa: { id: string; nom
                 </Interruptor>
               </li>
             ))}
+            {/* Financeiro escondido (16/11): para quem usa o ERP da Livih mas cuida do financeiro em outro sistema. */}
+            {oculto !== null && (
+              <li className="flex items-start gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">Esconder o Financeiro</p>
+                  <p className="text-pequeno text-texto-3">
+                    Para a empresa que cuida do financeiro em outro sistema. Tira o menu Financeiro e o bloco Pagamento dos
+                    orçamentos. Pedidos confirmados e notas de entrada deixam de gerar lançamentos, e os desse período não
+                    entram depois, se o Financeiro voltar.
+                  </p>
+                </div>
+                <Interruptor ligado={oculto} desabilitado={ocupado === 'financeiro'} aoMudar={() => void alternarFinanceiro()} className="shrink-0">
+                  {oculto ? 'Escondido' : 'Visível'}
+                </Interruptor>
+              </li>
+            )}
           </ul>
         )}
         <p className="text-legenda text-texto-3">Desligar um módulo esconde as telas dele. Os dados já registrados continuam guardados.</p>

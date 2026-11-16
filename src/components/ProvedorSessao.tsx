@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { acompanharSessao, encerrarSessao } from '../services/autenticacao'
 import { listarEquipe, listarOrganizacoes, type Organizacao, type Perfil } from '../services/atendimento'
 import { ehAdminPlataforma } from '../services/plataforma'
-import { listarModulos } from '../services/modulos'
+import { lerFinanceiroOculto, listarModulos } from '../services/modulos'
 import { desativarNotificacoes } from '../services/notificacoes'
 import { ContextoSessao } from '../hooks/useSessao'
 
@@ -34,7 +34,7 @@ function lerOrgSalva(): string | null {
 // descarta o antigo sem precisar zerar estado dentro de efeito.
 type Orgs = { userId: string; lista: Organizacao[]; admin: boolean }
 type Equipe = { orgId: string; mapa: Map<string, Perfil> }
-type Modulos = { chave: string; ligados: Set<string> }
+type Modulos = { chave: string; ligados: Set<string>; financeiroOculto: boolean }
 
 export function ProvedorSessao({ children }: { children: ReactNode }) {
   const [sessao, setSessao] = useState<Session | null | undefined>(undefined)
@@ -99,9 +99,13 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!orgAtivaId) return
     let ativo = true
-    listarModulos(orgAtivaId)
-      .then((l) => ativo && setModulos({ chave: chaveModulos, ligados: new Set(l.filter((m) => m.ativo).map((m) => m.codigo)) }))
-      .catch(() => ativo && setModulos({ chave: chaveModulos, ligados: new Set(['agenda']) }))
+    // Financeiro escondido (16/11): sem resposta, vale o padrão (mostrado).
+    Promise.all([listarModulos(orgAtivaId), lerFinanceiroOculto(orgAtivaId).catch(() => false)])
+      .then(
+        ([l, financeiroOculto]) =>
+          ativo && setModulos({ chave: chaveModulos, ligados: new Set(l.filter((m) => m.ativo).map((m) => m.codigo)), financeiroOculto }),
+      )
+      .catch(() => ativo && setModulos({ chave: chaveModulos, ligados: new Set(['agenda']), financeiroOculto: false }))
     return () => {
       ativo = false
     }
@@ -109,6 +113,7 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
   // Mantém o que já está na tela enquanto relê (sem piscar o menu); só some quando a empresa muda.
   // `modulos &&` explícito: com `modulos?.` o lado esquerdo vira undefined e casa com orgAtivaId undefined (sem login).
   const modulosAtivos = modulos && modulos.chave.split('|')[0] === orgAtivaId ? modulos.ligados : null
+  const financeiroOculto = !!modulos && modulos.chave.split('|')[0] === orgAtivaId && modulos.financeiroOculto
   const recarregarModulos = useCallback(() => setVersaoModulos((v) => v + 1), [])
 
   // Módulo ligado pela plataforma em outra aba ou outro aparelho: o menu acompanha quando a pessoa volta para a aba.
@@ -162,6 +167,7 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
       carregandoOrgs,
       equipe: mapaEquipe,
       modulos: modulosAtivos,
+      financeiroOculto,
       recarregarModulos,
       trocarOrganizacao,
       acessarComoSuporte,
@@ -177,6 +183,7 @@ export function ProvedorSessao({ children }: { children: ReactNode }) {
       carregandoOrgs,
       mapaEquipe,
       modulosAtivos,
+      financeiroOculto,
       recarregarModulos,
       trocarOrganizacao,
       acessarComoSuporte,

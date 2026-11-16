@@ -25,7 +25,8 @@ type GrupoMenu = { rotulo?: string; itens: ItemMenu[] }
  * Celular: barra lateral vira gaveta aberta pelo botão de menu.
  */
 export function Layout() {
-  const { orgAtiva, organizacoes, trocarOrganizacao, sessao, equipe, sair, adminPlataforma, modulos, sairDoSuporte } = useSessao()
+  const { orgAtiva, organizacoes, trocarOrganizacao, sessao, equipe, sair, adminPlataforma, modulos, financeiroOculto, sairDoSuporte } =
+    useSessao()
   const navegar = useNavigate()
   const aguardando = useContagemAguardando(orgAtiva?.id)
   const caidos = useNumerosCaidos(orgAtiva?.id)
@@ -64,7 +65,7 @@ export function Layout() {
     [ajuda],
   )
   // Financeiro (docs/financeiro.md): vem com o ERP ou as OS; dono e admin sempre veem, o atendente só com a permissão.
-  const comFinanceiro = !!modulos && (modulos.has('erp') || modulos.has('os'))
+  const comFinanceiro = !!modulos && (modulos.has('erp') || modulos.has('os')) && !financeiroOculto
   const [financeiroAtendente, setFinanceiroAtendente] = useState<{ orgId: string; ok: boolean } | null>(null)
   useEffect(() => {
     const id = orgAtiva?.id

@@ -17,6 +17,8 @@ export type Sessao = {
   equipe: Map<string, Perfil>
   /** Módulos ligados na empresa ativa; null enquanto carrega. */
   modulos: Set<string> | null
+  /** Financeiro escondido pela plataforma (a empresa usa outro sistema): sem menu, permissão e pagamento no orçamento. */
+  financeiroOculto: boolean
   /** Recarrega os módulos (depois que a plataforma muda algum). */
   recarregarModulos: () => void
   trocarOrganizacao: (id: string) => void

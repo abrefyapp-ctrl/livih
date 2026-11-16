@@ -8249,5 +8249,84 @@ reset role;
 insert into resultado (teste, ok) select 'telefone da equipe: o telefone de quem é de outra empresa ficou como estava',
   (select telefone from public.perfis where user_id = '00000000-0000-0000-0000-0000000000c1') is null;
 delete from public.membros_org where org_id = current_setting('teste.f7')::uuid and user_id = '00000000-0000-0000-0000-0000000000c1';
+
+-- Financeiro escondido por empresa (migration 20261116170000).
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$ begin
+  perform public.plataforma_definir_financeiro_oculto(current_setting('teste.f7')::uuid, true);
+  insert into resultado (teste, ok) values ('financeiro oculto: atendente não esconde', false);
+exception when others then
+  insert into resultado (teste, ok) values ('financeiro oculto: atendente não esconde', sqlerrm like 'Só a equipe da plataforma%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$ begin
+  perform public.plataforma_definir_financeiro_oculto(current_setting('teste.cli')::uuid, true);
+  insert into resultado (teste, ok) values ('financeiro oculto: dono que não é da plataforma não esconde', false);
+exception when others then
+  insert into resultado (teste, ok) values ('financeiro oculto: dono que não é da plataforma não esconde', sqlerrm like 'Só a equipe da plataforma%');
+end $$;
+-- A f7 já tem pagamento registrado (testes do financeiro): esconder agora travaria o cancelamento desses pedidos.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$ begin
+  if not exists (select 1 from public.fin_lancamentos where org_id = current_setting('teste.f7')::uuid
+                  and cancelado_em is null and valor_pago > 0) then
+    insert into resultado (teste, ok) values ('financeiro oculto: com pagamento registrado, não esconde (o teste precisa de um pagamento)', false);
+    return;
+  end if;
+  perform public.plataforma_definir_financeiro_oculto(current_setting('teste.f7')::uuid, true);
+  insert into resultado (teste, ok) values ('financeiro oculto: com pagamento registrado, não esconde', false);
+exception when others then
+  insert into resultado (teste, ok) values ('financeiro oculto: com pagamento registrado, não esconde', sqlerrm like 'Esta empresa já tem pagamentos%');
+end $$;
+-- Sem pagamento ativo (os do teste saem), dá para esconder.
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+update public.fin_lancamentos set cancelado_em = now() where org_id = current_setting('teste.f7')::uuid and valor_pago > 0;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_prod uuid;
+  v_ped uuid;
+  v_nota jsonb;
+begin
+  perform public.plataforma_definir_modulo(v_org, 'erp', true);
+  perform public.plataforma_definir_financeiro_oculto(v_org, true);
+  insert into public.produtos (org_id, nome, preco, controla_estoque) values (v_org, 'Item fin oculto', 80, false) returning id into v_prod;
+  insert into public.pedidos (org_id) values (v_org) returning id into v_ped;
+  insert into public.pedido_itens (org_id, pedido_id, produto_id, descricao, quantidade, preco_unitario)
+  values (v_org, v_ped, v_prod, 'Item fin oculto', 1, 80);
+  perform public.pedido_mudar_status(v_ped, 'confirmado');
+  insert into resultado (teste, ok) values ('financeiro oculto: pedido confirmado não gera parcelas',
+    (select status from public.pedidos where id = v_ped) = 'confirmado'
+    and not exists (select 1 from public.fin_lancamentos where pedido_id = v_ped));
+  insert into resultado (teste, ok) values ('financeiro oculto: mudança registrada na auditoria',
+    exists (select 1 from public.auditoria where org_id = v_org and acao = 'financeiro_oculto'));
+
+  -- Nota de entrada com o Financeiro escondido: não gera conta a pagar.
+  v_nota := public.nota_entrada_lancar(v_org,
+    '{"chave":"41201112345678000190550010000099991000099991","numero":"9999","serie":"1","emissao":"2026-11-16",
+      "emitente_cnpj":"12.345.678/0001-90","emitente_nome":"Fornecedor Oculto","valor_total":"80.00","origem":"xml"}',
+    jsonb_build_array(jsonb_build_object('produto_id', v_prod, 'codigo_fornecedor', 'FO-1', 'descricao', 'ITEM OCULTO',
+                                         'unidade', 'UN', 'quantidade', 1, 'valor_unitario', 80, 'valor_total', 80)));
+  insert into resultado (teste, ok) values ('financeiro oculto: nota de entrada não gera conta a pagar',
+    not exists (select 1 from public.fin_lancamentos where nota_entrada_id = (v_nota ->> 'nota_id')::uuid));
+  insert into resultado (teste, ok) values ('financeiro oculto: as funções do Financeiro o tratam como desligado',
+    not public.fin_ligado(v_org));
+
+  perform public.plataforma_definir_financeiro_oculto(v_org, false);
+  insert into public.pedidos (org_id) values (v_org) returning id into v_ped;
+  insert into public.pedido_itens (org_id, pedido_id, produto_id, descricao, quantidade, preco_unitario)
+  values (v_org, v_ped, v_prod, 'Item fin oculto', 1, 80);
+  perform public.pedido_mudar_status(v_ped, 'confirmado');
+  insert into resultado (teste, ok) values ('financeiro oculto: mostrado de novo, o pedido volta a gerar parcelas',
+    exists (select 1 from public.fin_lancamentos where pedido_id = v_ped and origem = 'pedido') and public.fin_ligado(v_org));
+end $$;
+reset role;
+insert into resultado (teste, ok) select 'financeiro oculto: o dono não muda a coluna direto',
+  not has_column_privilege('authenticated', 'public.organizacoes', 'financeiro_oculto', 'update');
 reset role;
 select n, teste, ok from resultado order by n;

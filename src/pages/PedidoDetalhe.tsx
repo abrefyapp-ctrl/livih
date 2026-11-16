@@ -62,7 +62,7 @@ const textoReais = (n: number | null | undefined) => (n == null ? '' : n.toFixed
 export function PedidoDetalhe() {
   const { id } = useParams()
   const navegar = useNavigate()
-  const { orgAtiva, modulos, sessao } = useSessao()
+  const { orgAtiva, modulos, sessao, financeiroOculto } = useSessao()
   const orgId = orgAtiva!.id
   const [dados, setDados] = useState<{ chave: string; pedido: Pedido; itens: ItemPedido[] } | null | undefined>(undefined)
   const [versao, setVersao] = useState(0)
@@ -333,7 +333,8 @@ export function PedidoDetalhe() {
 
         {/* Recria ao trocar a empresa: o banco recarrega validade, condições e prazo. */}
         <Orcamento key={pedido.emissora_id ?? 'sem'} orgId={orgId} pedido={pedido} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />
-        <PagamentoPedido pedido={pedido} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />
+        {/* Financeiro escondido (16/11): a empresa combina o pagamento no outro sistema. */}
+        {!financeiroOculto && <PagamentoPedido pedido={pedido} editavel={rascunho} aoMudar={recarregar} aoErro={setErro} />}
 
         <Observacao pedido={pedido} aoErro={setErro} />
       </div>
