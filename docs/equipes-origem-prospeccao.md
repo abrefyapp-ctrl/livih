@@ -254,6 +254,21 @@ Começou na tarde de 16/11, sem as respostas do Diego (entrega 2 fica para confi
   primeira cobrança, ao fim dos 30 dias: a tabela `planos` aparece para todas as empresas e o dono troca para
   qualquer plano dela, então precisa de um plano visível só para uma empresa.
 
+## Respostas do Diego (16/11) e o que viram na configuração
+
+| Pergunta | Resposta | Configuração |
+|---|---|---|
+| Sem carteira, mais atendeu, ausente → outro na hora | Sim | Já é a regra da entrega 2 |
+| Cidades | Castro e Piraí "normalmente" Loja Castro, Ponta Grossa "geralmente" Matriz; **não é regra**. Fora daí: vendedores externos ou canais online | **Não cadastrar cidades.** Pela regra construída, a cidade vence a equipe do número: o cliente de Ponta Grossa (a maioria) que escreve no 0800 ou no e-commerce iria para a Matriz e esvaziaria o Televendas |
+| Números divulgados | Caem no Televendas ou no E-commerce, conforme o número: o do site é o do e-commerce (42 98809-7934); o resto, o 0800 690 0800 | E-commerce: número da empresa, origem "Site", equipe E-commerce. 0800: número da empresa, equipe Televendas. Ordem que fica: mais atendeu → equipe do número → rodízio |
+| Cliente de Castro no número do site | Castro não tem número próprio; o mais próximo é o caixa (42 3219-6990) | Em aberto: conectar o caixa? Como número da empresa com a equipe Loja Castro ou como número do gerente? |
+| Janela do "mais atendeu" | Tirar a dúvida na reunião | Fica 90 dias até decidir |
+| Número pessoal do vendedor | Fica com o vendedor | Já é assim (número de vendedor não distribui) |
+| Perguntar a cidade | Só quando não der para saber | Sem cidades cadastradas, o agente nunca pergunta nem espera. Se as cidades voltarem: hoje ele pergunta quando o contato e o cliente não têm cidade; o DDD 42 não separa Castro de Ponta Grossa |
+| Vendedor vê clientes dos outros | Sim, pelo ERP | "Vê todos os clientes" ligado para todos os atendentes |
+
+Em aberto: o 0800 tem WhatsApp? Se não tiver, qual é o número do Google Ads? Televendas e E-commerce já atendem pela tela da Livih (distribuição ligada) durante a medição, ou continuam pelo celular?
+
 ## Decisões de 10/11 (usuário)
 
 | Pergunta | Decisão |
