@@ -37,7 +37,7 @@ async function soDestaOrganizacao(userId: string, orgId: string): Promise<boolea
   ]);
   return (count ?? 0) === 0 && !adm;
 }
-const SO_PELO_EMAIL = "Essa pessoa também tem acesso a outra organização. Peça para ela usar “Esqueci minha senha” na tela de entrar.";
+const SO_PELO_EMAIL = "Essa pessoa também tem acesso a outra empresa. Peça para ela usar “Esqueci minha senha” na tela de entrar.";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       .eq("papel", "dono").eq("ativo", true).maybeSingle(),
     admin.from("admins_plataforma").select("user_id").eq("user_id", quem.user.id).maybeSingle(),
   ]);
-  if (!dono && !daPlataforma) return json(403, { erro: "Só o dono da organização convida pessoas." });
+  if (!dono && !daPlataforma) return json(403, { erro: "Só o dono da empresa convida pessoas." });
   if (papelPedido === "dono" && !daPlataforma) return json(403, { erro: "Só a equipe da Livih define o dono." });
   const papel = papelPedido;
 

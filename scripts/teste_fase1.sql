@@ -8328,5 +8328,13 @@ end $$;
 reset role;
 insert into resultado (teste, ok) select 'financeiro oculto: o dono não muda a coluna direto',
   not has_column_privilege('authenticated', 'public.organizacoes', 'financeiro_oculto', 'update');
+
+-- Notificação de teste no feminino (migration 20261116190000).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+select public.push_testar();
+reset role;
+insert into resultado (teste, ok) select 'notificação de teste: "da Livih"',
+  exists (select 1 from public.push_fila where user_id = '00000000-0000-0000-0000-0000000000a1' and titulo = 'Notificações da Livih ativadas');
 reset role;
 select n, teste, ok from resultado order by n;

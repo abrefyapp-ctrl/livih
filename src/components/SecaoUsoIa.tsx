@@ -55,6 +55,8 @@ export function SecaoUsoIa() {
         <h2 className="text-h2 font-semibold">Uso da IA em {nomeDoMes(mesAtual())}</h2>
         <p className="mt-1 text-pequeno text-texto-2">
           Conta as conversas em que o agente respondeu e os áudios transcritos. Os números são atualizados a cada poucos minutos.
+          É só para acompanhar: o que conta para o plano são os atendimentos, mostrados acima. Uma conversa longa, de vários
+          dias, pode somar mais de um atendimento.
         </p>
       </div>
 

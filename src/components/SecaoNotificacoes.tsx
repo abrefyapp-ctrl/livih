@@ -91,8 +91,8 @@ export function SecaoNotificacoes() {
           </div>
         ) : estado === 'instalar_ios' ? (
           <p className="text-pequeno text-texto-2">
-            No iPhone, as notificações só funcionam com a Livih instalada na tela inicial. Use o botão <strong>Instalar app</strong> no
-            topo, abra a Livih pelo ícone e ative aqui.
+            No iPhone, as notificações só funcionam com a Livih instalada na tela de início. Use o botão <strong>Instalar app</strong> no
+            alto da tela, abra a Livih pelo ícone e ative aqui.
           </p>
         ) : estado === 'bloqueadas' ? (
           <p className="text-pequeno text-texto-2">

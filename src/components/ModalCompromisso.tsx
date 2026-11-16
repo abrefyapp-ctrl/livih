@@ -284,9 +284,9 @@ export function ModalCompromisso({
           </div>
           {semMeio && (
             <Aviso tom="atencao">
-              {responsavelSouEu ? 'Você não vai receber' : `${nomeResponsavel} não vai receber`} este lembrete: falta ativar as
-              notificações no celular (Configurações → Notificações) ou cadastrar o WhatsApp em Seus dados (Configurações →
-              Equipe){responsavelSouEu ? '.' : '. Só a própria pessoa faz isso, no aparelho dela.'}
+              {responsavelSouEu
+                ? 'Você não vai receber este lembrete: ative as notificações em Configurações → Notificações ou cadastre seu WhatsApp em Seus dados (clique no seu nome, no alto da tela).'
+                : `${nomeResponsavel} não vai receber este lembrete: falta ativar as notificações ou cadastrar o WhatsApp em Seus dados. Só a própria pessoa faz isso, entrando na Livih com a conta dela.`}
             </Aviso>
           )}
 

@@ -38,8 +38,8 @@ export function AusenciaPessoa({
       ) : (
         <>
           <p className="text-legenda text-texto-3">
-            Férias, folga ou afastamento. Enquanto estiver ausente, a pessoa não recebe contatos nem avisos de conversa
-            aguardando. Nos números da empresa que distribuem, os clientes que escreverem vão para outra pessoa da equipe.
+            Férias, folga ou afastamento. Enquanto estiver ausente, a pessoa não recebe contatos nem avisos de cliente
+            aguardando. Nos números com a distribuição ligada, os clientes que escreverem vão para outra pessoa da equipe.
             No dia seguinte à data, ela volta sozinha.
           </p>
           <div className="flex flex-wrap items-end gap-2">

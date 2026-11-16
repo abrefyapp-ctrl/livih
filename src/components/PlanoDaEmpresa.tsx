@@ -19,7 +19,7 @@ const ESCOLHAS: { valor: EscolhaFranquia; rotulo: string; detalhe: (c: ConsumoPl
   {
     valor: 'continuar',
     rotulo: 'Continuar com o agente',
-    detalhe: (c) => `Cada atendimento a mais custa ${reais(c.excedente_preco)} e entra na próxima mensalidade.`,
+    detalhe: (c) => `Cada atendimento a mais custa ${reais(c.excedente_preco)} e entra na próxima fatura.`,
   },
 ]
 
@@ -153,7 +153,7 @@ export function PlanoDaEmpresa() {
         <Aviso tom={c.escolha === 'parar' ? 'atencao' : 'info'}>
           {c.escolha === 'parar'
             ? `Os atendimentos deste mês acabaram. As conversas novas vão para a equipe, e o agente só termina os atendimentos que já começou. Ele volta a atender conversas novas no dia 1º ou quando ${dono ? 'você comprar' : 'o dono comprar'} um pacote.`
-            : `Os atendimentos deste mês acabaram. O agente continua, e cada atendimento a mais custa ${reais(c.excedente_preco)} na próxima mensalidade.`}
+            : `Os atendimentos deste mês acabaram. O agente continua, e cada atendimento a mais custa ${reais(c.excedente_preco)} na próxima fatura.`}
         </Aviso>
       )}
 
@@ -162,13 +162,13 @@ export function PlanoDaEmpresa() {
           {!!c.excedentes && (
             <li>
               {numero.format(c.excedentes)} {c.excedentes === 1 ? 'atendimento a mais' : 'atendimentos a mais'}:{' '}
-              {reais(c.excedentes * Number(c.excedente_preco))} na próxima mensalidade.
+              {reais(c.excedentes * Number(c.excedente_preco))} na próxima fatura.
             </li>
           )}
           {!!c.pacotes_mes && (
             <li>
               {c.pacotes_mes === 1 ? '1 pacote comprado' : `${c.pacotes_mes} pacotes comprados`} este mês:{' '}
-              {reais(c.valor_pacotes_mes)} na próxima mensalidade.
+              {reais(c.valor_pacotes_mes)} na próxima fatura.
             </li>
           )}
         </ul>
@@ -194,7 +194,7 @@ export function PlanoDaEmpresa() {
         ))}
         <p className="text-legenda text-texto-3">
           {dono
-            ? 'Aos 80 % e quando os atendimentos acabarem, o dono e os administradores recebem um aviso: no celular, se ativaram as notificações (Configurações → Notificações), e no WhatsApp cadastrado em Seus dados (Configurações → Equipe).'
+            ? 'Aos 80 % e quando os atendimentos acabarem, o dono e os administradores recebem um aviso: no celular, se ativaram as notificações (Configurações → Notificações), e no WhatsApp cadastrado em Seus dados (no nome de cada um, no alto da tela).'
             : 'Só o dono da empresa muda esta escolha e compra pacotes.'}
         </p>
       </fieldset>
@@ -205,7 +205,7 @@ export function PlanoDaEmpresa() {
             Comprar {numero.format(c.pacote_atendimentos)} atendimentos por {reais(c.pacote_preco)}
           </Botao>
           <p className="text-legenda text-texto-3">
-            Valem até o fim de {mes}. Os {reais(c.pacote_preco)} entram na próxima mensalidade.
+            Valem até o fim de {mes}. Os {reais(c.pacote_preco)} entram na próxima fatura.
           </p>
         </div>
       )}
@@ -221,7 +221,7 @@ export function PlanoDaEmpresa() {
         aoCancelar={() => setConfirmarPacote(false)}
       >
         O limite de {mes} passa de {numero.format(limite)} para {numero.format(limite + c.pacote_atendimentos)} atendimentos. Os{' '}
-        {reais(c.pacote_preco)} entram na próxima mensalidade. Os atendimentos que sobrarem não passam para o mês seguinte.
+        {reais(c.pacote_preco)} entram na próxima fatura. Os atendimentos que sobrarem não passam para o mês seguinte.
         {acabou && c.escolha === 'parar' && ' As conversas que já passaram para a equipe continuam com ela; o agente volta a atender as conversas novas.'}
       </DialogoConfirmacao>
     </section>

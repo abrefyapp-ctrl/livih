@@ -380,7 +380,7 @@ export function Layout() {
               Escolha <strong>Adicionar à Tela de Início</strong> e confirme em <strong>Adicionar</strong>.
             </li>
           </ol>
-          <p className="mt-3 text-legenda text-texto-3">O ícone da Livih aparece na tela inicial e abre como um app, sem a barra do navegador.</p>
+          <p className="mt-3 text-legenda text-texto-3">O ícone da Livih aparece na tela de início e abre como um app, sem a barra do navegador.</p>
         </Modal>
       </div>
     </div>

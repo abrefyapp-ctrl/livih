@@ -358,12 +358,12 @@ export function ModalNotaFiscal({ emissora: e, aoFechar, aoSalvar }: { emissora:
             value={c.limite}
             onChange={(ev) => muda({ limite: ev.target.value })}
             placeholder={limitePadrao(regime) ? moeda(limitePadrao(regime)!) : 'R$'}
-            ajuda={`Para a Livih sugerir qual CNPJ usar. Vazio: ${limitePadrao(regime) ? `${moeda(limitePadrao(regime)!)} (teto do regime)` : 'sem sugestão'}.`}
+            ajuda={`Fica anotado no cadastro do CNPJ, para consulta. Vazio: ${limitePadrao(regime) ? `${moeda(limitePadrao(regime)!)} (teto do regime)` : 'sem limite anotado'}.`}
             className="sm:max-w-xs"
           />
           <label className="flex items-center gap-2 text-pequeno text-texto-2">
             <input type="checkbox" checked={c.balcao} onChange={(ev) => muda({ balcao: ev.target.checked })} className="size-4 accent-primaria" />
-            CNPJ do balcão (vem escolhido nas vendas do balcão; os outros pedidos seguem com o CNPJ deles)
+            CNPJ do balcão (aparece marcado como “balcão” na lista de CNPJs e na hora de emitir a nota)
           </label>
         </fieldset>
       </form>

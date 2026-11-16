@@ -1,5 +1,7 @@
 import { NavLink, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { useAjuda } from '../hooks/useAjuda'
 import { useSessao } from '../hooks/useSessao'
+import { Botao } from '../components/Botao'
 import { CabecalhoPagina } from '../components/CabecalhoPagina'
 import { PrimeirosPassos } from '../components/PrimeirosPassos'
 import { Icone, type NomeIcone } from '../components/Icone'
@@ -20,12 +22,13 @@ import { SecaoWhatsapp } from '../components/SecaoWhatsapp'
 type Grupo = 'Empresa' | 'WhatsApp' | 'Agente' | 'Módulos'
 
 // Agrupadas e todas à vista: as abas em linha escondiam as últimas atrás de uma rolagem lateral sem barra (27/10).
-const SECOES: { id: string; rotulo: string; icone: NomeIcone; grupo: Grupo; modulo?: string }[] = [
-  { id: 'equipe', rotulo: 'Equipe', icone: 'equipe', grupo: 'Empresa' },
-  { id: 'empresa', rotulo: 'Empresa', icone: 'empresa', grupo: 'Empresa' },
-  { id: 'notificacoes', rotulo: 'Notificações', icone: 'sino', grupo: 'Empresa' },
+// manual: id do manual da Ajuda (src/ajuda/manuais.ts) que o "Como usar" do cabeçalho abre ao lado (16/11).
+const SECOES: { id: string; rotulo: string; icone: NomeIcone; grupo: Grupo; modulo?: string; manual?: string }[] = [
+  { id: 'equipe', rotulo: 'Equipe', icone: 'equipe', grupo: 'Empresa', manual: 'equipe' },
+  { id: 'empresa', rotulo: 'Empresa', icone: 'empresa', grupo: 'Empresa', manual: 'empresa' },
+  { id: 'notificacoes', rotulo: 'Notificações', icone: 'sino', grupo: 'Empresa', manual: 'notificacoes' },
   // O plano mora na mesma seção do uso da IA (id 'uso' mantido: os avisos de franquia apontam para /configuracoes/uso).
-  { id: 'uso', rotulo: 'Plano e consumo', icone: 'painel', grupo: 'Empresa' },
+  { id: 'uso', rotulo: 'Plano e consumo', icone: 'painel', grupo: 'Empresa', manual: 'plano' },
   { id: 'whatsapp', rotulo: 'WhatsApp', icone: 'telefone', grupo: 'WhatsApp' },
   // Modelos só existem na API oficial (liberada para todas as empresas em 26/10).
   { id: 'modelos', rotulo: 'Modelos', icone: 'arquivo', grupo: 'WhatsApp' },
@@ -42,11 +45,13 @@ export function Configuracoes() {
   const { secao } = useParams()
   const navegar = useNavigate()
   const { orgAtiva, modulos } = useSessao()
+  const ajuda = useAjuda()
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const secoes = SECOES.filter((s) => !s.modulo || modulos?.has(s.modulo))
   // Seção de módulo: espera os módulos carregarem antes de mandar embora.
   if (!modulos && SECOES.some((s) => s.id === secao && s.modulo)) return null
   if (!secoes.some((s) => s.id === secao)) return <Navigate to="/configuracoes/equipe" replace />
+  const manual = SECOES.find((s) => s.id === secao)?.manual
 
   return (
     // Tela larga (13/11): barra de título no alto, menu encostado à esquerda com rolagem própria e o conteúdo usando a
@@ -55,6 +60,13 @@ export function Configuracoes() {
       <CabecalhoPagina
         titulo="Configurações"
         descricao={`Como ${orgAtiva?.nome ?? 'a empresa'} usa a Livih: equipe, números de WhatsApp, agente e módulos.`}
+        acoes={
+          manual && (
+            <Botao variante="secundario" icone="livro" title="Abre o manual desta tela ao lado" onClick={() => ajuda.abrir(manual)}>
+              Como usar
+            </Botao>
+          )
+        }
       />
 
       <div className="flex min-h-0 flex-1">

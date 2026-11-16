@@ -394,7 +394,13 @@ export function SecaoEquipe() {
         )}
       </div>
 
-      {!souDono && <Aviso>Só o dono da organização convida pessoas e muda papéis.</Aviso>}
+      {!souDono && (
+        <Aviso>
+          {gerencia
+            ? 'Só o dono da empresa convida pessoas e muda papéis. Você ajusta as opções, as equipes e as ausências de cada pessoa.'
+            : 'Só o dono da empresa convida pessoas e muda papéis.'}
+        </Aviso>
+      )}
       {erroAcao && !editada && !ausenciaPessoa && <Aviso tom="erro">{erroAcao}</Aviso>}
       {erro && (
         <Aviso tom="erro" acao={<button onClick={recarregar} className="font-semibold underline">Tentar de novo</button>}>
@@ -619,7 +625,7 @@ export function SecaoEquipe() {
         aoConfirmar={() => desativar && void alterar(desativar, { ativo: false })}
         aoCancelar={() => setDesativar(null)}
       >
-        {desativar?.nome || desativar?.email} deixa de ver as conversas desta organização. O histórico do que fez continua.
+        {desativar?.nome || desativar?.email} deixa de ver as conversas desta empresa. O histórico do que fez continua.
         Dá para reativar depois.
       </DialogoConfirmacao>
     </section>

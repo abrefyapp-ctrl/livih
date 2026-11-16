@@ -79,7 +79,8 @@ function lerPlanilha(texto: string, membros: MembroEquipe[]): Linha[] {
       telefone,
       telefoneInvalido: !!telBruto && !telefone,
       equipe: pega(c, iEquipe),
-      gestor: SIM.has(semAcento(pega(c, iGestor))),
+      // Gestor só vale para atendente, como na janela Editar (admin já vê a empresa toda; revisão de 16/11).
+      gestor: SIM.has(semAcento(pega(c, iGestor))) && !semAcento(pega(c, iPapel)).startsWith('admin'),
       papel: semAcento(pega(c, iPapel)).startsWith('admin') ? 'admin' : 'atendente',
       erro,
       jaAtivo: ativos.has(email),
