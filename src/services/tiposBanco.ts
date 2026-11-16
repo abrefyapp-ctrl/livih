@@ -5267,6 +5267,10 @@ export type Database = {
         Args: { p_canal: string }
         Returns: undefined
       }
+      canal_para_avisar: {
+        Args: { p_org: string; p_usuario: string }
+        Returns: string
+      }
       canal_por_numero_meta: {
         Args: { p_phone_number_id: string }
         Returns: {
@@ -5734,6 +5738,7 @@ export type Database = {
         Args: { p_org: string; p_usuario: string }
         Returns: boolean
       }
+      gestores_da_conversa: { Args: { p_conversa: string }; Returns: string[] }
       guardar_midia: {
         Args: {
           p_mensagem: string
@@ -5792,6 +5797,10 @@ export type Database = {
       membro_definir_recebe_contatos: {
         Args: { p_org: string; p_usuario: string; p_valor: boolean }
         Returns: undefined
+      }
+      membro_definir_telefone: {
+        Args: { p_org: string; p_telefone: string; p_usuario: string }
+        Returns: boolean
       }
       membro_definir_ve_todos_clientes: {
         Args: { p_org: string; p_usuario: string; p_valor: boolean }
@@ -6282,6 +6291,7 @@ export type Database = {
         Returns: Json
       }
       push_testar: { Args: never; Returns: undefined }
+      quem_atende_conversa: { Args: { p_conversa: string }; Returns: string[] }
       reais: { Args: { p: number }; Returns: string }
       registrar_descricao: {
         Args: { p_descricao: string; p_mensagem: string }
@@ -6377,6 +6387,7 @@ export type Database = {
         }[]
       }
       ve_todos_clientes: { Args: { p_org: string }; Returns: boolean }
+      vendedor_da_conversa: { Args: { p_conversa: string }; Returns: string }
       vendedor_do_rodizio: {
         Args: { p_equipe: string; p_org: string }
         Returns: string
