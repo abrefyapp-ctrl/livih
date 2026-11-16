@@ -3231,6 +3231,7 @@ export type Database = {
           ao_passar_franquia: string
           criado_em: string
           distribuicao_janela_dias: number
+          financeiro_oculto: boolean
           id: string
           motivo_suspensao: string | null
           nome: string
@@ -3244,6 +3245,7 @@ export type Database = {
           ao_passar_franquia?: string
           criado_em?: string
           distribuicao_janela_dias?: number
+          financeiro_oculto?: boolean
           id?: string
           motivo_suspensao?: string | null
           nome: string
@@ -3257,6 +3259,7 @@ export type Database = {
           ao_passar_franquia?: string
           criado_em?: string
           distribuicao_janela_dias?: number
+          financeiro_oculto?: boolean
           id?: string
           motivo_suspensao?: string | null
           nome?: string
@@ -6155,6 +6158,10 @@ export type Database = {
           p_org: string
           p_valor_fixo: number
         }
+        Returns: undefined
+      }
+      plataforma_definir_financeiro_oculto: {
+        Args: { p_oculto: boolean; p_org: string }
         Returns: undefined
       }
       plataforma_definir_modulo: {
