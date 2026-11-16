@@ -25,8 +25,8 @@ function Casca({ children }: { children: ReactNode }) {
 }
 
 /**
- * Ajuda: os manuais de uso da Livih (src/ajuda/). Abre em outra aba (menu Ajuda e "Como usar" das telas), fora do
- * layout do app. /ajuda lista os manuais; /ajuda/<id> abre um, com o índice das seções ao lado (no celular, em cima).
+ * Ajuda em outra aba: os manuais de uso da Livih (src/ajuda/), fora do layout do app. No app, o menu Ajuda e o "Como
+ * usar" das telas abrem o painel ao lado (src/ajuda/PainelAjuda.tsx), que tem o botão para esta página. /ajuda lista os manuais; /ajuda/<id> abre um, com o índice das seções ao lado (no celular, em cima).
  * /ajuda/<id>#<seção> já abre na seção.
  */
 export function Ajuda() {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { useAjuda } from '../hooks/useAjuda'
 import { useSessao } from '../hooks/useSessao'
 import {
   acaoCampanha,
@@ -73,6 +74,7 @@ function Numeros({ r, campanhaId }: { r: Resumo | null; campanhaId: string }) {
 /** Campanhas de divulgação pela API oficial (docs/campanhas.md). Só dono e admin. */
 export function Campanhas() {
   const { orgAtiva } = useSessao()
+  const ajuda = useAjuda()
   const orgId = orgAtiva!.id
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const [dados, setDados] = useState<{ orgId: string; lista: { campanha: Campanha; resumo: Resumo | null }[] } | null>(null)
@@ -129,7 +131,7 @@ export function Campanhas() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Botao variante="secundario" icone="livro" title="Abre o manual em outra aba" onClick={() => window.open('/ajuda/campanhas', '_blank', 'noopener')}>
+            <Botao variante="secundario" icone="livro" title="Abre o manual ao lado da tela" onClick={() => ajuda.abrir('campanhas')}>
               Como usar
             </Botao>
             <Botao icone="mais" onClick={() => setNova(true)}>

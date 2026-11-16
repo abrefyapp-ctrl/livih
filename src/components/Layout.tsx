@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { PainelAjuda } from '../ajuda/PainelAjuda'
+import { AjudaContexto, type PainelAjuda as EstadoAjuda } from '../hooks/useAjuda'
 import { useSessao } from '../hooks/useSessao'
 import { useContagemAguardando } from '../hooks/useConversas'
 import { useNumerosCaidos } from '../hooks/useNumerosCaidos'
@@ -13,8 +15,8 @@ import { MeusDados } from './MeusDados'
 import { useInstalarApp } from '../pwa'
 import { podeFinanceiro } from '../services/financeiro'
 
-/** novaAba: abre em outra aba (a Ajuda, para ler de um lado e fazer do outro). */
-type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: number; novaAba?: boolean }
+/** aoClicar: item que não troca de tela (a Ajuda abre o painel ao lado); ativo diz se está aberto. */
+type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: number; aoClicar?: () => void; ativo?: boolean }
 /** Bloco do menu: rótulo pequeno em cima (no menu só de ícones vira uma linha); bloco vazio não aparece. */
 type GrupoMenu = { rotulo?: string; itens: ItemMenu[] }
 
@@ -51,6 +53,16 @@ export function Layout() {
   const app = useInstalarApp()
   const [ajudaIos, setAjudaIos] = useState(false)
   const [meusDados, setMeusDados] = useState(false)
+  // Painel da Ajuda à direita (16/11): continua aberto ao trocar de tela, para seguir o manual pelo app.
+  const [ajuda, setAjuda] = useState<{ aberta: boolean; manual: string | null }>({ aberta: false, manual: null })
+  const painelAjuda = useMemo<EstadoAjuda>(
+    () => ({
+      ...ajuda,
+      abrir: (manual = null) => setAjuda({ aberta: true, manual }),
+      fechar: () => setAjuda((a) => ({ ...a, aberta: false })),
+    }),
+    [ajuda],
+  )
   // Financeiro (docs/financeiro.md): vem com o ERP ou as OS; dono e admin sempre veem, o atendente só com a permissão.
   const comFinanceiro = !!modulos && (modulos.has('erp') || modulos.has('os'))
   const [financeiroAtendente, setFinanceiroAtendente] = useState<{ orgId: string; ok: boolean } | null>(null)
@@ -105,7 +117,13 @@ export function Layout() {
     },
   ]
   const rodape: ItemMenu[] = [
-    { para: '/ajuda', rotulo: 'Ajuda', icone: 'livro', novaAba: true },
+    {
+      para: '/ajuda',
+      rotulo: 'Ajuda',
+      icone: 'livro',
+      ativo: ajuda.aberta,
+      aoClicar: () => setAjuda((a) => ({ ...a, aberta: !a.aberta })),
+    },
     { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
     ...(adminPlataforma ? [{ para: '/empresas', rotulo: 'Empresas', icone: 'painel' as const }] : []),
   ]
@@ -113,18 +131,34 @@ export function Layout() {
   const userId = sessao?.user.id
   const meuNome = (userId && equipe.get(userId)?.nome) || sessao?.user.email || ''
 
-  const link = (item: ItemMenu, compacto: boolean) => (
+  const classeItem = (ativo: boolean, compacto: boolean) =>
+    `relative flex h-10 items-center gap-3 rounded-md px-3 font-medium transition-colors ${
+      ativo ? 'bg-primaria-suave text-primaria' : 'text-texto-2 hover:bg-fundo hover:text-texto'
+    } ${compacto ? 'justify-center px-0' : ''}`
+
+  const link = (item: ItemMenu, compacto: boolean) =>
+    item.aoClicar ? (
+      <button
+        key={item.para}
+        type="button"
+        title={compacto ? item.rotulo : undefined}
+        aria-pressed={item.ativo}
+        onClick={() => {
+          setGaveta(false)
+          item.aoClicar?.()
+        }}
+        className={classeItem(!!item.ativo, compacto)}
+      >
+        <Icone nome={item.icone} />
+        {!compacto && <span className="flex-1 text-left">{item.rotulo}</span>}
+      </button>
+    ) : (
     <NavLink
       key={item.para}
       to={item.para}
-      title={compacto ? item.rotulo : item.novaAba ? 'Abre em outra aba' : undefined}
-      {...(item.novaAba ? { target: '_blank', rel: 'noopener' } : {})}
+      title={compacto ? item.rotulo : undefined}
       onClick={() => setGaveta(false)}
-      className={({ isActive }) =>
-        `relative flex h-10 items-center gap-3 rounded-md px-3 font-medium transition-colors ${
-          isActive ? 'bg-primaria-suave text-primaria' : 'text-texto-2 hover:bg-fundo hover:text-texto'
-        } ${compacto ? 'justify-center px-0' : ''}`
-      }
+      className={({ isActive }) => classeItem(isActive, compacto)}
     >
       <Icone nome={item.icone} />
       {!compacto && <span className="flex-1">{item.rotulo}</span>}
@@ -165,6 +199,7 @@ export function Layout() {
   // `relative` é o que segura os elementos absolutos (ex.: textos sr-only dos balões): sem um ancestral
   // posicionado eles são colocados em relação à página, o overflow-hidden não os corta e esticam a página.
   return (
+    <AjudaContexto.Provider value={painelAjuda}>
     <div className="relative flex h-full overflow-hidden">
       {/* barra lateral: tablet (compacta) e desktop */}
       <aside className="hidden shrink-0 flex-col border-r border-borda bg-superficie md:flex md:w-16 lg:w-60">
@@ -321,9 +356,13 @@ export function Layout() {
           </div>
         )}
 
-        <main className="min-h-0 flex-1 overflow-hidden">
-          <Outlet />
-        </main>
+        {/* A Ajuda fica ao lado da tela, abaixo do cabeçalho: a tela encolhe, o manual não cobre o que se está fazendo. */}
+        <div className="flex min-h-0 flex-1">
+          <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+            <Outlet />
+          </main>
+          {ajuda.aberta && <PainelAjuda manual={ajuda.manual} aoEscolher={(manual) => painelAjuda.abrir(manual)} aoFechar={painelAjuda.fechar} />}
+        </div>
 
         <Modal aberto={meusDados} titulo="Seus dados" aoFechar={() => setMeusDados(false)}>
           {/* Recria quando o perfil chega, para o formulário abrir já preenchido. */}
@@ -344,5 +383,6 @@ export function Layout() {
         </Modal>
       </div>
     </div>
+    </AjudaContexto.Provider>
   )
 }

@@ -56,7 +56,7 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/definir-senha" element={<DefinirSenha />} />
-          {/* Ajuda abre em outra aba, sem o menu do app: o cliente lê de um lado e faz do outro. */}
+          {/* Ajuda em outra aba, sem o menu do app (botão do painel da Ajuda e links antigos); no app ela abre ao lado da tela. */}
           <Route
             path="/ajuda/:manual?"
             element={
