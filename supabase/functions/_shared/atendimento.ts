@@ -48,6 +48,36 @@ export async function avisarAgente(supabase: SupabaseClient, ref: { org_id: stri
   }
 }
 
+/**
+ * Transcreve o áudio (gpt-4o-transcribe, em português). Separada em 17/11 para o simulador (agente-simular) usar a
+ * mesma transcrição da entrada pelo WhatsApp. O webm é o que o navegador grava no "Testar agente"; no WhatsApp
+ * chega ogg. Devolve null se falhar.
+ */
+export async function transcrever(
+  bytes: ArrayBuffer, mime: string | undefined,
+): Promise<{ texto: string; tokensEntrada: number; tokensSaida: number } | null> {
+  if (!OPENAI_API_KEY) return null;
+  const tipo = (mime ?? "audio/ogg").split(";")[0];
+  const ext = tipo.includes("mpeg") || tipo.includes("mp3") ? "mp3" : tipo.includes("mp4") || tipo.includes("m4a") ? "m4a" : tipo.includes("webm") ? "webm"
+    : tipo.includes("wav") ? "wav" : "ogg";
+  const form = new FormData();
+  form.append("file", new Blob([bytes], { type: tipo }), `audio.${ext}`);
+  form.append("model", "gpt-4o-transcribe");
+  form.append("language", "pt");
+  const t = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+    body: form,
+    signal: AbortSignal.timeout(60000),
+  });
+  const corpo = await t.json().catch(() => null);
+  if (!t.ok || !corpo?.text) {
+    console.error("transcrição", t.status, JSON.stringify(corpo).slice(0, 200));
+    return null;
+  }
+  return { texto: corpo.text, tokensEntrada: Number(corpo.usage?.input_tokens ?? 0), tokensSaida: Number(corpo.usage?.output_tokens ?? 0) };
+}
+
 // Baixa o áudio (o arquivo não é guardado), transcreve e grava. Áudio longo demais não é transcrito:
 // o agente vê "[audio]" e pede um áudio mais curto ou texto. `baixar` sabe autenticar no provedor.
 export async function transcreverEAvisar(
@@ -57,30 +87,19 @@ export async function transcreverEAvisar(
   if (OPENAI_API_KEY && (!segundos || segundos <= AUDIO_MAX_SEGUNDOS)) {
     const audio = await baixar();
     if (audio.ok) {
-      const form = new FormData();
-      const ext = (mime ?? "").includes("mpeg") ? "mp3" : (mime ?? "").includes("mp4") ? "m4a" : "ogg";
-      form.append("file", new Blob([await audio.arrayBuffer()], { type: (mime ?? "audio/ogg").split(";")[0] }), `audio.${ext}`);
-      form.append("model", "gpt-4o-transcribe");
-      form.append("language", "pt");
-      const t = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
-        body: form,
-        signal: AbortSignal.timeout(60000),
-      });
-      const corpo = await t.json().catch(() => null);
-      if (t.ok && corpo?.text) {
-        const { data } = await supabase.rpc("registrar_transcricao", { p_mensagem: entrada.mensagem_id, p_transcricao: corpo.text });
+      const t = await transcrever(await audio.arrayBuffer(), mime);
+      if (t) {
+        const { data } = await supabase.rpc("registrar_transcricao", { p_mensagem: entrada.mensagem_id, p_transcricao: t.texto });
         chamar = data?.chamar_agente ?? chamar;
         // Consumo de IA (tabela uso_ia): falha aqui não atrapalha o atendimento.
         const { error: erroUso } = await supabase.from("uso_ia").upsert({
           org_id: entrada.org_id, conversa_id: entrada.conversa_id, mensagem_id: entrada.mensagem_id,
           tipo: "transcricao", modelo: "gpt-4o-transcribe",
-          tokens_entrada: Number(corpo.usage?.input_tokens ?? 0), tokens_saida: Number(corpo.usage?.output_tokens ?? 0),
+          tokens_entrada: t.tokensEntrada, tokens_saida: t.tokensSaida,
           segundos_audio: segundos || null, origem_ref: `audio:${entrada.mensagem_id}`,
         }, { onConflict: "origem_ref", ignoreDuplicates: true });
         if (erroUso) console.error("uso_ia transcrição", erroUso.message);
-      } else console.error("transcrição", t.status, JSON.stringify(corpo).slice(0, 200));
+      }
     } else console.error("download do áudio", audio.status);
   }
   if (chamar) await avisarAgente(supabase, entrada);

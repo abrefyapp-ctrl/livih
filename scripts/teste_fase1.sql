@@ -8336,5 +8336,31 @@ select public.push_testar();
 reset role;
 insert into resultado (teste, ok) select 'notificação de teste: "da Livih"',
   exists (select 1 from public.push_fila where user_id = '00000000-0000-0000-0000-0000000000a1' and titulo = 'Notificações da Livih ativadas');
+
+-- Simulador com foto e áudio (migration 20261117120000).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  c jsonb;
+begin
+  c := public.agente_contexto_simulado(current_setting('teste.f7')::uuid,
+    '[{"de":"cliente","tipo":"imagem","texto":"tem esse?","descricao":"Grampeador pneumático PACAR 80W"},
+      {"de":"cliente","tipo":"audio","texto":"quero dez caixas"},
+      {"de":"cliente","tipo":"video","texto":"oi","descricao":"x"},
+      {"de":"cliente","texto":"e o preço?"},
+      {"de":"assistente","tipo":"imagem","texto":"Olá!","descricao":"x"}]');
+  insert into resultado (teste, ok) values ('simulador: foto chega com a descrição e o tipo imagem',
+    c -> 'mensagens' -> 0 ->> 'tipo' = 'imagem' and c -> 'mensagens' -> 0 ->> 'descricao' = 'Grampeador pneumático PACAR 80W'
+    and c -> 'mensagens' -> 0 ->> 'texto' = 'tem esse?');
+  insert into resultado (teste, ok) values ('simulador: áudio chega com o tipo audio e o texto transcrito',
+    c -> 'mensagens' -> 1 ->> 'tipo' = 'audio' and c -> 'mensagens' -> 1 ->> 'texto' = 'quero dez caixas'
+    and c -> 'mensagens' -> 1 -> 'descricao' = 'null'::jsonb);
+  insert into resultado (teste, ok) values ('simulador: tipo desconhecido vira texto e mensagem sem tipo continua texto',
+    c -> 'mensagens' -> 2 ->> 'tipo' = 'texto' and c -> 'mensagens' -> 2 -> 'descricao' = 'null'::jsonb
+    and c -> 'mensagens' -> 3 ->> 'tipo' = 'texto');
+  insert into resultado (teste, ok) values ('simulador: mensagem do agente é sempre texto, sem descrição',
+    c -> 'mensagens' -> 4 ->> 'tipo' = 'texto' and c -> 'mensagens' -> 4 -> 'descricao' = 'null'::jsonb);
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

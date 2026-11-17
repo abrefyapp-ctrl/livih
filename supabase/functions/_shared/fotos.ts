@@ -3,7 +3,6 @@
 // - identificarProduto: na entrada (midia.ts), acha o produto da foto do cliente entre as fotos da biblioteca.
 
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
-import type { Entrada } from "./atendimento.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 export const MODELO_VISAO = "gpt-5-mini";
@@ -93,10 +92,16 @@ const FORMATO_COMPARAR = {
 
 const rotulo = (c: Candidato) => `${c.nome}${c.codigo ? ` (código ${c.codigo})` : ""}`;
 
-async function registrarUso(supabase: SupabaseClient, entrada: Entrada, ref: string, modelo: string, uso: Uso) {
+/**
+ * De quem é o consumo: a mensagem do cliente (entrada pelo WhatsApp, `chave` = id da mensagem) ou o teste do
+ * simulador (sem conversa nem mensagem, tipo "simulador", para não entrar na conta do atendimento real).
+ */
+export type OrigemUso = { org_id: string; conversa_id: string | null; mensagem_id: string | null; chave: string; tipo?: string };
+
+async function registrarUso(supabase: SupabaseClient, origem: OrigemUso, ref: string, modelo: string, uso: Uso) {
   const { error } = await supabase.from("uso_ia").upsert({
-    org_id: entrada.org_id, conversa_id: entrada.conversa_id, mensagem_id: entrada.mensagem_id,
-    tipo: "identificacao", modelo, tokens_entrada: uso.entrada, tokens_saida: uso.saida, origem_ref: ref,
+    org_id: origem.org_id, conversa_id: origem.conversa_id, mensagem_id: origem.mensagem_id,
+    tipo: origem.tipo ?? "identificacao", modelo, tokens_entrada: uso.entrada, tokens_saida: uso.saida, origem_ref: ref,
   }, { onConflict: "origem_ref", ignoreDuplicates: true });
   if (error) console.error("uso_ia identificação", error.message);
 }
@@ -106,18 +111,18 @@ async function registrarUso(supabase: SupabaseClient, entrada: Entrada, ref: str
  * (o agente e a equipe leem ali) ou null quando a empresa não tem fotos indexadas ou nada se parece.
  */
 export async function identificarProduto(
-  supabase: SupabaseClient, entrada: Entrada, foto: { bytes: Uint8Array; mime: string }, descricao: string,
+  supabase: SupabaseClient, origem: OrigemUso, foto: { bytes: Uint8Array; mime: string }, descricao: string,
 ): Promise<string | null> {
   if (!OPENAI_API_KEY) return null;
   // Empresa sem fotos prontas: nem gera o embedding.
   const { count } = await supabase.from("fotos_indice").select("documento_id", { count: "exact", head: true })
-    .eq("org_id", entrada.org_id).eq("status", "pronto");
+    .eq("org_id", origem.org_id).eq("status", "pronto");
   if (!count) return null;
 
   const emb = await embedding(descricao);
-  await registrarUso(supabase, entrada, `identificacao-busca:${entrada.mensagem_id}`, MODELO_EMBEDDING, { entrada: emb.tokens, saida: 0 });
+  await registrarUso(supabase, origem, `identificacao-busca:${origem.chave}`, MODELO_EMBEDDING, { entrada: emb.tokens, saida: 0 });
   const { data, error } = await supabase.rpc("fotos_candidatas", {
-    p_org: entrada.org_id, p_embedding: JSON.stringify(emb.vetor), p_texto: descricao, p_limite: CANDIDATOS,
+    p_org: origem.org_id, p_embedding: JSON.stringify(emb.vetor), p_texto: descricao, p_limite: CANDIDATOS,
   });
   if (error) throw new Error(`fotos_candidatas: ${error.message}`);
   const candidatos = (data ?? []) as Candidato[];
@@ -143,7 +148,7 @@ export async function identificarProduto(
   ];
   fotos.forEach((f, i) => conteudo.push({ type: "input_text", text: `Produto ${i + 1}: ${rotulo(f.c)}` }, imagem(f.bytes, f.mime)));
   const r = await responder(conteudo, { reasoning: { effort: "low" }, max_output_tokens: 2000, text: { format: FORMATO_COMPARAR } });
-  await registrarUso(supabase, entrada, `identificacao:${entrada.mensagem_id}`, MODELO_VISAO, r.uso);
+  await registrarUso(supabase, origem, `identificacao:${origem.chave}`, MODELO_VISAO, r.uso);
 
   let res: { produto: number; confianca: "alta" | "media" | "baixa"; motivo: string };
   try {

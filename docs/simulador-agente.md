@@ -20,6 +20,16 @@ precisar testar o agente antes de sugerir mudanças.
   envio de PDF e documento, e chamar a equipe só aparecem como "faria", embaixo da resposta.
 - **Limite:** 200 respostas de teste por empresa em 24 h (`simulador_registrar`). Cada teste custa IA de verdade.
 - **Consumo:** o coletor da VPS grava em `uso_ia` com tipo `simulador`, fora da contagem de respostas ao cliente.
+- **Foto e áudio** (17/11): pelo clipe (foto JPG, PNG ou WebP, ou arquivo de áudio) ou pelo microfone (grava no
+  navegador, até 5 min). Passam pelo mesmo caminho da entrada pelo WhatsApp:
+  - a foto é reduzida na tela como o WhatsApp faz (lado maior até 1.600 px, JPG), descrita pela IA e comparada com as
+    fotos do catálogo; a legenda vai junto, como no WhatsApp;
+  - o áudio é transcrito (gpt-4o-transcribe) e vai sem texto; mais de 5 min não é transcrito, igual à entrada real;
+  - embaixo do balão aparece o que o agente leu (a descrição ou a transcrição), ou o aviso de que não deu para ler,
+    e então o agente responde como responderia nesse caso;
+  - a descrição ou a transcrição fica na mensagem da tela e volta como texto nas próximas perguntas; o arquivo não é
+    processado de novo nem guardado;
+  - o consumo vai para `uso_ia` com tipo `simulador` (descrição, transcrição e identificação do produto).
 
 ## Peças
 
@@ -33,15 +43,20 @@ precisar testar o agente antes de sugerir mudanças.
   - O webhook é síncrono e não tem a espera de 6 s.
 - **Edge Function `agente-simular`:**
   - Confere o login e o papel, aplica o limite e limpa as mensagens (últimas 40, a última do cliente).
+  - Descreve a foto ou transcreve o áudio da última mensagem com `_shared/descricao.ts`, `_shared/fotos.ts` e
+    `transcrever` de `_shared/atendimento.ts`, as mesmas funções dos webhooks do WhatsApp.
   - Chama o webhook com o mesmo token do agente.
 - **Migration `20261019120000_simulador_agente.sql`:**
   - `buscar_produtos_org` e `buscar_documentos_org` recebem o corpo das buscas, e as do agente passam a chamá-las.
   - Funções novas: `agente_contexto_simulado`, `simulador_montar_pedido`, `simulador_documento`.
   - Limite de uso e tipo `simulador` em `uso_ia`.
+- **Migration `20261117120000_simulador_foto_audio.sql`:** `agente_contexto_simulado` repassa o tipo (`imagem`,
+  `audio` ou `texto`) e a descrição de cada mensagem, para o nó Contexto montar a linha igual à de uma conversa real.
 - **Tela:** `ModalSimulador` e `services/simulador.ts`. A tela traduz as ferramentas em frases ("Buscou produtos:
   “14/19” → 3 encontrados") e mostra o que elas devolveram, para conferir.
 
 ## Fora desta peça
 
 Custo de cada resposta na tela: o n8n não devolve os tokens na resposta do webhook. O total aparece no consumo,
-pelo coletor. Também ficam fora testar com áudio, imagem ou PDF do cliente e salvar conversas de teste.
+pelo coletor. Também ficam fora testar com PDF do cliente (precisaria do `pdf-lib` no `agente-simular`) e salvar
+conversas de teste.

@@ -1,19 +1,18 @@
 // Mídia que chega pelos webhooks (WAHA e Meta), sempre em segundo plano: a mensagem já foi gravada.
 // 1. Guarda o arquivo no bucket `midias` (cliente, ou equipe pelo celular). Migration 20261016130000.
-// 2. Imagem e PDF do cliente: a IA descreve em texto e só então o agente é chamado, já lendo a descrição (mesmo
-//    modelo da transcrição de áudio). Migration 20261016140000.
+// 2. Imagem e PDF do cliente: a IA descreve em texto (_shared/descricao.ts) e só então o agente é chamado, já lendo
+//    a descrição. Migration 20261016140000.
 // 3. Imagem: se a empresa tem fotos de produto na biblioteca, acha qual produto é e junta à descrição
 //    (_shared/fotos.ts, migration 20261022120000).
 
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { PDFDocument } from "npm:pdf-lib@1.17.1";
 import { avisarAgente, type Entrada } from "./atendimento.ts";
-import { base64, identificarProduto } from "./fotos.ts";
+import { descreverArquivo, MODELO_DESCRICAO } from "./descricao.ts";
+import { identificarProduto } from "./fotos.ts";
 
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const LIMITE = 50 * 1024 * 1024; // mesmo limite do bucket
 const PDF_PAGINAS = 5; // só as primeiras páginas vão para a IA: catálogo de 80 páginas não vira custo
-const MODELO_DESCRICAO = "gpt-5-mini";
 
 const EXTENSOES: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
@@ -98,55 +97,19 @@ async function primeirasPaginas(bytes: Uint8Array): Promise<Uint8Array> {
   }
 }
 
-const INSTRUCAO = `Você ajuda o atendimento de uma empresa no WhatsApp. Descreva em português, de forma objetiva e factual, o que o cliente enviou, para o atendente responder:
-- Foto de produto: o que é, marca, modelo, referência, medidas, quantidade na embalagem e textos legíveis.
-- Documento de compra (pedido, requisição, orçamento, lista): cada item com produto, referência ou código, quantidade e unidade; depois os dados úteis (empresa, prazo, entrega, observações).
-- Outra coisa (comprovante, foto de defeito, print): o que é e os dados principais (valores, datas, nomes).
-Não invente o que não estiver legível: diga "ilegível". Até 1.200 caracteres, sem saudação nem comentário.`;
-
 /** Descrição em texto da imagem ou do PDF (null se falhar). Registra o consumo em uso_ia. */
 async function descrever(supabase: SupabaseClient, g: Guardada, legenda: string | null, entrada: Entrada): Promise<string | null> {
-  if (!OPENAI_API_KEY) return null;
   const pdf = /pdf/i.test(g.mime);
-  const arquivo = pdf
-    ? { type: "input_file", filename: g.nome.endsWith(".pdf") ? g.nome : `${g.nome}.pdf`, file_data: `data:application/pdf;base64,${base64(await primeirasPaginas(g.bytes))}` }
-    : { type: "input_image", image_url: `data:${g.mime};base64,${base64(g.bytes)}` };
-  const r = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: MODELO_DESCRICAO,
-      reasoning: { effort: "minimal" },
-      max_output_tokens: 1200,
-      input: [{
-        role: "user",
-        content: [
-          { type: "input_text", text: `${INSTRUCAO}\n\nO cliente enviou ${pdf ? "um documento PDF" : "uma imagem"}${legenda ? ` com a mensagem: "${legenda}"` : ""}.` },
-          arquivo,
-        ],
-      }],
-    }),
-    signal: AbortSignal.timeout(90000),
-  });
-  const corpo = await r.json().catch(() => null);
-  if (!r.ok) {
-    console.error("descrição", r.status, JSON.stringify(corpo).slice(0, 300));
-    return null;
-  }
-  const texto = (corpo?.output ?? [])
-    .flatMap((o: { content?: { type: string; text?: string }[] }) => o.content ?? [])
-    .filter((c: { type: string }) => c.type === "output_text")
-    .map((c: { text?: string }) => c.text ?? "")
-    .join("\n")
-    .trim();
+  const d = await descreverArquivo({ ...g, bytes: pdf ? await primeirasPaginas(g.bytes) : g.bytes }, legenda);
+  if (!d) return null;
   const { error: erroUso } = await supabase.from("uso_ia").upsert({
     org_id: entrada.org_id, conversa_id: entrada.conversa_id, mensagem_id: entrada.mensagem_id,
     tipo: "descricao", modelo: MODELO_DESCRICAO,
-    tokens_entrada: Number(corpo?.usage?.input_tokens ?? 0), tokens_saida: Number(corpo?.usage?.output_tokens ?? 0),
+    tokens_entrada: d.tokensEntrada, tokens_saida: d.tokensSaida,
     origem_ref: `descricao:${entrada.mensagem_id}`,
   }, { onConflict: "origem_ref", ignoreDuplicates: true });
   if (erroUso) console.error("uso_ia descrição", erroUso.message);
-  return texto || null;
+  return d.texto;
 }
 
 /**
@@ -163,7 +126,8 @@ export async function guardarDescreverEAvisar(
       let texto = await descrever(supabase, g, legenda, entrada);
       if (texto && ref.tipo === "imagem") {
         // Se falhar, segue só com a descrição: o agente pergunta o produto como antes.
-        const produto = await identificarProduto(supabase, entrada, g, texto)
+        const origem = { org_id: entrada.org_id, conversa_id: entrada.conversa_id, mensagem_id: entrada.mensagem_id, chave: entrada.mensagem_id };
+        const produto = await identificarProduto(supabase, origem, g, texto)
           .catch((e) => (console.error("identificar produto", String(e).slice(0, 300)), null));
         if (produto) texto = `${texto}\n\n${produto}`;
       }
