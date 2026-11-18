@@ -3848,6 +3848,8 @@ export type Database = {
       }
       pedido_itens: {
         Row: {
+          desconto: number
+          desconto_percentual: number | null
           descricao: string
           id: string
           ordem: number
@@ -3857,8 +3859,11 @@ export type Database = {
           produto_id: string | null
           quantidade: number
           subtotal: number | null
+          total: number | null
         }
         Insert: {
+          desconto?: number
+          desconto_percentual?: number | null
           descricao: string
           id?: string
           ordem?: number
@@ -3868,8 +3873,11 @@ export type Database = {
           produto_id?: string | null
           quantidade: number
           subtotal?: number | null
+          total?: number | null
         }
         Update: {
+          desconto?: number
+          desconto_percentual?: number | null
           descricao?: string
           id?: string
           ordem?: number
@@ -3879,6 +3887,7 @@ export type Database = {
           produto_id?: string | null
           quantidade?: number
           subtotal?: number | null
+          total?: number | null
         }
         Relationships: [
           {
