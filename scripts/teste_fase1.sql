@@ -8362,5 +8362,87 @@ begin
   insert into resultado (teste, ok) values ('simulador: mensagem do agente é sempre texto, sem descrição',
     c -> 'mensagens' -> 4 ->> 'tipo' = 'texto' and c -> 'mensagens' -> 4 -> 'descricao' = 'null'::jsonb);
 end $$;
+
+-- Desconto por produto (migration 20261118120000).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_ped uuid; v_a uuid; v_b uuid;
+begin
+  insert into public.pedidos (org_id, desconto, frete) values (v_org, 10, 5) returning id into v_ped;
+  perform set_config('teste.ped_desconto', v_ped::text, true);
+  insert into public.pedido_itens (org_id, pedido_id, descricao, quantidade, preco_unitario, desconto)
+  values (v_org, v_ped, 'Pino F15', 3, 12.50, 7.50) returning id into v_a;
+  insert into public.pedido_itens (org_id, pedido_id, descricao, quantidade, preco_unitario, desconto_percentual)
+  values (v_org, v_ped, 'Grampeador', 2, 80, 10) returning id into v_b;
+  insert into resultado (teste, ok) select 'desconto item: em R$, o valor do item já sai com desconto',
+    subtotal = 37.50 and desconto = 7.50 and total = 30 from public.pedido_itens where id = v_a;
+  insert into resultado (teste, ok) select 'desconto item: em %, guarda o R$ calculado',
+    desconto = 16 and total = 144 from public.pedido_itens where id = v_b;
+  insert into resultado (teste, ok) select 'desconto item: subtotal soma os itens com desconto e o total tira o desconto do pedido',
+    subtotal = 174 and total = 169 from public.pedidos where id = v_ped;
+
+  update public.pedido_itens set quantidade = 3 where id = v_b;
+  insert into resultado (teste, ok) select 'desconto item: em %, acompanha a quantidade',
+    desconto = 24 and total = 216 from public.pedido_itens where id = v_b;
+  update public.pedido_itens set quantidade = 4 where id = v_a;
+  insert into resultado (teste, ok) select 'desconto item: em R$, fica o mesmo valor quando muda a quantidade',
+    desconto = 7.50 and total = 42.50 from public.pedido_itens where id = v_a;
+  update public.pedido_itens set desconto = 5, desconto_percentual = null where id = v_b;
+  insert into resultado (teste, ok) select 'desconto item: digitar em R$ depois de % troca para R$',
+    desconto = 5 and desconto_percentual is null and total = 235 from public.pedido_itens where id = v_b;
+  insert into resultado (teste, ok) select 'desconto item: pedido recalcula',
+    subtotal = 277.50 and total = 272.50 from public.pedidos where id = v_ped;
+
+  begin
+    update public.pedido_itens set desconto = 50.01 where id = v_a;
+    insert into resultado (teste, ok) values ('desconto item: não passa do valor do item', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('desconto item: não passa do valor do item',
+      sqlerrm = 'o desconto do item não pode passar do valor do item (R$ 50,00)');
+  end;
+  begin
+    update public.pedido_itens set desconto = 5, desconto_percentual = null where id = v_a;
+    update public.pedido_itens set quantidade = 0.1 where id = v_a;
+    insert into resultado (teste, ok) values ('desconto item: baixar a quantidade abaixo do desconto em R$ é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('desconto item: baixar a quantidade abaixo do desconto em R$ é recusado',
+      sqlerrm like 'o desconto do item não pode passar%');
+  end;
+  update public.pedido_itens set desconto_percentual = 100 where id = v_a;
+  insert into resultado (teste, ok) select 'desconto item: 100% zera o item',
+    desconto = 50 and total = 0 from public.pedido_itens where id = v_a;
+  begin
+    update public.pedido_itens set desconto_percentual = 101 where id = v_a;
+    insert into resultado (teste, ok) values ('desconto item: percentual acima de 100 é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('desconto item: percentual acima de 100 é recusado', sqlstate in ('23514', 'P0001'));
+  end;
+  begin
+    update public.pedido_itens set desconto = -1, desconto_percentual = null where id = v_a;
+    insert into resultado (teste, ok) values ('desconto item: negativo é recusado', false);
+  exception when check_violation then
+    insert into resultado (teste, ok) values ('desconto item: negativo é recusado', true);
+  end;
+
+  perform public.pedido_mudar_status(v_ped, 'confirmado');
+  begin
+    update public.pedido_itens set desconto_percentual = 5 where id = v_b;
+    insert into resultado (teste, ok) values ('desconto item: não muda depois de confirmado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('desconto item: não muda depois de confirmado', sqlerrm like 'só dá para mudar os itens%');
+  end;
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$
+declare n integer;
+begin
+  with u as (update public.pedido_itens set desconto = 1, desconto_percentual = null
+              where pedido_id = current_setting('teste.ped_desconto')::uuid returning 1)
+  select count(*) into n from u;
+  insert into resultado (teste, ok) values ('desconto item: outra empresa não mexe', n = 0);
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

@@ -187,6 +187,13 @@ function Documento({ d }: { d: DadosOrcamento }) {
   const titulo = `${orcamento ? 'Orçamento' : 'Pedido'} nº ${pedido.numero}`
   const desconto = Number(pedido.desconto)
   const frete = Number(pedido.frete)
+  // Coluna de desconto só quando algum item tem (desconto por produto, 18/11); aí as outras colunas cedem espaço.
+  const comDescItem = d.itens.some((i) => Number(i.desconto) > 0)
+  const larg = comDescItem
+    ? { codigo: { width: '12%' }, descricao: { width: '31%' }, qtd: { width: '8%' }, un: { width: '7%' }, preco: { width: '14%' } }
+    : { codigo: {}, descricao: {}, qtd: {}, un: {}, preco: {} }
+  const cDesc = { width: '14%', textAlign: 'right' as const }
+  const cTotal = comDescItem ? { width: '14%' } : {}
 
   return (
     <Document title={titulo} author={e?.nome_fantasia || e?.razao_social || undefined} creator="Livih" producer="Livih">
@@ -209,23 +216,33 @@ function Documento({ d }: { d: DadosOrcamento }) {
 
         <View style={s.tabela}>
           <View style={s.linhaCab} fixed>
-            <Text style={[s.cab, s.cCodigo]}>Código</Text>
-            <Text style={[s.cab, s.cDescricao]}>Descrição</Text>
-            <Text style={[s.cab, s.cQtd]}>Qtd.</Text>
-            <Text style={[s.cab, s.cUn]}>Un.</Text>
-            <Text style={[s.cab, s.cPreco]}>Valor unit.</Text>
-            <Text style={[s.cab, s.cSubtotal]}>Subtotal</Text>
+            <Text style={[s.cab, s.cCodigo, larg.codigo]}>Código</Text>
+            <Text style={[s.cab, s.cDescricao, larg.descricao]}>Descrição</Text>
+            <Text style={[s.cab, s.cQtd, larg.qtd]}>Qtd.</Text>
+            <Text style={[s.cab, s.cUn, larg.un]}>Un.</Text>
+            <Text style={[s.cab, s.cPreco, larg.preco]}>Valor unit.</Text>
+            {comDescItem && <Text style={[s.cab, cDesc]}>Desconto</Text>}
+            <Text style={[s.cab, s.cSubtotal, cTotal]}>Subtotal</Text>
           </View>
-          {d.itens.map((i) => (
-            <View key={i.id} style={s.linha} wrap={false}>
-              <Text style={[s.cCodigo, s.suave]}>{i.codigo ?? ''}</Text>
-              <Text style={s.cDescricao}>{i.descricao}</Text>
-              <Text style={s.cQtd}>{quantidade(Number(i.quantidade))}</Text>
-              <Text style={[s.cUn, s.suave]}>{i.unidade ?? ''}</Text>
-              <Text style={s.cPreco}>{moeda(Number(i.preco_unitario))}</Text>
-              <Text style={[s.cSubtotal, s.negrito]}>{moeda(Number(i.subtotal))}</Text>
-            </View>
-          ))}
+          {d.itens.map((i) => {
+            const descItem = Number(i.desconto)
+            return (
+              <View key={i.id} style={s.linha} wrap={false}>
+                <Text style={[s.cCodigo, larg.codigo, s.suave]}>{i.codigo ?? ''}</Text>
+                <Text style={[s.cDescricao, larg.descricao]}>{i.descricao}</Text>
+                <Text style={[s.cQtd, larg.qtd]}>{quantidade(Number(i.quantidade))}</Text>
+                <Text style={[s.cUn, larg.un, s.suave]}>{i.unidade ?? ''}</Text>
+                <Text style={[s.cPreco, larg.preco]}>{moeda(Number(i.preco_unitario))}</Text>
+                {comDescItem && (
+                  <Text style={cDesc}>
+                    {descItem > 0 ? `- ${moeda(descItem)}${i.desconto_percentual ? `\n(${quantidade(Number(i.desconto_percentual))}%)` : ''}` : ''}
+                  </Text>
+                )}
+                {/* total = quantidade × preço − desconto do item (coluna de 18/11; antes dela, o subtotal). */}
+                <Text style={[s.cSubtotal, cTotal, s.negrito]}>{moeda(Number(i.total ?? i.subtotal))}</Text>
+              </View>
+            )
+          })}
         </View>
 
         <View style={s.totais} wrap={false}>

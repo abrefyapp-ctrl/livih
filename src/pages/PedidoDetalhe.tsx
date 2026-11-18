@@ -507,6 +507,8 @@ function Itens({
   }
 
   const produtoEscolhido = produtos.find((p) => p.id === produtoId)
+  // Desconto por produto (18/11): a coluna aparece no rascunho e, depois, só se algum item teve desconto.
+  const comDesconto = editavel || itens.some((i) => Number(i.desconto) > 0)
 
   return (
     <section aria-labelledby="titulo-itens" className="rounded-lg border border-borda bg-superficie">
@@ -515,19 +517,20 @@ function Itens({
       </h2>
       {itens.length ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-pequeno">
+          <table className="w-full min-w-[680px] text-pequeno">
             <thead className="text-left text-legenda text-texto-3 uppercase">
               <tr>
                 <th className="px-4 py-2 font-medium">Item</th>
                 <th className="px-4 py-2 text-right font-medium">Qtd.</th>
                 <th className="px-4 py-2 text-right font-medium">Preço</th>
+                {comDesconto && <th className="px-4 py-2 text-right font-medium">Desconto</th>}
                 <th className="px-4 py-2 text-right font-medium">Subtotal</th>
                 {editavel && <th className="w-10" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-borda">
               {itens.map((i) => (
-                <LinhaItem key={i.id} item={i} editavel={editavel} aoMudar={aoMudar} aoErro={aoErro} />
+                <LinhaItem key={i.id} item={i} editavel={editavel} comDesconto={comDesconto} aoMudar={aoMudar} aoErro={aoErro} />
               ))}
             </tbody>
           </table>
@@ -592,9 +595,44 @@ function Itens({
   )
 }
 
-function LinhaItem({ item, editavel, aoMudar, aoErro }: { item: ItemPedido; editavel: boolean; aoMudar: () => void; aoErro: (m: string | null) => void }) {
+function LinhaItem({
+  item,
+  editavel,
+  comDesconto,
+  aoMudar,
+  aoErro,
+}: {
+  item: ItemPedido
+  editavel: boolean
+  comDesconto: boolean
+  aoMudar: () => void
+  aoErro: (m: string | null) => void
+}) {
   const [qtd, setQtd] = useState(texto(Number(item.quantidade)))
   const [preco, setPreco] = useState(textoReais(Number(item.preco_unitario)))
+  const pct = item.desconto_percentual == null ? null : Number(item.desconto_percentual)
+  const descontoReais = Number(item.desconto)
+  const [desconto, setDesconto] = useState(pct != null ? `${texto(pct)}%` : descontoReais > 0 ? textoReais(descontoReais) : '')
+
+  // "10%" guarda o percentual (o banco calcula o R$ e acompanha a quantidade); "5,00" guarda em R$; vazio zera.
+  async function salvarDesconto(valor: string) {
+    const t = valor.trim()
+    const emPct = t.endsWith('%')
+    const n = t ? lerNumero(t.slice(0, emPct ? -1 : undefined)) : 0
+    if (n == null || n < 0 || (emPct && n > 100)) {
+      aoErro('Desconto inválido. Digite em reais (5,00) ou em porcentagem (10%).')
+      return
+    }
+    const igual = emPct && n > 0 ? pct === n : pct == null && descontoReais === n
+    if (igual) return
+    try {
+      await atualizarItem(item.id, emPct && n > 0 ? { desconto_percentual: n } : { desconto: n, desconto_percentual: null })
+      aoErro(null)
+      aoMudar()
+    } catch (e) {
+      aoErro((e as Error).message)
+    }
+  }
 
   async function salvarCampo(campo: 'quantidade' | 'preco_unitario', valor: string) {
     const n = lerNumero(valor)
@@ -630,7 +668,31 @@ function LinhaItem({ item, editavel, aoMudar, aoErro }: { item: ItemPedido; edit
           moeda(Number(item.preco_unitario), true)
         )}
       </td>
-      <td className="px-4 py-2 text-right font-medium tabular-nums">{moeda(Number(item.subtotal), true)}</td>
+      {comDesconto && (
+        <td className="px-4 py-2 text-right tabular-nums">
+          {editavel ? (
+            <input
+              aria-label={`Desconto de ${item.descricao}, em reais ou em %`}
+              inputMode="decimal"
+              value={desconto}
+              placeholder="R$ ou %"
+              title="Digite 5,00 para desconto em reais ou 10% para porcentagem"
+              onChange={(e) => setDesconto(e.target.value)}
+              onBlur={() => void salvarDesconto(desconto)}
+              className={`${campo} placeholder:text-texto-3`}
+            />
+          ) : descontoReais > 0 ? (
+            <>
+              − {moeda(descontoReais, true)}
+              {pct != null && <span className="text-texto-3"> ({texto(pct)}%)</span>}
+            </>
+          ) : (
+            <span className="text-texto-3">—</span>
+          )}
+          {editavel && pct != null && descontoReais > 0 && <p className="mt-0.5 text-legenda text-texto-3">− {moeda(descontoReais, true)}</p>}
+        </td>
+      )}
+      <td className="px-4 py-2 text-right font-medium tabular-nums">{moeda(Number(item.total ?? item.subtotal), true)}</td>
       {editavel && (
         <td className="px-2 py-2">
           <button
@@ -676,7 +738,7 @@ function Totais({ pedido, editavel, aoMudar, aoErro }: { pedido: Pedido; editave
       </div>
       <div className={linha}>
         <label htmlFor="ped-desconto" className="text-texto-2">
-          Desconto
+          Desconto no total
         </label>
         {editavel ? (
           <input id="ped-desconto" inputMode="decimal" value={desconto} onChange={(e) => setDesconto(e.target.value)} onBlur={() => void salvar('desconto', desconto)} className={campo} />

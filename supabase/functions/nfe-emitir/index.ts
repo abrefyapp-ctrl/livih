@@ -37,7 +37,10 @@ function ratear(total: number, bases: number[]): number[] {
   const soma = bases.reduce((a, b) => a + b, 0);
   if (!total || !soma) return bases.map(() => 0);
   const partes = bases.map((b) => r2((total * b) / soma));
-  partes[partes.length - 1] = r2(partes[partes.length - 1] + total - partes.reduce((a, b) => a + b, 0));
+  // A sobra do arredondamento vai para o item de maior valor: com desconto por item (18/11), o último pode valer zero,
+  // e um centavo de desconto a mais nele passaria do valor do item.
+  const maior = bases.indexOf(Math.max(...bases));
+  partes[maior] = r2(partes[maior] + total - partes.reduce((a, b) => a + b, 0));
   return partes;
 }
 
@@ -278,10 +281,15 @@ Deno.serve(async (req) => {
   const ieCli = so(cli!.inscricao_estadual);
   const indicadorIe = cli!.tipo === "pf" ? 9 : ieCli ? 1 : /isent/i.test(cli!.inscricao_estadual ?? "") ? 2 : 9;
   const brutos = (itens ?? []).map((i) => r2(Number(i.quantidade) * Number(i.preco_unitario)));
-  const descontos = ratear(Number(ped.desconto) || 0, brutos);
+  // Desconto do item (18/11) vai direto no item; o desconto no total do pedido é rateado pelo valor que sobrou em cada um.
+  const descItens = (itens ?? []).map((i) => r2(Number(i.desconto) || 0));
+  const liquidos = brutos.map((b, n) => r2(b - descItens[n]));
+  const rateio = ratear(Number(ped.desconto) || 0, liquidos);
+  const descontos = descItens.map((d, n) => r2(d + rateio[n]));
   const fretes = ratear(Number(ped.frete) || 0, brutos);
   const valorProdutos = r2(brutos.reduce((a, b) => a + b, 0));
-  const valorTotal = r2(valorProdutos - (Number(ped.desconto) || 0) + (Number(ped.frete) || 0));
+  const valorDesconto = r2(descontos.reduce((a, b) => a + b, 0));
+  const valorTotal = r2(valorProdutos - valorDesconto + (Number(ped.frete) || 0));
   const zerado = (cst: string, prefixo: "pis" | "cofins") =>
     CST_ZERADO.includes(cst) ? { [`${prefixo}_base_calculo`]: 0, [`${prefixo}_aliquota_porcentual`]: 0, [`${prefixo}_valor`]: 0 } : {};
 
@@ -313,7 +321,7 @@ Deno.serve(async (req) => {
     ...(so(cli!.telefone || ct?.telefone).length >= 6 ? { telefone_destinatario: so(cli!.telefone || ct?.telefone).slice(-14) } : {}),
     ...((cli!.email || ct?.email) ? { email_destinatario: (cli!.email || ct?.email)!.slice(0, 60) } : {}),
     valor_produtos: valorProdutos,
-    valor_desconto: r2(Number(ped.desconto) || 0),
+    valor_desconto: valorDesconto,
     valor_frete: r2(Number(ped.frete) || 0),
     valor_total: valorTotal,
     formas_pagamento: [{

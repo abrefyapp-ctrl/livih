@@ -47,6 +47,7 @@ const amigavel = (m: string, padrao: string) => {
     'o responsável precisa ser da equipe',
     'a oportunidade é de outro cliente',
     'não dá para passar',
+    'o desconto do item não pode passar',
   ]
   const achado = conhecidos.find((c) => m.includes(c))
   if (achado) return new Error(m.charAt(0).toUpperCase() + m.slice(1).replace(/\.$/, '') + '.')
@@ -236,7 +237,11 @@ export async function adicionarItem(
   if (error) throw amigavel(error.message, 'Não foi possível adicionar o item.')
 }
 
-export async function atualizarItem(id: string, dados: { quantidade?: number; preco_unitario?: number; descricao?: string }) {
+// Desconto do item: em R$, desconto com desconto_percentual null; em %, só o percentual (o banco calcula o R$).
+export async function atualizarItem(
+  id: string,
+  dados: { quantidade?: number; preco_unitario?: number; descricao?: string; desconto?: number; desconto_percentual?: number | null },
+) {
   const { error } = await supabase.from('pedido_itens').update(dados).eq('id', id)
   if (error) throw amigavel(error.message, 'Não foi possível mudar o item.')
 }
