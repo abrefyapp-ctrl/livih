@@ -3229,6 +3229,7 @@ export type Database = {
       organizacoes: {
         Row: {
           ao_passar_franquia: string
+          balcao_conta_id: string | null
           criado_em: string
           distribuicao_janela_dias: number
           financeiro_oculto: boolean
@@ -3243,6 +3244,7 @@ export type Database = {
         }
         Insert: {
           ao_passar_franquia?: string
+          balcao_conta_id?: string | null
           criado_em?: string
           distribuicao_janela_dias?: number
           financeiro_oculto?: boolean
@@ -3257,6 +3259,7 @@ export type Database = {
         }
         Update: {
           ao_passar_franquia?: string
+          balcao_conta_id?: string | null
           criado_em?: string
           distribuicao_janela_dias?: number
           financeiro_oculto?: boolean
@@ -3270,6 +3273,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "organizacoes_balcao_conta_fk"
+            columns: ["balcao_conta_id", "id"]
+            isOneToOne: false
+            referencedRelation: "fin_contas"
+            referencedColumns: ["id", "org_id"]
+          },
           {
             foreignKeyName: "organizacoes_plano_fkey"
             columns: ["plano"]
@@ -5197,6 +5207,31 @@ export type Database = {
         Args: { p_conversa: string; p_texto: string }
         Returns: undefined
       }
+      balcao_config: { Args: { p_org: string }; Returns: Json }
+      balcao_conta: { Args: { p_org: string }; Returns: string }
+      balcao_definir_conta: {
+        Args: { p_conta: string; p_org: string }
+        Returns: undefined
+      }
+      balcao_fechar: {
+        Args: {
+          p_cliente: string
+          p_desconto: number
+          p_forma: string
+          p_itens: Json
+          p_observacao: string
+          p_org: string
+          p_prazos: number[]
+        }
+        Returns: Json
+      }
+      balcao_mais_vendidos: {
+        Args: { p_org: string }
+        Returns: {
+          produto_id: string
+        }[]
+      }
+      balcao_pode: { Args: { p_org: string }; Returns: boolean }
       buscar_documentos_org: {
         Args: { p_busca: string; p_org: string }
         Returns: Json
