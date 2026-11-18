@@ -88,10 +88,13 @@ export function Clientes() {
               className="h-10 w-full rounded-md border border-borda bg-superficie pr-3 pl-9 placeholder:text-texto-3 focus:border-primaria focus:outline-none"
             />
           </label>
-          <label className="flex cursor-pointer items-center gap-2 text-pequeno text-texto-2">
-            <input type="checkbox" checked={soMeus} onChange={(e) => setSoMeus(e.target.checked)} className="size-4 accent-primaria" />
-            Só os meus
-          </label>
+          {/* Usuário do balcão não tem carteira (18/11). */}
+          {orgAtiva?.papel !== 'balcao' && (
+            <label className="flex cursor-pointer items-center gap-2 text-pequeno text-texto-2">
+              <input type="checkbox" checked={soMeus} onChange={(e) => setSoMeus(e.target.checked)} className="size-4 accent-primaria" />
+              Só os meus
+            </label>
+          )}
           <label className="flex cursor-pointer items-center gap-2 text-pequeno text-texto-2">
             <input type="checkbox" checked={inativos} onChange={(e) => setInativos(e.target.checked)} className="size-4 accent-primaria" />
             Mostrar inativos

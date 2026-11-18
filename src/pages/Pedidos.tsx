@@ -132,7 +132,7 @@ function ListaPedidos({ orgId, soBalcao }: { orgId: string; soBalcao: boolean })
               <li key={p.id}>
                 <Link to={`/pedidos/${p.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-fundo">
                   <span className="w-14 font-semibold tabular-nums">#{p.numero}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{p.contato ? nomeDoContato(p.contato) : 'Sem cliente'}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{p.contato ? nomeDoContato(p.contato) : p.origem === 'balcao' ? 'Venda de balcão' : 'Sem cliente'}</span>
                   <span className="min-w-0 flex-1 truncate text-texto-2">{empresaDoPedido(p) ?? '—'}</span>
                   <EtiquetaPedido status={p.status} />
                   <span className="w-28 text-right font-medium tabular-nums">{moeda(Number(p.total), true)}</span>

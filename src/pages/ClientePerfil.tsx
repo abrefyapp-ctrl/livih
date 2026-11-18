@@ -75,6 +75,8 @@ export function ClientePerfil() {
   const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const comPedidos = !!modulos?.has('erp')
   const comOs = !!modulos?.has('os')
+  // Usuário só do balcão (18/11): não vê contatos nem OS (o banco também não devolve); fica o cadastro, as vendas e as notas.
+  const soBalcao = orgAtiva?.papel === 'balcao'
   const navegar = useNavigate()
   const [dados, setDados] = useState<Dados | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -195,6 +197,7 @@ export function ClientePerfil() {
 
         <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-4">
+            {!soBalcao && (
             <Bloco
               titulo="Contatos"
               acao={
@@ -231,6 +234,7 @@ export function ClientePerfil() {
                 </p>
               )}
             </Bloco>
+            )}
 
             {comPedidos && (
               <Bloco titulo="Pedidos e orçamentos">
@@ -253,7 +257,7 @@ export function ClientePerfil() {
               </Bloco>
             )}
 
-            {comOs && (
+            {comOs && !soBalcao && (
               <Bloco titulo="Ordens de serviço">
                 {atual.ordens.length ? (
                   <ul className="divide-y divide-borda">
