@@ -8712,5 +8712,133 @@ begin
 exception when others then
   insert into resultado (teste, ok) values ('balcão cancelar: outra empresa não cancela', sqlerrm = 'venda não encontrada');
 end $$;
+
+-- Usuário do balcão (migration 20261118180000): b9 só do balcão da teste.f7.
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000b9', 'balcao@f7.teste', '{"nome":"Dora do Balcão"}');
+insert into public.balcao_usuarios (org_id, user_id) values (current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000b9');
+do $$
+begin
+  insert into public.balcao_usuarios (org_id, user_id) values (current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000b1');
+  insert into resultado (teste, ok) values ('usuário do balcão: quem é da equipe não vira usuário do balcão', false);
+exception when others then
+  insert into resultado (teste, ok) values ('usuário do balcão: quem é da equipe não vira usuário do balcão', sqlerrm like 'essa pessoa já é da equipe%');
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b9","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_cli uuid; v_novo uuid; r jsonb; n integer;
+begin
+  insert into resultado (teste, ok) select 'usuário do balcão: vê a empresa, os módulos e abre o balcão',
+    exists (select 1 from public.organizacoes where id = v_org)
+    and exists (select 1 from public.org_modulos(v_org) where codigo = 'balcao' and ativo)
+    and public.balcao_pode(v_org) and not public.eh_membro(v_org);
+  insert into resultado (teste, ok) select 'usuário do balcão: não vê conversas, contatos, oportunidades, tarefas, números nem a equipe',
+    not exists (select 1 from public.conversas where org_id = v_org)
+    and not exists (select 1 from public.contatos where org_id = v_org)
+    and not exists (select 1 from public.oportunidades where org_id = v_org)
+    and not exists (select 1 from public.tarefas where org_id = v_org)
+    and not exists (select 1 from public.canais where org_id = v_org)
+    and not exists (select 1 from public.membros_org where org_id = v_org);
+  insert into resultado (teste, ok) select 'usuário do balcão: vê produtos com o saldo e os clientes',
+    exists (select 1 from public.produtos_saldo where org_id = v_org)
+    and (select count(*) from public.clientes where org_id = v_org) > 0;
+  insert into resultado (teste, ok) select 'usuário do balcão: vê só as vendas de balcão, não os outros pedidos',
+    exists (select 1 from public.pedidos where org_id = v_org and origem = 'balcao')
+    and not exists (select 1 from public.pedidos where org_id = v_org and origem <> 'balcao');
+  insert into resultado (teste, ok) select 'usuário do balcão: vê a nota da venda de balcão, não as outras',
+    exists (select 1 from public.notas_fiscais where pedido_id = current_setting('teste.bal_com_nota')::uuid)
+    and not exists (select 1 from public.notas_fiscais where id = current_setting('teste.nota')::uuid);
+  insert into resultado (teste, ok) select 'usuário do balcão: vê só a própria linha de usuário do balcão',
+    (select count(*) from public.balcao_usuarios) = 1;
+
+  -- Fecha venda: o pedido fica sem responsável (não é da equipe), criado por ele.
+  r := public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', current_setting('teste.bal_prod')::uuid, 'quantidade', 1)),
+                            null, 'pix', null, 0, null);
+  insert into resultado (teste, ok) select 'usuário do balcão: fecha a venda, criada por ele e sem vendedor responsável',
+    status = 'entregue' and criado_por = '00000000-0000-0000-0000-0000000000b9' and responsavel_id is null
+    and (r ->> 'pago')::boolean
+    from public.pedidos where id = (r ->> 'pedido_id')::uuid;
+  begin
+    perform public.pedido_mudar_status((r ->> 'pedido_id')::uuid, 'cancelado');
+    insert into resultado (teste, ok) values ('usuário do balcão: não muda situação de pedido fora do fechamento', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('usuário do balcão: não muda situação de pedido fora do fechamento', sqlerrm = 'pedido não encontrado');
+  end;
+  begin
+    insert into public.pedidos (org_id) values (v_org);
+    insert into resultado (teste, ok) values ('usuário do balcão: não cria pedido fora do balcão', false);
+  exception when insufficient_privilege then
+    insert into resultado (teste, ok) values ('usuário do balcão: não cria pedido fora do balcão', true);
+  end;
+  begin
+    perform public.balcao_cancelar((r ->> 'pedido_id')::uuid, 'Tentando cancelar');
+    insert into resultado (teste, ok) values ('usuário do balcão: não cancela venda', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('usuário do balcão: não cancela venda',
+      sqlerrm = 'venda não encontrada' or sqlerrm like 'só o dono ou um admin%');
+  end;
+
+  -- Clientes: cadastra (sem responsável) e corrige o cadastro fiscal; não arquiva nem troca o responsável.
+  insert into public.clientes (org_id, tipo, nome, documento, cidade, uf) values (v_org, 'pf', 'Cliente do Balcão', '93541134780', 'Curitiba', 'pr')
+  returning id into v_novo;
+  insert into resultado (teste, ok) select 'usuário do balcão: cadastra cliente, sem vendedor responsável',
+    responsavel_id is null and uf = 'PR' from public.clientes where id = v_novo;
+  select id into v_cli from public.clientes where org_id = v_org and id <> v_novo and ativo limit 1;
+  with u as (update public.clientes set logradouro = 'Rua do Balcão', numero = '10' where id = v_cli returning 1) select count(*) into n from u;
+  insert into resultado (teste, ok) values ('usuário do balcão: corrige o endereço de um cliente', n = 1);
+  begin
+    update public.clientes set ativo = false where id = v_cli;
+    insert into resultado (teste, ok) values ('usuário do balcão: não arquiva cliente', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('usuário do balcão: não arquiva cliente', sqlerrm like 'quem é do balcão não arquiva%');
+  end;
+  begin
+    update public.clientes set responsavel_id = '00000000-0000-0000-0000-0000000000b1' where id = v_cli;
+    insert into resultado (teste, ok) values ('usuário do balcão: não troca o vendedor do cliente', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('usuário do balcão: não troca o vendedor do cliente', sqlerrm like 'só dono e admin trocam%');
+  end;
+  with d as (delete from public.clientes where id = v_novo returning 1) select count(*) into n from d;
+  insert into resultado (teste, ok) values ('usuário do balcão: não apaga cliente', n = 0);
+
+  insert into resultado (teste, ok) values ('usuário do balcão: sem a permissão, não emite nota', not public.emite_nota_fiscal(v_org));
+  begin
+    perform public.balcao_usuarios_listar(v_org);
+    insert into resultado (teste, ok) values ('usuário do balcão: não vê a lista de usuários do balcão', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('usuário do balcão: não vê a lista de usuários do balcão', sqlerrm like 'só o dono ou um admin%');
+  end;
+end $$;
+-- O dono vê os usuários do balcão, libera a nota e tira o acesso.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  insert into resultado (teste, ok) select 'usuário do balcão: o dono vê a lista com o nome',
+    exists (select 1 from public.balcao_usuarios_listar(v_org) where nome = 'Dora do Balcão' and ativo and not emite_nota_fiscal);
+  perform public.balcao_usuario_definir(v_org, '00000000-0000-0000-0000-0000000000b9', null, true);
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b9","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'usuário do balcão: com a permissão do dono, emite nota',
+  public.emite_nota_fiscal(current_setting('teste.f7')::uuid);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.balcao_usuario_definir(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000b9', false, null);
+  insert into resultado (teste, ok) values ('usuário do balcão: atendente não mexe nos usuários do balcão', false);
+exception when others then
+  insert into resultado (teste, ok) values ('usuário do balcão: atendente não mexe nos usuários do balcão', sqlerrm like 'só o dono ou um admin%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+select public.balcao_usuario_definir(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000b9', false, null);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b9","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'usuário do balcão: sem acesso, não vê mais a empresa nem o balcão',
+  not exists (select 1 from public.organizacoes where id = current_setting('teste.f7')::uuid)
+  and not public.balcao_pode(current_setting('teste.f7')::uuid)
+  and not exists (select 1 from public.produtos where org_id = current_setting('teste.f7')::uuid);
 reset role;
 select n, teste, ok from resultado order by n;

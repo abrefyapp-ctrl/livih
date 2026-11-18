@@ -114,6 +114,24 @@ venda de balcão, dono e admin têm **Cancelar venda**, com motivo: desfaz o pag
 parcelas; o motivo fica na auditoria, no estorno e nas baixas desfeitas. Com NF-e autorizada ou ainda na SEFAZ,
 recusa: cancela-se a nota antes (prazo da SEFAZ de 24 horas).
 
+**Usuário do balcão (18/11, migration `20261118180000_balcao_usuarios`):** para abrir o balcão, o atendente
+precisava de "Vê todos os clientes", e um atendente vê bem mais do que o balcão usa (na JoGrampo, o número é
+compartilhado: veria todas as conversas). Decidido pelo usuário: um usuário só para a área do balcão.
+
+- **Não é da equipe:** fica em `balcao_usuarios`, não em `membros_org`. Tudo o que depende de ser da equipe
+  (conversas, contatos, oportunidades, tarefas, agenda, painel, campanhas, OS, financeiro, distribuição de contatos,
+  alertas, equipes) continua fechado para ele sem mexer nessas regras. Só o que o balcão usa ganhou uma política a
+  mais com `eh_balcao`: empresa e módulos, produtos e estoque, CNPJs, clientes, vendas de balcão (`origem =
+  'balcao'`, da loja inteira, para reimprimir a nota de um colega) e as notas delas.
+- **Clientes:** busca todos, cadastra (sem vendedor responsável) e corrige o cadastro fiscal; não arquiva, não apaga
+  e não troca o vendedor.
+- **Cadastro:** dono ou admin, em Configurações → Equipe → Usuários do balcão (`convidar-membro` com papel
+  `balcao`), com link para criar a senha, "Emite nota fiscal", link de senha nova e tirar ou devolver o acesso. Quem
+  é da equipe não vira usuário do balcão (e o contrário): use outro e-mail.
+- **No app:** entra direto no Balcão; o menu tem só Balcão, Vendas do balcão, Produtos e Clientes, e qualquer outra
+  tela volta para o Balcão. Não cancela venda (só dono e admin).
+- "Vê todos os clientes" continua para quem é da equipe e cuida do faturamento, e também abre o balcão.
+
 **Falta (entrega 2):** mandar a nota por WhatsApp e e-mail ao fechar (e o "Salvar no cadastro do cliente"), testar
 a impressão no Chrome e no Edge com nota de verdade, e o manual da Ajuda.
 

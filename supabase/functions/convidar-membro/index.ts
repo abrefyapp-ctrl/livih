@@ -5,7 +5,9 @@
 // um link de convite para o dono repassar (WhatsApp, por exemplo) — o link abre /definir-senha já
 // logado. Se a pessoa já tem conta na Livih, só entra na equipe e usa a senha que já tem.
 //
-// POST { org_id, email, nome?, papel: 'admin' | 'atendente' | 'dono' (só a plataforma), redirect_to }
+// POST { org_id, email, nome?, papel: 'admin' | 'atendente' | 'balcao' | 'dono' (só a plataforma), redirect_to }
+//   'balcao' (18/11): usuário só do balcão, em balcao_usuarios (não entra na equipe; docs/balcao.md). Dono e admin
+//   cadastram.
 //   → { link } (conta nova ou ainda sem senha) | { link: null } (já tinha conta: entra com a senha dela)
 //   409 se já está na equipe
 // POST { org_id, email, acao: 'redefinir', redirect_to } → { link } para alguém da equipe criar senha nova
@@ -31,11 +33,12 @@ const json = (status: number, corpo: unknown) =>
 // da plataforma), o dono desta tomaria a conta e veria a outra. Nesses casos, "Esqueci minha senha" (vai
 // para o e-mail dela).
 async function soDestaOrganizacao(userId: string, orgId: string): Promise<boolean> {
-  const [{ count }, { data: adm }] = await Promise.all([
+  const [{ count }, { count: noBalcao }, { data: adm }] = await Promise.all([
     admin.from("membros_org").select("org_id", { count: "exact", head: true }).eq("user_id", userId).neq("org_id", orgId),
+    admin.from("balcao_usuarios").select("org_id", { count: "exact", head: true }).eq("user_id", userId).neq("org_id", orgId),
     admin.from("admins_plataforma").select("user_id").eq("user_id", userId).maybeSingle(),
   ]);
-  return (count ?? 0) === 0 && !adm;
+  return (count ?? 0) === 0 && (noBalcao ?? 0) === 0 && !adm;
 }
 const SO_PELO_EMAIL = "Essa pessoa também tem acesso a outra empresa. Peça para ela usar “Esqueci minha senha” na tela de entrar.";
 
@@ -54,16 +57,22 @@ Deno.serve(async (req) => {
     return json(400, { erro: "corpo inválido" });
   }
   const email = (p.email ?? "").trim().toLowerCase();
-  const papelPedido = p.papel === "admin" || p.papel === "dono" ? p.papel : "atendente";
+  const papelPedido = p.papel === "admin" || p.papel === "dono" || p.papel === "balcao" ? p.papel : "atendente";
+  const balcao = papelPedido === "balcao";
   if (!p.org_id || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(400, { erro: "Informe um e-mail válido." });
 
-  // Mesma regra da RLS: só o dono da organização (ou a equipe da plataforma).
-  const [{ data: dono }, { data: daPlataforma }] = await Promise.all([
-    admin.from("membros_org").select("user_id").eq("org_id", p.org_id).eq("user_id", quem.user.id)
-      .eq("papel", "dono").eq("ativo", true).maybeSingle(),
+  // Mesma regra da RLS: só o dono da organização (ou a equipe da plataforma). O usuário do balcão, que vê bem
+  // menos, o admin também cadastra (decisão de 18/11).
+  const [{ data: quemConvida }, { data: daPlataforma }] = await Promise.all([
+    admin.from("membros_org").select("papel").eq("org_id", p.org_id).eq("user_id", quem.user.id)
+      .eq("ativo", true).maybeSingle(),
     admin.from("admins_plataforma").select("user_id").eq("user_id", quem.user.id).maybeSingle(),
   ]);
-  if (!dono && !daPlataforma) return json(403, { erro: "Só o dono da empresa convida pessoas." });
+  const dono = quemConvida?.papel === "dono";
+  const podeBalcao = dono || quemConvida?.papel === "admin";
+  if (balcao ? !podeBalcao && !daPlataforma : !dono && !daPlataforma) {
+    return json(403, { erro: balcao ? "Só o dono ou um admin cadastra usuário do balcão." : "Só o dono da empresa convida pessoas." });
+  }
   if (papelPedido === "dono" && !daPlataforma) return json(403, { erro: "Só a equipe da Livih define o dono." });
   const papel = papelPedido;
 
@@ -79,9 +88,10 @@ Deno.serve(async (req) => {
 
   if (p.acao === "redefinir") {
     const { data: membro } = existente
-      ? await admin.from("membros_org").select("ativo").eq("org_id", p.org_id).eq("user_id", existente.id).maybeSingle()
+      ? await admin.from(balcao ? "balcao_usuarios" : "membros_org").select("ativo").eq("org_id", p.org_id)
+        .eq("user_id", existente.id).maybeSingle()
       : { data: null };
-    if (!membro?.ativo) return json(404, { erro: "Essa pessoa não está ativa na equipe." });
+    if (!membro?.ativo) return json(404, { erro: balcao ? "Esse usuário do balcão não está ativo." : "Essa pessoa não está ativa na equipe." });
     if (!(await soDestaOrganizacao(existente!.id, p.org_id))) return json(409, { erro: SO_PELO_EMAIL });
     const { data, error } = await admin.auth.admin.generateLink({ type: "recovery", email, options: { redirectTo } });
     if (error) {
@@ -92,14 +102,21 @@ Deno.serve(async (req) => {
   }
 
   if (existente) {
-    const { data: membro } = await admin
-      .from("membros_org")
-      .select("ativo")
-      .eq("org_id", p.org_id)
-      .eq("user_id", existente.id)
-      .maybeSingle();
-    // Já está na equipe e ativo: convite novo não mexe no papel (isso é na lista da equipe).
-    if (membro?.ativo && existente.senha_definida) return json(409, { erro: "Essa pessoa já está na equipe." });
+    const [{ data: membro }, { data: doBalcao }] = await Promise.all([
+      admin.from("membros_org").select("ativo").eq("org_id", p.org_id).eq("user_id", existente.id).maybeSingle(),
+      admin.from("balcao_usuarios").select("ativo").eq("org_id", p.org_id).eq("user_id", existente.id).maybeSingle(),
+    ]);
+    // Equipe e balcão não se misturam: o balcão vê menos, e a mesma conta nos dois teria o acesso da equipe.
+    if (balcao && membro?.ativo) {
+      return json(409, { erro: "Essa pessoa já é da equipe desta empresa. Para o balcão, use outro e-mail." });
+    }
+    if (!balcao && doBalcao?.ativo) {
+      return json(409, { erro: "Esse e-mail é de um usuário do balcão. Tire o acesso dele ao balcão antes, ou use outro e-mail." });
+    }
+    // Já está ativo: convite novo não mexe no papel (isso é na lista da equipe).
+    if ((balcao ? doBalcao?.ativo : membro?.ativo) && existente.senha_definida) {
+      return json(409, { erro: balcao ? "Essa pessoa já é usuário do balcão." : "Essa pessoa já está na equipe." });
+    }
   }
 
   let userId = existente?.id ?? null;
@@ -132,9 +149,11 @@ Deno.serve(async (req) => {
   }
   if (nome && link) await admin.from("perfis").update({ nome }).eq("user_id", userId!);
 
-  const { error: erroMembro } = await admin
-    .from("membros_org")
-    .upsert({ org_id: p.org_id, user_id: userId!, papel, ativo: true }, { onConflict: "org_id,user_id" });
+  const { error: erroMembro } = balcao
+    ? await admin.from("balcao_usuarios")
+      .upsert({ org_id: p.org_id, user_id: userId!, ativo: true, criado_por: quem.user.id }, { onConflict: "org_id,user_id" })
+    : await admin.from("membros_org")
+      .upsert({ org_id: p.org_id, user_id: userId!, papel, ativo: true }, { onConflict: "org_id,user_id" });
   if (erroMembro) {
     console.error("membros_org", erroMembro.message);
     return json(500, { erro: "A conta existe, mas não entrou na equipe. Tente de novo." });

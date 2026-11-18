@@ -22,7 +22,8 @@ export type Organizacao = {
   status: string
   /** Suspensa por 'inadimplencia' (fatura com 10 dias de atraso) ou pela 'plataforma'. */
   motivo_suspensao?: string | null
-  papel: Database['public']['Enums']['papel_org']
+  /** 'balcao' (18/11): usuário só do balcão (balcao_usuarios), que não é da equipe e vê só a área do balcão. */
+  papel: Database['public']['Enums']['papel_org'] | 'balcao'
   /** Equipe da plataforma dentro de uma empresa da qual não é membro (modo suporte). */
   suporte?: boolean
 }
@@ -35,22 +36,32 @@ const CAMPOS_CONVERSA =
   'id, estado, atribuida_a, motivo_humano, ultima_mensagem_em, ultima_mensagem_resumo, nao_lidas, contato:contatos(id, nome, nome_whatsapp, telefone, sem_agente), canal:canais(id, nome, tipo)'
 
 export async function listarOrganizacoes(userId: string): Promise<Organizacao[]> {
-  const { data, error } = await supabase
-    .from('membros_org')
-    .select('papel, organizacoes(id, nome, status, motivo_suspensao)')
-    .eq('user_id', userId)
-    .eq('ativo', true)
+  const [{ data, error }, { data: balcao, error: erroBalcao }] = await Promise.all([
+    supabase.from('membros_org').select('papel, organizacoes(id, nome, status, motivo_suspensao)').eq('user_id', userId).eq('ativo', true),
+    // Empresas em que a pessoa é usuário do balcão (a RLS só mostra a empresa ativa).
+    supabase.from('balcao_usuarios').select('organizacoes(id, nome, status, motivo_suspensao)').eq('user_id', userId).eq('ativo', true),
+  ])
   if (error) throw error
-  return (data ?? [])
+  if (erroBalcao) throw erroBalcao
+  const daEquipe = (data ?? [])
     .filter((m) => m.organizacoes)
     .map((m) => ({
       id: m.organizacoes!.id,
       nome: m.organizacoes!.nome,
       status: m.organizacoes!.status,
       motivo_suspensao: m.organizacoes!.motivo_suspensao,
-      papel: m.papel,
+      papel: m.papel as Organizacao['papel'],
     }))
-    .sort((a, b) => a.nome.localeCompare(b.nome))
+  const doBalcao = (balcao ?? [])
+    .filter((m) => m.organizacoes && !daEquipe.some((o) => o.id === m.organizacoes!.id))
+    .map((m) => ({
+      id: m.organizacoes!.id,
+      nome: m.organizacoes!.nome,
+      status: m.organizacoes!.status,
+      motivo_suspensao: m.organizacoes!.motivo_suspensao,
+      papel: 'balcao' as const,
+    }))
+  return [...daEquipe, ...doBalcao].sort((a, b) => a.nome.localeCompare(b.nome))
 }
 
 /** Perfis da equipe (para mostrar quem está atendendo). A RLS só devolve quem divide organização. */

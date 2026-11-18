@@ -34,12 +34,14 @@ export function Pedidos() {
       </EstadoVazio>
     )
   }
-  return <ListaPedidos orgId={orgAtiva!.id} />
+  return <ListaPedidos orgId={orgAtiva!.id} soBalcao={orgAtiva?.papel === 'balcao'} />
 }
 
-function ListaPedidos({ orgId }: { orgId: string }) {
+// Usuário só do balcão (18/11): a RLS só devolve as vendas de balcão, que nascem entregues; abre em Todos e sem
+// "Novo pedido" (pedido fora do balcão não é dele).
+function ListaPedidos({ orgId, soBalcao }: { orgId: string; soBalcao: boolean }) {
   const navegar = useNavigate()
-  const [filtro, setFiltro] = useState<Filtro>('abertos')
+  const [filtro, setFiltro] = useState<Filtro>(soBalcao ? 'todos' : 'abertos')
   const [dados, setDados] = useState<{ chave: string; lista: Pedido[] } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
@@ -73,12 +75,18 @@ function ListaPedidos({ orgId }: { orgId: string }) {
       <div className="space-y-3 px-4 pt-6 pb-3 lg:px-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-h1 font-semibold">Pedidos</h1>
-            <p className="text-pequeno text-texto-3">Do rascunho à entrega. Confirmar dá baixa no estoque; cancelar devolve.</p>
+            <h1 className="text-h1 font-semibold">{soBalcao ? 'Vendas do balcão' : 'Pedidos'}</h1>
+            <p className="text-pequeno text-texto-3">
+              {soBalcao
+                ? 'As vendas de balcão da loja. Abra uma venda para ver a nota, reimprimir ou emitir de novo.'
+                : 'Do rascunho à entrega. Confirmar dá baixa no estoque; cancelar devolve.'}
+            </p>
           </div>
-          <Botao icone="mais" onClick={() => setNovo(true)}>
-            Novo pedido
-          </Botao>
+          {!soBalcao && (
+            <Botao icone="mais" onClick={() => setNovo(true)}>
+              Novo pedido
+            </Botao>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div role="tablist" aria-label="Situação" className="flex gap-1 overflow-x-auto rounded-md bg-slate-100 p-1 text-pequeno">

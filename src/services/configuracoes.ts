@@ -37,7 +37,7 @@ async function chamarConvite(corpo: Record<string, unknown>): Promise<RespostaCo
   return data as RespostaConvite
 }
 
-export type TipoLink = 'convite' | 'senha' | 'dono'
+export type TipoLink = 'convite' | 'senha' | 'dono' | 'balcao'
 
 /** Mensagem pronta para mandar o link pelo WhatsApp (também usada no convite em lote). */
 export function mensagemDoLink(link: string, nome: string, nomeOrg: string, tipo: TipoLink = 'convite') {
@@ -48,12 +48,15 @@ export function mensagemDoLink(link: string, nome: string, nomeOrg: string, tipo
     : tipo === 'dono'
       ? `${oi} A conta da ${nomeOrg} na Livih está pronta. Crie sua senha por este link (vale por 24 horas) ` +
         `e siga os primeiros passos para conectar o WhatsApp e configurar o agente: ${link}`
+      : tipo === 'balcao'
+        ? `${oi} Você foi cadastrado(a) no balcão da ${nomeOrg} na Livih. ` +
+          `Crie sua senha por este link (vale por 24 horas): ${link}`
       : `${oi} Você foi convidado(a) para atender as conversas da ${nomeOrg} na Livih. ` +
         `Crie sua senha por este link (vale por 24 horas): ${link}`
 }
 
 /** Link de convite (conta nova ou ainda sem senha); link null = já tinha conta (aviso explica se houver). */
-export const convidarMembro = (orgId: string, dados: { email: string; nome: string; papel: Exclude<Papel, 'dono'> }) =>
+export const convidarMembro = (orgId: string, dados: { email: string; nome: string; papel: Exclude<Papel, 'dono'> | 'balcao' }) =>
   chamarConvite({ org_id: orgId, ...dados })
 
 /** Dono de empresa nova (só a equipe da plataforma): mesmo convite, papel dono. */
@@ -61,8 +64,8 @@ export const convidarDono = (orgId: string, dados: { email: string; nome: string
   chamarConvite({ org_id: orgId, ...dados, papel: 'dono' })
 
 /** Link para alguém da equipe criar senha nova (esqueceu), sem depender de e-mail. */
-export const linkNovaSenha = (orgId: string, email: string) =>
-  chamarConvite({ org_id: orgId, email, acao: 'redefinir' }).then((r) => r.link)
+export const linkNovaSenha = (orgId: string, email: string, balcao = false) =>
+  chamarConvite({ org_id: orgId, email, acao: 'redefinir', ...(balcao ? { papel: 'balcao' } : {}) }).then((r) => r.link)
 
 export async function alterarMembro(orgId: string, userId: string, campos: { papel?: Papel; ativo?: boolean }) {
   const { error } = await supabase.from('membros_org').update(campos).eq('org_id', orgId).eq('user_id', userId)

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { PainelAjuda } from '../ajuda/PainelAjuda'
 import { AjudaContexto, type PainelAjuda as EstadoAjuda } from '../hooks/useAjuda'
 import { useSessao } from '../hooks/useSessao'
@@ -15,6 +15,9 @@ import { MeusDados } from './MeusDados'
 import { useInstalarApp } from '../pwa'
 import { podeFinanceiro } from '../services/financeiro'
 import { podeBalcao } from '../services/balcao'
+
+/** O que o usuário só do balcão abre; o resto leva de volta ao Balcão (inclusive a tela inicial, /conversas). */
+const ROTAS_DO_BALCAO = ['/balcao', '/pedidos', '/produtos', '/clientes', '/ajuda']
 
 /** aoClicar: item que não troca de tela (a Ajuda abre o painel ao lado); ativo diz se está aberto. */
 type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: number; aoClicar?: () => void; ativo?: boolean }
@@ -91,6 +94,9 @@ export function Layout() {
     }
   }, [orgAtiva?.id, gerencia, comBalcao])
   const verBalcao = comBalcao && (gerencia || (balcaoAtendente?.orgId === orgAtiva?.id && balcaoAtendente?.ok))
+  // Usuário só do balcão (18/11): não é da equipe; vê só o balcão, as vendas de balcão, produtos e clientes. O banco
+  // já recusa o resto; o menu e o desvio de rota só evitam telas vazias.
+  const soBalcao = orgAtiva?.papel === 'balcao'
 
   // Título da aba avisa quem está em outra aba.
   useEffect(() => {
@@ -98,7 +104,18 @@ export function Layout() {
   }, [aguardando])
 
   // Por tarefa: o dia a dia em cima, vendas, operação (módulos) e, no pé, o que se ajusta de vez em quando.
-  const grupos: GrupoMenu[] = [
+  const grupos: GrupoMenu[] = soBalcao
+    ? [
+        {
+          itens: [
+            ...(comBalcao ? [{ para: '/balcao', rotulo: 'Balcão', icone: 'caixa' as const }] : []),
+            { para: '/pedidos', rotulo: 'Vendas do balcão', icone: 'pedido' },
+            { para: '/produtos', rotulo: 'Produtos', icone: 'caixa' },
+            { para: '/clientes', rotulo: 'Clientes', icone: 'empresa' },
+          ],
+        },
+      ]
+    : [
     {
       itens: [
         { para: '/painel', rotulo: 'Painel', icone: 'grafico' },
@@ -140,7 +157,7 @@ export function Layout() {
       ativo: ajuda.aberta,
       aoClicar: () => setAjuda((a) => ({ ...a, aberta: !a.aberta })),
     },
-    { para: '/configuracoes', rotulo: 'Configurações', icone: 'config' },
+    ...(soBalcao ? [] : [{ para: '/configuracoes', rotulo: 'Configurações', icone: 'config' as const }]),
     ...(adminPlataforma ? [{ para: '/empresas', rotulo: 'Empresas', icone: 'painel' as const }] : []),
   ]
 
@@ -214,6 +231,10 @@ export function Layout() {
   // ao chegar no fim de uma lista interna a rolagem passava para a página inteira.
   // `relative` é o que segura os elementos absolutos (ex.: textos sr-only dos balões): sem um ancestral
   // posicionado eles são colocados em relação à página, o overflow-hidden não os corta e esticam a página.
+  if (soBalcao && !ROTAS_DO_BALCAO.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
+    return <Navigate to="/balcao" replace />
+  }
+
   return (
     <AjudaContexto.Provider value={painelAjuda}>
     <div className="relative flex h-full overflow-hidden">

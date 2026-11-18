@@ -12,6 +12,7 @@ import { SecaoBase } from '../components/SecaoBase'
 import { SecaoDocumentos } from '../components/SecaoDocumentos'
 import { SecaoEmpresa } from '../components/SecaoEmpresa'
 import { SecaoEquipe } from '../components/SecaoEquipe'
+import { SecaoBalcaoUsuarios } from '../components/SecaoBalcaoUsuarios'
 import { SecaoModelos } from '../components/SecaoModelos'
 import { SecaoNotificacoes } from '../components/SecaoNotificacoes'
 import { SecaoOrdensServico } from '../components/SecaoOrdensServico'
@@ -126,7 +127,12 @@ export function Configuracoes() {
             </div>
 
             <div className="min-w-0">
-              {secao === 'equipe' && <SecaoEquipe />}
+              {secao === 'equipe' && (
+                <>
+                  <SecaoEquipe />
+                  <SecaoBalcaoUsuarios />
+                </>
+              )}
               {secao === 'empresa' && <SecaoEmpresa />}
               {secao === 'whatsapp' && <SecaoWhatsapp />}
               {secao === 'modelos' && <SecaoModelos />}

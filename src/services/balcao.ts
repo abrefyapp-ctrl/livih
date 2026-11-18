@@ -55,6 +55,7 @@ const amigavel = (m: string, padrao: string) => {
     'só dá para cancelar venda fechada',
     'escreva o motivo',
     'a NF-e desta venda',
+    'usuário do balcão não encontrado',
   ]
   if (conhecidos.some((c) => m.includes(c))) return new Error(m.charAt(0).toUpperCase() + m.slice(1).replace(/\.$/, '') + '.')
   return new Error(padrao)
@@ -112,4 +113,25 @@ export function lerPrazos(texto: string): number[] | null {
 export async function cancelarVenda(pedidoId: string, motivo: string) {
   const { error } = await supabase.rpc('balcao_cancelar', { p_pedido: pedidoId, p_motivo: motivo })
   if (error) throw amigavel(error.message, 'Não foi possível cancelar a venda. Tente de novo.')
+}
+
+// ---- usuários do balcão (Configurações → Equipe; dono e admin) ----
+
+export type UsuarioBalcao = { user_id: string; nome: string; email: string; ativo: boolean; emite_nota_fiscal: boolean; criado_em: string }
+
+export async function listarUsuariosBalcao(orgId: string): Promise<UsuarioBalcao[]> {
+  const { data, error } = await supabase.rpc('balcao_usuarios_listar', { p_org: orgId })
+  if (error) throw amigavel(error.message, 'Não foi possível carregar os usuários do balcão.')
+  return (data ?? []) as UsuarioBalcao[]
+}
+
+/** Tira ou devolve o acesso e liga ou desliga "Emite nota fiscal" (null mantém como está). */
+export async function definirUsuarioBalcao(orgId: string, userId: string, campos: { ativo?: boolean; emiteNota?: boolean }) {
+  const { error } = await supabase.rpc('balcao_usuario_definir', {
+    p_org: orgId,
+    p_usuario: userId,
+    p_ativo: (campos.ativo ?? null) as boolean,
+    p_emite_nota: (campos.emiteNota ?? null) as boolean,
+  })
+  if (error) throw amigavel(error.message, 'Não foi possível salvar. Tente de novo.')
 }
