@@ -338,7 +338,8 @@ export function PedidoDetalhe() {
           </div>
         </div>
 
-        {erro && <Aviso tom="erro">{erro}</Aviso>}
+        {/* Com o diálogo de cancelar aberto, o erro aparece só dentro dele. */}
+        {erro && cancelarBalcao === null && <Aviso tom="erro">{erro}</Aviso>}
         {enviadoEm && (
           <Aviso>
             PDF enviado. Ele aparece na conversa como “Enviando” e muda para entregue quando chegar.{' '}
@@ -444,7 +445,10 @@ export function PedidoDetalhe() {
         perigo
         carregando={ocupado === 'cancelar-balcao'}
         aoConfirmar={() => void cancelarDoBalcao()}
-        aoCancelar={() => setCancelarBalcao(null)}
+        aoCancelar={() => {
+          setCancelarBalcao(null)
+          setErro(null)
+        }}
       >
         <div className="space-y-3">
           <p>
@@ -455,7 +459,10 @@ export function PedidoDetalhe() {
           <CampoTexto
             rotulo="Motivo"
             value={cancelarBalcao ?? ''}
-            onChange={(e) => setCancelarBalcao(e.target.value)}
+            onChange={(e) => {
+              setCancelarBalcao(e.target.value)
+              setErro(null)
+            }}
             maxLength={200}
             placeholder="Ex.: cliente desistiu, produto errado"
           />
