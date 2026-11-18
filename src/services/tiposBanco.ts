@@ -440,6 +440,44 @@ export type Database = {
           },
         ]
       }
+      balcao_usuarios: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          criado_em: string
+          criado_por: string | null
+          emite_nota_fiscal: boolean
+          org_id: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          emite_nota_fiscal?: boolean
+          org_id: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          emite_nota_fiscal?: boolean
+          org_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balcao_usuarios_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       base_conhecimento: {
         Row: {
           ativo: boolean
@@ -5236,6 +5274,26 @@ export type Database = {
         }[]
       }
       balcao_pode: { Args: { p_org: string }; Returns: boolean }
+      balcao_usuario_definir: {
+        Args: {
+          p_ativo: boolean
+          p_emite_nota: boolean
+          p_org: string
+          p_usuario: string
+        }
+        Returns: undefined
+      }
+      balcao_usuarios_listar: {
+        Args: { p_org: string }
+        Returns: {
+          ativo: boolean
+          criado_em: string
+          email: string
+          emite_nota_fiscal: boolean
+          nome: string
+          user_id: string
+        }[]
+      }
       buscar_documentos_org: {
         Args: { p_busca: string; p_org: string }
         Returns: Json
@@ -5470,6 +5528,7 @@ export type Database = {
         Returns: Record<string, unknown>
       }
       eh_admin_plataforma: { Args: never; Returns: boolean }
+      eh_balcao: { Args: { p_org: string }; Returns: boolean }
       eh_dono_de_fato: { Args: { p_org: string }; Returns: boolean }
       eh_membro: { Args: { p_org: string }; Returns: boolean }
       eh_mensagem_automatica: {
