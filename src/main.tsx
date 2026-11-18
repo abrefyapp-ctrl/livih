@@ -23,6 +23,7 @@ import { Tarefas } from './pages/Tarefas'
 import { Ajuda } from './pages/Ajuda'
 import { PedidoDetalhe } from './pages/PedidoDetalhe'
 import { Pedidos } from './pages/Pedidos'
+import { Balcao } from './pages/Balcao'
 import { Produtos } from './pages/Produtos'
 import { OrdensServico } from './pages/OrdensServico'
 import { OrdemServicoDetalhe } from './pages/OrdemServicoDetalhe'
@@ -83,6 +84,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="tarefas" element={<Tarefas />} />
             <Route path="agenda" element={<Agenda />} />
             <Route path="campanhas" element={<Campanhas />} />
+            <Route path="balcao" element={<Balcao />} />
             <Route path="pedidos" element={<Pedidos />} />
             <Route path="pedidos/:id" element={<PedidoDetalhe />} />
             <Route path="produtos" element={<Produtos />} />

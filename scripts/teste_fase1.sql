@@ -8444,5 +8444,188 @@ begin
   select count(*) into n from u;
   insert into resultado (teste, ok) values ('desconto item: outra empresa não mexe', n = 0);
 end $$;
+
+-- Venda de balcão (migration 20261118140000).
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_prod uuid; v_prod2 uuid; v_cli uuid; r jsonb; v_conta uuid; v_conta2 uuid; v_antes integer; c jsonb;
+begin
+  perform public.plataforma_definir_modulo(v_org, 'erp', true);
+  insert into public.produtos (org_id, codigo, nome, preco, controla_estoque) values (v_org, 'BAL-1', 'Grampo balcão', 20, true)
+  returning id into v_prod;
+  insert into public.produtos (org_id, codigo, nome, preco, controla_estoque) values (v_org, 'BAL-2', 'Serviço balcão', 50, false)
+  returning id into v_prod2;
+  perform public.estoque_lancar(v_prod, 10, 'entrada');
+  insert into public.clientes (org_id, tipo, nome, documento) values (v_org, 'pf', 'Cliente Balcão', '38147290560') returning id into v_cli;
+  perform set_config('teste.bal_prod', v_prod::text, true);
+  perform set_config('teste.bal_cli', v_cli::text, true);
+
+  begin
+    perform public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', v_prod, 'quantidade', 1)),
+                                 null, 'dinheiro', null, 0, null);
+    insert into resultado (teste, ok) values ('balcão: módulo desligado, não fecha venda', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão: módulo desligado, não fecha venda', sqlerrm like 'o balcão não está liberado%');
+  end;
+  insert into resultado (teste, ok) select 'balcão: módulo no catálogo, desligado por padrão e sem preço',
+    exists (select 1 from public.modulos where codigo = 'balcao' and not padrao and preco_mensal is null)
+    and not public.modulo_ativo(v_org, 'balcao');
+  perform public.plataforma_definir_modulo(v_org, 'balcao', true);
+
+  -- Dinheiro, com desconto no item (10%) e no total (R$ 5).
+  r := public.balcao_fechar(v_org, jsonb_build_array(
+         jsonb_build_object('produto_id', v_prod, 'quantidade', 3, 'desconto_percentual', 10),
+         jsonb_build_object('produto_id', v_prod2, 'quantidade', 1)), null, 'dinheiro', null, 5, '  ');
+  perform set_config('teste.bal_ped', r ->> 'pedido_id', true);
+  insert into resultado (teste, ok) select 'balcão: dinheiro fecha entregue, com origem balcão e os descontos',
+    status = 'entregue' and origem = 'balcao' and subtotal = 104 and total = 99 and pagamento_forma = 'dinheiro'
+    and pagamento_prazos = '{0}' and cliente_id is null and observacao is null and (r ->> 'pago')::boolean
+    from public.pedidos where id = (r ->> 'pedido_id')::uuid;
+  insert into resultado (teste, ok) select 'balcão: baixa o estoque só do que controla',
+    (select saldo from public.produtos_saldo where id = v_prod) = 7
+    and (select count(*) from public.estoque_movimentos where pedido_id = (r ->> 'pedido_id')::uuid) = 1;
+  select id into v_conta from public.fin_contas where org_id = v_org and ativa and tipo = 'caixa' order by criado_em limit 1;
+  insert into resultado (teste, ok) select 'balcão: dinheiro já entra pago na conta do caixa',
+    l.valor = 99 and l.valor_pago = 99 and l.vencimento = public.hoje_brasil()
+    and (select count(*) from public.fin_baixas b where b.lancamento_id = l.id and b.conta_id = v_conta and b.forma = 'dinheiro' and b.valor = 99) = 1
+    from public.fin_lancamentos l where l.pedido_id = (r ->> 'pedido_id')::uuid and l.cancelado_em is null;
+  insert into resultado (teste, ok) select 'balcão: não manda aviso de situação pelo WhatsApp',
+    not exists (select 1 from public.pedido_avisos_envios where pedido_id = (r ->> 'pedido_id')::uuid);
+
+  -- Crédito: a receber em 30 dias.
+  r := public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', v_prod2, 'quantidade', 2)),
+                            null, 'cartao_credito', null, 0, null);
+  insert into resultado (teste, ok) select 'balcão: crédito fica a receber em 30 dias',
+    not (r ->> 'pago')::boolean and l.valor = 100 and l.valor_pago = 0 and l.vencimento = public.hoje_brasil() + 30
+    from public.fin_lancamentos l where l.pedido_id = (r ->> 'pedido_id')::uuid and l.cancelado_em is null;
+
+  -- A prazo: exige cliente; prazos em ordem, em boleto.
+  begin
+    perform public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', v_prod2, 'quantidade', 1)),
+                                 null, 'a_prazo', '{30}', 0, null);
+    insert into resultado (teste, ok) values ('balcão: a prazo sem cliente é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão: a prazo sem cliente é recusado', sqlerrm like 'venda a prazo precisa de cliente%');
+  end;
+  begin
+    perform public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', v_prod2, 'quantidade', 1)),
+                                 v_cli, 'a_prazo', '{0}', 0, null);
+    insert into resultado (teste, ok) values ('balcão: a prazo com prazo zero é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão: a prazo com prazo zero é recusado', sqlerrm like 'informe de 1 a 12 prazos%');
+  end;
+  r := public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', v_prod2, 'quantidade', 1)),
+                            v_cli, 'a_prazo', '{60,30}', 0, null);
+  insert into resultado (teste, ok) select 'balcão: a prazo em boleto, duas parcelas nos prazos em ordem, sem baixa',
+    p.pagamento_forma = 'boleto' and p.pagamento_prazos = '{30,60}' and p.cliente_id = v_cli
+    and (select count(*) from public.fin_lancamentos l where l.pedido_id = p.id and l.cancelado_em is null and l.valor_pago = 0) = 2
+    and (select min(vencimento) from public.fin_lancamentos l where l.pedido_id = p.id) = public.hoje_brasil() + 30
+    from public.pedidos p where p.id = (r ->> 'pedido_id')::uuid;
+
+  -- Recusas sem deixar nada pela metade.
+  select count(*) into v_antes from public.pedidos where org_id = v_org;
+  begin
+    perform public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', v_prod2, 'quantidade', 1)),
+                                 null, 'pix', null, 60, null);
+    insert into resultado (teste, ok) values ('balcão: desconto no total maior que os itens é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão: desconto no total maior que os itens é recusado',
+      sqlerrm like 'o desconto no total passa%');
+  end;
+  begin
+    perform public.balcao_fechar(v_org, '[]'::jsonb, null, 'pix', null, 0, null);
+    insert into resultado (teste, ok) values ('balcão: venda sem itens é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão: venda sem itens é recusada', sqlerrm = 'a venda não tem itens');
+  end;
+  begin
+    perform public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', v_prod2, 'quantidade', 1)),
+                                 null, 'fiado', null, 0, null);
+    insert into resultado (teste, ok) values ('balcão: forma desconhecida é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão: forma desconhecida é recusada', sqlerrm like 'escolha a forma%');
+  end;
+  begin
+    perform public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', v_prod2, 'quantidade', 0)),
+                                 null, 'pix', null, 0, null);
+    insert into resultado (teste, ok) values ('balcão: quantidade zero é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão: quantidade zero é recusada', sqlerrm like 'quantidade inválida%');
+  end;
+  insert into resultado (teste, ok) select 'balcão: recusa não deixa pedido pela metade',
+    (select count(*) from public.pedidos where org_id = v_org) = v_antes;
+
+  -- Conta do caixa escolhida pelo dono.
+  v_conta2 := public.fin_salvar_conta(v_org, null, 'Banco do balcão', 'banco', null, 0, public.hoje_brasil(), true);
+  perform public.balcao_definir_conta(v_org, v_conta2);
+  r := public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', v_prod2, 'quantidade', 1)),
+                            null, 'pix', null, 0, null);
+  insert into resultado (teste, ok) select 'balcão: Pix entra na conta escolhida pelo dono',
+    exists (select 1 from public.fin_baixas b join public.fin_lancamentos l on l.id = b.lancamento_id
+             where l.pedido_id = (r ->> 'pedido_id')::uuid and b.conta_id = v_conta2 and b.forma = 'pix');
+  c := public.balcao_config(v_org);
+  insert into resultado (teste, ok) values ('balcão: configuração mostra a conta escolhida e a lista para o dono',
+    (c -> 'conta' ->> 'id')::uuid = v_conta2 and (c ->> 'gerencia')::boolean and jsonb_array_length(c -> 'contas') >= 2);
+  insert into resultado (teste, ok) select 'balcão: mais vendidos traz o produto vendido',
+    exists (select 1 from public.balcao_mais_vendidos(v_org) m where m.produto_id = v_prod2);
+  perform public.balcao_definir_conta(v_org, null);
+end $$;
+-- Atendente sem "Vê todos os clientes" não abre; com a permissão, abre e fecha a venda.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.f7')::uuid;
+begin
+  begin
+    perform public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', current_setting('teste.bal_prod')::uuid, 'quantidade', 1)),
+                                 null, 'pix', null, 0, null);
+    insert into resultado (teste, ok) values ('balcão: atendente sem "Vê todos os clientes" não vende', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão: atendente sem "Vê todos os clientes" não vende', sqlerrm like 'o balcão não está liberado%');
+  end;
+  begin
+    perform public.balcao_definir_conta(v_org, null);
+    insert into resultado (teste, ok) values ('balcão: atendente não escolhe a conta do caixa', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão: atendente não escolhe a conta do caixa', sqlerrm like 'só o dono ou um admin%');
+  end;
+  insert into resultado (teste, ok) values ('balcão: atendente sem permissão não vê o balcão', not public.balcao_pode(v_org));
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+select public.membro_definir_ve_todos_clientes(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000b1', true);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+declare v_org uuid := current_setting('teste.f7')::uuid; r jsonb; c jsonb;
+begin
+  r := public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', current_setting('teste.bal_prod')::uuid, 'quantidade', 1)),
+                            current_setting('teste.bal_cli')::uuid, 'cartao_debito', null, 0, 'Retirou na loja');
+  insert into resultado (teste, ok) select 'balcão: atendente com "Vê todos os clientes" vende, e o pedido fica com ele',
+    status = 'entregue' and responsavel_id = '00000000-0000-0000-0000-0000000000b1' and observacao = 'Retirou na loja'
+    and (r ->> 'pago')::boolean
+    from public.pedidos where id = (r ->> 'pedido_id')::uuid;
+  c := public.balcao_config(v_org);
+  insert into resultado (teste, ok) values ('balcão: atendente não recebe a lista de contas', not (c ->> 'gerencia')::boolean and c -> 'contas' = 'null'::jsonb);
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+select public.membro_definir_ve_todos_clientes(current_setting('teste.f7')::uuid, '00000000-0000-0000-0000-0000000000b1', false);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.balcao_fechar(current_setting('teste.f7')::uuid,
+    jsonb_build_array(jsonb_build_object('produto_id', current_setting('teste.bal_prod')::uuid, 'quantidade', 1)), null, 'pix', null, 0, null);
+  insert into resultado (teste, ok) values ('balcão: outra empresa não vende', false);
+exception when others then
+  insert into resultado (teste, ok) values ('balcão: outra empresa não vende', sqlerrm like 'o balcão não está liberado%');
+end $$;
+do $$
+begin
+  perform public.balcao_config(current_setting('teste.f7')::uuid);
+  insert into resultado (teste, ok) values ('balcão: outra empresa não lê a configuração', false);
+exception when others then
+  insert into resultado (teste, ok) values ('balcão: outra empresa não lê a configuração', sqlerrm like 'o balcão não está liberado%');
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

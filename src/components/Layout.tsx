@@ -14,6 +14,7 @@ import { Modal } from './Modal'
 import { MeusDados } from './MeusDados'
 import { useInstalarApp } from '../pwa'
 import { podeFinanceiro } from '../services/financeiro'
+import { podeBalcao } from '../services/balcao'
 
 /** aoClicar: item que não troca de tela (a Ajuda abre o painel ao lado); ativo diz se está aberto. */
 type ItemMenu = { para: string; rotulo: string; icone: NomeIcone; contador?: number; aoClicar?: () => void; ativo?: boolean }
@@ -77,6 +78,19 @@ export function Layout() {
     }
   }, [orgAtiva?.id, gerencia, comFinanceiro])
   const verFinanceiro = comFinanceiro && (gerencia || (financeiroAtendente?.orgId === orgAtiva?.id && financeiroAtendente?.ok))
+  // Balcão (docs/balcao.md): módulo à parte, sobre o ERP; dono e admin sempre, o atendente com "Vê todos os clientes".
+  const comBalcao = !!modulos && modulos.has('erp') && modulos.has('balcao')
+  const [balcaoAtendente, setBalcaoAtendente] = useState<{ orgId: string; ok: boolean } | null>(null)
+  useEffect(() => {
+    const id = orgAtiva?.id
+    if (!id || gerencia || !comBalcao) return
+    let ativo = true
+    podeBalcao(id).then((ok) => ativo && setBalcaoAtendente({ orgId: id, ok }))
+    return () => {
+      ativo = false
+    }
+  }, [orgAtiva?.id, gerencia, comBalcao])
+  const verBalcao = comBalcao && (gerencia || (balcaoAtendente?.orgId === orgAtiva?.id && balcaoAtendente?.ok))
 
   // Título da aba avisa quem está em outra aba.
   useEffect(() => {
@@ -106,6 +120,7 @@ export function Layout() {
     {
       rotulo: 'Operação',
       itens: [
+        ...(verBalcao ? [{ para: '/balcao', rotulo: 'Balcão', icone: 'caixa' as const }] : []),
         ...(modulos?.has('erp')
           ? [
               { para: '/pedidos', rotulo: 'Pedidos', icone: 'pedido' as const },

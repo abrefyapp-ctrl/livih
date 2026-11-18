@@ -270,6 +270,7 @@ export function PedidoDetalhe() {
               )}
               <span className="text-texto-3"> · criado {quandoCurto(pedido.criado_em).toLowerCase()}</span>
               {pedido.origem === 'agente' && <span className="text-texto-3"> · montado pelo agente</span>}
+              {pedido.origem === 'balcao' && <span className="text-texto-3"> · venda de balcão</span>}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

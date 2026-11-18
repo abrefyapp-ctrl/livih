@@ -82,6 +82,35 @@ mostram o desconto de cada item.
 - PDF: coluna "Desconto" só quando algum item tem. O serviço `livih-pdf` da VPS precisa ser reconstruído para o PDF
   que o agente manda mostrar a coluna.
 
+## Entrega 1 (18/11): a tela e o módulo
+
+Pedido do usuário em 18/11: construir a tela e deixar o balcão como um módulo (migration `20261118140000_balcao`).
+
+- **Módulo "Balcão"** no catálogo de módulos (`modulos.codigo = 'balcao'`), ligado pela plataforma em Empresas →
+  Módulos, como o ERP e as OS. Precisa do ERP ligado. Sem preço por enquanto (`preco_mensal` nulo): não entra na
+  fatura nem na tela do plano do dono. **Falta decidir o preço** (ou se vem junto com o ERP).
+- **Menu:** Operação → Balcão, para dono, admin e quem tem "Vê todos os clientes" (`balcao_pode`).
+- **Tela** ([Balcao.tsx](../src/pages/Balcao.tsx)): busca por código ou nome (Enter adiciona o código exato, senão o
+  primeiro da lista; é o que o leitor de código de barras faz), mais vendidos dos últimos 90 dias antes de buscar,
+  itens com − e +, desconto do item (R$ ou %), cliente opcional (consumidor final por padrão), as cinco formas,
+  valor recebido e troco no dinheiro, prazos 30, 30/60, 30/60/90 ou digitados no a prazo, desconto no total,
+  observação e o andamento da última venda (o vendedor já atende o próximo).
+- **Fechar** (`balcao_fechar`, tudo ou nada): cria o pedido com origem `balcao` e o CNPJ do balcão, os itens com o
+  preço do cadastro, confirma (baixa o estoque e gera as parcelas), marca entregue e, no dinheiro, Pix e débito, dá a
+  baixa na conta do caixa. Crédito: a receber em 30 dias. A prazo: boleto, exige cliente. A venda de balcão não manda
+  o aviso de situação do pedido pelo WhatsApp.
+- **Conta do caixa:** dono e admin escolhem na própria tela (`balcao_definir_conta`); sem escolha, a primeira conta
+  do tipo caixa.
+- **NF-e:** marcada quando há cliente, o CNPJ do balcão está pronto e quem vende tem "Emite nota fiscal". Sai pela
+  `nfe-emitir` (presencial, sem frete; crédito vai como à vista para a SEFAZ). Quando a nota é autorizada e o DANFE
+  está guardado, a Livih baixa o PDF e abre a impressão (opção lembrada por computador). Se faltar algo no cadastro
+  do cliente, a tela lista o que falta e a venda continua gravada.
+- **Consumidor final não recebe NF-e:** a NF-e (modelo 55) exige destinatário. Para vender sem cadastro com nota,
+  só com a NFC-e, que segue fora desta etapa.
+
+**Falta (entrega 2):** mandar a nota por WhatsApp e e-mail ao fechar (e o "Salvar no cadastro do cliente"), testar
+a impressão no Chrome e no Edge com nota de verdade, e o manual da Ajuda.
+
 ## Fora desta etapa
 
 - Caixa: abrir e fechar, sangria, reforço, fechamento do dia (e as permissões de desconto e cancelamento).
