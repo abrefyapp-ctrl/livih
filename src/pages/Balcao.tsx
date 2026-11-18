@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
@@ -16,7 +16,7 @@ import {
   type FormaBalcao,
   type VendaFechada,
 } from '../services/balcao'
-import { procurarClientes, type ClienteResumo } from '../services/clientes'
+import { clienteResumo, procurarClientes, type ClienteResumo } from '../services/clientes'
 import { listarProdutos, type Produto } from '../services/erp'
 import { formatarDocumento, lerNumero, moeda, quantidade } from '../services/formato'
 import { emitirNota, FaltaParaEmitir, FORMA_SEFAZ, notaDoPedido, urlArquivoNota, type NotaFiscal } from '../services/nfe'
@@ -133,6 +133,21 @@ function TelaBalcao({ orgId }: { orgId: string }) {
   const [erro, setErro] = useState<string | null>(null)
   const [ultima, setUltima] = useState<Ultima | null>(null)
   const campoBusca = useRef<HTMLInputElement>(null)
+
+  // Veio do cadastro do cliente ("Iniciar venda", 18/11): começa a venda com ele escolhido e limpa o endereço.
+  const [params, setParams] = useSearchParams()
+  const clienteDoLink = params.get('cliente')
+  useEffect(() => {
+    if (!clienteDoLink) return
+    let ativo = true
+    clienteResumo(clienteDoLink)
+      .then((c) => ativo && c && setCliente(c))
+      .catch(() => undefined)
+      .finally(() => ativo && setParams({}, { replace: true }))
+    return () => {
+      ativo = false
+    }
+  }, [clienteDoLink, setParams])
 
   useEffect(() => {
     let ativo = true

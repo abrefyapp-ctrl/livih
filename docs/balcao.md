@@ -131,6 +131,10 @@ compartilhado: veria todas as conversas). Decidido pelo usuário: um usuário s�
 - **No app:** entra direto no Balcão; o menu tem só Balcão, Vendas do balcão, Produtos e Clientes, e qualquer outra
   tela volta para o Balcão. Não cancela venda (só dono e admin).
 - "Vê todos os clientes" continua para quem é da equipe e cuida do faturamento, e também abre o balcão.
+- **Iniciar venda pelo cliente (18/11):** no cadastro do cliente, quem abre o balcão tem **Iniciar venda**, que
+  abre o Balcão com o cliente já escolhido (`/balcao?cliente=<id>`).
+- **Nota de serviço é da equipe:** o usuário do balcão não emite NFS-e (nem a avulsa), mesmo com "Emite nota
+  fiscal"; a `nfse-emitir` confere que quem emite é da equipe.
 
 **Falta (entrega 2):** mandar a nota por WhatsApp e e-mail ao fechar (e o "Salvar no cadastro do cliente"), testar
 a impressão no Chrome e no Edge com nota de verdade, e o manual da Ajuda.

@@ -187,7 +187,8 @@ export function BlocoNota({ orgId, alvo }: { orgId: string; alvo: Extract<Alvo, 
 }
 
 /** Perfil do cliente: as notas dele e a nota de serviço avulsa. */
-export function NotasDoCliente({ orgId, clienteId, nome }: { orgId: string; clienteId: string; nome: string }) {
+/** semAvulsa: o usuário do balcão vê as notas, mas não emite nota de serviço (18/11). */
+export function NotasDoCliente({ orgId, clienteId, nome, semAvulsa = false }: { orgId: string; clienteId: string; nome: string; semAvulsa?: boolean }) {
   const [notas, setNotas] = useState<{ clienteId: string; lista: NotaFiscal[] } | null>(null)
   const [pode, setPode] = useState(false)
   const [emitindo, setEmitindo] = useState(false)
@@ -209,13 +210,13 @@ export function NotasDoCliente({ orgId, clienteId, nome }: { orgId: string; clie
     const t = setTimeout(() => setVersao((v) => v + 1), 4000)
     return () => clearTimeout(t)
   }, [lista])
-  if (!lista || (!lista.length && !pode)) return null
+  if (!lista || (!lista.length && (!pode || semAvulsa))) return null
 
   return (
     <section className="rounded-lg border border-borda bg-superficie">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-borda px-4 py-3">
         <h2 className="font-semibold">Notas fiscais</h2>
-        {pode && (
+        {pode && !semAvulsa && (
           <Botao tamanho="sm" variante="secundario" icone="nota" onClick={() => setEmitindo(true)}>
             Nota de serviço avulsa
           </Botao>

@@ -113,6 +113,13 @@ Deno.serve(async (req) => {
 
   const { data: pode } = await comoUsuario.rpc("emite_nota_fiscal", { p_org: orgId });
   if (pode !== true) return json(403, { erro: "Você não tem a permissão \"Emite nota fiscal\". Peça ao dono ou ao admin." });
+  // Nota de serviço é da equipe: o usuário do balcão (18/11) emite só a NF-e das vendas de balcão, mesmo com
+  // "Emite nota fiscal" ligado (ele vê os clientes e as vendas de balcão, e passaria por cima daqui).
+  const [{ data: daEquipe }, { data: daPlataforma }] = await Promise.all([
+    admin.from("membros_org").select("user_id").eq("org_id", orgId).eq("user_id", quem.user.id).eq("ativo", true).maybeSingle(),
+    admin.from("admins_plataforma").select("user_id").eq("user_id", quem.user.id).maybeSingle(),
+  ]);
+  if (!daEquipe && !daPlataforma) return json(403, { erro: "A nota de serviço é emitida pela equipe, não pelo balcão." });
   // Nota fiscal só com o ERP ou as OS ligados (planos de 28/10; nota_fiscal_liberada).
   const { data: liberada } = await admin.rpc("nota_fiscal_liberada", { p_org: orgId });
   if (liberada !== true) return json(403, { erro: "A nota fiscal vem com o módulo Pedidos e estoque (ERP) ou Ordens de serviço, e nenhum dos dois está ligado nesta empresa. Para ligar, o dono fala com a equipe da Livih." });

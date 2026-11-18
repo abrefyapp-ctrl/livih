@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { podeBalcao } from '../services/balcao'
 import {
   apagarCliente,
   atividadeDosContatos,
@@ -77,6 +78,19 @@ export function ClientePerfil() {
   const comOs = !!modulos?.has('os')
   // Usuário só do balcão (18/11): não vê contatos nem OS (o banco também não devolve); fica o cadastro, as vendas e as notas.
   const soBalcao = orgAtiva?.papel === 'balcao'
+  // Iniciar venda (18/11): achou o cliente, abre o Balcão com ele escolhido. Para quem abre o balcão.
+  const comBalcao = !!modulos?.has('erp') && !!modulos?.has('balcao')
+  const [vendeNoBalcao, setVendeNoBalcao] = useState<{ orgId: string; ok: boolean } | null>(null)
+  useEffect(() => {
+    const id = orgAtiva?.id
+    if (!id || !comBalcao) return
+    let ativo = true
+    podeBalcao(id).then((ok) => ativo && setVendeNoBalcao({ orgId: id, ok }))
+    return () => {
+      ativo = false
+    }
+  }, [orgAtiva?.id, comBalcao])
+  const iniciaVenda = comBalcao && vendeNoBalcao?.orgId === orgAtiva?.id && !!vendeNoBalcao?.ok
   const navegar = useNavigate()
   const [dados, setDados] = useState<Dados | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -188,6 +202,11 @@ export function ClientePerfil() {
             {c.observacoes && <p className="text-pequeno whitespace-pre-line text-texto-3">{c.observacoes}</p>}
           </div>
           <div className="flex flex-wrap gap-2">
+            {iniciaVenda && c.ativo && (
+              <Botao icone="caixa" onClick={() => navegar(`/balcao?cliente=${c.id}`)}>
+                Iniciar venda
+              </Botao>
+            )}
             <Botao variante="secundario" icone="nota" onClick={() => setEditando(true)}>
               Editar
             </Botao>
@@ -309,7 +328,7 @@ export function ClientePerfil() {
           </div>
 
           <div className="space-y-4">
-            <NotasDoCliente orgId={orgId} clienteId={c.id} nome={c.nome} />
+            <NotasDoCliente orgId={orgId} clienteId={c.id} nome={c.nome} semAvulsa={soBalcao} />
             <Bloco titulo="Sobre o cadastro">
               <ul className="space-y-2 text-pequeno text-texto-2">
                 <li>{c.tipo === 'pj' ? 'Empresa (CNPJ)' : 'Pessoa física (CPF)'}</li>
