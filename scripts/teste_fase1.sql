@@ -8840,5 +8840,17 @@ insert into resultado (teste, ok) select 'usuário do balcão: sem acesso, não 
   not exists (select 1 from public.organizacoes where id = current_setting('teste.f7')::uuid)
   and not public.balcao_pode(current_setting('teste.f7')::uuid)
   and not exists (select 1 from public.produtos where org_id = current_setting('teste.f7')::uuid);
+
+-- Logo da empresa para o usuário do balcão (migration 20261118200000).
+reset role;
+update public.balcao_usuarios set ativo = true where user_id = '00000000-0000-0000-0000-0000000000b9';
+insert into storage.objects (bucket_id, name) values ('logos', current_setting('teste.f7') || '/teste/logo-balcao.png');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b9","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'usuário do balcão: vê o logo da empresa',
+  exists (select 1 from storage.objects where bucket_id = 'logos' and name = current_setting('teste.f7') || '/teste/logo-balcao.png');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'logo: outra empresa não vê',
+  not exists (select 1 from storage.objects where bucket_id = 'logos' and name = current_setting('teste.f7') || '/teste/logo-balcao.png');
 reset role;
 select n, teste, ok from resultado order by n;
