@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import type { NomeIcone } from '../components/Icone'
+import { ManualBalcao, SECOES_BALCAO } from './ManualBalcao'
 import { ManualCampanhas, SECOES_CAMPANHAS } from './ManualCampanhas'
 import { ManualEmpresa, SECOES_EMPRESA } from './ManualEmpresa'
 import { ManualEquipe, SECOES_EQUIPE } from './ManualEquipe'
@@ -26,6 +27,16 @@ export type Manual = {
 
 // Os de Configurações abrem também pelo "Como usar" do cabeçalho de cada tela (src/pages/Configuracoes.tsx).
 export const MANUAIS: Manual[] = [
+  {
+    id: 'balcao',
+    titulo: 'Balcão',
+    resumo: 'Venda de loja numa tela: produto, cliente, pagamento, NF-e com impressão e envio da nota ao cliente.',
+    icone: 'caixa',
+    secoes: SECOES_BALCAO,
+    Conteudo: ManualBalcao,
+    para: 'Quem vende no balcão, dono e admin',
+    atualizado: '18/11/2026',
+  },
   {
     id: 'equipe',
     titulo: 'Equipe',

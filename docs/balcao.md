@@ -136,8 +136,31 @@ compartilhado: veria todas as conversas). Decidido pelo usuário: um usuário s�
 - **Nota de serviço é da equipe:** o usuário do balcão não emite NFS-e (nem a avulsa), mesmo com "Emite nota
   fiscal"; a `nfse-emitir` confere que quem emite é da equipe.
 
-**Falta (entrega 2):** mandar a nota por WhatsApp e e-mail ao fechar (e o "Salvar no cadastro do cliente"), testar
-a impressão no Chrome e no Edge com nota de verdade, e o manual da Ajuda.
+## Entrega 2 (18/11): mandar a nota ao cliente
+
+Migration `20261118220000_nota_envios`, Edge Function `nota-enviar` e `_shared/envioNota.ts` (usado também pela
+`nfe-retorno`).
+
+- **No Balcão**, com a NF-e marcada, o bloco "Quando a nota for autorizada" traz o WhatsApp e o e-mail do cliente
+  (`nota_destinos`: os contatos ligados ao cliente, o que conversou por último primeiro; sem contato, o telefone do
+  cliente se for celular; e-mail do cliente ou de um contato). Ao fechar, a Livih emite e pede o envio; ele fica
+  pendente em `nota_envios` e sai quando a nota é autorizada e o DANFE está guardado (`nfe-retorno` →
+  `processarEnvios`). O quadro da última venda mostra cada envio e o resultado.
+- **Depois**, no bloco da nota do pedido: "Enviar ao cliente" (mesmos campos) e a lista do que já saiu.
+- **WhatsApp:** pelo número da empresa, na conversa mais recente do contato num número ativo; sem conversa, abre uma
+  no número compartilhado (o primeiro sem vendedor). Não mexe no estado da conversa (o agente continua). Número
+  sem contato vira contato (origem `balcao`) ligado ao cliente. O DANFE é copiado de `notas-fiscais` para
+  `midias/<org>/<conversa>/` (a fila do WhatsApp só lê de lá). Não sai, com o motivo registrado: contato
+  descadastrado, número desconectado, API oficial fora das 24 horas (só com modelo; mandar por e-mail).
+- **E-mail:** pela Focus (`POST /v2/nfe/{ref}/email`, até 10 e-mails, em segundo plano). **A confirmar no primeiro
+  envio real:** a documentação não diz se vão o DANFE e o XML.
+- **Salvar no cadastro:** o e-mail corrigido vai para o cliente (marcado por padrão). O WhatsApp corrigido **não**
+  troca o telefone de um contato (o telefone é a identidade dele no WhatsApp e nas conversas): vira um contato
+  ligado ao cliente. Mudança da decisão de 27/10, que dizia "o número vai para o contato escolhido".
+- **Manual da Ajuda:** `src/ajuda/ManualBalcao.tsx`, só texto (faltam as imagens, com dados fictícios).
+
+**Falta:** testar a impressão do DANFE e os envios com uma nota de verdade (a F7 Tech não emite NF-e: 554, IE
+"ISENTO"), e as imagens do manual.
 
 ## Fora desta etapa
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { listarEmissoras, type Emissora } from '../services/empresa'
 import type { Pedido } from '../services/erp'
 import { formatarCnpj, moeda } from '../services/formato'
@@ -17,10 +17,14 @@ import {
   rejeicaoCredenciamento,
   PRESENCAS,
   urlArquivoNota,
+  enviosDaNota,
+  type EnvioNota,
   type NotaFiscal,
   type TransporteNota,
 } from '../services/nfe'
 import { Aviso } from './Aviso'
+import { ListaEnvios, ModalEnviarNota } from './EnvioNota'
+import { enviosEmAndamento } from '../services/envioNota'
 import { CredenciamentoSefaz } from './CredenciamentoSefaz'
 import { Botao } from './Botao'
 import { CampoTexto } from './CampoTexto'
@@ -148,6 +152,28 @@ export function BlocoNota({ orgId, alvo }: { orgId: string; alvo: Extract<Alvo, 
     return () => clearTimeout(t)
   }, [atual])
 
+  // Envio da NF-e ao cliente (entrega 2 do balcão): o que já saiu e "Enviar ao cliente".
+  const notaId = atual?.modelo === 'nfe' && alvo.tipo === 'pedido' ? atual.id : null
+  const [envios, setEnvios] = useState<{ notaId: string; lista: EnvioNota[] } | null>(null)
+  const [versaoEnvios, setVersaoEnvios] = useState(0)
+  const [enviandoNota, setEnviandoNota] = useState(false)
+  useEffect(() => {
+    if (!notaId) return
+    let ativo = true
+    enviosDaNota(notaId)
+      .then((lista) => ativo && setEnvios({ notaId, lista }))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [notaId, versaoEnvios])
+  const listaEnvios = useMemo(() => (notaId && envios?.notaId === notaId ? envios.lista : []), [notaId, envios])
+  useEffect(() => {
+    if (!enviosEmAndamento(listaEnvios)) return
+    const t = setTimeout(() => setVersaoEnvios((v) => v + 1), 4000)
+    return () => clearTimeout(t)
+  }, [listaEnvios])
+
   if (atual === undefined) return null
   if (!atual && !pode) return null
   const status = alvo.tipo === 'pedido' ? alvo.pedido.status : null
@@ -167,11 +193,41 @@ export function BlocoNota({ orgId, alvo }: { orgId: string; alvo: Extract<Alvo, 
         )}
       </div>
       {atual ? (
-        <Situacao nota={atual} />
+        <>
+          <Situacao nota={atual} />
+          {notaId && (atual.status === 'autorizada' || listaEnvios.length > 0) && (
+            <div className="space-y-2 border-t border-borda pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-pequeno font-medium">Envio ao cliente</p>
+                {atual.status === 'autorizada' && (
+                  <Botao tamanho="sm" variante="secundario" icone="enviar" onClick={() => setEnviandoNota(true)}>
+                    Enviar ao cliente
+                  </Botao>
+                )}
+              </div>
+              {listaEnvios.length ? (
+                <ListaEnvios envios={listaEnvios} />
+              ) : (
+                <p className="text-legenda text-texto-3">A nota ainda não foi mandada ao cliente pela Livih.</p>
+              )}
+            </div>
+          )}
+        </>
       ) : (
         <p className="text-pequeno text-texto-3">
           {status === 'rascunho' ? 'Confirme o pedido para emitir a nota.' : status === 'cancelado' ? 'Pedido cancelado.' : 'Nenhuma nota emitida.'}
         </p>
+      )}
+      {enviandoNota && notaId && (
+        <ModalEnviarNota
+          notaId={notaId}
+          clienteId={alvo.tipo === 'pedido' ? alvo.pedido.cliente_id : null}
+          aoFechar={() => setEnviandoNota(false)}
+          aoEnviar={(lista) => {
+            setEnvios({ notaId, lista })
+            setEnviandoNota(false)
+          }}
+        />
       )}
       {emitindo && (
         <ModalEmitirNota

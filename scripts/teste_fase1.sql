@@ -8852,5 +8852,90 @@ insert into resultado (teste, ok) select 'usuário do balcão: vê o logo da emp
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
 insert into resultado (teste, ok) select 'logo: outra empresa não vê',
   not exists (select 1 from storage.objects where bucket_id = 'logos' and name = current_setting('teste.f7') || '/teste/logo-balcao.png');
+
+-- Envio da NF-e ao cliente (migration 20261118220000).
+reset role;
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_cli uuid := current_setting('teste.bal_cli')::uuid;
+  v_nota uuid;
+  v_envio uuid; v_envio2 uuid; r jsonb; v_msg uuid; v_ct uuid;
+begin
+  -- Nota de uma venda de balcão com cliente (a do atendente com "Vê todos os clientes").
+  insert into public.notas_fiscais (org_id, emissora_id, pedido_id, ref, ambiente, valor, status)
+  select v_org, (select id from public.emissoras where org_id = v_org limit 1), p.id, 'lvhbalcao2', 'homologacao', p.total, 'autorizada'
+    from public.pedidos p where p.org_id = v_org and p.origem = 'balcao' and p.cliente_id = v_cli and p.status = 'entregue'
+   limit 1
+  returning id into v_nota;
+  update public.canais set status_conexao = 'WORKING' where org_id = v_org and tipo = 'waha';
+  perform set_config('teste.nota_balcao', v_nota::text, true);
+
+  insert into public.nota_envios (org_id, nota_id, canal, destino, criado_por)
+  values (v_org, v_nota, 'whatsapp', '5541999887766', '00000000-0000-0000-0000-0000000000a1') returning id into v_envio;
+  r := public.nota_whatsapp_preparar(v_envio);
+  select id into v_ct from public.contatos where org_id = v_org and telefone = '5541999887766';
+  insert into resultado (teste, ok) values ('envio da nota: número novo vira contato do balcão, ligado ao cliente da venda',
+    v_ct is not null and (select origem from public.contatos where id = v_ct) = 'balcao'
+    and exists (select 1 from public.contatos_clientes where contato_id = v_ct and cliente_id = v_cli)
+    and (select contato_id from public.nota_envios where id = v_envio) = v_ct);
+  -- Na API oficial, a conversa nova está fora das 24 h: não sai. Com mensagem do cliente agora, sai.
+  if not coalesce((r ->> 'ok')::boolean, false) then
+    insert into resultado (teste, ok) values ('envio da nota: na API oficial, fora das 24 horas, não sai e diz o motivo',
+      r ->> 'motivo' like 'na API oficial, fora das 24 horas%');
+    insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, status_entrega)
+    select v_org, c.id, 'entrada', 'contato', 'texto', 'oi', 'recebida' from public.conversas c where c.contato_id = v_ct;
+    r := public.nota_whatsapp_preparar(v_envio);
+  end if;
+  insert into resultado (teste, ok) values ('envio da nota: abre a conversa no número da empresa sem mexer no estado',
+    (r ->> 'ok')::boolean and exists (select 1 from public.conversas where id = (r ->> 'conversa_id')::uuid and contato_id = v_ct and estado = 'bot'));
+
+  v_msg := public.nota_whatsapp_enfileirar(v_envio, (r ->> 'conversa_id')::uuid,
+             v_org || '/' || (r ->> 'conversa_id') || '/nota-1.pdf', 'NF-e 1.pdf', 'Nota fiscal nº 1');
+  insert into resultado (teste, ok) values ('envio da nota: DANFE entra na fila da conversa e o envio fica como enviado',
+    exists (select 1 from public.fila_envio where mensagem_id = v_msg)
+    and exists (select 1 from public.mensagens where id = v_msg and tipo = 'documento' and midia_mime = 'application/pdf')
+    and (select situacao from public.nota_envios where id = v_envio) = 'enviado');
+  begin
+    perform public.nota_whatsapp_enfileirar(v_envio, (r ->> 'conversa_id')::uuid, v_org || '/' || (r ->> 'conversa_id') || '/nota-2.pdf', 'x', null);
+    insert into resultado (teste, ok) values ('envio da nota: não manda duas vezes o mesmo envio', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('envio da nota: não manda duas vezes o mesmo envio', sqlerrm like 'envio não encontrado ou já feito%');
+  end;
+
+  insert into public.nota_envios (org_id, nota_id, canal, destino) values (v_org, v_nota, 'whatsapp', '5541999887766') returning id into v_envio2;
+  begin
+    perform public.nota_whatsapp_enfileirar(v_envio2, (r ->> 'conversa_id')::uuid, 'outra-org/x/nota.pdf', 'x', null);
+    insert into resultado (teste, ok) values ('envio da nota: arquivo de fora da conversa é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('envio da nota: arquivo de fora da conversa é recusado', sqlerrm = 'arquivo fora da conversa');
+  end;
+  update public.contatos set descadastrado_em = now() where id = v_ct;
+  r := public.nota_whatsapp_preparar(v_envio2);
+  insert into resultado (teste, ok) values ('envio da nota: contato descadastrado não recebe',
+    not (r ->> 'ok')::boolean and r ->> 'motivo' like 'o cliente pediu para não receber%');
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b9","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'envio da nota: o balcão vê os destinos do cliente e os envios da nota',
+  jsonb_array_length(public.nota_destinos(current_setting('teste.bal_cli')::uuid) -> 'contatos') >= 1
+  and exists (select 1 from public.nota_envios where nota_id = current_setting('teste.nota_balcao')::uuid);
+do $$
+begin
+  perform public.nota_whatsapp_preparar((select id from public.nota_envios limit 1));
+  insert into resultado (teste, ok) values ('envio da nota: usuário logado não chama as funções de envio', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('envio da nota: usuário logado não chama as funções de envio', true);
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.nota_destinos(current_setting('teste.bal_cli')::uuid);
+  insert into resultado (teste, ok) values ('envio da nota: outra empresa não vê os destinos', false);
+exception when others then
+  insert into resultado (teste, ok) values ('envio da nota: outra empresa não vê os destinos', sqlerrm = 'cliente não encontrado');
+end $$;
+insert into resultado (teste, ok) select 'envio da nota: outra empresa não vê os envios',
+  not exists (select 1 from public.nota_envios where nota_id = current_setting('teste.nota_balcao')::uuid);
 reset role;
 select n, teste, ok from resultado order by n;

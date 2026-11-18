@@ -9,6 +9,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { aplicarRetorno, consultarNota, type Nota } from "../_shared/focus.ts";
+import { processarEnvios } from "../_shared/envioNota.ts";
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
   auth: { persistSession: false },
@@ -20,12 +21,18 @@ async function conferir() {
   const { data } = await admin.from("notas_fiscais").select("id, org_id, emissora_id, ref, ambiente, status, consultas, modelo")
     .eq("status", "processando").lt("atualizado_em", new Date(Date.now() - 120_000).toISOString()).lt("consultas", 60)
     .order("atualizado_em").limit(20);
-  for (const nota of (data ?? []) as Nota[]) await consultarNota(admin, nota);
+  for (const nota of (data ?? []) as Nota[]) {
+    await consultarNota(admin, nota);
+    await processarEnvios(admin, nota.id);
+  }
   const { data: semArquivo } = await admin.from("notas_fiscais").select("id, org_id, emissora_id, ref, ambiente, status, consultas, modelo")
     .eq("status", "autorizada").or("xml_path.is.null,danfe_path.is.null")
     .lt("atualizado_em", new Date(Date.now() - 120_000).toISOString()).lt("consultas", 60)
     .order("atualizado_em").limit(20);
-  for (const nota of (semArquivo ?? []) as Nota[]) await consultarNota(admin, nota);
+  for (const nota of (semArquivo ?? []) as Nota[]) {
+    await consultarNota(admin, nota);
+    await processarEnvios(admin, nota.id);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -50,7 +57,9 @@ Deno.serve(async (req) => {
     .eq("ref", corpo.ref).maybeSingle<Nota>();
   // Nota que não é da Livih (outro sistema no mesmo CNPJ): só confirma o recebimento.
   if (!nota) return Response.json({ ok: true, ignorado: "ref desconhecida" });
+  // Autorizada: manda a nota ao cliente (WhatsApp, e-mail) se alguém pediu no balcão ou no pedido (nota_envios).
   emSegundoPlano(aplicarRetorno(admin, nota, corpo as Parameters<typeof aplicarRetorno>[2])
+    .then(() => processarEnvios(admin, nota.id))
     .catch((e) => console.error("retorno nota", nota.ref, String(e))));
   return Response.json({ ok: true });
 });

@@ -4,7 +4,10 @@ import { useSessao } from '../hooks/useSessao'
 import { Aviso } from '../components/Aviso'
 import { Botao } from '../components/Botao'
 import { EstadoVazio } from '../components/EstadoVazio'
+import { CamposEnvio, ListaEnvios } from '../components/EnvioNota'
 import { Icone } from '../components/Icone'
+import { useDestinosNota } from '../hooks/useDestinosNota'
+import { enviosEmAndamento, formInicial, paraEnvio, problemaEnvio, querEnviar, type FormEnvio } from '../services/envioNota'
 import {
   configBalcao,
   definirContaBalcao,
@@ -19,7 +22,18 @@ import {
 import { clienteResumo, procurarClientes, type ClienteResumo } from '../services/clientes'
 import { listarProdutos, type Produto } from '../services/erp'
 import { formatarDocumento, lerNumero, moeda, quantidade } from '../services/formato'
-import { emitirNota, FaltaParaEmitir, FORMA_SEFAZ, notaDoPedido, urlArquivoNota, type NotaFiscal } from '../services/nfe'
+import {
+  emitirNota,
+  enviosDaNota,
+  FaltaParaEmitir,
+  FORMA_SEFAZ,
+  notaDoPedido,
+  pedirEnvioNota,
+  urlArquivoNota,
+  type DestinosNota,
+  type EnvioNota,
+  type NotaFiscal,
+} from '../services/nfe'
 
 // Venda de balcão (docs/balcao.md, decisões de 27/10 e 18/11). Uma tela para a venda de um minuto: buscar o produto
 // (o leitor de código de barras funciona como teclado: digita o código e aperta Enter), ajustar, escolher o pagamento
@@ -96,7 +110,16 @@ type EstadoNota =
   | { tipo: 'enviando' }
   | { tipo: 'nota'; nota: NotaFiscal }
   | { tipo: 'falha'; erro: string; faltando: string[] }
-type Ultima = { venda: VendaFechada; forma: FormaBalcao; cliente: string | null; nota: EstadoNota; impressa: boolean | null }
+type Ultima = {
+  venda: VendaFechada
+  forma: FormaBalcao
+  cliente: string | null
+  nota: EstadoNota
+  impressa: boolean | null
+  /** Envio da nota ao cliente (entrega 2): o que foi pedido e o resultado. */
+  envios: EnvioNota[]
+  erroEnvio: string | null
+}
 
 export function Balcao() {
   const { orgAtiva, modulos } = useSessao()
@@ -233,6 +256,17 @@ function TelaBalcao({ orgId }: { orgId: string }) {
           : null
   const vaiEmitir = podeNota && !!cliente && emitir
 
+  // Para onde vai a nota quando for autorizada (entrega 2): o WhatsApp e o e-mail do cliente, já sugeridos.
+  const destinosCli = useDestinosNota(vaiEmitir ? (cliente?.id ?? null) : null)
+  const [envioForm, setEnvioForm] = useState<{ clienteId: string; form: FormEnvio } | null>(null)
+  const formEnvio: FormEnvio | null =
+    vaiEmitir && cliente && destinosCli.carregado
+      ? envioForm?.clienteId === cliente.id
+        ? envioForm.form
+        : formInicial(destinosCli.destinos)
+      : null
+  const problemaDoEnvio = formEnvio && querEnviar(formEnvio) ? problemaEnvio(formEnvio) : null
+
   const bloqueio = !linhas.length
     ? 'Adicione pelo menos um produto.'
     : calc.some((c) => c.erro)
@@ -247,7 +281,7 @@ function TelaBalcao({ orgId }: { orgId: string }) {
               ? 'Informe os prazos em dias, como 30/60 (de 1 a 365 dias, até 12 parcelas).'
               : forma === 'dinheiro' && recebido.trim() && (valorRecebido == null || valorRecebido < total)
                 ? 'O valor recebido é menor que o total.'
-                : null
+                : problemaDoEnvio
 
   function limpar() {
     setLinhas([])
@@ -259,6 +293,7 @@ function TelaBalcao({ orgId }: { orgId: string }) {
     setDescontoTotal('')
     setObservacao('')
     setEmitir(true)
+    setEnvioForm(null)
     setErro(null)
     campoBusca.current?.focus()
   }
@@ -282,15 +317,18 @@ function TelaBalcao({ orgId }: { orgId: string }) {
       })
       const nomeCliente = cliente ? cliente.razao_social || cliente.nome : null
       const emiteAgora = vaiEmitir
+      const envio = emiteAgora && formEnvio && querEnviar(formEnvio) ? { form: formEnvio, destinos: destinosCli.destinos } : null
       setUltima({
         venda,
         forma,
         cliente: nomeCliente,
         nota: emiteAgora ? { tipo: 'enviando' } : { tipo: 'sem', motivo: cliente ? motivoSemNota : null },
         impressa: null,
+        envios: [],
+        erroEnvio: null,
       })
       limpar()
-      if (emiteAgora) void emitirDaVenda(venda, forma)
+      if (emiteAgora) void emitirDaVenda(venda, forma, envio)
     } catch (e) {
       setErro((e as Error).message)
     } finally {
@@ -298,7 +336,11 @@ function TelaBalcao({ orgId }: { orgId: string }) {
     }
   }
 
-  async function emitirDaVenda(venda: VendaFechada, formaVenda: FormaBalcao) {
+  async function emitirDaVenda(
+    venda: VendaFechada,
+    formaVenda: FormaBalcao,
+    envio: { form: FormEnvio; destinos: DestinosNota | null } | null,
+  ) {
     try {
       const nota = await emitirNota({
         pedido_id: venda.pedido_id,
@@ -311,6 +353,16 @@ function TelaBalcao({ orgId }: { orgId: string }) {
         transporte: { modalidade: 9, transportadora: null, volume: null },
       })
       setUltima((u) => (u && u.venda.pedido_id === venda.pedido_id ? { ...u, nota: { tipo: 'nota', nota } } : u))
+      // A nota ainda está na SEFAZ: o envio fica pedido e sai sozinho quando ela for autorizada (nfe-retorno).
+      if (envio) {
+        try {
+          const envios = await pedirEnvioNota(paraEnvio(nota.id, envio.form, envio.destinos))
+          setUltima((u) => (u && u.venda.pedido_id === venda.pedido_id ? { ...u, envios } : u))
+        } catch (e) {
+          const erroEnvio = (e as Error).message
+          setUltima((u) => (u && u.venda.pedido_id === venda.pedido_id ? { ...u, erroEnvio } : u))
+        }
+      }
     } catch (e) {
       const faltando = e instanceof FaltaParaEmitir ? e.faltando : []
       setUltima((u) =>
@@ -318,6 +370,19 @@ function TelaBalcao({ orgId }: { orgId: string }) {
       )
     }
   }
+
+  // Acompanha os envios ao cliente até saírem (a nfe-retorno manda em segundo plano).
+  const notaDosEnvios = ultima?.nota.tipo === 'nota' ? ultima.nota.nota.id : null
+  const enviosPendentes = !!ultima && enviosEmAndamento(ultima.envios)
+  useEffect(() => {
+    if (!enviosPendentes || !notaDosEnvios) return
+    const t = setTimeout(() => {
+      enviosDaNota(notaDosEnvios)
+        .then((envios) => setUltima((u) => (u && u.nota.tipo === 'nota' && u.nota.nota.id === notaDosEnvios ? { ...u, envios } : u)))
+        .catch(() => undefined)
+    }, 4000)
+    return () => clearTimeout(t)
+  }, [enviosPendentes, notaDosEnvios, ultima])
 
   // Acompanha a nota até ter o DANFE guardado; aí abre a impressão (se marcado neste computador).
   const notaAtual = ultima?.nota.tipo === 'nota' ? ultima.nota.nota : null
@@ -707,6 +772,20 @@ function TelaBalcao({ orgId }: { orgId: string }) {
                     </span>
                   </label>
                 )}
+                {vaiEmitir && cliente && (
+                  <div className="space-y-2 rounded-md bg-fundo p-3">
+                    <p className="text-legenda font-medium text-texto-2 uppercase">Quando a nota for autorizada</p>
+                    {formEnvio ? (
+                      <CamposEnvio
+                        destinos={destinosCli.destinos}
+                        valor={formEnvio}
+                        aoMudar={(f) => setEnvioForm({ clienteId: cliente.id, form: f })}
+                      />
+                    ) : (
+                      <p className="text-legenda text-texto-3">Carregando o WhatsApp e o e-mail do cliente…</p>
+                    )}
+                  </div>
+                )}
               </fieldset>
 
               {erro && <Aviso tom="erro">{erro}</Aviso>}
@@ -906,6 +985,12 @@ function UltimaVenda({ ultima, aoImprimir }: { ultima: Ultima; aoImprimir: (path
                 )
               : passo(false, `NF-e ${n.status === 'rejeitada' ? 'recusada' : n.status}: ${n.mensagem ?? 'veja no pedido'}`))}
       </ul>
+      {ultima.erroEnvio && <Aviso tom="erro">Envio da nota ao cliente: {ultima.erroEnvio} Reenvie pelo pedido.</Aviso>}
+      {ultima.envios.length > 0 && (
+        <div className="border-t border-borda pt-2">
+          <ListaEnvios envios={ultima.envios} />
+        </div>
+      )}
     </section>
   )
 }

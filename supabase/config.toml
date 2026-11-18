@@ -476,6 +476,10 @@ verify_jwt = false
 [functions.nfe-emitir]
 verify_jwt = false
 
+[functions.nota-enviar]
+# Autenticação dentro da função (login da pessoa; a RLS de notas_fiscais decide quem manda).
+verify_jwt = false
+
 # nfe-retorno: gatilho da Focus (cabeçalho X-Livih-Focus com o segredo do Vault) e conferência do cron (x-livih-segredo).
 [functions.nfe-retorno]
 verify_jwt = false

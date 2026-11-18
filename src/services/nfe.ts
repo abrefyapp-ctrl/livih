@@ -297,3 +297,45 @@ export const FOCUS_RESPONSAVEL_TECNICO = { cnpj: '07.504.505/0001-32', razao: 'F
 
 /** A rejeição é a do sistema emissor não credenciado? */
 export const rejeicaoCredenciamento = (mensagem: string | null) => !!mensagem && /^\s*(974|203)\b/.test(mensagem)
+
+// ---- envio da NF-e ao cliente (docs/balcao.md, entrega 2; migration 20261118220000) ----
+
+export type DestinosNota = {
+  email: string | null
+  telefone: string | null
+  contatos: { id: string; nome: string | null; telefone: string; email: string | null }[]
+}
+export type EnvioNota = { id: string; canal: 'whatsapp' | 'email'; destino: string; situacao: 'pendente' | 'enviando' | 'enviado' | 'erro'; resultado: string | null; criado_em: string }
+
+/** WhatsApps (contatos ligados, o que conversou por último primeiro) e e-mail do cliente, para escolher para onde vai a nota. */
+export async function destinosNota(clienteId: string): Promise<DestinosNota> {
+  const { data, error } = await supabase.rpc('nota_destinos', { p_cliente: clienteId })
+  if (error) throw new Error('Não foi possível carregar o WhatsApp e o e-mail do cliente.')
+  return data as unknown as DestinosNota
+}
+
+export async function enviosDaNota(notaId: string): Promise<EnvioNota[]> {
+  const { data, error } = await supabase
+    .from('nota_envios')
+    .select('id, canal, destino, situacao, resultado, criado_em')
+    .eq('nota_id', notaId)
+    .order('criado_em', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as EnvioNota[]
+}
+
+/** Pede o envio: com a nota autorizada sai na hora; ainda na SEFAZ, sai quando ela for autorizada. */
+export async function pedirEnvioNota(dados: {
+  nota_id: string
+  whatsapp?: string
+  contato_id?: string | null
+  email?: string
+  salvar_email?: boolean
+}): Promise<EnvioNota[]> {
+  const { data, error } = await supabase.functions.invoke('nota-enviar', { body: dados })
+  if (error) {
+    const r = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null
+    throw new Error(r?.erro ?? 'Não foi possível mandar a nota. Tente de novo.')
+  }
+  return (data as { envios: EnvioNota[] }).envios
+}
