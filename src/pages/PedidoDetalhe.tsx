@@ -17,6 +17,7 @@ import {
   type Produto,
   type StatusPedido,
 } from '../services/erp'
+import { cancelarVenda } from '../services/balcao'
 import { listarEmissoras, type Emissora } from '../services/empresa'
 import {
   abrirConversaDoContato,
@@ -64,6 +65,7 @@ export function PedidoDetalhe() {
   const navegar = useNavigate()
   const { orgAtiva, modulos, sessao, financeiroOculto } = useSessao()
   const orgId = orgAtiva!.id
+  const gerencia = orgAtiva?.papel === 'dono' || orgAtiva?.papel === 'admin'
   const [dados, setDados] = useState<{ chave: string; pedido: Pedido; itens: ItemPedido[] } | null | undefined>(undefined)
   const [versao, setVersao] = useState(0)
   const [erro, setErro] = useState<string | null>(null)
@@ -75,6 +77,8 @@ export function PedidoDetalhe() {
   const [enviadoEm, setEnviadoEm] = useState<string | null>(null)
   const [previa, setPrevia] = useState<{ dados: DadosOrcamento | null; pdf: Blob | null; erro: string | null } | null>(null)
   const [escolherCliente, setEscolherCliente] = useState(false)
+  // Venda de balcão nasce entregue: cancelar é à parte, só dono e admin, com motivo (migration 20261118160000).
+  const [cancelarBalcao, setCancelarBalcao] = useState<string | null>(null)
 
   const chave = `${id}|${versao}`
   useEffect(() => {
@@ -208,6 +212,21 @@ export function PedidoDetalhe() {
     }
   }
 
+  // Fecha o diálogo só se deu certo: o erro (NF-e autorizada, sem motivo) aparece dentro dele.
+  async function cancelarDoBalcao() {
+    setOcupado('cancelar-balcao')
+    setErro(null)
+    try {
+      await cancelarVenda(pedido.id, cancelarBalcao ?? '')
+      setCancelarBalcao(null)
+      recarregar()
+    } catch (e) {
+      setErro((e as Error).message)
+    } finally {
+      setOcupado(null)
+    }
+  }
+
   // Ações destrutivas (cancelar, voltar ao rascunho, apagar) pedem confirmação; o resto vai direto.
   function acao(s: StatusPedido) {
     if (s === 'cancelado' || s === 'rascunho') setConfirmar(s)
@@ -311,6 +330,11 @@ export function PedidoDetalhe() {
                 Apagar
               </Botao>
             )}
+            {pedido.origem === 'balcao' && (pedido.status === 'entregue' || pedido.status === 'confirmado') && gerencia && (
+              <Botao tamanho="sm" variante="perigoTexto" onClick={() => setCancelarBalcao('')} disabled={!!ocupado}>
+                Cancelar venda
+              </Botao>
+            )}
           </div>
         </div>
 
@@ -411,6 +435,32 @@ export function PedidoDetalhe() {
           : confirmar === 'cancelado'
             ? `O pedido fica registrado como cancelado${pedido.estoque_baixado ? ' e os itens voltam para o estoque' : ''}. Não dá para desfazer.`
             : `Os itens ${pedido.estoque_baixado ? 'voltam para o estoque e ' : ''}podem ser editados de novo.`}
+      </DialogoConfirmacao>
+
+      <DialogoConfirmacao
+        aberto={cancelarBalcao !== null}
+        titulo={`Cancelar a venda nº ${pedido.numero}?`}
+        rotuloConfirmar="Cancelar venda"
+        perigo
+        carregando={ocupado === 'cancelar-balcao'}
+        aoConfirmar={() => void cancelarDoBalcao()}
+        aoCancelar={() => setCancelarBalcao(null)}
+      >
+        <div className="space-y-3">
+          <p>
+            O pagamento registrado é desfeito, as parcelas são canceladas
+            {pedido.estoque_baixado ? ' e os itens voltam para o estoque' : ''}. Não dá para desfazer. Se a venda tem NF-e
+            autorizada, cancele a nota antes, no bloco Nota fiscal abaixo.
+          </p>
+          <CampoTexto
+            rotulo="Motivo"
+            value={cancelarBalcao ?? ''}
+            onChange={(e) => setCancelarBalcao(e.target.value)}
+            maxLength={200}
+            placeholder="Ex.: cliente desistiu, produto errado"
+          />
+          {erro && cancelarBalcao !== null && <Aviso tom="erro">{erro}</Aviso>}
+        </div>
       </DialogoConfirmacao>
 
       {escolherCliente && (

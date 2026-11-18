@@ -108,6 +108,12 @@ Pedido do usuário em 18/11: construir a tela e deixar o balcão como um módulo
 - **Consumidor final não recebe NF-e:** a NF-e (modelo 55) exige destinatário. Para vender sem cadastro com nota,
   só com a NFC-e, que segue fora desta etapa.
 
+**Cancelar venda (18/11, migration `20261118160000_balcao_cancelar`):** a venda de balcão nasce entregue, e pedido
+entregue não cancela pela `pedido_mudar_status` (no teste da F7 Tech as vendas só saíram pelo banco). No pedido da
+venda de balcão, dono e admin têm **Cancelar venda**, com motivo: desfaz o pagamento, devolve o estoque e cancela as
+parcelas; o motivo fica na auditoria, no estorno e nas baixas desfeitas. Com NF-e autorizada ou ainda na SEFAZ,
+recusa: cancela-se a nota antes (prazo da SEFAZ de 24 horas).
+
 **Falta (entrega 2):** mandar a nota por WhatsApp e e-mail ao fechar (e o "Salvar no cadastro do cliente"), testar
 a impressão no Chrome e no Edge com nota de verdade, e o manual da Ajuda.
 

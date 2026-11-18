@@ -8627,5 +8627,90 @@ begin
 exception when others then
   insert into resultado (teste, ok) values ('balcão: outra empresa não lê a configuração', sqlerrm like 'o balcão não está liberado%');
 end $$;
+
+-- Cancelar venda de balcão (migration 20261118160000).
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare
+  v_org uuid := current_setting('teste.f7')::uuid;
+  v_prod uuid := current_setting('teste.bal_prod')::uuid;
+  v_saldo numeric; r jsonb; v_ped uuid; v_manual uuid;
+begin
+  select saldo into v_saldo from public.produtos_saldo where id = v_prod;
+  r := public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', v_prod, 'quantidade', 2)),
+                            null, 'dinheiro', null, 0, null);
+  v_ped := (r ->> 'pedido_id')::uuid;
+  perform set_config('teste.bal_cancelar', v_ped::text, true);
+  begin
+    perform public.balcao_cancelar(v_ped, ' ');
+    insert into resultado (teste, ok) values ('balcão cancelar: exige motivo', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão cancelar: exige motivo', sqlerrm = 'escreva o motivo do cancelamento');
+  end;
+  perform public.balcao_cancelar(v_ped, 'Cliente desistiu');
+  insert into resultado (teste, ok) select 'balcão cancelar: venda paga fica cancelada, sem baixa e sem parcela aberta',
+    status = 'cancelado' and not estoque_baixado
+    and not exists (select 1 from public.fin_lancamentos l where l.pedido_id = v_ped and l.cancelado_em is null)
+    and not exists (select 1 from public.fin_baixas b join public.fin_lancamentos l on l.id = b.lancamento_id
+                     where l.pedido_id = v_ped and b.desfeita_em is null)
+    and exists (select 1 from public.fin_baixas b join public.fin_lancamentos l on l.id = b.lancamento_id
+                 where l.pedido_id = v_ped and b.motivo_desfazer = 'Venda de balcão cancelada: Cliente desistiu')
+    from public.pedidos where id = v_ped;
+  insert into resultado (teste, ok) select 'balcão cancelar: o estoque volta e o motivo fica no estorno',
+    (select saldo from public.produtos_saldo where id = v_prod) = v_saldo
+    and exists (select 1 from public.estoque_movimentos where pedido_id = v_ped and tipo = 'estorno' and quantidade = 2
+                 and motivo = 'venda de balcão cancelada: Cliente desistiu');
+  insert into resultado (teste, ok) select 'balcão cancelar: fica na auditoria com o motivo',
+    exists (select 1 from public.auditoria where acao = 'balcao_cancelar' and entidade_id = v_ped::text
+             and depois ->> 'motivo' = 'Cliente desistiu');
+  begin
+    perform public.balcao_cancelar(v_ped, 'de novo');
+    insert into resultado (teste, ok) values ('balcão cancelar: venda já cancelada é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão cancelar: venda já cancelada é recusada', sqlerrm like 'só dá para cancelar venda fechada%');
+  end;
+
+  insert into public.pedidos (org_id) values (v_org) returning id into v_manual;
+  begin
+    perform public.balcao_cancelar(v_manual, 'não é balcão');
+    insert into resultado (teste, ok) values ('balcão cancelar: pedido comum é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('balcão cancelar: pedido comum é recusado', sqlerrm like 'este pedido não é venda de balcão%');
+  end;
+
+  -- Venda com NF-e autorizada: cancela a nota antes.
+  r := public.balcao_fechar(v_org, jsonb_build_array(jsonb_build_object('produto_id', v_prod, 'quantidade', 1)),
+                            null, 'pix', null, 0, null);
+  perform set_config('teste.bal_com_nota', r ->> 'pedido_id', true);
+end $$;
+reset role;
+insert into public.notas_fiscais (org_id, emissora_id, pedido_id, ref, ambiente, valor, status)
+select current_setting('teste.f7')::uuid, (select id from public.emissoras where org_id = current_setting('teste.f7')::uuid limit 1),
+       current_setting('teste.bal_com_nota')::uuid, 'lvhbalcao1', 'homologacao', 20, 'autorizada';
+set local role authenticated;
+do $$
+begin
+  perform public.balcao_cancelar(current_setting('teste.bal_com_nota')::uuid, 'Errei o produto');
+  insert into resultado (teste, ok) values ('balcão cancelar: com NF-e autorizada, pede para cancelar a nota antes', false);
+exception when others then
+  insert into resultado (teste, ok) values ('balcão cancelar: com NF-e autorizada, pede para cancelar a nota antes',
+    sqlerrm like 'a NF-e desta venda está autorizada%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.balcao_cancelar(current_setting('teste.bal_com_nota')::uuid, 'Atendente tentando');
+  insert into resultado (teste, ok) values ('balcão cancelar: atendente não cancela', false);
+exception when others then
+  insert into resultado (teste, ok) values ('balcão cancelar: atendente não cancela', sqlerrm like 'só o dono ou um admin%');
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.balcao_cancelar(current_setting('teste.bal_com_nota')::uuid, 'Outra empresa');
+  insert into resultado (teste, ok) values ('balcão cancelar: outra empresa não cancela', false);
+exception when others then
+  insert into resultado (teste, ok) values ('balcão cancelar: outra empresa não cancela', sqlerrm = 'venda não encontrada');
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

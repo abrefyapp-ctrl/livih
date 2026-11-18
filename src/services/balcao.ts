@@ -49,6 +49,12 @@ const amigavel = (m: string, padrao: string) => {
     'a empresa não tem conta',
     'só o dono ou um admin',
     'escolha uma conta',
+    'venda não encontrada',
+    'só o dono ou um admin cancela',
+    'este pedido não é venda de balcão',
+    'só dá para cancelar venda fechada',
+    'escreva o motivo',
+    'a NF-e desta venda',
   ]
   if (conhecidos.some((c) => m.includes(c))) return new Error(m.charAt(0).toUpperCase() + m.slice(1).replace(/\.$/, '') + '.')
   return new Error(padrao)
@@ -100,4 +106,10 @@ export function lerPrazos(texto: string): number[] | null {
   const dias = partes.map((p) => Number(p))
   if (dias.some((d) => !Number.isInteger(d) || d < 1 || d > 365)) return null
   return [...dias].sort((a, b) => a - b)
+}
+
+/** Cancela a venda de balcão inteira (dono e admin): desfaz o pagamento, devolve o estoque e cancela as parcelas. */
+export async function cancelarVenda(pedidoId: string, motivo: string) {
+  const { error } = await supabase.rpc('balcao_cancelar', { p_pedido: pedidoId, p_motivo: motivo })
+  if (error) throw amigavel(error.message, 'Não foi possível cancelar a venda. Tente de novo.')
 }
