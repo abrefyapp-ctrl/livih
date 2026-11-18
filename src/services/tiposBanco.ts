@@ -5207,6 +5207,10 @@ export type Database = {
         Args: { p_conversa: string; p_texto: string }
         Returns: undefined
       }
+      balcao_cancelar: {
+        Args: { p_motivo: string; p_pedido: string }
+        Returns: undefined
+      }
       balcao_config: { Args: { p_org: string }; Returns: Json }
       balcao_conta: { Args: { p_org: string }; Returns: string }
       balcao_definir_conta: {
