@@ -5976,6 +5976,14 @@ export type Database = {
         }
         Returns: string
       }
+      instagram_marcar_enviada: {
+        Args: { p_canal: string; p_mensagem: string; p_mid: string }
+        Returns: undefined
+      }
+      instagram_pode_responder: {
+        Args: { p_conversa: string }
+        Returns: boolean
+      }
       limpar_documento: { Args: { p: string }; Returns: string }
       membro_ausente: {
         Args: { p_org: string; p_usuario: string }
@@ -6572,6 +6580,17 @@ export type Database = {
           p_texto: string
           p_tipo: Database["public"]["Enums"]["tipo_msg"]
           p_wa_id: string
+        }
+        Returns: Json
+      }
+      registrar_saida_instagram: {
+        Args: {
+          p_canal: string
+          p_igsid: string
+          p_mid: string
+          p_payload: Json
+          p_texto: string
+          p_tipo: Database["public"]["Enums"]["tipo_msg"]
         }
         Returns: Json
       }
