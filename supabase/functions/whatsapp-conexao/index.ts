@@ -18,7 +18,7 @@
 //         → número que já está no portfólio da F7, pelo token de usuário do sistema. Só admin da plataforma.
 //       { org_id, acao: 'instagram', code }                         → { canais } (dono/admin)
 //         → contas do Instagram profissional pelo login da Meta (Unified Login, docs/instagram.md): cada conta
-//           liberada vira um canal 'instagram', sem ocupar vaga de número e sem agente até a entrega 2.
+//           liberada vira um canal 'instagram', sem ocupar vaga de número, com o agente da empresa desligado.
 //       { org_id, acao: 'instagram_diagnostico' }                   → o que a Meta vê de cada conta (só plataforma)
 //       { org_id, canal_id, acao: 'agenda' }                        → { contatos: [{ nome, telefone }] }
 //         → contatos salvos na agenda do celular do número (WAHA), para a prospecção. Quem vê o número.
@@ -310,12 +310,16 @@ async function conectarInstagram(orgId: string, code: string | undefined): Promi
       if (error) throw new Error(`canal: ${error.message}`);
       canal = data as Canal;
     } else {
-      // Sem linha em agentes: o agente no Instagram vem na entrega 2 (até lá a conversa vai direto para a equipe).
       const { data, error } = await admin.from("canais")
         // Origem "Instagram": o Painel não mostra essas conversas como "Direto no WhatsApp" (o dono pode trocar).
         .insert({ org_id: orgId, tipo: "instagram", nome, instance_id: id, origem: "Instagram" }).select(CAMPOS).single();
       if (error) throw new Error(`canal: ${error.message}`);
       canal = data as Canal;
+      // Entrega 2: o agente da empresa, desligado nesta conta (como os números novos em criarCanal).
+      const { data: modelo } = await admin.from("agentes").select("prompt, regras_humano, telefone_alerta, modelo")
+        .eq("org_id", orgId).order("ativo", { ascending: false }).limit(1).maybeSingle();
+      const { error: erroAgente } = await admin.from("agentes").insert({ org_id: orgId, canal_id: canal.id, ativo: false, ...(modelo ?? {}) });
+      if (erroAgente) console.error("instagram: agente da conta", erroAgente.message);
     }
     const { error: erroToken } = await admin.rpc("meta_guardar_token", { p_canal: canal.id, p_token: token, p_expira_em: expira });
     if (erroToken) throw new Error(`token: ${erroToken.message}`);

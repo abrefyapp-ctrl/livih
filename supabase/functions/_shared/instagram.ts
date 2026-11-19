@@ -132,6 +132,34 @@ async function completarPerfil(supabase: SupabaseClient, canalId: string, orgId:
 }
 
 /**
+ * Eco (entrega 2): mensagem que a conta da empresa mandou ao cliente. Se foi a Livih (equipe ou agente), o banco
+ * reconhece e ignora; se foi alguém pelo app do Instagram, entra na conversa e a equipe assume
+ * (registrar_saida_instagram). O arquivo do eco não é baixado: o balão mostra o tipo ("[imagem]").
+ */
+export async function gravarEco(
+  supabase: SupabaseClient,
+  canal: { canal_id: string },
+  base: { mid: string; igsid: string },
+  lidas: Lida[],
+  payload: Json,
+): Promise<number> {
+  let novas = 0;
+  for (const [i, lida] of lidas.entries()) {
+    const { data, error } = await supabase.rpc("registrar_saida_instagram", {
+      p_canal: canal.canal_id,
+      p_mid: i === 0 ? base.mid : `${base.mid}:${i}`,
+      p_igsid: base.igsid,
+      p_tipo: lida.tipo,
+      p_texto: lida.texto,
+      p_payload: { ...payload, anexo: i },
+    });
+    if (error) throw new Error(`registrar_saida_instagram: ${error.message}`);
+    if (!data?.duplicada) novas++;
+  }
+  return novas;
+}
+
+/**
  * Grava as partes de uma mensagem recebida (mid, mid:1…) e cuida da mídia como no WhatsApp: áudio é transcrito;
  * imagem e PDF são guardados e descritos; o agente é chamado depois. Devolve quantas partes entraram (0 = já estava).
  */

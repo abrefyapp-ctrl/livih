@@ -1,6 +1,6 @@
 // Esvazia a fila de envio: chamada pelo trigger da fila_envio e pelo cron (a cada minuto).
 // Só aceita chamada do próprio banco (header x-livih-segredo, conferido no Vault).
-// Um adaptador por provedor: WAHA e a API oficial da Meta (Cloud API).
+// Um adaptador por provedor: WAHA, a API oficial da Meta (Cloud API) e o Instagram (Direct).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { ERROS_META } from "../_shared/errosMeta.ts";
@@ -158,9 +158,93 @@ async function enviarMeta(item: ItemFila): Promise<Resultado> {
   return { ok: true, id: id ? String(id) : undefined };
 }
 
+// ---- Instagram (docs/instagram.md, entrega 2) ----
+// Pela API do Instagram (login unificado): POST /{conta}/messages, destinatário pelo IGSID do contato. Texto até
+// 1.000 bytes por mensagem: o mais longo sai em partes, cortadas em espaço (o eco de cada parte é reconhecido como
+// da Livih pelo banco, registrar_saida_instagram). Arquivo sai sem legenda (o Instagram não tem): a legenda vai logo
+// depois, como texto. A janela de 24 horas já foi conferida ao entrar na fila (instagram_pode_responder).
+const LIMITE_INSTAGRAM = 1000;
+const TIPO_ANEXO_INSTAGRAM: Record<string, string> = { imagem: "image", video: "video", audio: "audio" };
+
+function partesInstagram(texto: string): string[] {
+  const enc = new TextEncoder();
+  const partes: string[] = [];
+  let resto = texto.trim();
+  while (enc.encode(resto).length > LIMITE_INSTAGRAM) {
+    // Maior trecho que cabe, cortado no último espaço ou quebra de linha (nunca no meio de uma palavra).
+    let fim = resto.length;
+    while (enc.encode(resto.slice(0, fim)).length > LIMITE_INSTAGRAM) fim = Math.floor(fim * 0.9);
+    const corte = Math.max(resto.lastIndexOf("\n", fim), resto.lastIndexOf(" ", fim));
+    const ate = corte > fim * 0.5 ? corte : fim;
+    partes.push(resto.slice(0, ate).trim());
+    resto = resto.slice(ate).trim();
+  }
+  if (resto) partes.push(resto);
+  return partes;
+}
+
+async function postInstagram(conta: string, token: string, corpo: unknown): Promise<Resultado> {
+  const r = await fetch(`https://graph.facebook.com/v25.0/${conta}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(corpo),
+    signal: AbortSignal.timeout(30000),
+  });
+  // deno-lint-ignore no-explicit-any
+  const resposta: any = await r.json().catch(() => null);
+  if (!r.ok) {
+    const e = resposta?.error ?? {};
+    // 10 / 2018278: fora da janela de 24 horas (a fila pode ter demorado).
+    if (Number(e.code) === 10 || Number(e.error_subcode) === 2018278) {
+      return { ok: false, erro: "Passaram 24 horas da última mensagem do cliente no Instagram: a Meta não deixa responder." };
+    }
+    return { ok: false, erro: `Instagram ${r.status} (${e.code ?? "?"}): ${String(e.message ?? "").slice(0, 250)}` };
+  }
+  return { ok: true, id: resposta?.message_id ? String(resposta.message_id) : undefined };
+}
+
+async function enviarInstagram(item: ItemFila): Promise<Resultado> {
+  if (!item.instance_id) return { ok: false, erro: "canal sem a conta do Instagram" };
+  const { data: tokenCanal } = await supabase.rpc("meta_token_do_canal", { p_canal: item.canal_id });
+  const token = tokenCanal as string | null;
+  if (!token) return { ok: false, erro: "conta do Instagram sem token: reconecte em Configurações" };
+  const { data: msg } = await supabase.from("mensagens")
+    .select("conversa:conversas(contato:contatos(instagram_id))").eq("id", item.mensagem_id).maybeSingle();
+  // deno-lint-ignore no-explicit-any
+  const igsid = (msg as any)?.conversa?.contato?.instagram_id as string | undefined;
+  if (!igsid) return { ok: false, erro: "contato sem o ID do Instagram" };
+  const destino = { recipient: { id: igsid } };
+
+  let primeiro: string | undefined;
+  if (item.midia_path) {
+    const tipo = TIPO_ANEXO_INSTAGRAM[item.tipo] ?? "file";
+    const r = await postInstagram(item.instance_id, token, {
+      ...destino, message: { attachment: { type: tipo, payload: { url: await urlArquivo(item.midia_path) } } },
+    });
+    if (!r.ok) return r;
+    primeiro = r.id;
+  }
+  const texto = (item.texto ?? "").trim();
+  for (const parte of texto ? partesInstagram(texto) : []) {
+    const r = await postInstagram(item.instance_id, token, { ...destino, message: { text: parte } });
+    // Uma parte (ou o arquivo) já saiu e a seguinte falhou: conta como enviado, senão a fila tentaria de novo e o
+    // cliente receberia a primeira parte duas vezes. O erro fica no log.
+    if (!r.ok) {
+      if (primeiro) {
+        console.error("instagram: parte da mensagem não saiu", item.mensagem_id, r.erro);
+        break;
+      }
+      return r;
+    }
+    primeiro ??= r.id;
+  }
+  return primeiro ? { ok: true, id: primeiro } : { ok: false, erro: "mensagem vazia" };
+}
+
 const ADAPTADORES: Record<string, (item: ItemFila) => Promise<Resultado>> = {
   waha: enviarWaha,
   meta: enviarMeta,
+  instagram: enviarInstagram,
 };
 
 Deno.serve(async (req) => {

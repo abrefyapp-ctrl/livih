@@ -1,12 +1,13 @@
 // Busca as mensagens do Direct pela API, a cada minuto (cron livih-instagram-sincronizar, header x-livih-segredo).
 // Reserva do instagram-webhook (docs/instagram.md): em 19/11 a Meta não entregava ao webhook as mensagens reais do
 // livih.tech, embora a API de conversas as mostrasse. Para cada conta do Instagram ativa, pega as conversas que mudaram
-// na última hora e as mensagens recebidas nelas; a que já entrou (pelo webhook ou numa busca anterior) é recusada pelo
+// na última hora e as mensagens nelas (as do cliente e, desde a entrega 2, os ecos do que a empresa mandou); a que já
+// entrou (pelo webhook ou numa busca anterior) é recusada pelo
 // ID, então repetir não duplica e não é preciso guardar um "lido até". Só mensagens depois de a conta ser conectada:
 // o histórico de antes não entra.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { GRAPH, gravarRecebida, lerMensagemApi, tokenDoCanal, type Json } from "../_shared/instagram.ts";
+import { GRAPH, gravarEco, gravarRecebida, lerMensagemApi, tokenDoCanal, type Json } from "../_shared/instagram.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -17,9 +18,9 @@ const supabase = createClient(
 const JANELA_MS = 60 * 60 * 1000;
 // Do mais completo ao mínimo: se a Meta recusar um campo (erro 100), tenta o seguinte.
 const CAMPOS_MENSAGEM = [
-  "id,created_time,from,message,attachments{mime_type,name,image_data,video_data,file_url},story,shares{link,name},is_unsupported",
-  "id,created_time,from,message,attachments,story",
-  "id,created_time,from,message",
+  "id,created_time,from,to,message,attachments{mime_type,name,image_data,video_data,file_url},story,shares{link,name},is_unsupported",
+  "id,created_time,from,to,message,attachments,story",
+  "id,created_time,from,to,message",
 ];
 
 // "2026-11-19T20:12:36+0000" → Date (o fuso sem dois-pontos não é ISO).
@@ -48,11 +49,17 @@ async function sincronizar(c: { id: string; org_id: string; instance_id: string;
   for (const conv of await conversas(c.instance_id, token)) {
     if (quando(conv.updated_time).getTime() < desde) continue;
     // A API traz da mais nova para a mais antiga: grava na ordem em que foram mandadas.
-    const recebidas = ((conv.messages?.data ?? []) as Json[])
-      .filter((m) => m?.id && m.from?.id && String(m.from.id) !== c.instance_id && quando(m.created_time).getTime() >= desde)
+    const recentes = ((conv.messages?.data ?? []) as Json[])
+      .filter((m) => m?.id && m.from?.id && quando(m.created_time).getTime() >= desde)
       .reverse();
-    for (const m of recebidas) {
+    for (const m of recentes) {
       try {
+        if (String(m.from.id) === c.instance_id) {
+          // Eco (entrega 2): mandada pela conta da empresa; o cliente é o destinatário.
+          const cliente = m.to?.data?.[0]?.id;
+          if (cliente) novas += await gravarEco(supabase, { canal_id: c.id }, { mid: String(m.id), igsid: String(cliente) }, lerMensagemApi(m), { api: m });
+          continue;
+        }
         novas += await gravarRecebida(
           supabase,
           { canal_id: c.id, org_id: c.org_id },

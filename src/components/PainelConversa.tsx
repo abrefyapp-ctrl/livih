@@ -167,11 +167,15 @@ export function PainelConversa({
         ? 'Ao enviar, você assume a conversa e o agente para de responder.'
         : undefined
 
-  // API oficial: 24 h depois da última mensagem do cliente, só modelo aprovado é entregue.
+  // API oficial: 24 h depois da última mensagem do cliente, só modelo aprovado é entregue. Instagram (entrega 2 de
+  // docs/instagram.md): a mesma janela, sem modelo; o banco recusa do mesmo jeito (instagram_pode_responder).
   const oficial = conversa?.canal?.tipo === 'meta'
-  const ultimaEntrada = oficial ? mensagens.findLast((m) => m.direcao === 'entrada') : undefined
+  const instagram = conversa?.canal?.tipo === 'instagram'
+  const ultimaEntrada = oficial || instagram ? mensagens.findLast((m) => m.direcao === 'entrada') : undefined
   const janelaFechada =
-    oficial && !carregando && (!ultimaEntrada || agora - new Date(ultimaEntrada.criado_em).getTime() > 24 * 3600_000)
+    (oficial || instagram) &&
+    !carregando &&
+    (!ultimaEntrada || agora - new Date(ultimaEntrada.criado_em).getTime() > 24 * 3600_000)
   const botaoModelo = oficial && (
     <Botao variante="secundario" icone="arquivo" title="Enviar modelo" onClick={() => setEnviandoModelo(true)}>
       <span className={janelaFechada ? '' : 'sr-only'}>Enviar modelo</span>
@@ -295,7 +299,9 @@ export function PainelConversa({
         respostas={respostasProntas}
         bloqueio={
           janelaFechada &&
-          `Faz mais de 24 horas que ${nome} escreveu. Pela API oficial do WhatsApp, só dá para retomar com um modelo aprovado.`
+          (instagram
+            ? `Faz mais de 24 horas que ${nome} escreveu. No Instagram, a Meta só deixa responder até 24 horas depois da última mensagem do cliente. Continue pelo WhatsApp, se tiver o número, ou espere ele escrever de novo.`
+            : `Faz mais de 24 horas que ${nome} escreveu. Pela API oficial do WhatsApp, só dá para retomar com um modelo aprovado.`)
         }
       />
       {orgAtiva && <ModalBiblioteca aberto={biblioteca} conversaId={conversaId} aoFechar={() => setBiblioteca(false)} />}

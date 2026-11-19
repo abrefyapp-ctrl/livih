@@ -9028,14 +9028,13 @@ begin
       sqlerrm = 'mensagem do Instagram sem o ID da pessoa');
   end;
 
-  -- Responder pela Livih ainda não: recusa com o motivo, sem deixar mensagem parada na fila.
+  -- Entrega 2 (migration 20261119180000): dentro das 24 horas, a resposta entra na fila do envio.
   begin
     perform public.enfileirar_saida(v_conv.id, 'Temos sim', 'atendente', null);
-    insert into resultado (teste, ok) values ('instagram: responder pela Livih é recusado até a entrega 2', false);
+    insert into resultado (teste, ok) values ('instagram: dentro das 24 horas a resposta entra na fila',
+      exists (select 1 from public.fila_envio where conversa_id = v_conv.id));
   exception when others then
-    insert into resultado (teste, ok) values ('instagram: responder pela Livih é recusado até a entrega 2',
-      sqlerrm like 'Responder pelo Instagram na Livih chega na próxima etapa%'
-      and not exists (select 1 from public.fila_envio where conversa_id = v_conv.id));
+    insert into resultado (teste, ok) values ('instagram: dentro das 24 horas a resposta entra na fila', false);
   end;
 
   -- A mesma pessoa no WhatsApp continua separada (a junção vem na entrega 3), e o WhatsApp segue igual.
@@ -9056,13 +9055,13 @@ begin
     insert into resultado (teste, ok) values ('instagram: contato sem nenhum identificador é recusado', true);
   end;
 
-  -- Revisão de 19/11: o agente não entra no canal do Instagram até a entrega 2.
+  -- Entrega 2: o agente entra no canal do Instagram (a trava da entrega 1 saiu). Desligado aqui, para não mudar os
+  -- estados que os testes abaixo conferem.
   begin
-    insert into public.agentes (org_id, canal_id, ativo, prompt) values (v_org, v_ig, true, 'prompt');
-    insert into resultado (teste, ok) values ('instagram: agente no canal do Instagram é recusado até a entrega 2', false);
+    insert into public.agentes (org_id, canal_id, ativo, prompt) values (v_org, v_ig, false, 'prompt');
+    insert into resultado (teste, ok) values ('instagram: o canal do Instagram aceita agente', true);
   exception when others then
-    insert into resultado (teste, ok) values ('instagram: agente no canal do Instagram é recusado até a entrega 2',
-      sqlerrm like 'O agente no Instagram chega na próxima etapa%');
+    insert into resultado (teste, ok) values ('instagram: o canal do Instagram aceita agente', false);
   end;
 
   -- WhatsApp mais novo que o Instagram: o alerta escolhe o WhatsApp; e com o plano no limite, outra conta do
@@ -9162,26 +9161,25 @@ exception when others then
   insert into resultado (teste, ok) values ('instagram: o Instagram do contato não muda pela tela',
     sqlerrm like 'O Instagram do contato vem da conversa%');
 end $$;
--- Responder pela tela (enviar_mensagem, enviar_arquivo): recusado, e a conversa continua como estava.
+-- Responder pela tela (entrega 2): dentro das 24 horas sai, e quem respondeu assume a conversa; o arquivo passa da
+-- regra do Instagram (aqui para em "arquivo não encontrado", porque o teste não sobe arquivo).
 do $$
-declare v_antes public.conversas;
+declare v_conv uuid := current_setting('teste.ig_f7_conv')::uuid;
 begin
-  select * into v_antes from public.conversas where id = current_setting('teste.ig_f7_conv')::uuid;
   begin
-    perform public.enviar_mensagem(v_antes.id, 'Temos sim');
-    insert into resultado (teste, ok) values ('instagram: responder pela tela é recusado e a conversa não muda', false);
+    perform public.enviar_mensagem(v_conv, 'Temos sim');
+    insert into resultado (teste, ok) values ('instagram: responder pela tela sai e a conversa fica com quem respondeu',
+      (select estado = 'humano' and atribuida_a = '00000000-0000-0000-0000-0000000000a1' from public.conversas where id = v_conv)
+      and exists (select 1 from public.mensagens m join public.fila_envio f on f.mensagem_id = m.id
+                   where m.conversa_id = v_conv and m.direcao = 'saida' and m.texto = 'Temos sim'));
   exception when others then
-    insert into resultado (teste, ok) values ('instagram: responder pela tela é recusado e a conversa não muda',
-      sqlerrm like 'Responder pelo Instagram na Livih chega na próxima etapa%'
-      and (select estado from public.conversas where id = v_antes.id) = v_antes.estado
-      and not exists (select 1 from public.mensagens where conversa_id = v_antes.id and direcao = 'saida'));
+    insert into resultado (teste, ok) values ('instagram: responder pela tela sai e a conversa fica com quem respondeu', false);
   end;
   begin
-    perform public.enviar_arquivo(v_antes.id, current_setting('teste.f7') || '/' || v_antes.id || '/x.pdf', 'x.pdf', null);
-    insert into resultado (teste, ok) values ('instagram: arquivo pela tela é recusado', false);
+    perform public.enviar_arquivo(v_conv, current_setting('teste.f7') || '/' || v_conv || '/x.pdf', 'x.pdf', null);
+    insert into resultado (teste, ok) values ('instagram: arquivo pela tela passa da regra das 24 horas', false);
   exception when others then
-    insert into resultado (teste, ok) values ('instagram: arquivo pela tela é recusado',
-      sqlerrm like 'Responder pelo Instagram na Livih chega na próxima etapa%');
+    insert into resultado (teste, ok) values ('instagram: arquivo pela tela passa da regra das 24 horas', sqlerrm = 'arquivo não encontrado');
   end;
 end $$;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
@@ -9273,4 +9271,92 @@ reset role;
 insert into resultado (teste, ok) select 'instagram: a busca pela API roda a cada minuto, só com conta do Instagram ativa',
   exists (select 1 from cron.job where jobname = 'livih-instagram-sincronizar' and schedule = '* * * * *'
             and command like '%instagram-sincronizar%' and command like '%tipo = ''instagram'' and ativo%');
+
+-- Instagram, entrega 2: responder (migration 20261119180000_instagram_responder).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+set local role service_role;
+do $$
+declare
+  v_f7 uuid := current_setting('teste.f7')::uuid;
+  v_org uuid := current_setting('teste.insta_org')::uuid;
+  v_ig uuid := (select id from public.canais where instance_id = '17841400000000001');
+  v_ig_f7 uuid := current_setting('teste.ig_f7')::uuid;
+  v_conv uuid := current_setting('teste.ig_conv')::uuid;
+  v_ct uuid;
+  v_velha uuid;
+  v_wa uuid;
+  r jsonb;
+begin
+  -- A conta conectada antes desta migration ganhou o agente desligado (as criadas nos testes vêm depois dela).
+  insert into resultado (teste, ok) values ('instagram 2: conta já conectada ganha o agente desligado',
+    not exists (select 1 from public.canais k where k.tipo = 'instagram' and k.ativo and k.criado_em < now()
+                  and not exists (select 1 from public.agentes a where a.canal_id = k.id and not a.ativo)));
+
+  -- Conversa com a última mensagem do cliente há 2 dias: fora da janela da Meta.
+  insert into public.contatos (org_id, instagram_id, origem) values (v_f7, '1122334455660001', 'instagram') returning id into v_ct;
+  insert into public.conversas (org_id, canal_id, contato_id, estado) values (v_f7, v_ig_f7, v_ct, 'bot') returning id into v_velha;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, status_entrega, criado_em)
+  values (v_f7, v_velha, 'entrada', 'contato', 'texto', 'oi', 'recebida', now() - interval '2 days');
+  begin
+    perform public.enfileirar_saida(v_velha, 'Ainda tem?', 'atendente', null);
+    insert into resultado (teste, ok) values ('instagram 2: fora das 24 horas a resposta é recusada, sem ir para a fila', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('instagram 2: fora das 24 horas a resposta é recusada, sem ir para a fila',
+      sqlerrm like 'Passaram 24 horas da última mensagem do cliente no Instagram%'
+      and not exists (select 1 from public.fila_envio where conversa_id = v_velha));
+  end;
+  r := public.agente_enviar_arquivo(v_velha, v_f7 || '/' || v_velha || '/x.pdf', 'x.pdf', null);
+  insert into resultado (teste, ok) values ('instagram 2: fora das 24 horas o arquivo do agente volta com aviso',
+    not (r ->> 'enviado')::boolean and r ->> 'aviso' like 'Passaram 24 horas%');
+  insert into resultado (teste, ok) values ('instagram 2: a regra das 24 horas não vale para o WhatsApp',
+    public.instagram_pode_responder((select c.id from public.conversas c join public.canais k on k.id = c.canal_id
+                                      where k.tipo = 'waha' and c.org_id = v_f7 limit 1)));
+
+  -- Eco: a resposta que a Livih mandou (ainda sem ID) é reconhecida pelo texto e não vira mensagem nova.
+  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-1', '1122334455667788', 'texto', 'Temos sim', '{}');
+  insert into resultado (teste, ok) values ('instagram 2: eco da resposta da Livih não duplica e ganha o ID',
+    (r ->> 'duplicada')::boolean
+    and (select count(*) from public.mensagens where conversa_id = v_conv and direcao = 'saida' and texto = 'Temos sim') = 1
+    and exists (select 1 from public.mensagens where conversa_id = v_conv and wa_id = 'aWdfECO-1'));
+  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-1', '1122334455667788', 'texto', 'Temos sim', '{}');
+  insert into resultado (teste, ok) values ('instagram 2: o mesmo eco de novo não duplica', (r ->> 'duplicada')::boolean);
+  -- Texto longo sai em partes: o eco de um pedaço da resposta da Livih também não é mensagem nova.
+  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-1b', '1122334455667788', 'texto', 'sim', '{}');
+  insert into resultado (teste, ok) values ('instagram 2: eco de um pedaço da resposta da Livih não duplica',
+    (r ->> 'duplicada')::boolean and not exists (select 1 from public.mensagens where wa_id = 'aWdfECO-1b'));
+  -- Eco do que a equipe digitou no app do Instagram: entra e a conversa passa para a equipe.
+  update public.conversas set estado = 'bot' where id = v_conv;
+  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-2', '1122334455667788', 'texto', 'Respondi pelo celular', '{}');
+  insert into resultado (teste, ok) values ('instagram 2: resposta pelo app do Instagram entra e a equipe assume',
+    not (r ->> 'duplicada')::boolean
+    and exists (select 1 from public.mensagens where conversa_id = v_conv and direcao = 'saida' and autor_tipo = 'atendente'
+                  and texto = 'Respondi pelo celular' and wa_id = 'aWdfECO-2')
+    and (select estado = 'humano' and motivo_humano = 'respondida pelo app do Instagram' from public.conversas where id = v_conv));
+
+  -- Agente chamou a equipe numa conversa do Instagram: a cópia para o número da empresa sai pelo WhatsApp.
+  select id into v_wa from public.canais where instance_id = 'INST-INSTA';
+  update public.agentes set telefone_alerta = '5541900001111' where canal_id = v_ig;
+  update public.conversas set estado = 'bot' where id = v_conv;
+  perform public.agente_chamar_humano(v_conv, 'teste');
+  insert into resultado (teste, ok) values ('instagram 2: o alerta da conversa do Instagram sai pelo WhatsApp',
+    exists (select 1 from public.alertas where conversa_id = v_conv and telefone = '5541900001111' and canal_id = v_wa));
+
+  -- O agente sabe o canal.
+  r := public.agente_contexto(v_conv);
+  insert into resultado (teste, ok) values ('instagram 2: o contexto do agente traz o canal e o @',
+    r -> 'canal' ->> 'tipo' = 'instagram' and r -> 'contato' ->> 'instagram_usuario' is not null);
+end $$;
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.registrar_saida_instagram((select id from public.canais where instance_id = '17841400000000002'),
+    'aWdfECO-X', '1122334455669999', 'texto', 'x', '{}');
+  insert into resultado (teste, ok) values ('instagram 2: usuário logado não registra eco', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('instagram 2: usuário logado não registra eco', true);
+end $$;
+reset role;
 select n, teste, ok from resultado order by n;

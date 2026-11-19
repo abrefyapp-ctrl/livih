@@ -46,6 +46,9 @@ const cl = c.cliente;
 // Contato que compra por mais de uma empresa (migration 20261105120000): todas, a principal primeiro.
 const empresas = c.clientes || [];
 const regras = c.agente?.regras_humano?.casos || [];
+// Canal da conversa (Instagram, entrega 2 de docs/instagram.md): o prompt pede respostas curtas e o WhatsApp do
+// cliente quando o assunto vai passar das 24 horas da Meta.
+const instagram = c.canal?.tipo === 'instagram';
 
 // Arquivo/imagem: o `texto` é só o nome do arquivo ou a legenda. Sem esta marcação o agente lia
 // "cliente: requisicao_compra.pdf" como se tivesse o conteúdo e inventava "os itens do anexo" (JoGrampo, 15/10).
@@ -166,7 +169,7 @@ ${blocoAbertura}
 ` : ''}
 # O QUE JÁ SABEMOS DESTE CONTATO
 
-- Nome: ${contato.nome || contato.nome_whatsapp || 'não informado'}${contato.nome ? '' : ' (nome do perfil do WhatsApp, não confirmado)'}
+- Nome: ${contato.nome || contato.nome_whatsapp || 'não informado'}${contato.nome ? '' : ` (nome do perfil do ${instagram ? 'Instagram' : 'WhatsApp'}, não confirmado)`}
 - Empresa: ${contato.empresa || 'não informada'}
 - Cliente (cadastro): ${cl ? `${cl.nome}${cl.razao_social && cl.razao_social !== cl.nome ? ` (razão social: ${cl.razao_social})` : ''}${cl.cidade ? ` — ${cl.cidade}${cl.uf ? `/${cl.uf}` : ''}` : ''}${cl.tem_documento ? '; CNPJ/CPF no cadastro' : '; sem CNPJ/CPF no cadastro'}` : 'não ligado a um cliente cadastrado'}${empresas.length > 1 ? `
 - Empresas deste WhatsApp (compra por todas; a primeira é a principal): ${empresas.map((e) => `${e.razao_social || e.nome}${e.cnpj ? ` (CNPJ ${e.cnpj})` : ' (pessoa física)'}`).join('; ')}` : ''}
@@ -175,6 +178,8 @@ ${blocoAbertura}
 - Oportunidade aberta: ${op ? `"${op.titulo}" — etapa ${op.etapa}${op.resumo ? `. Resumo: ${op.resumo}` : ''}` : 'nenhuma ainda'}
 ${c.perguntar_cidade ? `
 CIDADE DO CLIENTE: ainda não sabemos de qual cidade este cliente fala, e a empresa usa a cidade para passar o atendimento à equipe certa. Na sua resposta, junto com o que for responder, pergunte a cidade numa frase curta (é a exceção à regra de não perguntar só para preencher cadastro). Pergunte uma vez só: se ele não responder, siga o atendimento sem insistir. Assim que o cliente disser, grave com atualizar_contato no campo cidade. Se ele já disse a cidade nesta conversa, só grave, sem perguntar de novo. Não diga ao cliente quem vai atendê-lo.
+` : ''}${instagram ? `
+CANAL: esta conversa é pelo Direct do Instagram${contato.instagram_usuario ? ` (@${contato.instagram_usuario})` : ''}, não pelo WhatsApp. A sua resposta vai no Direct, e não no WhatsApp: escreva curto (até uns 600 caracteres; texto mais longo chega picado em várias mensagens). Pela regra da Meta, a empresa só pode responder até 24 horas depois da última mensagem do cliente: não prometa mandar nada "mais tarde" ou "amanhã" por aqui. Se o assunto for continuar depois (orçamento para fechar, retorno da equipe), peça o WhatsApp do cliente para a equipe seguir por lá e anote o número com registrar_nota.
 ` : ''}
 Data e hora agora: ${agora} (horário de Brasília).`;
 

@@ -5,10 +5,11 @@
 // URL no painel do app (Instagram → Webhooks): /functions/v1/instagram-webhook
 //
 // A leitura e a gravação ficam em _shared/instagram.ts, as mesmas da busca pela API (instagram-sincronizar).
-// O que fica para a entrega 2: o eco do que a equipe digita no app do Instagram (is_echo), lido, reações.
+// Eco (is_echo, entrega 2): o que a equipe digita no app do Instagram entra e a passa a conversa para a equipe; o que
+// a própria Livih mandou é reconhecido e ignorado. Lido e reações ainda não.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { gravarRecebida, lerMensagemWebhook, type Json } from "../_shared/instagram.ts";
+import { gravarEco, gravarRecebida, lerMensagemWebhook, type Json } from "../_shared/instagram.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -38,9 +39,15 @@ async function assinaturaValida(corpo: string, cabecalho: string | null): Promis
 
 async function entrada(canal: { canal_id: string; org_id: string }, ev: Json) {
   const m = ev.message ?? {};
+  if (!m.mid) return;
+  // Eco: a conta da empresa mandou (pela Livih ou pelo app do Instagram); o cliente é o destinatário.
+  if (m.is_echo) {
+    const cliente = String(ev.recipient?.id ?? "");
+    if (cliente) await gravarEco(supabase, canal, { mid: String(m.mid), igsid: cliente }, lerMensagemWebhook(m), { evento: ev });
+    return;
+  }
   const igsid = String(ev.sender?.id ?? "");
-  if (!m.mid || !igsid) return;
-  if (m.is_echo) return; // entrega 2: o que a equipe digitou no app do Instagram
+  if (!igsid) return;
   if (m.is_deleted) {
     console.log("mensagem apagada pela pessoa", m.mid);
     return;

@@ -538,10 +538,7 @@ export function SecaoWhatsapp() {
                             Conectar celular
                           </Botao>
                         )}
-                        {n.tipo === 'instagram' ? (
-                          // Entrega 2: o agente responde no Instagram. Até lá, a conversa vai direto para a equipe.
-                          <span className="text-pequeno text-texto-3">Atendimento pela equipe</span>
-                        ) : podeLigarAgente(n) ? (
+                        {podeLigarAgente(n) ? (
                           <Interruptor
                             ligado={n.agente_ativo}
                             desabilitado={ocupado === n.id}

@@ -181,6 +181,31 @@ Migration `20261119120000_instagram_canal`, Edge Function `instagram-webhook` (n
 - **Conferência de tipos das Edge Functions:** `npx -y deno check --node-modules-dir=none <arquivo>` resolve o
   `pdf-lib` pelo cache e passa também nas funções que importam `_shared/midia.ts`.
 
+## Entrega 2 (19/11): responder
+
+Migration `20261119180000_instagram_responder`; Edge Functions `whatsapp-enviar` (envio), `instagram-webhook` e
+`instagram-sincronizar` (eco), `whatsapp-conexao` (agente da conta nova); n8n (`gerar_workflow.py`); tela.
+
+- **Envio** (`whatsapp-enviar`, adaptador `instagram`): `POST /{conta}/messages` com o IGSID do contato. Texto longo sai
+  em partes de até 1.000 bytes, cortadas em espaço; arquivo (imagem, vídeo, áudio ou documento) sai sem legenda, e a
+  legenda vai logo depois como texto. Se uma parte já saiu e a seguinte falha, conta como enviado (sem repetir a
+  primeira na nova tentativa). Erro 10 / 2018278 da Meta vira "Passaram 24 horas…".
+- **Janela de 24 horas** (`instagram_pode_responder`, 5 minutos de folga): fora dela, `enfileirar_saida` e
+  `enviar_arquivo` recusam com o motivo, e `agente_enviar_arquivo` devolve aviso. Na tela, o campo de resposta fica
+  bloqueado com o aviso (como a API oficial, mas sem modelo). O follow-up do agente, passadas as 24 horas, vai para a
+  equipe.
+- **Eco** (`registrar_saida_instagram`): o que a conta mandou chega pelo webhook (`is_echo`) ou pela busca (mensagem
+  da própria conta). O que a Livih mandou é ignorado (mesmo ID, ou texto contido numa saída da Livih dos últimos 10
+  minutos, para as partes de um texto longo e o eco que chega antes de o envio gravar o ID). O que foi digitado no app
+  do Instagram entra como mensagem da equipe e passa a conversa para a equipe ("respondida pelo app do Instagram").
+  O arquivo do eco não é baixado (o balão mostra o tipo).
+- **Agente:** sai a trava `agentes_sem_instagram`; a conta conectada ganhou o agente desligado (cópia do da empresa),
+  e a conta nova nasce com ele (`whatsapp-conexao`). Em Configurações, a conta tem o botão do agente como os números.
+  O contexto (`agente_contexto`) traz o canal e o @; no Instagram, o prompt pede respostas curtas, nada de prometer
+  "mais tarde" por ali (24 horas) e, se o assunto for continuar, pedir o WhatsApp e anotar com `registrar_nota`
+  (gravar o número no contato e juntar os contatos é a entrega 3). A cópia do alerta "o agente chamou a equipe" para
+  o número da empresa sai pelo WhatsApp.
+
 ## Em aberto
 
 - **Primeira mensagem no WhatsApp:** com o número em mãos, quem fala primeiro? (a) O agente responde no Direct com o
