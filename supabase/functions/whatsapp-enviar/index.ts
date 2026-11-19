@@ -214,11 +214,21 @@ async function enviarInstagram(item: ItemFila): Promise<Resultado> {
   const igsid = (msg as any)?.conversa?.contato?.instagram_id as string | undefined;
   if (!igsid) return { ok: false, erro: "contato sem o ID do Instagram" };
   const destino = { recipient: { id: igsid } };
+  // Cada mensagem que sai tem o ID marcado na hora: o eco dela (webhook ou busca) é reconhecido como da Livih pelo ID
+  // (instagram_marcar_enviada), e não vira mensagem da equipe.
+  const mandar = async (corpo: unknown): Promise<Resultado> => {
+    const r = await postInstagram(item.instance_id!, token, corpo);
+    if (r.ok && r.id) {
+      const { error } = await supabase.rpc("instagram_marcar_enviada", { p_canal: item.canal_id, p_mid: r.id, p_mensagem: item.mensagem_id });
+      if (error) console.error("instagram_marcar_enviada", error.message);
+    }
+    return r;
+  };
 
   let primeiro: string | undefined;
   if (item.midia_path) {
     const tipo = TIPO_ANEXO_INSTAGRAM[item.tipo] ?? "file";
-    const r = await postInstagram(item.instance_id, token, {
+    const r = await mandar({
       ...destino, message: { attachment: { type: tipo, payload: { url: await urlArquivo(item.midia_path) } } },
     });
     if (!r.ok) return r;
@@ -226,7 +236,7 @@ async function enviarInstagram(item: ItemFila): Promise<Resultado> {
   }
   const texto = (item.texto ?? "").trim();
   for (const parte of texto ? partesInstagram(texto) : []) {
-    const r = await postInstagram(item.instance_id, token, { ...destino, message: { text: parte } });
+    const r = await mandar({ ...destino, message: { text: parte } });
     // Uma parte (ou o arquivo) já saiu e a seguinte falhou: conta como enviado, senão a fila tentaria de novo e o
     // cliente receberia a primeira parte duas vezes. O erro fica no log.
     if (!r.ok) {
@@ -272,12 +282,14 @@ Deno.serve(async (req) => {
       } catch (e) {
         resultado = { ok: false, erro: String(e).slice(0, 300) };
       }
-      await supabase.rpc("fila_resultado", {
+      const { error: erroResultado } = await supabase.rpc("fila_resultado", {
         p_fila: item.fila_id,
         p_ok: resultado.ok,
         p_wa_id: resultado.id ?? null,
         p_erro: resultado.erro ?? null,
       });
+      // Sem isto, um erro aqui deixava o item "enviando" para sempre sem rastro (revisão de 19/11).
+      if (erroResultado) console.error("fila_resultado", item.fila_id, item.mensagem_id, erroResultado.message);
       resultado.ok ? enviadas++ : falhas++;
     }
   }

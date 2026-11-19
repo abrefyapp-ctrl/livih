@@ -9309,30 +9309,50 @@ begin
   r := public.agente_enviar_arquivo(v_velha, v_f7 || '/' || v_velha || '/x.pdf', 'x.pdf', null);
   insert into resultado (teste, ok) values ('instagram 2: fora das 24 horas o arquivo do agente volta com aviso',
     not (r ->> 'enviado')::boolean and r ->> 'aviso' like 'Passaram 24 horas%');
+  r := public.agente_responder(v_velha, 'Ainda tem sim',
+         (select id from public.mensagens where conversa_id = v_velha and direcao = 'entrada' limit 1));
+  insert into resultado (teste, ok) values ('instagram 2: fora das 24 horas a resposta do agente volta com o motivo, sem erro',
+    not (r ->> 'enviado')::boolean and r ->> 'motivo' like 'passaram 24 horas%'
+    and not exists (select 1 from public.fila_envio where conversa_id = v_velha));
   insert into resultado (teste, ok) values ('instagram 2: a regra das 24 horas não vale para o WhatsApp',
     public.instagram_pode_responder((select c.id from public.conversas c join public.canais k on k.id = c.canal_id
                                       where k.tipo = 'waha' and c.org_id = v_f7 limit 1)));
 
-  -- Eco: a resposta que a Livih mandou (ainda sem ID) é reconhecida pelo texto e não vira mensagem nova.
+  -- Eco do que a Livih mandou: cada parte marcada pelo ID no envio não vira mensagem nova, nem depois de muito tempo.
+  perform public.instagram_marcar_enviada(v_ig, 'aWdfECO-1', null);
+  perform public.instagram_marcar_enviada(v_ig, 'aWdfECO-1b', null);
   r := public.registrar_saida_instagram(v_ig, 'aWdfECO-1', '1122334455667788', 'texto', 'Temos sim', '{}');
-  insert into resultado (teste, ok) values ('instagram 2: eco da resposta da Livih não duplica e ganha o ID',
+  insert into resultado (teste, ok) values ('instagram 2: eco de mensagem marcada no envio não duplica',
     (r ->> 'duplicada')::boolean
-    and (select count(*) from public.mensagens where conversa_id = v_conv and direcao = 'saida' and texto = 'Temos sim') = 1
-    and exists (select 1 from public.mensagens where conversa_id = v_conv and wa_id = 'aWdfECO-1'));
-  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-1', '1122334455667788', 'texto', 'Temos sim', '{}');
-  insert into resultado (teste, ok) values ('instagram 2: o mesmo eco de novo não duplica', (r ->> 'duplicada')::boolean);
-  -- Texto longo sai em partes: o eco de um pedaço da resposta da Livih também não é mensagem nova.
-  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-1b', '1122334455667788', 'texto', 'sim', '{}');
-  insert into resultado (teste, ok) values ('instagram 2: eco de um pedaço da resposta da Livih não duplica',
+    and (select count(*) from public.mensagens where conversa_id = v_conv and direcao = 'saida' and texto = 'Temos sim') = 1);
+  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-1b', '1122334455667788', 'texto', 'parte dois', '{}');
+  insert into resultado (teste, ok) values ('instagram 2: eco de outra parte marcada também não duplica',
     (r ->> 'duplicada')::boolean and not exists (select 1 from public.mensagens where wa_id = 'aWdfECO-1b'));
-  -- Eco do que a equipe digitou no app do Instagram: entra e a conversa passa para a equipe.
+  -- Eco que chega enquanto a Livih ainda manda uma mensagem da conversa (antes de marcar o ID): é dela.
+  update public.fila_envio set status = 'enviando' where conversa_id = v_conv;
+  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-1c', '1122334455667788', 'texto', 'Temos sim', '{}');
+  insert into resultado (teste, ok) values ('instagram 2: eco durante o envio da Livih não vira mensagem da equipe',
+    (r ->> 'duplicada')::boolean and not exists (select 1 from public.mensagens where wa_id = 'aWdfECO-1c'));
+  update public.fila_envio set status = 'enviada' where conversa_id = v_conv;
+  -- O que a equipe digitou no app entra, mesmo que o texto apareça na resposta da Livih ("sim" em "Temos sim").
   update public.conversas set estado = 'bot' where id = v_conv;
-  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-2', '1122334455667788', 'texto', 'Respondi pelo celular', '{}');
+  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-2', '1122334455667788', 'texto', 'sim', '{}');
   insert into resultado (teste, ok) values ('instagram 2: resposta pelo app do Instagram entra e a equipe assume',
     not (r ->> 'duplicada')::boolean
     and exists (select 1 from public.mensagens where conversa_id = v_conv and direcao = 'saida' and autor_tipo = 'atendente'
-                  and texto = 'Respondi pelo celular' and wa_id = 'aWdfECO-2')
+                  and texto = 'sim' and wa_id = 'aWdfECO-2' and not automatica)
     and (select estado = 'humano' and motivo_humano = 'respondida pelo app do Instagram' from public.conversas where id = v_conv));
+  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-2', '1122334455667788', 'texto', 'sim', '{}');
+  insert into resultado (teste, ok) values ('instagram 2: o mesmo eco de novo não duplica', (r ->> 'duplicada')::boolean);
+  -- Resposta automática configurada: entra marcada como automática e não tira a conversa do agente.
+  update public.agentes set regras_humano = jsonb_build_object('mensagens_automaticas', jsonb_build_array('Recebemos sua mensagem!'))
+   where canal_id = v_ig;
+  update public.conversas set estado = 'bot' where id = v_conv;
+  r := public.registrar_saida_instagram(v_ig, 'aWdfECO-3', '1122334455667788', 'texto', 'Recebemos sua mensagem!', '{}');
+  insert into resultado (teste, ok) values ('instagram 2: resposta automática do Instagram não tira a conversa do agente',
+    (r ->> 'automatica')::boolean
+    and exists (select 1 from public.mensagens where wa_id = 'aWdfECO-3' and automatica)
+    and (select estado from public.conversas where id = v_conv) = 'bot');
 
   -- Agente chamou a equipe numa conversa do Instagram: a cópia para o número da empresa sai pelo WhatsApp.
   select id into v_wa from public.canais where instance_id = 'INST-INSTA';

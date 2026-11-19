@@ -5,9 +5,9 @@
 --   - janela da Meta: responder só até 24 horas depois da última mensagem do cliente (5 minutos de folga). Fora dela,
 --     a resposta é recusada com o motivo, sem ficar parada na fila (instagram_pode_responder);
 --   - eco do app do Instagram: o que a equipe digita direto no app entra na conversa e a passa para a equipe, como o
---     app do WhatsApp Business na coexistência (registrar_saida_instagram). A mensagem que a própria Livih mandou não
---     é eco: reconhecida pelo ID ou, se o eco chegar antes de o envio gravar o ID, pelo mesmo texto nos últimos 10
---     minutos;
+--     app do WhatsApp Business na coexistência (registrar_saida_instagram); resposta automática configurada entra sem
+--     tirar a conversa do agente. A mensagem que a própria Livih mandou não é eco: cada parte é marcada pelo ID no
+--     envio (instagram_marcar_enviada), e o eco que chega durante o envio também é dela;
 --   - agente: sai a trava de agentes_sem_instagram; a conta já conectada ganha o agente desligado (cópia do da
 --     empresa, como os números de WhatsApp). A cópia do alerta "o agente chamou a equipe" para o número da empresa sai
 --     por WhatsApp; o follow-up, passadas as 24 horas no Instagram, vai para a equipe;
@@ -43,6 +43,18 @@ revoke all on function public.instagram_pode_responder(uuid) from public, anon, 
 
 -- ---- eco do app do Instagram ----
 
+-- A whatsapp-enviar marca o ID de cada mensagem que manda ao Instagram (cada parte de um texto longo, o arquivo e a
+-- legenda): o eco dela é reconhecido pelo ID, sem comparar texto nem depender de prazo (revisão de 19/11: comparar
+-- texto engolia um "ok" digitado no app, e uma nova tentativa da fila depois de 10 minutos virava mensagem da equipe).
+create function public.instagram_marcar_enviada(p_canal uuid, p_mid text, p_mensagem uuid)
+returns void language sql security definer set search_path = '' as $$
+  insert into public.eventos_recebidos (canal_id, wa_id, payload, processado_em)
+  values (p_canal, p_mid, jsonb_build_object('enviada_pela_livih', p_mensagem), now())
+  on conflict (canal_id, wa_id) do nothing;
+$$;
+revoke all on function public.instagram_marcar_enviada(uuid, text, uuid) from public, anon, authenticated;
+grant execute on function public.instagram_marcar_enviada(uuid, text, uuid) to service_role;
+
 create function public.registrar_saida_instagram(p_canal uuid, p_mid text, p_igsid text, p_tipo public.tipo_msg,
                                                  p_texto text, p_payload jsonb)
 returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -51,7 +63,7 @@ declare
   v_evento bigint;
   v_contato uuid;
   v_conversa public.conversas;
-  v_propria uuid;
+  v_auto boolean;
 begin
   select org_id into v_org from public.canais where id = p_canal and ativo and tipo = 'instagram';
   if v_org is null then
@@ -60,7 +72,8 @@ begin
   if coalesce(btrim(p_mid), '') = '' then
     raise exception 'mensagem do Instagram sem ID';
   end if;
-  -- Mensagem que a Livih mandou e já tem o ID gravado: não é eco.
+  -- Mensagem que a Livih mandou: o ID de cada parte é marcado no envio (instagram_marcar_enviada, em
+  -- eventos_recebidos), e o da primeira também fica na mensagem. O insert abaixo esbarra na marca e devolve duplicada.
   if exists (select 1 from public.mensagens m join public.conversas c on c.id = m.conversa_id
               where c.canal_id = p_canal and m.direcao = 'saida' and m.wa_id = p_mid) then
     return jsonb_build_object('duplicada', true);
@@ -80,34 +93,35 @@ begin
   on conflict (canal_id, contato_id) do nothing;
   select * into v_conversa from public.conversas where canal_id = p_canal and contato_id = v_contato for update;
 
-  -- Mensagem que a Livih mandou nos últimos 10 minutos e cujo eco chegou antes de o envio gravar o ID, ou um pedaço
-  -- dela: texto longo sai em partes de até 1.000 bytes, e a legenda de um arquivo sai numa mensagem à parte. Texto:
-  -- o eco está contido no que a Livih mandou; arquivo: mesmo tipo.
-  select m.id into v_propria from public.mensagens m
-   where m.conversa_id = v_conversa.id and m.direcao = 'saida' and not m.automatica
-     and m.autor_tipo in ('bot', 'atendente') and m.criado_em > now() - interval '10 minutes'
-     and case when p_tipo = 'texto'
-              then nullif(btrim(p_texto), '') is not null and position(btrim(p_texto) in coalesce(m.texto, '')) > 0
-              else m.tipo = p_tipo end
-   order by (m.wa_id is null) desc, m.criado_em desc limit 1;
-  if v_propria is not null then
-    update public.mensagens set wa_id = p_mid where id = v_propria and wa_id is null;
-    update public.eventos_recebidos set processado_em = now() where id = v_evento;
+  -- O eco chegou enquanto a Livih ainda mandava uma mensagem desta conversa (antes de marcar o ID dela): é dela.
+  -- Uma mensagem digitada no app exatamente nesses segundos também cairia aqui; é raro, e o contrário (o eco da
+  -- Livih virar mensagem da equipe) tiraria a conversa do agente.
+  if exists (select 1 from public.fila_envio f where f.conversa_id = v_conversa.id and f.status = 'enviando') then
+    update public.eventos_recebidos set processado_em = now(), erro = 'eco durante o envio da Livih' where id = v_evento;
     return jsonb_build_object('duplicada', true);
   end if;
 
-  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, wa_id, status_entrega)
-  values (v_org, v_conversa.id, 'saida', 'atendente', p_tipo, p_texto, p_mid, 'enviada');
-  update public.conversas
-     set ultima_mensagem_em = now(),
-         ultima_mensagem_resumo = left(coalesce(p_texto, '[' || p_tipo::text || ']'), 140),
-         estado = case when estado in ('bot', 'aguardando_humano', 'encerrada') then 'humano' else estado end,
-         motivo_humano = case when estado in ('bot', 'aguardando_humano', 'encerrada')
-                              then 'respondida pelo app do Instagram' else motivo_humano end,
-         nao_lidas = 0
-   where id = v_conversa.id;
+  -- Resposta automática configurada (a mesma lista do WhatsApp, no agente do canal): entra sem tirar a conversa do
+  -- agente, como em registrar_saida_celular.
+  v_auto := public.eh_mensagem_automatica(p_canal, p_texto);
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, wa_id, status_entrega, automatica)
+  values (v_org, v_conversa.id, 'saida', 'atendente', p_tipo, p_texto, p_mid, 'enviada', v_auto);
+  if v_auto then
+    update public.conversas
+       set ultima_mensagem_em = now(), ultima_mensagem_resumo = left(coalesce(p_texto, '[' || p_tipo::text || ']'), 140)
+     where id = v_conversa.id;
+  else
+    update public.conversas
+       set ultima_mensagem_em = now(),
+           ultima_mensagem_resumo = left(coalesce(p_texto, '[' || p_tipo::text || ']'), 140),
+           estado = case when estado in ('bot', 'aguardando_humano', 'encerrada') then 'humano' else estado end,
+           motivo_humano = case when estado in ('bot', 'aguardando_humano', 'encerrada')
+                                then 'respondida pelo app do Instagram' else motivo_humano end,
+           nao_lidas = 0
+     where id = v_conversa.id;
+  end if;
   update public.eventos_recebidos set processado_em = now() where id = v_evento;
-  return jsonb_build_object('duplicada', false, 'conversa_id', v_conversa.id);
+  return jsonb_build_object('duplicada', false, 'conversa_id', v_conversa.id, 'automatica', v_auto);
 end $$;
 revoke all on function public.registrar_saida_instagram(uuid, text, text, public.tipo_msg, text, jsonb)
   from public, anon, authenticated;
@@ -263,6 +277,37 @@ begin
      set ultima_mensagem_em = now(), ultima_mensagem_resumo = left('📎 ' || coalesce(v_legenda, v_nome), 140)
    where id = p_conversa;
   return jsonb_build_object('enviado', true, 'mensagem_id', v_msg);
+end $function$;
+
+-- agente_responder: No Instagram, fora das 24 horas o agente recebe o motivo em vez de um erro (que derrubava a execução no n8n).
+CREATE OR REPLACE FUNCTION public.agente_responder(p_conversa uuid, p_texto text, p_mensagem uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  perform public.agente_marcar();
+  if not public.instagram_pode_responder(p_conversa) then
+    return jsonb_build_object('enviado', false, 'motivo', 'passaram 24 horas da última mensagem do cliente no Instagram');
+  end if;
+  -- Confere de novo na hora de gravar: entre pensar e responder o cliente pode ter escrito de
+  -- novo ou um atendente pode ter assumido. Exceção: se foi o próprio agente que acabou de passar
+  -- a conversa para a equipe nesta rodada, a mensagem de despedida ("vou chamar alguém") sai.
+  if not public.agente_deve_responder(p_conversa, p_mensagem)
+     and not exists (
+       select 1 from public.conversas c
+        where c.id = p_conversa and c.estado = 'aguardando_humano' and c.atribuida_a is null
+          and p_mensagem = (select id from public.mensagens where conversa_id = p_conversa and direcao = 'entrada'
+                             order by criado_em desc limit 1)
+          and exists (select 1 from public.auditoria a
+                       where a.entidade = 'conversas' and a.entidade_id = p_conversa::text
+                         and a.acao = 'conversa_estado' and a.ator_tipo = 'bot'
+                         and a.criado_em >= (select criado_em from public.mensagens where id = p_mensagem))
+     ) then
+    return jsonb_build_object('enviado', false, 'motivo', 'conversa mudou enquanto o agente pensava');
+  end if;
+  return jsonb_build_object('enviado', true, 'mensagem_id', public.enfileirar_saida(p_conversa, p_texto, 'bot', null));
 end $function$;
 
 -- agente_chamar_humano: A cópia do alerta para o número da empresa sai por WhatsApp mesmo quando a conversa é do Instagram.

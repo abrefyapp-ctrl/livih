@@ -195,10 +195,16 @@ Migration `20261119180000_instagram_responder`; Edge Functions `whatsapp-enviar`
   bloqueado com o aviso (como a API oficial, mas sem modelo). O follow-up do agente, passadas as 24 horas, vai para a
   equipe.
 - **Eco** (`registrar_saida_instagram`): o que a conta mandou chega pelo webhook (`is_echo`) ou pela busca (mensagem
-  da própria conta). O que a Livih mandou é ignorado (mesmo ID, ou texto contido numa saída da Livih dos últimos 10
-  minutos, para as partes de um texto longo e o eco que chega antes de o envio gravar o ID). O que foi digitado no app
-  do Instagram entra como mensagem da equipe e passa a conversa para a equipe ("respondida pelo app do Instagram").
-  O arquivo do eco não é baixado (o balão mostra o tipo).
+  da própria conta). O que a Livih mandou é reconhecido pelo ID: a `whatsapp-enviar` marca cada parte, o arquivo e a
+  legenda na hora em que saem (`instagram_marcar_enviada`, em `eventos_recebidos`); o eco que chega enquanto a
+  mensagem da conversa ainda está saindo (fila "enviando") também é da Livih. O que foi digitado no app do Instagram
+  entra como mensagem da equipe e passa a conversa para a equipe ("respondida pelo app do Instagram"); resposta
+  automática da lista do agente entra marcada como automática, sem tirar a conversa do agente. O arquivo do eco não é
+  baixado (o balão mostra o tipo).
+  Revisão do banco (19/11): a primeira versão comparava o texto (um "ok" digitado no app, contido na resposta da
+  Livih, era engolido) e dava 10 minutos (uma nova tentativa da fila depois disso virava mensagem da equipe); trocada
+  pela marca do ID. Também: o agente fora das 24 horas recebe o motivo em vez de erro (`agente_responder`), e a
+  `whatsapp-enviar` registra no log quando `fila_resultado` falha.
 - **Agente:** sai a trava `agentes_sem_instagram`; a conta conectada ganhou o agente desligado (cópia do da empresa),
   e a conta nova nasce com ele (`whatsapp-conexao`). Em Configurações, a conta tem o botão do agente como os números.
   O contexto (`agente_contexto`) traz o canal e o @; no Instagram, o prompt pede respostas curtas, nada de prometer
