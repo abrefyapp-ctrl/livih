@@ -147,6 +147,15 @@ Migration `20261119120000_instagram_canal`, Edge Function `instagram-webhook` (n
   confere o token ao salvar o webhook). Conta de teste: **livih.tech**,
   no portfólio Livih (o WhatsApp oficial fica no portfólio F7 Tech; para o Direct, não importa). "Permitir acesso às
   mensagens" precisa de quem tem a senha do Instagram (pedido em 19/11).
+- **Teste de 19/11 com o livih.tech:**
+  - **Funcionou:** a conexão pelo botão (a conta virou o canal "@livih.tech" na F7 Tech, com token sem expiração;
+    `/me/assigned_instagram_accounts` e `subscribed_apps` funcionaram); o caminho Meta → Livih (o "Testar" do campo
+    `messages` chegou ao `instagram-webhook` com 200).
+  - **Não chegou:** nenhuma mensagem real do Direct (nenhum POST nos logs), nem de uma conta cadastrada e aceita como
+    testador do Instagram. Isso descarta a falta do App Review e aponta para o **"Permitir acesso às mensagens"** do
+    livih.tech, ainda desligado (o Business Suite mostra o alerta "as mensagens do Instagram ficarão indisponíveis
+    até você confirmar…", que pede a senha do Instagram; quem tem a senha precisa ligar).
+  - **Próximo:** com o acesso ligado, mandar de novo como testador e conferir contato, @, nome e a imagem do Story.
 - **A confirmar no primeiro teste** com a conta da F7: a lista de contas (`/me/assigned_instagram_accounts`, sem
   exemplo de resposta na documentação), o `entry.id` do webhook (a documentação diz que é o ID da conta profissional)
   e o perfil da pessoa pelo `graph.facebook.com`.
