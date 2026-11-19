@@ -2718,6 +2718,73 @@ export type Database = {
           },
         ]
       }
+      nota_envios: {
+        Row: {
+          canal: string
+          contato_id: string | null
+          criado_em: string
+          criado_por: string | null
+          destino: string
+          enviado_em: string | null
+          id: string
+          mensagem_id: string | null
+          nota_id: string
+          org_id: string
+          resultado: string | null
+          situacao: string
+        }
+        Insert: {
+          canal: string
+          contato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          destino: string
+          enviado_em?: string | null
+          id?: string
+          mensagem_id?: string | null
+          nota_id: string
+          org_id: string
+          resultado?: string | null
+          situacao?: string
+        }
+        Update: {
+          canal?: string
+          contato_id?: string | null
+          criado_em?: string
+          criado_por?: string | null
+          destino?: string
+          enviado_em?: string | null
+          id?: string
+          mensagem_id?: string | null
+          nota_id?: string
+          org_id?: string
+          resultado?: string | null
+          situacao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nota_envios_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nota_envios_nota_id_fkey"
+            columns: ["nota_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nota_envios_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notas: {
         Row: {
           autor_id: string | null
@@ -5973,11 +6040,23 @@ export type Database = {
         Returns: string
       }
       nomes_conferem: { Args: { p_a: string; p_b: string }; Returns: boolean }
+      nota_destinos: { Args: { p_cliente: string }; Returns: Json }
       nota_entrada_lancar: {
         Args: { p_itens: Json; p_nota: Json; p_org: string }
         Returns: Json
       }
       nota_fiscal_liberada: { Args: { p_org: string }; Returns: boolean }
+      nota_whatsapp_enfileirar: {
+        Args: {
+          p_conversa: string
+          p_envio: string
+          p_legenda: string
+          p_nome: string
+          p_path: string
+        }
+        Returns: string
+      }
+      nota_whatsapp_preparar: { Args: { p_envio: string }; Returns: Json }
       notas_excedentes: {
         Args: { p_mes: string; p_org: string }
         Returns: number
