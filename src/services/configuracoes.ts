@@ -132,7 +132,8 @@ export async function removerConteudo(id: string) {
 
 export type NumeroWhatsapp = {
   id: string
-  tipo: 'waha' | 'meta'
+  /** 'instagram': conta do Instagram profissional (docs/instagram.md), na mesma lista dos números. */
+  tipo: 'waha' | 'meta' | 'instagram'
   meta_coexistencia: boolean
   nome: string
   responsavel_id: string | null
@@ -175,6 +176,10 @@ export const conectarOficial = (
   dados: { code: string; waba_id: string; phone_number_id?: string; evento: string },
   destino: { canal_id: string } | { nome: string; responsavel_id: string | null },
 ) => conexao<{ canal: NumeroWhatsapp }>(orgId, 'oficial', { ...dados, ...destino })
+
+/** Depois do login da Meta para o Instagram: cada conta liberada vira um canal. */
+export const conectarInstagram = (orgId: string, code: string) =>
+  conexao<{ canais: NumeroWhatsapp[] }>(orgId, 'instagram', { code }).then((r) => r.canais)
 
 /** Número que já está no portfólio da F7 (ex.: o de teste da Meta), com o token de usuário do sistema. Só plataforma. */
 export const conectarNumeroDoPortfolio = (orgId: string, dados: { nome: string; waba_id: string; phone_number_id: string }) =>

@@ -16,6 +16,9 @@
 //           (o histórico fica); sem, nasce um canal novo. (dono/admin)
 //       { org_id, acao: 'oficial_sistema', waba_id, phone_number_id, nome? }
 //         → número que já está no portfólio da F7, pelo token de usuário do sistema. Só admin da plataforma.
+//       { org_id, acao: 'instagram', code }                         → { canais } (dono/admin)
+//         → contas do Instagram profissional pelo login da Meta (Unified Login, docs/instagram.md): cada conta
+//           liberada vira um canal 'instagram', sem ocupar vaga de número e sem agente até a entrega 2.
 //       { org_id, canal_id, acao: 'agenda' }                        → { contatos: [{ nome, telefone }] }
 //         → contatos salvos na agenda do celular do número (WAHA), para a prospecção. Quem vê o número.
 // A chave do WAHA e os tokens da Meta nunca saem daqui.
@@ -258,6 +261,72 @@ async function conectarOficial(orgId: string, p: Oficial & { canal_id?: string; 
   return canal;
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// Instagram (Unified Login, docs/instagram.md)
+
+// Campos do webhook assinados por conta. Entrega 1: mensagens e anúncios; o resto entra com o envio (entrega 2).
+const CAMPOS_INSTAGRAM = "messages,messaging_referral";
+
+async function conectarInstagram(orgId: string, code: string | undefined): Promise<Canal[]> {
+  if (!META_APP_SECRET) throw new Error("META_APP_SECRET não configurado");
+  if (!code) throw new ErroUsuario("A Meta não devolveu os dados da conta. Tente conectar de novo.");
+
+  // 1. O código vale pouco tempo: troca primeiro. O token é do usuário de sistema do portfólio do cliente.
+  const q = new URLSearchParams({ client_id: META_APP_ID, client_secret: META_APP_SECRET, code });
+  const r = await fetch(`${GRAPH}/oauth/access_token?${q}`, { signal: AbortSignal.timeout(15_000) });
+  const troca = await r.json().catch(() => null);
+  if (!r.ok || !troca?.access_token) {
+    console.error("instagram: troca do código", r.status, JSON.stringify(troca).slice(0, 300));
+    throw new ErroUsuario("A Meta recusou a conexão (o código expirou?). Tente conectar de novo.");
+  }
+  const token = String(troca.access_token);
+  const expira = troca.expires_in ? new Date(Date.now() + Number(troca.expires_in) * 1000).toISOString() : null;
+
+  // 2. As contas que a pessoa liberou no login. A confirmar no primeiro teste com a conta da F7 (19/11): a documentação
+  //    do Unified Login cita /me/assigned_instagram_accounts, sem exemplo de resposta.
+  const contas = await graph(`/me/assigned_instagram_accounts?fields=id,username,name`, token);
+  const lista = ((contas?.data ?? []) as { id?: string; username?: string; name?: string }[])
+    .filter((c) => /^\d{5,30}$/.test(String(c.id ?? "")));
+  if (!lista.length) {
+    console.error("instagram: nenhuma conta", JSON.stringify(contas).slice(0, 300));
+    throw new ErroUsuario("A Meta não liberou nenhuma conta do Instagram. Conecte de novo e marque a conta da empresa.");
+  }
+
+  const feitos: Canal[] = [];
+  for (const conta of lista) {
+    const id = String(conta.id);
+    // 3. A mesma conta não fica ativa em duas empresas; a desligada de antes libera o ID (unique tipo + instance_id).
+    const { data: outro } = await admin.from("canais").select("id, org_id, ativo").eq("tipo", "instagram").eq("instance_id", id).maybeSingle();
+    if (outro?.ativo && outro.org_id !== orgId) throw new ErroUsuario(`A conta @${conta.username ?? id} já está conectada na Livih por outra empresa.`);
+    if (outro && !outro.ativo) await admin.from("canais").update({ instance_id: null }).eq("id", outro.id);
+
+    let canal: Canal;
+    const nome = conta.username ? `@${conta.username}` : (conta.name?.trim() || "Instagram");
+    if (outro?.ativo) {
+      // Já conectada nesta empresa: só renova o token (reconectar depois de trocar a senha, por exemplo).
+      const { data, error } = await admin.from("canais").update({ desconectado_em: null, desconectado_por: null })
+        .eq("id", outro.id).select(CAMPOS).single();
+      if (error) throw new Error(`canal: ${error.message}`);
+      canal = data as Canal;
+    } else {
+      // Sem linha em agentes: o agente no Instagram vem na entrega 2 (até lá a conversa vai direto para a equipe).
+      const { data, error } = await admin.from("canais")
+        // Origem "Instagram": o Painel não mostra essas conversas como "Direto no WhatsApp" (o dono pode trocar).
+        .insert({ org_id: orgId, tipo: "instagram", nome, instance_id: id, origem: "Instagram" }).select(CAMPOS).single();
+      if (error) throw new Error(`canal: ${error.message}`);
+      canal = data as Canal;
+    }
+    const { error: erroToken } = await admin.rpc("meta_guardar_token", { p_canal: canal.id, p_token: token, p_expira_em: expira });
+    if (erroToken) throw new Error(`token: ${erroToken.message}`);
+
+    // 4. As mensagens desta conta passam a chegar no instagram-webhook.
+    await graph(`/${id}/subscribed_apps?subscribed_fields=${CAMPOS_INSTAGRAM}`, token, { method: "POST" });
+    await admin.rpc("canal_atualizar_status", { p_canal: canal.id, p_status: "WORKING", p_numero: null });
+    feitos.push(canal);
+  }
+  return feitos;
+}
+
 // Número do portfólio da F7: sem cadastro, sem token próprio no canal (o envio cai no META_SYSTEM_TOKEN).
 // O de teste da Meta já vem registrado na Cloud API. Um número novo, adicionado pelo Gerenciador e confirmado
 // por SMS, ainda não: aqui ele é registrado com um PIN de duas etapas aleatório, guardado no Vault.
@@ -442,6 +511,11 @@ Deno.serve(async (req) => {
       return json(200, { canal: await conectarOficial(p.org_id, p) });
     }
 
+    if (p.acao === "instagram") {
+      // Não passa pelo limite de números: o Instagram não ocupa vaga de WhatsApp (canais_limite_plano).
+      return json(200, { canais: await conectarInstagram(p.org_id, p.code) });
+    }
+
     if (p.acao === "oficial_sistema") {
       const { data: plataforma } = await admin.from("admins_plataforma").select("user_id").eq("user_id", quem.user.id).maybeSingle();
       if (!plataforma) return json(403, { erro: "Só a equipe da Livih conecta números do portfólio da F7." });
@@ -454,9 +528,13 @@ Deno.serve(async (req) => {
     const canal = achado as Canal | null;
     if (!canal?.instance_id) return json(404, { erro: "Número não encontrado." });
 
-    if (canal.tipo === "meta") {
-      // Número da API oficial: conectar é pelo Embedded Signup; aqui ele só sai da Livih.
-      if (p.acao !== "remover") throw new ErroUsuario("Este número está na API oficial. Para reconectar, use “Conectar pela API oficial”.");
+    if (canal.tipo === "meta" || canal.tipo === "instagram") {
+      // API oficial e Instagram: conectar é pelo login da Meta; aqui o canal só sai da Livih.
+      if (p.acao !== "remover") {
+        throw new ErroUsuario(canal.tipo === "instagram"
+          ? "Esta é uma conta do Instagram. Para reconectar, use “Conectar Instagram”."
+          : "Este número está na API oficial. Para reconectar, use “Conectar pela API oficial”.");
+      }
       await admin.from("canais").update({ ativo: false, desconectado_em: new Date().toISOString(), desconectado_por: quem.user.id })
         .eq("id", canal.id);
       await admin.from("agentes").update({ ativo: false }).eq("canal_id", canal.id);

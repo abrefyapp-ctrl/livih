@@ -226,7 +226,7 @@ export function ListaConversas({
                       </span>
                       {variosNumeros && c.canal && !numero && (
                         <span className="mt-1 flex items-center gap-1 text-legenda text-texto-3">
-                          <Icone nome="telefone" className="size-3.5 shrink-0" />
+                          <Icone nome={c.canal.tipo === 'instagram' ? 'instagram' : 'telefone'} className="size-3.5 shrink-0" />
                           <span className="truncate">{c.canal.nome}</span>
                         </span>
                       )}

@@ -62,8 +62,8 @@ de 12 x R$ 139,17 desde 16/11, acertado por permuta, sem fatura na Livih).
 
 ## 4. Produto, quando sobrar espaço
 
-- **Instagram e Facebook na Livih:** a CEFEQ pediu e o concorrente oferece. Sobe se a CEFEQ fechar. Não está na
-  proposta.
+- **Instagram na Livih:** começou em 19/11, por decisão do usuário (sem esperar a CEFEQ). Plano e decisões em
+  [instagram.md](instagram.md): primeiro o Instagram (Direct, Stories, anúncios), depois o Messenger.
 - **Agenda:** o agente marca sozinho, lembrete com Confirmar e Remarcar, tipos de compromisso e distribuição.
 - **Google Agenda:** dar entrada já na verificação do app no Google (leva semanas).
 - **Biblioteca, parte 2:** catálogo de fornecedor compartilhado e importador da PACAR

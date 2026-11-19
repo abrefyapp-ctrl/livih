@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useSessao } from '../hooks/useSessao'
-import { abrirCadastroMeta, carregarSdkMeta } from '../services/cadastroMeta'
+import { abrirCadastroMeta, abrirLoginInstagram, carregarSdkMeta, CONFIG_ID_INSTAGRAM } from '../services/cadastroMeta'
 import {
   codigoNumero,
+  conectarInstagram,
   conectarNumeroDoPortfolio,
   conectarOficial,
   criarNumero,
@@ -69,7 +70,7 @@ function Situacao({ n }: { n: NumeroWhatsapp }) {
       <p className="flex gap-2 text-pequeno">
         <Ponto cor="bg-destaque" />
         <span>
-          {n.tipo === 'meta' ? 'Conectado pela API oficial' : 'Conectado'}
+          {n.tipo === 'meta' ? 'Conectado pela API oficial' : n.tipo === 'instagram' ? 'Conectado ao Instagram' : 'Conectado'}
           {n.numero_conectado && ` · ${formatarTelefone(n.numero_conectado)}`}
           {n.conectado_em && <span className="text-texto-3"> · desde {quandoCurto(n.conectado_em).toLowerCase()}</span>}
         </span>
@@ -163,6 +164,22 @@ export function SecaoWhatsapp() {
         setConfirmacao(null)
         recarregar()
       })
+      .catch((e) => setErro((e as Error).message))
+      .finally(() => setOcupado(null))
+  }
+
+  /** Instagram (docs/instagram.md): login da Meta com a configuração do Instagram; cada conta liberada vira um canal. */
+  function conectarPeloInstagram() {
+    const fb = sdkMeta.current
+    if (!fb) {
+      setErro('O login da Meta ainda está carregando (ou foi bloqueado pelo navegador). Tente de novo em instantes.')
+      return
+    }
+    setOcupado('instagram')
+    setErro(null)
+    abrirLoginInstagram(fb)
+      .then((code) => conectarInstagram(orgId, code))
+      .then(() => recarregar())
       .catch((e) => setErro((e as Error).message))
       .finally(() => setOcupado(null))
   }
@@ -381,6 +398,11 @@ export function SecaoWhatsapp() {
                 Conectar pela API oficial
               </Botao>
             )}
+            {oficial && CONFIG_ID_INSTAGRAM && (
+              <Botao variante="secundario" carregando={ocupado === 'instagram'} onClick={conectarPeloInstagram}>
+                Conectar Instagram
+              </Botao>
+            )}
             {portfolioF7 && (
               <Botao variante="secundario" onClick={() => setPortfolio({ nome: '', waba_id: '', phone_number_id: '' })}>
                 Número do portfólio da F7
@@ -493,12 +515,13 @@ export function SecaoWhatsapp() {
                           {!n.responsavel_id ? 'Da empresa · toda a equipe vê' : n.responsavel_id === eu ? 'Seu número' : `De ${nomeDe(n.responsavel_id)}`}
                           {eq && ` · ${eq.nome}`}
                           {n.tipo === 'meta' && (n.meta_coexistencia ? ' · API oficial, também no app do celular' : ' · API oficial')}
+                          {n.tipo === 'instagram' && ' · Instagram: as mensagens do Direct chegam aqui'}
                         </p>
                         <Situacao n={n} />
                       </div>
 
                       <div className="ml-auto flex flex-wrap items-center gap-3">
-                        {gerencia && !conectado && n.tipo !== 'meta' && (
+                        {gerencia && !conectado && n.tipo === 'waha' && (
                           <Botao
                             tamanho="sm"
                             icone="telefone"
@@ -513,7 +536,10 @@ export function SecaoWhatsapp() {
                             Conectar celular
                           </Botao>
                         )}
-                        {podeLigarAgente(n) ? (
+                        {n.tipo === 'instagram' ? (
+                          // Entrega 2: o agente responde no Instagram. Até lá, a conversa vai direto para a equipe.
+                          <span className="text-pequeno text-texto-3">Atendimento pela equipe</span>
+                        ) : podeLigarAgente(n) ? (
                           <Interruptor
                             ligado={n.agente_ativo}
                             desabilitado={ocupado === n.id}
@@ -689,18 +715,18 @@ export function SecaoWhatsapp() {
             <div className="space-y-2 border-t border-borda pt-4">
               <p className="text-pequeno font-medium text-texto-2">Conexão</p>
               <div className="flex flex-wrap gap-2">
-                {oficial && config.numero.tipo !== 'meta' && (
+                {oficial && config.numero.tipo === 'waha' && (
                   <Botao tamanho="sm" variante="secundario" onClick={() => confirmar('oficial')}>
                     Passar para a API oficial
                   </Botao>
                 )}
-                {config.numero.status_conexao === 'WORKING' && config.numero.tipo !== 'meta' && (
+                {config.numero.status_conexao === 'WORKING' && config.numero.tipo === 'waha' && (
                   <Botao tamanho="sm" variante="perigoTexto" onClick={() => confirmar('desconectar')}>
                     Desconectar
                   </Botao>
                 )}
                 <Botao tamanho="sm" variante="perigoTexto" icone="lixeira" onClick={() => confirmar('remover')}>
-                  Remover número
+                  {config.numero.tipo === 'instagram' ? 'Remover conta' : 'Remover número'}
                 </Botao>
               </div>
             </div>

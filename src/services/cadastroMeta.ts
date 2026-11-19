@@ -67,6 +67,23 @@ export function carregarSdkMeta(): Promise<FB> {
   return carregando
 }
 
+/**
+ * Instagram (Unified Login, docs/instagram.md): configuração própria do Facebook Login for Business, marcada
+ * "Instagram Login Compatible", com instagram_basic e instagram_manage_messages. Vazio enquanto a configuração não é
+ * criada no painel do app: o botão "Conectar Instagram" só aparece com ela.
+ */
+export const CONFIG_ID_INSTAGRAM = ''
+
+/** Login da Meta para o Instagram: devolve o código, que a whatsapp-conexao troca pelo token. Dentro do clique. */
+export function abrirLoginInstagram(fb: FB): Promise<string> {
+  return new Promise((resolver, rejeitar) => {
+    fb.login(
+      (r) => (r.authResponse?.code ? resolver(r.authResponse.code) : rejeitar(new Error('Conexão cancelada antes do fim.'))),
+      { config_id: CONFIG_ID_INSTAGRAM, response_type: 'code', override_default_response_type: true },
+    )
+  })
+}
+
 /** Abre o cadastro. Precisa ser chamada dentro do clique, com o SDK já carregado. */
 export function abrirCadastroMeta(fb: FB): Promise<ResultadoCadastro> {
   return new Promise((resolver, rejeitar) => {

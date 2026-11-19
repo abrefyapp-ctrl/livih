@@ -8937,5 +8937,279 @@ exception when others then
 end $$;
 insert into resultado (teste, ok) select 'envio da nota: outra empresa não vê os envios',
   not exists (select 1 from public.nota_envios where nota_id = current_setting('teste.nota_balcao')::uuid);
+
+-- Instagram, entrega 1: conectar e receber (migration 20261119120000_instagram_canal).
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+begin
+  perform set_config('teste.insta_org', public.criar_organizacao('Insta Teste', 'teste-insta')::text, true);
+end $$;
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+set local role service_role;
+do $$
+declare
+  v_f7 uuid := current_setting('teste.f7')::uuid;
+  v_org uuid := current_setting('teste.insta_org')::uuid;
+  v_vaga text;
+  v_ig uuid;
+  v_ig_f7 uuid;
+  r jsonb;
+  r2 jsonb;
+  v_ct public.contatos;
+  v_conv public.conversas;
+begin
+  -- Empresa só com o Instagram: ele não ocupa vaga de número nem vira canal de alerta.
+  v_vaga := public.canais_sem_vaga(v_org);
+  insert into public.canais (org_id, tipo, nome, instance_id)
+  values (v_org, 'instagram', 'Instagram Insta', '17841400000000001') returning id into v_ig;
+  insert into resultado (teste, ok) values ('instagram: a conta entra como canal e não ocupa vaga de número',
+    public.canais_sem_vaga(v_org) is not distinct from v_vaga);
+  insert into resultado (teste, ok) values ('instagram: alerta para a equipe não sai pelo Instagram',
+    public.canal_para_avisar(v_org, null) is null);
+  insert into resultado (teste, ok) values ('instagram: o canal é achado pela conta',
+    (select canal_id from public.canal_por_instagram('17841400000000001')) = v_ig
+    and not exists (select 1 from public.canal_por_instagram('INST-F7')));
+
+  -- Mesma conta em outra empresa: recusada.
+  begin
+    insert into public.canais (org_id, tipo, nome, instance_id) values (v_f7, 'instagram', 'Copia', '17841400000000001');
+    insert into resultado (teste, ok) values ('instagram: a mesma conta não entra em duas empresas', false);
+  exception when unique_violation then
+    insert into resultado (teste, ok) values ('instagram: a mesma conta não entra em duas empresas', true);
+  end;
+
+  -- Primeira mensagem: contato sem telefone, conversa com a equipe (sem agente no canal).
+  r := public.registrar_entrada_instagram(v_ig, 'aWdfMID-1', '1122334455667788', '@cliente.exemplo', 'Cliente Exemplo',
+                                          'texto', 'Oi, tem em 8 mm?', '{"x":1}');
+  select * into v_ct from public.contatos where org_id = v_org and instagram_id = '1122334455667788';
+  select * into v_conv from public.conversas where id = (r ->> 'conversa_id')::uuid;
+  insert into resultado (teste, ok) values ('instagram: a mensagem cria o contato sem telefone, com o @ e o nome',
+    v_ct.telefone is null and v_ct.whatsapp_lid is null and v_ct.instagram_usuario = 'cliente.exemplo'
+    and v_ct.nome_whatsapp = 'Cliente Exemplo' and v_ct.origem = 'instagram');
+  insert into resultado (teste, ok) values ('instagram: sem agente no canal, a conversa vai para a equipe',
+    not (r ->> 'chamar_agente')::boolean and v_conv.estado = 'aguardando_humano' and v_conv.motivo_humano = 'Agente desligado'
+    and v_conv.canal_id = v_ig and v_conv.nao_lidas = 1 and v_conv.ultima_mensagem_resumo = 'Oi, tem em 8 mm?');
+
+  -- A Meta reenvia: não duplica. Outra mensagem da mesma pessoa: mesmo contato, @ atualizado.
+  r2 := public.registrar_entrada_instagram(v_ig, 'aWdfMID-1', '1122334455667788', 'cliente.exemplo', 'Cliente Exemplo',
+                                           'texto', 'Oi, tem em 8 mm?', '{"x":1}');
+  insert into resultado (teste, ok) values ('instagram: a mesma mensagem não entra duas vezes', (r2 ->> 'duplicada')::boolean);
+  r2 := public.registrar_entrada_instagram(v_ig, 'aWdfMID-2', '1122334455667788', 'cliente.novo', null,
+                                           'imagem', null, '{}', 'image/jpeg');
+  insert into resultado (teste, ok) values ('instagram: a segunda mensagem fica na mesma conversa e atualiza o @',
+    r2 ->> 'conversa_id' = r ->> 'conversa_id'
+    and (select count(*) from public.contatos where org_id = v_org) = 1
+    and (select instagram_usuario from public.contatos where id = v_ct.id) = 'cliente.novo'
+    and (select nome_whatsapp from public.contatos where id = v_ct.id) = 'Cliente Exemplo'
+    and (select count(*) from public.mensagens where conversa_id = v_conv.id) = 2);
+
+  -- @ inválido não quebra a entrada: fica o que já estava.
+  perform public.registrar_entrada_instagram(v_ig, 'aWdfMID-3', '1122334455667788', 'com espaço!', null, 'texto', 'ok', '{}');
+  insert into resultado (teste, ok) values ('instagram: @ inválido é ignorado',
+    (select instagram_usuario from public.contatos where id = v_ct.id) = 'cliente.novo');
+
+  -- Canal errado ou sem o ID da pessoa: recusa.
+  begin
+    perform public.registrar_entrada_instagram((select id from public.canais where instance_id = 'INST-F7'),
+      'aWdfMID-X', '1122334455667788', null, null, 'texto', 'x', '{}');
+    insert into resultado (teste, ok) values ('instagram: canal de WhatsApp não recebe pelo Instagram', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('instagram: canal de WhatsApp não recebe pelo Instagram',
+      sqlerrm = 'canal do Instagram inativo ou inexistente');
+  end;
+  begin
+    perform public.registrar_entrada_instagram(v_ig, 'aWdfMID-Y', 'abc', null, null, 'texto', 'x', '{}');
+    insert into resultado (teste, ok) values ('instagram: mensagem sem o ID da pessoa é recusada', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('instagram: mensagem sem o ID da pessoa é recusada',
+      sqlerrm = 'mensagem do Instagram sem o ID da pessoa');
+  end;
+
+  -- Responder pela Livih ainda não: recusa com o motivo, sem deixar mensagem parada na fila.
+  begin
+    perform public.enfileirar_saida(v_conv.id, 'Temos sim', 'atendente', null);
+    insert into resultado (teste, ok) values ('instagram: responder pela Livih é recusado até a entrega 2', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('instagram: responder pela Livih é recusado até a entrega 2',
+      sqlerrm like 'Responder pelo Instagram na Livih chega na próxima etapa%'
+      and not exists (select 1 from public.fila_envio where conversa_id = v_conv.id));
+  end;
+
+  -- A mesma pessoa no WhatsApp continua separada (a junção vem na entrega 3), e o WhatsApp segue igual.
+  r := public.registrar_entrada((select id from public.canais where instance_id = 'INST-F7'), 'WAMID-INSTA-1',
+                                '5541955554444', null, 'Fulano Insta', 'texto', 'oi', '{}');
+  -- (O estado depende da distribuição ligada nos blocos anteriores; os blocos do WhatsApp já testam essa parte.)
+  insert into resultado (teste, ok) values ('instagram: a entrada do WhatsApp continua gravando contato, conversa e mensagem',
+    not (r ->> 'duplicada')::boolean
+    and (select origem from public.contatos where org_id = v_f7 and telefone = '5541955554444') = 'whatsapp'
+    and exists (select 1 from public.mensagens where id = (r ->> 'mensagem_id')::uuid
+                 and conversa_id = (r ->> 'conversa_id')::uuid and direcao = 'entrada' and texto = 'oi'));
+
+  -- Contato sem telefone, sem LID e sem Instagram continua proibido.
+  begin
+    insert into public.contatos (org_id, nome) values (v_org, 'Ninguém');
+    insert into resultado (teste, ok) values ('instagram: contato sem nenhum identificador é recusado', false);
+  exception when check_violation then
+    insert into resultado (teste, ok) values ('instagram: contato sem nenhum identificador é recusado', true);
+  end;
+
+  -- Revisão de 19/11: o agente não entra no canal do Instagram até a entrega 2.
+  begin
+    insert into public.agentes (org_id, canal_id, ativo, prompt) values (v_org, v_ig, true, 'prompt');
+    insert into resultado (teste, ok) values ('instagram: agente no canal do Instagram é recusado até a entrega 2', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('instagram: agente no canal do Instagram é recusado até a entrega 2',
+      sqlerrm like 'O agente no Instagram chega na próxima etapa%');
+  end;
+
+  -- WhatsApp mais novo que o Instagram: o alerta escolhe o WhatsApp; e com o plano no limite, outra conta do
+  -- Instagram ainda entra (não ocupa vaga).
+  declare v_wa uuid; v_ig2 uuid;
+  begin
+    insert into public.canais (org_id, nome, telefone, instance_id, status_conexao)
+    values (v_org, 'WhatsApp Insta', '5541911112222', 'INST-INSTA', 'WORKING') returning id into v_wa;
+    update public.canais set status_conexao = 'WORKING' where id = v_ig;
+    insert into resultado (teste, ok) values ('instagram: com WhatsApp e Instagram, o alerta sai pelo WhatsApp',
+      public.canal_para_avisar(v_org, null) = v_wa);
+    -- Essencial: 1 número, já ocupado pelo WhatsApp acima.
+    update public.organizacoes set plano = 'essencial' where id = v_org;
+    v_vaga := public.canais_sem_vaga(v_org);
+    insert into public.canais (org_id, tipo, nome, instance_id) values (v_org, 'instagram', 'Instagram 2', '17841400000000003')
+    returning id into v_ig2;
+    insert into resultado (teste, ok) values ('instagram: outra conta entra mesmo com o plano sem vaga de número',
+      v_vaga is not null and v_ig2 is not null);
+    -- Conta removida: não recebe mais.
+    update public.canais set ativo = false where id = v_ig2;
+    begin
+      perform public.registrar_entrada_instagram(v_ig2, 'aWdfMID-INATIVO', '1122334455667788', null, null, 'texto', 'x', '{}');
+      insert into resultado (teste, ok) values ('instagram: conta removida não recebe mensagem', false);
+    exception when others then
+      insert into resultado (teste, ok) values ('instagram: conta removida não recebe mensagem',
+        sqlerrm = 'canal do Instagram inativo ou inexistente');
+    end;
+    insert into resultado (teste, ok) values ('instagram: conta removida não é achada pelo webhook',
+      not exists (select 1 from public.canal_por_instagram('17841400000000003')));
+  end;
+
+  -- Mensagem com telefone (WhatsApp) não entra num canal do Instagram.
+  begin
+    perform public.registrar_entrada(v_ig, 'WAMID-NO-IG', '5541922223333', null, 'x', 'texto', 'x', '{}');
+    insert into resultado (teste, ok) values ('instagram: entrada do WhatsApp recusa canal do Instagram', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('instagram: entrada do WhatsApp recusa canal do Instagram',
+      sqlerrm = 'canal inativo ou inexistente');
+  end;
+
+  -- Origem: com a origem do canal "Instagram", o contato novo fica com ela (a provisória 'instagram' é trocada).
+  update public.canais set origem = 'Instagram' where id = v_ig;
+  perform public.registrar_entrada_instagram(v_ig, 'aWdfMID-ORIGEM', '1122334455660000', 'outra.pessoa', null, 'texto', 'oi', '{}');
+  insert into resultado (teste, ok) values ('instagram: contato novo fica com a origem do canal',
+    (select origem from public.contatos where org_id = v_org and instagram_id = '1122334455660000') = 'Instagram');
+
+  -- Conta do Instagram na F7 Teste, com uma conversa, para os testes de tela abaixo.
+  insert into public.canais (org_id, tipo, nome, instance_id) values (v_f7, 'instagram', 'Instagram F7', '17841400000000002')
+  returning id into v_ig_f7;
+  r := public.registrar_entrada_instagram(v_ig_f7, 'aWdfMID-F7', '1122334455669999', 'cliente.f7', 'Cliente F7', 'texto', 'oi', '{}');
+  perform set_config('teste.ig_f7', v_ig_f7::text, true);
+  perform set_config('teste.ig_f7_conv', r ->> 'conversa_id', true);
+  perform set_config('teste.ig_conv', v_conv.id::text, true);
+end $$;
+
+-- Pela tela: o dono não abre conversa nova no Instagram; ninguém de fora chama as funções do sistema.
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.iniciar_conversa(current_setting('teste.ig_f7')::uuid, '5541933332222', 'Fulano', null);
+  insert into resultado (teste, ok) values ('instagram: conversa nova pela Livih só no WhatsApp', false);
+exception when others then
+  insert into resultado (teste, ok) values ('instagram: conversa nova pela Livih só no WhatsApp',
+    sqlerrm like 'Conversa nova pela Livih só no WhatsApp%');
+end $$;
+insert into resultado (teste, ok) select 'instagram: a tela do plano não conta o Instagram como número',
+  (public.plano_troca_situacao(current_setting('teste.insta_org')::uuid) ->> 'numeros_ativos')::int = 1;
+-- Revisão de 19/11: pela API, o dono não cria, não reativa e não troca a conta do Instagram; o nome ele muda.
+do $$
+begin
+  insert into public.canais (org_id, tipo, nome, instance_id)
+  values (current_setting('teste.f7')::uuid, 'instagram', 'Pirata', '17841400000009999');
+  insert into resultado (teste, ok) values ('instagram: dono não cria conta do Instagram pela API', false);
+exception when others then
+  insert into resultado (teste, ok) values ('instagram: dono não cria conta do Instagram pela API',
+    sqlerrm like 'Conta do Instagram só se conecta pelo botão%');
+end $$;
+do $$
+begin
+  update public.canais set ativo = false where id = current_setting('teste.ig_f7')::uuid;
+  insert into resultado (teste, ok) values ('instagram: dono não liga nem desliga a conta pela API', false);
+exception when others then
+  insert into resultado (teste, ok) values ('instagram: dono não liga nem desliga a conta pela API',
+    sqlerrm like 'Conta do Instagram só se conecta pelo botão%');
+end $$;
+update public.canais set nome = '@loja.f7' where id = current_setting('teste.ig_f7')::uuid;
+insert into resultado (teste, ok) select 'instagram: dono muda o nome da conta',
+  (select nome from public.canais where id = current_setting('teste.ig_f7')::uuid) = '@loja.f7';
+do $$
+begin
+  update public.contatos set instagram_id = '1122334455661111'
+   where org_id = current_setting('teste.f7')::uuid and instagram_id = '1122334455669999';
+  insert into resultado (teste, ok) values ('instagram: o Instagram do contato não muda pela tela', false);
+exception when others then
+  insert into resultado (teste, ok) values ('instagram: o Instagram do contato não muda pela tela',
+    sqlerrm like 'O Instagram do contato vem da conversa%');
+end $$;
+-- Responder pela tela (enviar_mensagem, enviar_arquivo): recusado, e a conversa continua como estava.
+do $$
+declare v_antes public.conversas;
+begin
+  select * into v_antes from public.conversas where id = current_setting('teste.ig_f7_conv')::uuid;
+  begin
+    perform public.enviar_mensagem(v_antes.id, 'Temos sim');
+    insert into resultado (teste, ok) values ('instagram: responder pela tela é recusado e a conversa não muda', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('instagram: responder pela tela é recusado e a conversa não muda',
+      sqlerrm like 'Responder pelo Instagram na Livih chega na próxima etapa%'
+      and (select estado from public.conversas where id = v_antes.id) = v_antes.estado
+      and not exists (select 1 from public.mensagens where conversa_id = v_antes.id and direcao = 'saida'));
+  end;
+  begin
+    perform public.enviar_arquivo(v_antes.id, current_setting('teste.f7') || '/' || v_antes.id || '/x.pdf', 'x.pdf', null);
+    insert into resultado (teste, ok) values ('instagram: arquivo pela tela é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('instagram: arquivo pela tela é recusado',
+      sqlerrm like 'Responder pelo Instagram na Livih chega na próxima etapa%');
+  end;
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.registrar_entrada_instagram(current_setting('teste.ig_f7')::uuid, 'aWdfMID-Z', '1122334455667799',
+    null, null, 'texto', 'x', '{}');
+  insert into resultado (teste, ok) values ('instagram: usuário logado não registra entrada', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('instagram: usuário logado não registra entrada', true);
+end $$;
+do $$
+begin
+  perform public.contato_por_instagram(current_setting('teste.f7')::uuid, '1122334455667799', null, null);
+  insert into resultado (teste, ok) values ('instagram: usuário logado não cria contato pelo Instagram', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('instagram: usuário logado não cria contato pelo Instagram', true);
+end $$;
+do $$
+begin
+  perform public.canal_por_instagram('17841400000000001');
+  insert into resultado (teste, ok) values ('instagram: usuário logado não procura canal pela conta', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('instagram: usuário logado não procura canal pela conta', true);
+end $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+insert into resultado (teste, ok) select 'instagram: outra empresa não vê o contato nem a conversa do Instagram',
+  not exists (select 1 from public.contatos where instagram_id = '1122334455667788')
+  and not exists (select 1 from public.conversas where id = current_setting('teste.ig_conv')::uuid);
 reset role;
 select n, teste, ok from resultado order by n;

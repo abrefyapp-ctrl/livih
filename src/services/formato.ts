@@ -17,9 +17,13 @@ export function formatarTelefoneLocal(v: string | null | undefined): string {
   return m ? `(${m[1]}) ${m[2]}-${m[3]}` : (v ?? '')
 }
 
-export function nomeDoContato(c: { nome: string | null; nome_whatsapp: string | null; telefone: string | null } | null) {
+// Contato do Instagram não tem telefone: sem nome, aparece o @ (docs/instagram.md, 19/11).
+export function nomeDoContato(
+  c: { nome: string | null; nome_whatsapp: string | null; telefone: string | null; instagram_usuario?: string | null } | null,
+) {
   if (!c) return 'Contato'
-  return c.nome?.trim() || c.nome_whatsapp?.trim() || formatarTelefone(c.telefone) || 'Contato sem nome'
+  return c.nome?.trim() || c.nome_whatsapp?.trim() || formatarTelefone(c.telefone)
+    || (c.instagram_usuario ? `@${c.instagram_usuario}` : '') || 'Contato sem nome'
 }
 
 export function iniciais(nome: string): string {

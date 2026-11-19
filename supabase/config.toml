@@ -440,6 +440,10 @@ verify_jwt = false
 [functions.meta-webhook]
 verify_jwt = false
 
+# instagram-webhook: mensagens do Direct (docs/instagram.md); a Meta assina com o segredo do app, conferido dentro.
+[functions.instagram-webhook]
+verify_jwt = false
+
 # whatsapp-modelos: modelos da API oficial; login validado dentro da função (mesmo padrão da whatsapp-conexao).
 [functions.whatsapp-modelos]
 verify_jwt = false
