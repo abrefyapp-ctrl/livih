@@ -10,7 +10,8 @@ type EtapaResumo = { nome: string; tipo: TipoEtapa } | null
 
 export type ContatoLista = Pick<
   Tabelas['contatos']['Row'],
-  'id' | 'nome' | 'nome_whatsapp' | 'telefone' | 'empresa' | 'email' | 'origem' | 'tags' | 'responsavel_id' | 'sem_agente' | 'criado_em'
+  | 'id' | 'nome' | 'nome_whatsapp' | 'telefone' | 'empresa' | 'email' | 'origem' | 'tags' | 'responsavel_id' | 'sem_agente' | 'criado_em'
+  | 'instagram_usuario'
 > & {
   conversas: { id: string; estado: EstadoConversa; ultima_mensagem_em: string | null }[]
   oportunidades: { id: string; titulo: string; valor_estimado: number | null; fechada_em: string | null; etapa: EtapaResumo }[]
@@ -66,7 +67,8 @@ export async function listarContatos(orgId: string, busca: string): Promise<Cont
   let consulta = supabase
     .from('contatos')
     .select(
-      'id, nome, nome_whatsapp, telefone, empresa, email, origem, tags, responsavel_id, sem_agente, criado_em, ' +
+      // instagram_usuario: contato do Instagram sem nome aparece pelo @ (nomeDoContato).
+      'id, nome, nome_whatsapp, telefone, empresa, email, origem, tags, responsavel_id, sem_agente, criado_em, instagram_usuario, ' +
         'conversas(id, estado, ultima_mensagem_em), ' +
         'oportunidades(id, titulo, valor_estimado, fechada_em, etapa:etapas_funil(nome, tipo))',
     )

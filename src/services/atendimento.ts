@@ -12,7 +12,7 @@ export type ConversaLista = Pick<
   Tabelas['conversas']['Row'],
   'id' | 'estado' | 'atribuida_a' | 'motivo_humano' | 'ultima_mensagem_em' | 'ultima_mensagem_resumo' | 'nao_lidas'
 > & {
-  contato: Pick<Contato, 'id' | 'nome' | 'nome_whatsapp' | 'telefone' | 'sem_agente'> | null
+  contato: Pick<Contato, 'id' | 'nome' | 'nome_whatsapp' | 'telefone' | 'sem_agente' | 'instagram_usuario'> | null
   canal: { id: string; nome: string; tipo: string } | null
 }
 
@@ -32,8 +32,9 @@ export type Oportunidade = Pick<Tabelas['oportunidades']['Row'], 'id' | 'titulo'
   etapa: { nome: string; tipo: Database['public']['Enums']['tipo_etapa'] } | null
 }
 
+// instagram_usuario: contato do Instagram sem nome aparece pelo @ (nomeDoContato, docs/instagram.md).
 const CAMPOS_CONVERSA =
-  'id, estado, atribuida_a, motivo_humano, ultima_mensagem_em, ultima_mensagem_resumo, nao_lidas, contato:contatos(id, nome, nome_whatsapp, telefone, sem_agente), canal:canais(id, nome, tipo)'
+  'id, estado, atribuida_a, motivo_humano, ultima_mensagem_em, ultima_mensagem_resumo, nao_lidas, contato:contatos(id, nome, nome_whatsapp, telefone, sem_agente, instagram_usuario), canal:canais(id, nome, tipo)'
 
 export async function listarOrganizacoes(userId: string): Promise<Organizacao[]> {
   const [{ data, error }, { data: balcao, error: erroBalcao }] = await Promise.all([

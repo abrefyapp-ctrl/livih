@@ -106,11 +106,12 @@ export async function tokenDoCanal(supabase: SupabaseClient, canalId: string): P
   return (data as string | null) || null;
 }
 
-// Nome e @ da pessoa: o webhook só traz o ID. Busca uma vez, quando o contato ainda não tem o @.
+// Nome e @ da pessoa: o webhook só traz o ID, e a busca pela API traz o @ sem o nome. Busca enquanto faltar um dos dois
+// (19/11: o contato do felippers85 entrou pela busca com o @ e sem nome).
 async function completarPerfil(supabase: SupabaseClient, canalId: string, orgId: string, igsid: string) {
-  const { data: ct } = await supabase.from("contatos").select("id, instagram_usuario")
+  const { data: ct } = await supabase.from("contatos").select("id, instagram_usuario, nome_whatsapp")
     .eq("org_id", orgId).eq("instagram_id", igsid).maybeSingle();
-  if (!ct || ct.instagram_usuario) return;
+  if (!ct || (ct.instagram_usuario && ct.nome_whatsapp)) return;
   const token = await tokenDoCanal(supabase, canalId);
   if (!token) return;
   const r = await fetch(`${GRAPH}/${igsid}?fields=name,username`, {
