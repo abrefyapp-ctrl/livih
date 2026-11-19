@@ -168,6 +168,10 @@ Migration `20261119120000_instagram_canal`, Edge Function `instagram-webhook` (n
   regras, e a mensagem que já entrou é recusada pelo ID (supõe o mesmo ID nas duas; conferir quando o webhook voltar).
   Limite: a API de conversas aceita cerca de 2 chamadas por segundo por conta; serve para dezenas de contas, não para
   centenas (aí o webhook precisa funcionar).
+  **Funcionando em 19/11:** as mensagens do felippers85 entraram na conversa do @livih.tech (com a equipe, origem
+  "Instagram", sem duplicar entre rodadas) em menos de um minuto, e o nome dele ("Felippe Soares") veio da Meta. A
+  busca do perfil passou a rodar também quando o @ já vem da API, e as listas de conversas e de contatos mostram o @ de
+  quem ainda não tem nome. Falta testar a resposta a Story pela busca (`story.reply_to`).
 - **A confirmar no primeiro teste** com a conta da F7: a lista de contas (`/me/assigned_instagram_accounts`, sem
   exemplo de resposta na documentação), o `entry.id` do webhook (a documentação diz que é o ID da conta profissional)
   e o perfil da pessoa pelo `graph.facebook.com`.
