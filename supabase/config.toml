@@ -444,6 +444,10 @@ verify_jwt = false
 [functions.instagram-webhook]
 verify_jwt = false
 
+# instagram-sincronizar: busca do Direct pela API, chamada pelo cron com o segredo interno (conferido dentro).
+[functions.instagram-sincronizar]
+verify_jwt = false
+
 # whatsapp-modelos: modelos da API oficial; login validado dentro da função (mesmo padrão da whatsapp-conexao).
 [functions.whatsapp-modelos]
 verify_jwt = false

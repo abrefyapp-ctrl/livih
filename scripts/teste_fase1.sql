@@ -9267,5 +9267,10 @@ begin
 exception when others then
   insert into resultado (teste, ok) values ('ligar WhatsApp: outra empresa não liga número ao cliente', sqlerrm = 'cliente não encontrado');
 end $$;
+
+-- Busca do Direct pela API (migration 20261119160000_instagram_sincronizar).
 reset role;
+insert into resultado (teste, ok) select 'instagram: a busca pela API roda a cada minuto, só com conta do Instagram ativa',
+  exists (select 1 from cron.job where jobname = 'livih-instagram-sincronizar' and schedule = '* * * * *'
+            and command like '%instagram-sincronizar%' and command like '%tipo = ''instagram'' and ativo%');
 select n, teste, ok from resultado order by n;

@@ -155,7 +155,19 @@ Migration `20261119120000_instagram_canal`, Edge Function `instagram-webhook` (n
     testador do Instagram. Isso descarta a falta do App Review e aponta para o **"Permitir acesso às mensagens"** do
     livih.tech, ainda desligado (o Business Suite mostra o alerta "as mensagens do Instagram ficarão indisponíveis
     até você confirmar…", que pede a senha do Instagram; quem tem a senha precisa ligar).
-  - **Próximo:** com o acesso ligado, mandar de novo como testador e conferir contato, @, nome e a imagem do Story.
+  - **Depois:** acesso às mensagens ligado (o alerta do Business Suite sumiu e as mensagens aparecem na Caixa de
+    Entrada dele), livih.tech também como testador (e com a assinatura do webhook ativada no painel), app publicado,
+    reconexões: **nenhum POST** do Direct. O diagnóstico (`whatsapp-conexao`, ação `instagram_diagnostico`) mostra a
+    conta assinada com `messages` e `messaging_referral` (v25 e v27) e a API enxergando a conversa com o felippers85.
+    Leitura: no acesso padrão a Meta não está entregando o evento; o App Review (acesso avançado) é o próximo passo.
+- **Busca pela API (19/11, decidido pelo usuário):** Edge Function `instagram-sincronizar`, a cada minuto (cron
+  `livih-instagram-sincronizar`, migration `20261119160000`, só quando existe conta do Instagram ativa). Para cada
+  conta, pega as conversas que mudaram na última hora (`/{ig}/conversations?platform=instagram`, com as mensagens) e
+  grava as recebidas depois de a conta ser conectada. A leitura e a gravação saíram do webhook para
+  `_shared/instagram.ts` (`lerMensagemWebhook`, `lerMensagemApi`, `gravarRecebida`): as duas portas seguem as mesmas
+  regras, e a mensagem que já entrou é recusada pelo ID (supõe o mesmo ID nas duas; conferir quando o webhook voltar).
+  Limite: a API de conversas aceita cerca de 2 chamadas por segundo por conta; serve para dezenas de contas, não para
+  centenas (aí o webhook precisa funcionar).
 - **A confirmar no primeiro teste** com a conta da F7: a lista de contas (`/me/assigned_instagram_accounts`, sem
   exemplo de resposta na documentação), o `entry.id` do webhook (a documentação diz que é o ID da conta profissional)
   e o perfil da pessoa pelo `graph.facebook.com`.
