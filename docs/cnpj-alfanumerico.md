@@ -26,8 +26,8 @@ Migration `20261102130000_cnpj_alfanumerico`; 11 testes no `teste_fase1.sql`.
 
 ## Fica para depois
 
-- **PDF do orçamento** (`livih-pdf` na VPS): até a próxima reconstrução do serviço, o CNPJ com letras sai sem pontuação
-  no PDF (`12ABC34501DE35`), legível. Vai junto com a próxima publicação do serviço.
+- **PDF do orçamento** (`livih-pdf` na VPS): feito em 19/11, com a reconstrução do serviço; o CNPJ com letras sai com
+  pontuação também no PDF que o agente manda (antes saía `12ABC34501DE35`).
 - **Focus NFe e SEFAZ:** a Livih já aceita a emissora com CNPJ de letras; se a SEFAZ do estado ainda não aceitar o
   layout novo, a recusa aparece na nota como qualquer outra rejeição.
 - **Asaas:** o CNPJ com letras vai como veio nos dados de cobrança; se o Asaas recusar, a fatura fica "Sem link de

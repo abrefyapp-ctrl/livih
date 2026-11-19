@@ -191,6 +191,7 @@ ter custo.
 | **ERP** (pedidos, estoque, entrada por nota, NF-e), com 1 CNPJ e 100 notas por mês | **R$ 79,90/mês** (02/11) | ~R$ 39,90 | ~R$ 40 |
 | **Ordens de serviço** (OS, etapas, PDF, NFS-e), com 1 CNPJ e 100 notas por mês | **R$ 79,90/mês** (02/11) | ~R$ 39,90 | ~R$ 40 |
 | **ERP e OS juntos** no mesmo CNPJ, com 100 notas por mês | **R$ 109,80/mês** (79,90 + 29,90; 02/11) | ~R$ 39,90 | ~R$ 70 |
+| **Balcão** (venda de loja com NF-e; precisa do ERP) | **Junto com o ERP, sem custo à parte** (19/11) | as notas contam nas 100 do ERP | — |
 | CNPJ adicional | **R$ 49/mês** | R$ 39,90 | ~R$ 9 |
 | Nota além das 100 por CNPJ | **R$ 0,20** | R$ 0,11 | R$ 0,09 |
 

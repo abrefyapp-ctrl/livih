@@ -1,4 +1,4 @@
-import { Caminho, Lista, Paragrafo, Secao, Subtitulo, Tabela } from './componentes'
+import { Caminho, Figura, Lista, Paragrafo, Secao, Subtitulo, Tabela } from './componentes'
 
 // Manual do Balcão (18/11). O texto sai do que a tela faz: src/pages/Balcao.tsx, src/components/EnvioNota.tsx,
 // src/components/SecaoBalcaoUsuarios.tsx e o cancelamento em src/pages/PedidoDetalhe.tsx; as regras, das migrations
@@ -15,6 +15,10 @@ export const SECOES_BALCAO = [
 ]
 
 const titulo = (id: string) => SECOES_BALCAO.find((s) => s.id === id)!.titulo
+
+// Imagens de 19/11, com produtos, cliente e contatos fictícios (as respostas do banco foram trocadas só no navegador
+// da captura; nada foi gravado).
+const IMG = '/ajuda/balcao'
 
 export function ManualBalcao() {
   return (
@@ -91,6 +95,12 @@ export function ManualBalcao() {
             </>,
           ]}
         />
+        <Figura
+          src={`${IMG}/venda.png`}
+          alt="O Balcão com quatro itens, um deles com 10% de desconto, o cliente escolhido e o pagamento em dinheiro com valor recebido e troco"
+          legenda="Uma venda montada: quantidades, desconto no item, cliente e troco. Os dados são de exemplo."
+          largura="max-w-3xl"
+        />
         <Tabela
           colunas={['Forma', 'No Financeiro']}
           linhas={[
@@ -133,6 +143,12 @@ export function ManualBalcao() {
           Com a NF-e marcada, o bloco <Caminho>Quando a nota for autorizada</Caminho> já traz o WhatsApp e o e-mail do cliente.
           A nota (DANFE em PDF) sai sozinha assim que a SEFAZ autorizar.
         </Paragrafo>
+        <Figura
+          src={`${IMG}/nota.png`}
+          alt="O fim da venda: NF-e e impressão do DANFE marcadas e o bloco Quando a nota for autorizada, com o WhatsApp de um contato do cliente e o e-mail"
+          legenda="Com vários contatos, escolha na lista para qual WhatsApp vai a nota."
+          largura="max-w-sm"
+        />
         <Tabela
           colunas={['', 'De onde vem', 'Como sai']}
           linhas={[
@@ -152,6 +168,12 @@ export function ManualBalcao() {
           Para reenviar ou mandar depois, abra a venda e use <Caminho>Enviar ao cliente</Caminho> no bloco da nota. Ali também
           aparece o que já foi enviado e o motivo, quando não saiu.
         </Paragrafo>
+        <Figura
+          src={`${IMG}/reenviar.png`}
+          alt="A janela Enviar a nota ao cliente, com o WhatsApp e o e-mail já preenchidos e os botões Cancelar e Enviar"
+          legenda="Enviar ao cliente, no bloco da nota do pedido: os mesmos campos do Balcão."
+          largura="max-w-md"
+        />
       </Secao>
 
       <Secao id="depois" titulo={titulo('depois')}>

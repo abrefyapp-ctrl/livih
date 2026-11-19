@@ -79,16 +79,18 @@ mostram o desconto de cada item.
   totais. O agente não dá desconto.
 - NF-e: o desconto do item vai no item, e o desconto no total é rateado pelo valor que sobrou em cada item; a sobra
   do arredondamento fica no item de maior valor (não pode cair num item zerado).
-- PDF: coluna "Desconto" só quando algum item tem. O serviço `livih-pdf` da VPS precisa ser reconstruído para o PDF
-  que o agente manda mostrar a coluna.
+- PDF: coluna "Desconto" só quando algum item tem. O PDF que o agente manda mostra a coluna desde 19/11, quando o
+  serviço `livih-pdf` da VPS foi reconstruído (cópia do pacote anterior em `dist/entrada.js.bak-20261119`).
 
 ## Entrega 1 (18/11): a tela e o módulo
 
 Pedido do usuário em 18/11: construir a tela e deixar o balcão como um módulo (migration `20261118140000_balcao`).
 
 - **Módulo "Balcão"** no catálogo de módulos (`modulos.codigo = 'balcao'`), ligado pela plataforma em Empresas →
-  Módulos, como o ERP e as OS. Precisa do ERP ligado. Sem preço por enquanto (`preco_mensal` nulo): não entra na
-  fatura nem na tela do plano do dono. **Falta decidir o preço** (ou se vem junto com o ERP).
+  Módulos, como o ERP e as OS. Precisa do ERP ligado. **Preço (decidido em 19/11): vem junto com o ERP, sem
+  cobrança à parte**, porque não tem custo de servidor e as notas do balcão contam nas 100 do ERP (passou disso, a
+  nota extra já é cobrada). Por isso `preco_mensal` fica nulo: não entra na fatura nem na tela do plano do dono. A
+  plataforma continua ligando por empresa, para o menu não aparecer em quem só vende pelo WhatsApp.
 - **Menu:** Operação → Balcão, para dono, admin e quem tem "Vê todos os clientes" (`balcao_pode`).
 - **Tela** ([Balcao.tsx](../src/pages/Balcao.tsx)): busca por código ou nome (Enter adiciona o código exato, senão o
   primeiro da lista; é o que o leitor de código de barras faz), mais vendidos dos últimos 90 dias antes de buscar,
@@ -158,7 +160,9 @@ Migration `20261118220000_nota_envios`, Edge Function `nota-enviar` e `_shared/e
   antes vinha marcado). O WhatsApp corrigido **não**
   troca o telefone de um contato (o telefone é a identidade dele no WhatsApp e nas conversas): vira um contato
   ligado ao cliente. Mudança da decisão de 27/10, que dizia "o número vai para o contato escolhido".
-- **Manual da Ajuda:** `src/ajuda/ManualBalcao.tsx`, só texto (faltam as imagens, com dados fictícios).
+- **Manual da Ajuda:** `src/ajuda/ManualBalcao.tsx`, com três imagens desde 19/11 (`public/ajuda/balcao/`: a venda,
+  o bloco da nota e o "Enviar ao cliente"). Os dados são fictícios: na captura, as respostas do banco (produtos,
+  cliente, contatos) foram trocadas só no navegador, sem gravar nada.
 
 **Teste de 19/11/2026** (NF-e nº 3 da JoGrampo, homologação, pelo "Enviar ao cliente" do pedido, para o WhatsApp e o
 e-mail do Felippe):
@@ -173,8 +177,8 @@ e-mail do Felippe):
   mandar para outro endereço troca o cadastro sem perceber. Passou a vir desmarcado. E no pedido de outra empresa (administrador da
   plataforma), "Empresa (CNPJ)" e a lista de vendedores mostraram as da F7 Tech, a empresa em que se estava.
 
-**Falta:** confirmar o e-mail da Focus, testar a impressão do DANFE com uma nota de verdade (a F7 Tech não emite
-NF-e: 554, IE "ISENTO"), e as imagens do manual.
+**Falta:** confirmar o e-mail da Focus e testar a impressão do DANFE com uma nota de verdade (a F7 Tech não emite
+NF-e: 554, IE "ISENTO").
 
 ## Fora desta etapa
 
