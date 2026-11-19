@@ -5483,6 +5483,10 @@ export type Database = {
       }
       cidade_chave: { Args: { p: string }; Returns: string }
       cidade_do_contato: { Args: { p_contato: string }; Returns: string }
+      cliente_ligar_whatsapp: {
+        Args: { p_cliente: string; p_telefone: string }
+        Returns: string
+      }
       clientes_importar: {
         Args: { p_linhas: Json; p_org: string }
         Returns: Json
