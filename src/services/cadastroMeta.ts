@@ -72,7 +72,10 @@ export function carregarSdkMeta(): Promise<FB> {
  * "Instagram Login Compatible", com instagram_basic e instagram_manage_messages. Vazio enquanto a configuração não é
  * criada no painel do app: o botão "Conectar Instagram" só aparece com ela.
  */
-export const CONFIG_ID_INSTAGRAM = ''
+// 19/11: criada do modelo da Meta ("API do Instagram (login unificado)"), que traz também as permissões e as contas de
+// anúncios. Em acesso padrão elas só são pedidas a quem tem função no app; antes de liberar aos clientes, trocar por uma
+// configuração só com o Instagram (docs/instagram.md).
+export const CONFIG_ID_INSTAGRAM = '3888750944626294'
 
 /** Login da Meta para o Instagram: devolve o código, que a whatsapp-conexao troca pelo token. Dentro do clique. */
 export function abrirLoginInstagram(fb: FB): Promise<string> {

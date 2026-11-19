@@ -398,7 +398,9 @@ export function SecaoWhatsapp() {
                 Conectar pela API oficial
               </Botao>
             )}
-            {oficial && CONFIG_ID_INSTAGRAM && (
+            {/* Só a equipe da Livih até a Meta aprovar o app (App Review): antes disso, o login só funciona para quem
+                tem função no app (docs/instagram.md). Depois, troca portfolioF7 (dono/admin e da plataforma) por oficial. */}
+            {portfolioF7 && CONFIG_ID_INSTAGRAM && (
               <Botao variante="secundario" carregando={ocupado === 'instagram'} onClick={conectarPeloInstagram}>
                 Conectar Instagram
               </Botao>

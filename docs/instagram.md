@@ -138,6 +138,13 @@ Migration `20261119120000_instagram_canal`, Edge Function `instagram-webhook` (n
   tela; `'instagram'` é origem provisória do contato, como `'whatsapp'` (a regra de origem ou a do canal a troca), e a
   conta nasce com a origem "Instagram"; entrada, eco do celular e segredo do WAHA só em canal de WhatsApp; contato sem
   telefone fora dos destinos da nota.
+- **Meta, 19/11:** caso de uso "Gerenciar mensagens e conteúdo no Instagram" no app livih; configuração do login
+  unificado criada **do modelo** (`config_id` 3888750944626294), que traz também `ads_management`, `ads_read`,
+  `instagram_manage_comments`, `instagram_content_publish` e contas de anúncios. Em acesso padrão só são pedidas a quem
+  tem função no app; **antes de liberar aos clientes**, criar uma configuração só com a conta do Instagram,
+  `instagram_basic` e `instagram_manage_messages`, e trocar o `CONFIG_ID_INSTAGRAM`. Conta de teste: **livih.tech**,
+  no portfólio Livih (o WhatsApp oficial fica no portfólio F7 Tech; para o Direct, não importa). "Permitir acesso às
+  mensagens" precisa de quem tem a senha do Instagram (pedido em 19/11).
 - **A confirmar no primeiro teste** com a conta da F7: a lista de contas (`/me/assigned_instagram_accounts`, sem
   exemplo de resposta na documentação), o `entry.id` do webhook (a documentação diz que é o ID da conta profissional)
   e o perfil da pessoa pelo `graph.facebook.com`.
