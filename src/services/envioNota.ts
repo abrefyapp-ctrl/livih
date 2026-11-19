@@ -37,7 +37,9 @@ export function formInicial(d: DestinosNota | null): FormEnvio {
     contatoId: contato?.id ?? null,
     email: !!endereco,
     endereco,
-    salvarEmail: true,
+    // Desmarcado (19/11/2026): no teste, trocar o e-mail só para mandar a nota a outro endereço trocava também o
+    // cadastro do cliente sem a pessoa perceber.
+    salvarEmail: false,
   }
 }
 

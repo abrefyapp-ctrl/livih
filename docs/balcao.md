@@ -24,7 +24,7 @@ pelo menu Share).
 | Enviar a nota | WhatsApp e/ou e-mail, marcados antes de fechar e enviados sozinhos quando a nota é autorizada. Depois de fechar, botões para reimprimir e reenviar |
 | De onde vem o WhatsApp | O contato ligado ao cliente que conversou por último. Vários contatos: lista para escolher, o mais recente selecionado. Sem contato: o `telefone` do cliente, só se for celular; fixo deixa o campo vazio com o aviso "Pergunte o WhatsApp ao cliente" |
 | De onde vem o e-mail | O `email` do cliente (financeiro/fiscal); sem ele, o do contato |
-| Número ou e-mail corrigido na hora | Aparece **"Salvar no cadastro do cliente"** (marcado) só quando o valor mudou. Trocar entre contatos da lista não conta como mudança. O número vai para o contato escolhido; sem contato, para o telefone do cliente. No consumidor final não aparece |
+| Número ou e-mail corrigido na hora | Aparece **"Salvar no cadastro do cliente"** (desmarcado desde 19/11) só quando o valor mudou. Trocar entre contatos da lista não conta como mudança. O número vai para o contato escolhido; sem contato, para o telefone do cliente. No consumidor final não aparece |
 
 ## Como funciona (protótipo)
 
@@ -154,13 +154,27 @@ Migration `20261118220000_nota_envios`, Edge Function `nota-enviar` e `_shared/e
   descadastrado, número desconectado, API oficial fora das 24 horas (só com modelo; mandar por e-mail).
 - **E-mail:** pela Focus (`POST /v2/nfe/{ref}/email`, até 10 e-mails, em segundo plano). **A confirmar no primeiro
   envio real:** a documentação não diz se vão o DANFE e o XML.
-- **Salvar no cadastro:** o e-mail corrigido vai para o cliente (marcado por padrão). O WhatsApp corrigido **não**
+- **Salvar no cadastro:** o e-mail corrigido vai para o cliente se a pessoa marcar (desmarcado por padrão desde 19/11;
+  antes vinha marcado). O WhatsApp corrigido **não**
   troca o telefone de um contato (o telefone é a identidade dele no WhatsApp e nas conversas): vira um contato
   ligado ao cliente. Mudança da decisão de 27/10, que dizia "o número vai para o contato escolhido".
 - **Manual da Ajuda:** `src/ajuda/ManualBalcao.tsx`, só texto (faltam as imagens, com dados fictícios).
 
-**Falta:** testar a impressão do DANFE e os envios com uma nota de verdade (a F7 Tech não emite NF-e: 554, IE
-"ISENTO"), e as imagens do manual.
+**Teste de 19/11/2026** (NF-e nº 3 da JoGrampo, homologação, pelo "Enviar ao cliente" do pedido, para o WhatsApp e o
+e-mail do Felippe):
+
+- **WhatsApp: funcionou.** Saiu da fila na primeira tentativa, com o PDF "NF-e 3.pdf" e a legenda "Nota fiscal nº 3 –
+  FIXOTEC", e chegou como lida. O número já era contato da JoGrampo (testes antigos): o envio usou a conversa dele e o
+  ligou ao cliente da nota. A ligação foi apagada depois do teste.
+- **E-mail: não chegou.** A Focus aceitou (200 = "agendado") e o envio ficou "enviado", mas nada chegou ao Gmail. A
+  documentação da Focus não diz se a homologação manda e-mail nem o que vai nele, e não há consulta de entrega
+  (só a de e-mails bloqueados). Falta confirmar com o suporte da Focus ou na primeira nota de produção.
+- **Visto no teste:** com o e-mail trocado no diálogo, "Salvar no cadastro do cliente" vem marcado; quem só quer
+  mandar para outro endereço troca o cadastro sem perceber. Passou a vir desmarcado. E no pedido de outra empresa (administrador da
+  plataforma), "Empresa (CNPJ)" e a lista de vendedores mostraram as da F7 Tech, a empresa em que se estava.
+
+**Falta:** confirmar o e-mail da Focus, testar a impressão do DANFE com uma nota de verdade (a F7 Tech não emite
+NF-e: 554, IE "ISENTO"), e as imagens do manual.
 
 ## Fora desta etapa
 
