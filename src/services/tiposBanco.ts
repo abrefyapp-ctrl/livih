@@ -969,6 +969,8 @@ export type Database = {
           email: string | null
           empresa: string | null
           id: string
+          instagram_id: string | null
+          instagram_usuario: string | null
           nome: string | null
           nome_whatsapp: string | null
           org_id: string
@@ -989,6 +991,8 @@ export type Database = {
           email?: string | null
           empresa?: string | null
           id?: string
+          instagram_id?: string | null
+          instagram_usuario?: string | null
           nome?: string | null
           nome_whatsapp?: string | null
           org_id: string
@@ -1009,6 +1013,8 @@ export type Database = {
           email?: string | null
           empresa?: string | null
           id?: string
+          instagram_id?: string | null
+          instagram_usuario?: string | null
           nome?: string | null
           nome_whatsapp?: string | null
           org_id?: string
@@ -5447,6 +5453,13 @@ export type Database = {
         Args: { p_org: string; p_usuario: string }
         Returns: string
       }
+      canal_por_instagram: {
+        Args: { p_conta: string }
+        Returns: {
+          canal_id: string
+          org_id: string
+        }[]
+      }
       canal_por_numero_meta: {
         Args: { p_phone_number_id: string }
         Returns: {
@@ -5563,6 +5576,15 @@ export type Database = {
         Returns: undefined
       }
       cobranca_vencimento: { Args: { p_base: string }; Returns: string }
+      contato_por_instagram: {
+        Args: {
+          p_igsid: string
+          p_nome: string
+          p_org: string
+          p_usuario: string
+        }
+        Returns: string
+      }
       contato_por_whatsapp: {
         Args: {
           p_lid: string
@@ -5611,6 +5633,20 @@ export type Database = {
           p_texto: string
         }
         Returns: string
+      }
+      entrada_gravar: {
+        Args: {
+          p_canal: string
+          p_contato: string
+          p_evento: number
+          p_midia_mime: string
+          p_org: string
+          p_texto: string
+          p_tipo: Database["public"]["Enums"]["tipo_msg"]
+          p_transcricao: string
+          p_wa_id: string
+        }
+        Returns: Json
       }
       enviar_arquivo: {
         Args: {
@@ -6502,6 +6538,20 @@ export type Database = {
           p_tipo: Database["public"]["Enums"]["tipo_msg"]
           p_transcricao?: string
           p_wa_id: string
+        }
+        Returns: Json
+      }
+      registrar_entrada_instagram: {
+        Args: {
+          p_canal: string
+          p_igsid: string
+          p_mid: string
+          p_midia_mime?: string
+          p_nome: string
+          p_payload: Json
+          p_texto: string
+          p_tipo: Database["public"]["Enums"]["tipo_msg"]
+          p_usuario: string
         }
         Returns: Json
       }
