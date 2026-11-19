@@ -131,8 +131,10 @@ export function ManualBalcao() {
               sozinha quando a nota é autorizada; aperte Enter. A opção fica lembrada no computador.
             </>,
             <>
-              <strong>Se faltar algo no cadastro</strong> (endereço, CPF), a tela lista o que falta. A venda fica gravada: acerte o
-              cadastro e emita no pedido (<Caminho>Vendas do balcão</Caminho> → a venda → <Caminho>Emitir nota</Caminho>).
+              <strong>Se faltar algo para a nota</strong> (CNPJ ou CPF e endereço do cliente, NCM do produto), a tela avisa antes
+              de fechar e o botão fica apagado. Clique em <Caminho>Completar o cadastro do cliente</Caminho>, ou desmarque{' '}
+              <Caminho>Emitir a NF-e</Caminho> para vender sem nota e emitir depois no pedido (<Caminho>Vendas do balcão</Caminho>{' '}
+              → a venda → <Caminho>Emitir nota</Caminho>).
             </>,
           ]}
         />
@@ -155,7 +157,7 @@ export function ManualBalcao() {
             [
               'WhatsApp',
               'O contato do cliente que conversou por último (vários: escolha na lista). Sem contato, o telefone do cliente, se for celular',
-              'Pelo número da empresa, na conversa do cliente, sem tirar a conversa do agente. Um número novo vira contato ligado ao cliente',
+              'Pelo número da empresa, na conversa do cliente, sem tirar a conversa do agente. Um número novo vira contato ligado ao cliente já ao fechar a venda',
             ],
             [
               'E-mail',

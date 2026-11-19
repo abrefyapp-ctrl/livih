@@ -116,6 +116,16 @@ export async function apagarCliente(id: string) {
 }
 
 /** Busca para escolher um cliente (ligar contato, pedido). */
+/**
+ * Liga um WhatsApp ao cliente (contato novo, ou o contato que já tem o número), sem mudar o telefone de ninguém.
+ * O Balcão chama ao fechar a venda, para o número não depender de a nota sair (19/11, migration 20261119140000).
+ */
+export async function ligarWhatsappAoCliente(clienteId: string, telefone: string): Promise<string> {
+  const { data, error } = await supabase.rpc('cliente_ligar_whatsapp', { p_cliente: clienteId, p_telefone: telefone })
+  if (error) throw new Error(error.message.startsWith('Confira') ? error.message : 'Não foi possível guardar o WhatsApp no cliente.')
+  return data as string
+}
+
 export async function procurarClientes(orgId: string, busca: string): Promise<ClienteResumo[]> {
   const termo = busca.trim().replace(/[,()%]/g, ' ')
   if (!termo) return []

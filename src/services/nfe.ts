@@ -228,6 +228,26 @@ export class FaltaParaEmitir extends Error {
   }
 }
 
+/**
+ * O que a nfe-emitir recusaria por causa do cliente ou dos produtos, conferido no Balcão antes de fechar a venda.
+ * Caso real (19/11, JoGrampo): a venda do Affonso Ditzel fechou e a nota não saiu, por falta do endereço do cliente.
+ * Mesmas regras e textos de supabase/functions/nfe-emitir/index.ts: mudou lá, mude aqui.
+ */
+export function faltaParaNfe(
+  cli: { nome: string; documento: string | null; cep: string | null; logradouro: string | null; numero: string | null;
+    bairro: string | null; cidade: string | null; uf: string | null },
+  itens: { nome: string; ncm: string | null }[],
+): { cliente: string[]; produtos: string[] } {
+  const cliente: string[] = []
+  if (!cli.documento) cliente.push(`O cliente ${cli.nome} não tem CNPJ/CPF no cadastro.`)
+  const end = ([['CEP', cli.cep], ['rua', cli.logradouro], ['número', cli.numero], ['bairro', cli.bairro], ['cidade', cli.cidade], ['UF', cli.uf]] as const)
+    .filter(([, v]) => !v?.trim())
+    .map(([n]) => n)
+  if (end.length) cliente.push(`Endereço do cliente ${cli.nome}: falta ${end.join(', ')}.`)
+  const produtos = itens.filter((i) => !/^\d{8}$/.test(i.ncm ?? '')).map((i) => `Produto ${i.nome}: falta o NCM (8 números) no cadastro.`)
+  return { cliente, produtos }
+}
+
 export async function emitirNota(dados: PedidoEmissao): Promise<NotaFiscal> {
   const { data, error } = await supabase.functions.invoke('nfe-emitir', { body: dados })
   if (error) {

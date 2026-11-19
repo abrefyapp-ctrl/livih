@@ -52,6 +52,13 @@ export function problemaEnvio(f: FormEnvio): string | null {
 
 export const querEnviar = (f: FormEnvio) => f.whatsapp || f.email
 
+/** WhatsApp marcado que ainda não é de um contato ligado ao cliente (null se não há nada a ligar). */
+export function whatsappNovo(f: FormEnvio, d: DestinosNota | null): string | null {
+  const numero = f.whatsapp ? normalizarWhatsapp(f.numero) : null
+  if (!numero) return null
+  return d?.contatos.some((c) => c.telefone === numero) ? null : numero
+}
+
 /** Corpo para pedirEnvioNota. */
 export function paraEnvio(notaId: string, f: FormEnvio, d: DestinosNota | null) {
   const numero = f.whatsapp ? normalizarWhatsapp(f.numero) : null

@@ -6,8 +6,17 @@ import { Botao } from '../components/Botao'
 import { EstadoVazio } from '../components/EstadoVazio'
 import { CamposEnvio, ListaEnvios } from '../components/EnvioNota'
 import { Icone } from '../components/Icone'
+import { ModalCliente } from '../components/ModalCliente'
 import { useDestinosNota } from '../hooks/useDestinosNota'
-import { enviosEmAndamento, formInicial, paraEnvio, problemaEnvio, querEnviar, type FormEnvio } from '../services/envioNota'
+import {
+  enviosEmAndamento,
+  formInicial,
+  paraEnvio,
+  problemaEnvio,
+  querEnviar,
+  whatsappNovo,
+  type FormEnvio,
+} from '../services/envioNota'
 import {
   configBalcao,
   definirContaBalcao,
@@ -19,13 +28,21 @@ import {
   type FormaBalcao,
   type VendaFechada,
 } from '../services/balcao'
-import { clienteResumo, procurarClientes, type ClienteResumo } from '../services/clientes'
+import {
+  buscarCliente,
+  clienteResumo,
+  ligarWhatsappAoCliente,
+  procurarClientes,
+  type Cliente,
+  type ClienteResumo,
+} from '../services/clientes'
 import { listarProdutos, type Produto } from '../services/erp'
 import { formatarDocumento, lerNumero, moeda, quantidade } from '../services/formato'
 import {
   emitirNota,
   enviosDaNota,
   FaltaParaEmitir,
+  faltaParaNfe,
   FORMA_SEFAZ,
   notaDoPedido,
   pedirEnvioNota,
@@ -119,6 +136,8 @@ type Ultima = {
   /** Envio da nota ao cliente (entrega 2): o que foi pedido e o resultado. */
   envios: EnvioNota[]
   erroEnvio: string | null
+  /** O WhatsApp digitado não ficou ligado ao cliente (19/11: ligado ao fechar, não só quando a nota sai). */
+  erroWhatsapp: string | null
 }
 
 export function Balcao() {
@@ -256,6 +275,29 @@ function TelaBalcao({ orgId }: { orgId: string }) {
           : null
   const vaiEmitir = podeNota && !!cliente && emitir
 
+  // Cadastro completo do cliente, para conferir antes de fechar o que a NF-e exige (CNPJ/CPF e endereço) e o NCM dos
+  // produtos. Caso real (19/11, JoGrampo): a venda do Affonso Ditzel fechou e a nota não saiu por falta do endereço.
+  const [fiscal, setFiscal] = useState<{ id: string; cliente: Cliente } | null>(null)
+  const [versaoFiscal, setVersaoFiscal] = useState(0)
+  const [editandoCliente, setEditandoCliente] = useState(false)
+  const clienteDaNota = vaiEmitir ? (cliente?.id ?? null) : null
+  useEffect(() => {
+    if (!clienteDaNota) return
+    let ativo = true
+    buscarCliente(clienteDaNota)
+      .then((c) => ativo && c && setFiscal({ id: clienteDaNota, cliente: c }))
+      .catch(() => undefined)
+    return () => {
+      ativo = false
+    }
+  }, [clienteDaNota, versaoFiscal])
+  const cadastroFiscal = fiscal?.id === clienteDaNota ? fiscal.cliente : null
+  const faltaNota =
+    vaiEmitir && cadastroFiscal
+      ? faltaParaNfe(cadastroFiscal, linhas.map((l) => ({ nome: l.produto.nome ?? 'sem nome', ncm: l.produto.ncm })))
+      : { cliente: [], produtos: [] }
+  const temFaltaNota = faltaNota.cliente.length + faltaNota.produtos.length > 0
+
   // Para onde vai a nota quando for autorizada (entrega 2): o WhatsApp e o e-mail do cliente, já sugeridos.
   const destinosCli = useDestinosNota(vaiEmitir ? (cliente?.id ?? null) : null)
   const [envioForm, setEnvioForm] = useState<{ clienteId: string; form: FormEnvio } | null>(null)
@@ -281,7 +323,9 @@ function TelaBalcao({ orgId }: { orgId: string }) {
               ? 'Informe os prazos em dias, como 30/60 (de 1 a 365 dias, até 12 parcelas).'
               : forma === 'dinheiro' && recebido.trim() && (valorRecebido == null || valorRecebido < total)
                 ? 'O valor recebido é menor que o total.'
-                : problemaDoEnvio
+                : temFaltaNota
+                  ? 'Para a NF-e sair, acerte o que falta (acima) ou desmarque “Emitir a NF-e”.'
+                  : problemaDoEnvio
 
   function limpar() {
     setLinhas([])
@@ -318,6 +362,9 @@ function TelaBalcao({ orgId }: { orgId: string }) {
       const nomeCliente = cliente ? cliente.razao_social || cliente.nome : null
       const emiteAgora = vaiEmitir
       const envio = emiteAgora && formEnvio && querEnviar(formEnvio) ? { form: formEnvio, destinos: destinosCli.destinos } : null
+      // WhatsApp novo: fica ligado ao cliente já agora, e não só quando a nota é enviada (19/11).
+      const clienteId = cliente?.id ?? null
+      const numeroNovo = clienteId && envio ? whatsappNovo(envio.form, envio.destinos) : null
       setUltima({
         venda,
         forma,
@@ -326,8 +373,16 @@ function TelaBalcao({ orgId }: { orgId: string }) {
         impressa: null,
         envios: [],
         erroEnvio: null,
+        erroWhatsapp: null,
       })
       limpar()
+      // Antes da nota: o envio dela acha o contato já ligado, sem duas criações do mesmo número ao mesmo tempo.
+      if (numeroNovo && clienteId) {
+        await ligarWhatsappAoCliente(clienteId, numeroNovo).catch((e) => {
+          const erroWhatsapp = (e as Error).message
+          setUltima((u) => (u && u.venda.pedido_id === venda.pedido_id ? { ...u, erroWhatsapp } : u))
+        })
+      }
       if (emiteAgora) void emitirDaVenda(venda, forma, envio)
     } catch (e) {
       setErro((e as Error).message)
@@ -755,6 +810,22 @@ function TelaBalcao({ orgId }: { orgId: string }) {
                     {motivoSemNota && <span className="block text-legenda text-texto-3">{motivoSemNota}</span>}
                   </span>
                 </label>
+                {vaiEmitir && temFaltaNota && (
+                  <Aviso tom="atencao">
+                    <span className="block font-medium">Falta para a NF-e sair:</span>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {[...faltaNota.cliente, ...faltaNota.produtos].map((f) => (
+                        <li key={f}>{f}</li>
+                      ))}
+                    </ul>
+                    {faltaNota.cliente.length > 0 && cadastroFiscal && (
+                      <Botao tamanho="sm" variante="secundario" className="mt-2" onClick={() => setEditandoCliente(true)}>
+                        Completar o cadastro do cliente
+                      </Botao>
+                    )}
+                    {faltaNota.produtos.length > 0 && <span className="mt-1 block">O NCM se acerta em Produtos.</span>}
+                  </Aviso>
+                )}
                 {vaiEmitir && (
                   <label className="flex cursor-pointer items-start gap-2">
                     <input
@@ -802,6 +873,18 @@ function TelaBalcao({ orgId }: { orgId: string }) {
           </div>
         </div>
       </div>
+
+      {editandoCliente && cadastroFiscal && (
+        <ModalCliente
+          inicial={cadastroFiscal}
+          aoFechar={() => setEditandoCliente(false)}
+          aoSalvar={(id) => {
+            setEditandoCliente(false)
+            setVersaoFiscal((v) => v + 1)
+            void clienteResumo(id).then((c) => c && setCliente(c))
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -985,6 +1068,9 @@ function UltimaVenda({ ultima, aoImprimir }: { ultima: Ultima; aoImprimir: (path
                 )
               : passo(false, `NF-e ${n.status === 'rejeitada' ? 'recusada' : n.status}: ${n.mensagem ?? 'veja no pedido'}`))}
       </ul>
+      {ultima.erroWhatsapp && (
+        <Aviso tom="erro">O WhatsApp não ficou guardado no cliente: {ultima.erroWhatsapp} Ligue o contato no cadastro do cliente.</Aviso>
+      )}
       {ultima.erroEnvio && <Aviso tom="erro">Envio da nota ao cliente: {ultima.erroEnvio} Reenvie pelo pedido.</Aviso>}
       {ultima.envios.length > 0 && (
         <div className="border-t border-borda pt-2">

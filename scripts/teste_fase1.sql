@@ -9211,5 +9211,61 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 insert into resultado (teste, ok) select 'instagram: outra empresa não vê o contato nem a conversa do Instagram',
   not exists (select 1 from public.contatos where instagram_id = '1122334455667788')
   and not exists (select 1 from public.conversas where id = current_setting('teste.ig_conv')::uuid);
+
+-- WhatsApp ligado ao cliente ao fechar a venda do Balcão (migration 20261119140000_cliente_ligar_whatsapp).
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000b9","role":"authenticated"}', true);
+do $$
+declare
+  v_cli uuid := current_setting('teste.bal_cli')::uuid;
+  v_ct uuid;
+  v_ct2 uuid;
+begin
+  v_ct := public.cliente_ligar_whatsapp(v_cli, '5541933334444');
+  perform set_config('teste.lig_ct', v_ct::text, true);
+  v_ct2 := public.cliente_ligar_whatsapp(v_cli, '5541933334444');
+  perform set_config('teste.lig_ct2', v_ct2::text, true);
+  begin
+    perform public.cliente_ligar_whatsapp(v_cli, '41933334444');
+    insert into resultado (teste, ok) values ('ligar WhatsApp: número sem o 55 é recusado', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('ligar WhatsApp: número sem o 55 é recusado', sqlerrm like 'Confira o WhatsApp%');
+  end;
+end $$;
+reset role;
+insert into resultado (teste, ok) select 'ligar WhatsApp: o balcão cria o contato ligado ao cliente, sem vendedor',
+  ct.telefone = '5541933334444' and ct.origem = 'balcao' and ct.responsavel_id is null
+  and current_setting('teste.lig_ct2') = ct.id::text
+  and (select count(*) from public.contatos_clientes cc where cc.contato_id = ct.id and cc.cliente_id = current_setting('teste.bal_cli')::uuid) = 1
+  from public.contatos ct where ct.id = current_setting('teste.lig_ct')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+declare v_ct uuid;
+begin
+  -- Número que já é de um contato (o da primeira entrada do WhatsApp nos testes): liga esse, sem mudar o telefone.
+  v_ct := public.cliente_ligar_whatsapp(current_setting('teste.bal_cli')::uuid, '5541988887777');
+  perform set_config('teste.lig_existente', v_ct::text, true);
+  -- O dono é da equipe: o contato novo também nasce sem vendedor.
+  perform set_config('teste.lig_dono', public.cliente_ligar_whatsapp(current_setting('teste.bal_cli')::uuid, '5541933335555')::text, true);
+end $$;
+reset role;
+insert into resultado (teste, ok) select 'ligar WhatsApp: número que já existe liga o mesmo contato, sem criar outro',
+  (select id from public.contatos where org_id = current_setting('teste.f7')::uuid and telefone = '5541988887777') = current_setting('teste.lig_existente')::uuid
+  and (select count(*) from public.contatos where org_id = current_setting('teste.f7')::uuid and telefone = '5541988887777') = 1
+  and exists (select 1 from public.contatos_clientes where contato_id = current_setting('teste.lig_existente')::uuid
+                and cliente_id = current_setting('teste.bal_cli')::uuid);
+insert into resultado (teste, ok) select 'ligar WhatsApp: contato criado pelo dono também nasce sem vendedor',
+  (select responsavel_id from public.contatos where id = current_setting('teste.lig_dono')::uuid) is null;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000c1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.cliente_ligar_whatsapp(current_setting('teste.bal_cli')::uuid, '5541933336666');
+  insert into resultado (teste, ok) values ('ligar WhatsApp: outra empresa não liga número ao cliente', false);
+exception when others then
+  insert into resultado (teste, ok) values ('ligar WhatsApp: outra empresa não liga número ao cliente', sqlerrm = 'cliente não encontrado');
+end $$;
 reset role;
 select n, teste, ok from resultado order by n;

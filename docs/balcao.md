@@ -180,6 +180,25 @@ e-mail do Felippe):
 **Falta:** confirmar o e-mail da Focus e testar a impressão do DANFE com uma nota de verdade (a F7 Tech não emite
 NF-e: 554, IE "ISENTO").
 
+## Ajustes de 19/11 (teste na JoGrampo)
+
+Caso real: a venda de balcão nº 51 da JoGrampo, para o Affonso Ditzel, fechou e a NF-e não saiu, porque faltava o
+endereço do cliente. O WhatsApp digitado não ficou em lugar nenhum, porque só era ligado ao cliente quando a nota era
+enviada. Pedido do usuário: as duas melhorias abaixo.
+
+- **Aviso antes de fechar:** com "Emitir a NF-e" marcado, o Balcão lê o cadastro completo do cliente e confere o que a
+  `nfe-emitir` recusaria por causa dele ou dos produtos: CNPJ/CPF, endereço (CEP, rua, número, bairro, cidade, UF) e o
+  NCM de cada produto (`faltaParaNfe` em [nfe.ts](../src/services/nfe.ts), com as mesmas regras e textos da função).
+  Faltando algo, a lista aparece embaixo da opção, com **Completar o cadastro do cliente** (a janela de cadastro de
+  sempre), e **Fechar venda** fica apagado até acertar ou desmarcar a NF-e. A conferência da `nfe-emitir` continua:
+  é ela que vale (ex.: o CNPJ do balcão deixar de estar pronto).
+- **WhatsApp ligado ao fechar:** se o WhatsApp marcado ainda não é de um contato do cliente, o Balcão chama
+  `cliente_ligar_whatsapp` logo depois de fechar e antes de emitir a nota (migration
+  `20261119140000_cliente_ligar_whatsapp`). Mesmas regras do envio da nota: número novo vira contato ligado ao cliente
+  (origem `balcao`, sem vendedor responsável), número que já é de um contato liga esse contato, e o telefone de ninguém
+  muda. Quem pode: quem vê o cliente e o usuário do balcão. Se falhar, a venda continua fechada e o quadro da última
+  venda avisa.
+
 ## Fora desta etapa
 
 - Caixa: abrir e fechar, sangria, reforço, fechamento do dia (e as permissões de desconto e cancelamento).
