@@ -19,6 +19,7 @@
 //       { org_id, acao: 'instagram', code }                         → { canais } (dono/admin)
 //         → contas do Instagram profissional pelo login da Meta (Unified Login, docs/instagram.md): cada conta
 //           liberada vira um canal 'instagram', sem ocupar vaga de número e sem agente até a entrega 2.
+//       { org_id, acao: 'instagram_diagnostico' }                   → o que a Meta vê de cada conta (só plataforma)
 //       { org_id, canal_id, acao: 'agenda' }                        → { contatos: [{ nome, telefone }] }
 //         → contatos salvos na agenda do celular do número (WAHA), para a prospecção. Quem vê o número.
 // A chave do WAHA e os tokens da Meta nunca saem daqui.
@@ -327,6 +328,35 @@ async function conectarInstagram(orgId: string, code: string | undefined): Promi
   return feitos;
 }
 
+// Diagnóstico (19/11): as mensagens do livih.tech apareciam no Business Suite e não chegavam ao instagram-webhook.
+// Pergunta à Meta, com o token de cada conta da empresa, o que ela vê: a conta, os apps e campos assinados e as últimas
+// conversas. Devolve as respostas da Meta (sem o token). Só a equipe da Livih.
+async function diagnosticoInstagram(orgId: string) {
+  const { data: canais } = await admin.from("canais").select("id, nome, instance_id").eq("org_id", orgId).eq("tipo", "instagram").eq("ativo", true);
+  const saida: Record<string, unknown>[] = [];
+  for (const c of canais ?? []) {
+    const { data: token } = await admin.rpc("meta_token_do_canal", { p_canal: c.id });
+    const perguntar = async (versao: string, caminho: string) => {
+      const r = await fetch(`https://graph.facebook.com/${versao}${caminho}`, {
+        headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000),
+      });
+      const corpo = await r.json().catch(() => null);
+      return { status: r.status, corpo };
+    };
+    const id = c.instance_id;
+    saida.push({
+      canal: c.nome,
+      conta: id,
+      tem_token: !!token,
+      perfil: await perguntar("v25.0", `/${id}?fields=id,username,name`),
+      assinaturas_v25: await perguntar("v25.0", `/${id}/subscribed_apps`),
+      assinaturas_v27: await perguntar("v27.0", `/${id}/subscribed_apps`),
+      conversas: await perguntar("v25.0", `/${id}/conversations?platform=instagram&fields=updated_time,participants&limit=3`),
+    });
+  }
+  return saida;
+}
+
 // Número do portfólio da F7: sem cadastro, sem token próprio no canal (o envio cai no META_SYSTEM_TOKEN).
 // O de teste da Meta já vem registrado na Cloud API. Um número novo, adicionado pelo Gerenciador e confirmado
 // por SMS, ainda não: aqui ele é registrado com um PIN de duas etapas aleatório, guardado no Vault.
@@ -509,6 +539,12 @@ Deno.serve(async (req) => {
         if (!ok) throw new ErroUsuario("O responsável precisa estar ativo na equipe.");
       }
       return json(200, { canal: await conectarOficial(p.org_id, p) });
+    }
+
+    if (p.acao === "instagram_diagnostico") {
+      const { data: plataforma } = await admin.from("admins_plataforma").select("user_id").eq("user_id", quem.user.id).maybeSingle();
+      if (!plataforma) return json(403, { erro: "Só a equipe da Livih." });
+      return json(200, { diagnostico: await diagnosticoInstagram(p.org_id) });
     }
 
     if (p.acao === "instagram") {
