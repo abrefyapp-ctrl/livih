@@ -299,15 +299,23 @@ async function conectarInstagram(orgId: string, code: string | undefined): Promi
     // 3. A mesma conta não fica ativa em duas empresas; a desligada de antes libera o ID (unique tipo + instance_id).
     const { data: outro } = await admin.from("canais").select("id, org_id, ativo").eq("tipo", "instagram").eq("instance_id", id).maybeSingle();
     if (outro?.ativo && outro.org_id !== orgId) throw new ErroUsuario(`A conta @${conta.username ?? id} já está conectada na Livih por outra empresa.`);
-    if (outro && !outro.ativo) await admin.from("canais").update({ instance_id: null }).eq("id", outro.id);
+    if (outro && !outro.ativo) {
+      // Rede de segurança (revisão de 20/11): um token que tenha ficado no canal antigo (remoção e reconexão ao
+      // mesmo tempo, ou falha na remoção) sai do Vault antes de o ID ser liberado.
+      const { error: erroAntigo } = await admin.rpc("meta_canal_removido", { p_canal: outro.id });
+      if (erroAntigo) console.error("instagram: limpar canal antigo", erroAntigo.message);
+      await admin.from("canais").update({ instance_id: null }).eq("id", outro.id);
+    }
 
     let canal: Canal;
     const nome = conta.username ? `@${conta.username}` : (conta.name?.trim() || "Instagram");
     if (outro?.ativo) {
-      // Já conectada nesta empresa: só renova o token (reconectar depois de trocar a senha, por exemplo).
+      // Já conectada nesta empresa: só renova o token (reconectar depois de trocar a senha, por exemplo). Só se ainda
+      // estiver ativa: removida no meio do caminho, não ganha token nem assinatura de novo.
       const { data, error } = await admin.from("canais").update({ desconectado_em: null, desconectado_por: null })
-        .eq("id", outro.id).select(CAMPOS).single();
+        .eq("id", outro.id).eq("ativo", true).select(CAMPOS).maybeSingle();
       if (error) throw new Error(`canal: ${error.message}`);
+      if (!data) throw new ErroUsuario(`A conta @${conta.username ?? id} acabou de ser removida. Conecte de novo.`);
       canal = data as Canal;
     } else {
       const { data, error } = await admin.from("canais")
@@ -575,9 +583,31 @@ Deno.serve(async (req) => {
           ? "Esta é uma conta do Instagram. Para reconectar, use “Conectar Instagram”."
           : "Este número está na API oficial. Para reconectar, use “Conectar pela API oficial”.");
       }
-      await admin.from("canais").update({ ativo: false, desconectado_em: new Date().toISOString(), desconectado_por: quem.user.id })
+      // Instagram (20/11, App Review e política de privacidade): a Meta para de mandar as mensagens da conta, o token
+      // sai do Vault e a fila do canal é encerrada (meta_canal_removido). Ordem da revisão do banco: lê o token,
+      // desativa (a busca e o webhook param de gravar), cancela a assinatura e só então apaga o token. Cancelar a
+      // assinatura não segura a remoção: com o token vencido ou o acesso já retirado no Instagram, a Meta recusa, e a
+      // conta sai da Livih do mesmo jeito.
+      const { data: token } = canal.tipo === "instagram"
+        ? await admin.rpc("meta_token_do_canal", { p_canal: canal.id })
+        : { data: null };
+      const { error: erroCanal } = await admin.from("canais")
+        .update({ ativo: false, desconectado_em: new Date().toISOString(), desconectado_por: quem.user.id })
         .eq("id", canal.id);
+      if (erroCanal) throw new Error(`remover: ${erroCanal.message}`);
       await admin.from("agentes").update({ ativo: false }).eq("canal_id", canal.id);
+      if (canal.tipo === "instagram") {
+        if (token) {
+          try {
+            const r = await graph(`/${canal.instance_id}/subscribed_apps`, String(token), { method: "DELETE" });
+            if (r?.success !== true) console.error("instagram: cancelar assinatura", JSON.stringify(r).slice(0, 300));
+          } catch (e) {
+            console.error("instagram: cancelar assinatura", String(e));
+          }
+        }
+        const { error: erroToken } = await admin.rpc("meta_canal_removido", { p_canal: canal.id });
+        if (erroToken) throw new Error(`instagram: apagar token: ${erroToken.message}`);
+      }
       return json(200, { ok: true });
     }
 

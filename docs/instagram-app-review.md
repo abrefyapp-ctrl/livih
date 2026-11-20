@@ -34,11 +34,13 @@ que valer diferente.
    "se necessário"; não pode ser o login pessoal do Felippe nem conta falsa (recusa o envio inteiro), e um login na
    F7 Tech mostraria conversas reais. Caminho sem mexer no botão: o vídeo mostra o fluxo inteiro, e a instrução diz
    que a conexão é liberada pela equipe da Livih para cada empresa durante o onboarding.
-3. **Remover a conta de verdade** (sugestão do revisor de textos, 20/11): hoje "Remover conta"
-   (`whatsapp-conexao`, ação `remover`) só desativa o canal e desliga o agente; a assinatura do webhook na Meta e o
-   token no Vault continuam, e o `instagram-webhook` descarta o que chega. Melhor para o App Review: na remoção,
-   `DELETE /{ig-id}/subscribed_apps` e apagar o token do Vault. A política de privacidade foi escrita para o
-   comportamento de hoje ("para de registrar e de responder").
+3. **Remover a conta de verdade** (sugestão do revisor de textos, 20/11; migration `20261120120000`): antes,
+   "Remover conta" só desativava o canal e o agente, e a assinatura do webhook e o token no Vault ficavam. Agora a
+   `whatsapp-conexao` desativa o canal, cancela a assinatura (`DELETE /{ig-id}/subscribed_apps`; se a Meta recusar,
+   a conta sai do mesmo jeito) e chama `meta_canal_removido`, que apaga o token do Vault e encerra a fila do canal
+   (pendentes viram erro "conta do Instagram removida"). Na reconexão, o canal antigo da mesma conta passa pela mesma
+   limpeza, e a renovação de token não religa uma conta removida no meio do caminho (revisão do banco). Conferir uma
+   vez em produção, com uma conta de teste, que o `DELETE` responde `success: true` (log da `whatsapp-conexao`).
 
 ## Vídeo (um por permissão, ou o mesmo vídeo nas duas)
 

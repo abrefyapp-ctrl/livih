@@ -9288,10 +9288,11 @@ declare
   v_wa uuid;
   r jsonb;
 begin
-  -- A conta conectada antes desta migration ganhou o agente desligado (as criadas nos testes vêm depois dela).
-  insert into resultado (teste, ok) values ('instagram 2: conta já conectada ganha o agente desligado',
+  -- A conta conectada antes desta migration ganhou o agente (nasce desligado; o dono pode ligar, como o do livih.tech
+  -- em 20/11, então aqui só se confere que existe). As criadas nos testes vêm depois dela.
+  insert into resultado (teste, ok) values ('instagram 2: conta já conectada ganha o agente',
     not exists (select 1 from public.canais k where k.tipo = 'instagram' and k.ativo and k.criado_em < now()
-                  and not exists (select 1 from public.agentes a where a.canal_id = k.id and not a.ativo)));
+                  and not exists (select 1 from public.agentes a where a.canal_id = k.id)));
 
   -- Conversa com a última mensagem do cliente há 2 dias: fora da janela da Meta.
   insert into public.contatos (org_id, instagram_id, origem) values (v_f7, '1122334455660001', 'instagram') returning id into v_ct;
@@ -9377,6 +9378,72 @@ begin
   insert into resultado (teste, ok) values ('instagram 2: usuário logado não registra eco', false);
 exception when insufficient_privilege then
   insert into resultado (teste, ok) values ('instagram 2: usuário logado não registra eco', true);
+end $$;
+
+-- Remover a conta do Instagram: token fora do Vault e fila encerrada (migration 20261120120000).
+reset role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  v_ig uuid := current_setting('teste.ig_f7')::uuid;
+  v_conv uuid := current_setting('teste.ig_f7_conv')::uuid;
+  v_org uuid;
+  v_segredo uuid;
+  v_msg uuid;
+  v_fila bigint;
+begin
+  select org_id into v_org from public.canais where id = v_ig;
+  perform public.meta_guardar_token(v_ig, 'token-ig-remover', null);
+  select vault_token_id into v_segredo from public.canais where id = v_ig;
+  insert into public.mensagens (org_id, conversa_id, direcao, autor_tipo, tipo, texto, status_entrega)
+  values (v_org, v_conv, 'saida', 'atendente', 'texto', 'resposta presa na fila', 'pendente') returning id into v_msg;
+  insert into public.fila_envio (org_id, conversa_id, mensagem_id, status, tentativas, proxima_tentativa_em)
+  values (v_org, v_conv, v_msg, 'pendente', 0, now()) returning id into v_fila;
+
+  begin
+    perform public.meta_canal_removido(v_ig);
+    insert into resultado (teste, ok) values ('instagram remover: canal ativo não perde o token', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('instagram remover: canal ativo não perde o token',
+      sqlerrm like 'o token só sai de canal desativado%' and exists (select 1 from vault.secrets where id = v_segredo));
+  end;
+  begin
+    perform public.meta_canal_removido(gen_random_uuid());
+    insert into resultado (teste, ok) values ('instagram remover: canal inexistente dá erro', false);
+  exception when others then
+    insert into resultado (teste, ok) values ('instagram remover: canal inexistente dá erro', sqlerrm like 'canal não encontrado%');
+  end;
+
+  update public.canais set ativo = false, desconectado_em = now() where id = v_ig;
+  perform public.meta_canal_removido(v_ig);
+  insert into resultado (teste, ok) values ('instagram remover: canal desativado fica sem token e o Vault sem o segredo',
+    (select vault_token_id from public.canais where id = v_ig) is null
+    and not exists (select 1 from vault.secrets where id = v_segredo)
+    and public.meta_token_do_canal(v_ig) is null);
+  insert into resultado (teste, ok) values ('instagram remover: a fila do canal vira erro final com o motivo',
+    (select status = 'erro' and tentativas >= 6 and erro = 'conta do Instagram removida' from public.fila_envio where id = v_fila)
+    and (select status_entrega = 'erro' and erro = 'conta do Instagram removida' from public.mensagens where id = v_msg)
+    and not exists (select 1 from public.fila_reivindicar(100) r where r.fila_id = v_fila));
+  -- Repetir (a remoção pode ser tentada de novo) não dá erro; o nome do segredo fica livre para uma conexão nova.
+  perform public.meta_canal_removido(v_ig);
+  insert into resultado (teste, ok) values ('instagram remover: apagar de novo não dá erro', true);
+  perform public.meta_guardar_token(v_ig, 'token-ig-de-novo', null);
+  insert into resultado (teste, ok) values ('instagram remover: o mesmo canal pode guardar token de novo',
+    public.meta_token_do_canal(v_ig) = 'token-ig-de-novo');
+  perform public.meta_canal_removido(v_ig);
+  insert into resultado (teste, ok) values ('instagram remover: só a chave de serviço chama',
+    has_function_privilege('service_role', 'public.meta_canal_removido(uuid)', 'execute')
+    and not has_function_privilege('authenticated', 'public.meta_canal_removido(uuid)', 'execute')
+    and not has_function_privilege('anon', 'public.meta_canal_removido(uuid)', 'execute'));
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
+do $$
+begin
+  perform public.meta_canal_removido(current_setting('teste.ig_f7')::uuid);
+  insert into resultado (teste, ok) values ('instagram remover: dono pela API não apaga token', false);
+exception when insufficient_privilege then
+  insert into resultado (teste, ok) values ('instagram remover: dono pela API não apaga token', true);
 end $$;
 reset role;
 select n, teste, ok from resultado order by n;
