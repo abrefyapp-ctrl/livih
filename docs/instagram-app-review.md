@@ -26,10 +26,12 @@ Requisitos no painel (20/11), nas duas permissões: verificação da empresa ✅
 chamadas), nenhuma permissão de Página como dependência. Faltam a **Análise do app** (vídeo e textos) e as
 **Perguntas sobre tratamento de dados**.
 
-## Perguntas sobre tratamento de dados (sugestão de respostas)
+## Perguntas sobre tratamento de dados
 
-Questionário do app, respondido uma vez (se o WhatsApp oficial já respondeu, só conferir). A redação da Meta pode
-variar; as respostas seguem a [política de privacidade](../site/public/privacidade/index.html).
+**Já respondidas** no envio do WhatsApp aprovado em 26/10/2026 (conferido em 20/11): Sim; F7 Tech, CNPJ
+62.213.016/0001-30, BR; zero pedidos; as quatro políticas. A lista de operadores aparece vazia na tela de detalhes:
+se o envio do Instagram pedir para confirmar, preencher com os da tabela. Seguem a
+[política de privacidade](../site/public/privacidade/index.html).
 
 | Pergunta (resumo) | Resposta |
 |---|---|
@@ -83,29 +85,44 @@ replies and hands the conversation to a human team member." É opcional; se entr
 
 ## Textos do formulário (em inglês, um por permissão, sem copiar um no outro)
 
+No formato do envio do WhatsApp aprovado em 26/10/2026 (o que é, "How we use" com os endpoints, "Value for the
+user", "Why it is necessary", "In the video"). Vídeo também no mesmo formato: o Instagram do cliente de um lado e a
+Livih do outro.
+
 **instagram_basic**
 
-> Livih is a CRM used by small and medium businesses in Brazil to answer their customers' WhatsApp and Instagram
-> messages in a shared team inbox. When a business owner clicks "Conectar Instagram" (Connect Instagram) in Settings
-> and completes Facebook Login for Business, Livih uses instagram_basic to read the ID and username of the Instagram
-> professional account they selected. The account then appears in Settings as a connected channel
-> ("@username – Connected to Instagram"), and every conversation that arrives through it is labeled with that
-> account, so the team knows which account received each message. We also use the account ID to subscribe the
-> account to our webhook and to send replies from the correct account. Livih does not read or display the
-> account's posts, media, followers or insights.
+> Livih is a shared inbox and CRM for small and medium sales teams in Brazil. Besides WhatsApp, each business can
+> connect its own Instagram professional account to Livih through Facebook Login for Business, so its team answers
+> Instagram Direct messages from the same place. How we use instagram_basic: right after the login, we read the
+> Instagram accounts the business selected (GET /me/assigned_instagram_accounts?fields=id,username,name), create one
+> channel per account showing its @username, and subscribe our app to that account's webhooks
+> (POST /{ig-id}/subscribed_apps). The account ID is also used to send replies from the correct account, and the
+> @username labels every conversation that arrives through it. We do not read or display posts, media, followers or
+> insights. Value for the user: the business sees in Settings which Instagram account is connected
+> ("@username – Connected to Instagram") and the team knows which account received each message. Why it is
+> necessary: without this permission Livih cannot identify the account the business chose during login, so it cannot
+> connect it as a channel. In the video, a logged-in owner opens Settings, clicks "Conectar Instagram" (Connect
+> Instagram), completes Facebook Login for Business selecting the account, and the account appears in Livih with its
+> @username.
 
 **instagram_manage_messages**
 
-> Businesses that connect their Instagram professional account to Livih receive their Instagram Direct messages,
-> including replies to their Stories, in the Livih inbox next to their WhatsApp conversations, and answer them from
-> Livih. We use instagram_manage_messages to: (1) receive new messages through the webhook and the conversations
-> endpoint; (2) get the sender's name and username to show in the conversation; (3) send replies written by the
-> business's team members, including images and documents, only within the 24-hour messaging window; and (4) send
-> replies written by the business's AI assistant, which each business can turn on or off per account and which hands
-> the conversation over to a human team member when needed. Messages the business types directly in the Instagram app
-> are also shown in Livih, so the conversation history stays complete. Livih does not send messages outside the
-> 24-hour window, does not send bulk or promotional messages on Instagram, and does not use message content for
-> advertising.
+> Livih is a shared inbox and CRM for small and medium sales teams in Brazil, where a business answers its customers'
+> WhatsApp and Instagram Direct messages with its whole team. How we use instagram_manage_messages: we receive the
+> account's incoming Direct messages, including replies to its Stories, through our webhook and, as a fallback, the
+> conversations endpoint (GET /{ig-id}/conversations?platform=instagram), and store them in the conversation history;
+> we read the sender's name and username (GET /{igsid}?fields=name,username) to show who wrote; and we send replies
+> written by the business's agents, including images and documents, with POST /{ig-id}/messages. The business can
+> also turn on an AI assistant per account, which replies within the same rules and hands the conversation over to a
+> human agent when needed. Replies are only sent within the 24-hour window after the customer's last message; after
+> that, Livih blocks the reply box and tells the agent why. No bulk or promotional messages are sent on Instagram.
+> Messages typed directly in the Instagram app also appear in Livih, so the history stays complete. Value for the
+> user: the whole team sees and answers Instagram and WhatsApp conversations in one inbox, nothing is lost when an
+> employee leaves, and managers can follow every conversation. Why it is necessary: receiving and replying to Direct
+> messages on behalf of the business is the core of this feature; without this permission Livih cannot deliver the
+> business's replies. In the video, a customer sends a Direct message from Instagram (left), it appears in the Livih
+> inbox with the customer's name and @username (right), an agent replies from Livih with text and an image, and the
+> reply is delivered to the customer's Instagram inbox.
 
 **Instruções para o revisor** (campo de acesso ao app)
 
