@@ -6041,6 +6041,7 @@ export type Database = {
       }
       mes_brasilia: { Args: never; Returns: string }
       meses_entre: { Args: { p_ate: string; p_de: string }; Returns: number }
+      meta_canal_removido: { Args: { p_canal: string }; Returns: undefined }
       meta_guardar_pin: {
         Args: { p_canal: string; p_pin: string }
         Returns: undefined
