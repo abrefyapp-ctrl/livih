@@ -16,7 +16,7 @@ que valer diferente.
 | Verificação de empresa da F7 Tech (obrigatória para Advanced Access) | **Feita** em 12/10/2026 (portfólio F7 Tech, ID 1587552546442374, CNPJ 62.213.016/0001-30). O endereço do portfólio (Av. João Gualberto, 1342) é outro que o da política (Rua Visconde do Rio Branco, 1488); já era assim na aprovação do WhatsApp, então fica como está |
 | Chamada com sucesso de cada permissão nos últimos 30 dias (o botão de pedir fica cinza até a Meta registrar; leva até 2 dias) | Feita em 19 e 20/11 (conexão, busca, envio). Enviar até 19/12, ou repetir um envio antes |
 | Dependências: o painel pode pedir junto `pages_show_list` e `pages_read_user_content` (dependências de `instagram_basic` na referência) | **Conferir** a lista em App Review → Permissões e recursos; pedir só o que o painel exigir |
-| Ícone, categoria ("Negócio e Páginas"), e-mail, URL da política de privacidade, URL de exclusão de dados (`/privacidade/#direitos`), Verificação de Uso de Dados | **Prontos** em Configurações → Básico (20/11). Faltava a URL dos Termos de Serviço: `https://livih.com.br/termos/` |
+| Ícone, categoria ("Negócio e Páginas"), e-mail, URL da política de privacidade, URL de exclusão de dados (`/privacidade/#direitos`), Verificação de Uso de Dados | **Prontos** em Configurações → Básico (20/11), com a URL dos Termos de Serviço (`https://livih.com.br/termos/`) preenchida no mesmo dia |
 | Política de privacidade cobrindo o Instagram | **Publicada** em 20/11 |
 | Acesso do revisor: login na Livih e o botão "Conectar Instagram" visível | **Falta** (seção abaixo) |
 | Finalidade do app: "Clientes" (Tech Provider, serve várias empresas) | Marcar no formulário |
