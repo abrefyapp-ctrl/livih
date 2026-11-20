@@ -211,6 +211,19 @@ Migration `20261119180000_instagram_responder`; Edge Functions `whatsapp-enviar`
   "mais tarde" por ali (24 horas) e, se o assunto for continuar, pedir o WhatsApp e anotar com `registrar_nota`
   (gravar o número no contato e juntar os contatos é a entrega 3). A cópia do alerta "o agente chamou a equipe" para
   o número da empresa sai pelo WhatsApp.
+- **Publicada em 19 e 20/11** (banco, tipos e app em 19/11; funções e n8n em 20/11, com backup dos dois workflows em
+  `/docker/n8n/backups-workflows/*-20261120-142825.json`).
+- **Teste de 20/11 com o livih.tech e o felippers85** (tudo pela busca, já que o webhook segue mudo):
+  - **Resposta pelo app do Instagram:** "Oi Felippe" e "tudo bem?" entraram como mensagens da equipe, uma vez cada,
+    e a conversa passou para a equipe ("respondida pelo app do Instagram").
+  - **Resposta pela Livih:** texto e PDF com legenda saíram na 1ª tentativa da fila; o arquivo e a legenda foram
+    marcados um a um, e a busca seguinte não repetiu nada.
+  - **Agente:** ligado no @livih.tech e a conversa devolvida a ele, respondeu em cerca de 30 segundos, curto (duas
+    frases), e o eco da resposta não duplicou. Não chegou a pedir o WhatsApp (só pede quando o assunto continua
+    depois; falta testar com um pedido de orçamento).
+  - **Efeito da busca:** "Bom dia livih" e "Quero saber mais sobre a Livih", mandadas no mesmo segundo, apareceram
+    na API com um minuto de diferença; o agente respondeu cada uma e repetiu a explicação da Livih. Com o webhook
+    (depois do App Review), chegam juntas; até lá, fica assim.
 
 ## Em aberto
 
